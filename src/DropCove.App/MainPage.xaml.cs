@@ -1,13 +1,15 @@
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
 using DropCove.Core;
+using DropCove.Native;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
-using Windows.Storage.FileProperties;
 
 namespace DropCove;
 
@@ -15,9 +17,12 @@ namespace DropCove;
 public sealed partial class MainPage : Page
 {
     private readonly Dictionary<string, IStorageItem> _storageItems = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, ImageSource?> _iconCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<ShelfItemViewModel, VisualRequest> _visualRequests = [];
+    private readonly Dictionary<UIElement, ShelfItemViewModel> _itemRealizations = [];
+    private readonly Dictionary<UIElement, IReadOnlyList<ShelfItemViewModel>> _batchPreviews = [];
     private DropShelfManager? _manager;
     private DragDropService? _dragDropService;
+    private ShelfVisualCoordinator<ImageSource>? _visualCoordinator;
     private Action? _hideShelf;
     private Action? _showSettings;
     private Action? _beginWindowMove;
@@ -40,6 +45,9 @@ public sealed partial class MainPage : Page
         Func<string, string, Task<bool>> confirm)
     {
         _manager = manager;
+        _visualCoordinator = new ShelfVisualCoordinator<ImageSource>(
+            new WindowsShelfVisualProvider(TryGetCachedStorageItem),
+            IsImageShelfItem);
         _dragDropService = new DragDropService(manager, confirm);
         _hideShelf = hideShelf;
         _showSettings = showSettings;
@@ -279,11 +287,11 @@ public sealed partial class MainPage : Page
         ResizeForBatchCount(_manager!.Batches.Count);
     }
 
-    private async Task RebuildBatchCardsAsync()
+    private Task RebuildBatchCardsAsync()
     {
         var manager = _manager!;
-        var tasks = manager.Batches.Select(CreateBatchCardAsync).ToArray();
-        var cards = await Task.WhenAll(tasks);
+        CancelVisualRequests();
+        var cards = manager.Batches.Select(CreateBatchCard).ToArray();
         BatchList.ItemsSource = cards;
         EmptyState.Visibility = cards.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         BatchScroller.Visibility = cards.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
@@ -291,12 +299,143 @@ public sealed partial class MainPage : Page
         var overflow = Math.Max(0, cards.Length - 4);
         OverflowLabel.Text = $"+{overflow} batch{(overflow == 1 ? string.Empty : "es")}";
         OverflowLabel.Visibility = overflow == 0 ? Visibility.Collapsed : Visibility.Visible;
+        return Task.CompletedTask;
     }
 
-    private async Task<BatchCardViewModel> CreateBatchCardAsync(ShelfBatch batch)
+    private void OnBatchElementPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)
     {
-        var itemTasks = batch.Items.Select(CreateShelfItemViewModelAsync).ToArray();
-        var items = await Task.WhenAll(itemTasks);
+        if (args.Element is not FrameworkElement { DataContext: BatchCardViewModel batch })
+        {
+            return;
+        }
+
+        var previewItems = batch.Items.Take(3).ToArray();
+        _batchPreviews[args.Element] = previewItems;
+        foreach (var item in previewItems)
+        {
+            RealizeVisual(item);
+        }
+    }
+
+    private void OnBatchElementClearing(ItemsRepeater sender, ItemsRepeaterElementClearingEventArgs args)
+    {
+        if (_batchPreviews.Remove(args.Element, out var previewItems))
+        {
+            foreach (var item in previewItems)
+            {
+                ReleaseVisual(item);
+            }
+        }
+
+        if (args.Element is FrameworkElement { DataContext: BatchCardViewModel batch })
+        {
+            foreach (var realization in _itemRealizations
+                         .Where(pair => batch.Items.Contains(pair.Value))
+                         .ToArray())
+            {
+                _itemRealizations.Remove(realization.Key);
+                ReleaseVisual(realization.Value);
+            }
+        }
+    }
+
+    private void OnItemElementPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)
+    {
+        if (args.Element is not FrameworkElement { DataContext: ShelfItemViewModel item })
+        {
+            return;
+        }
+
+        _itemRealizations[args.Element] = item;
+        RealizeVisual(item);
+    }
+
+    private void OnItemElementClearing(ItemsRepeater sender, ItemsRepeaterElementClearingEventArgs args)
+    {
+        if (_itemRealizations.Remove(args.Element, out var item))
+        {
+            ReleaseVisual(item);
+        }
+    }
+
+    private void RealizeVisual(ShelfItemViewModel item)
+    {
+        if (_visualCoordinator is null)
+        {
+            return;
+        }
+
+        if (_visualRequests.TryGetValue(item, out var existing))
+        {
+            existing.RealizationCount++;
+            return;
+        }
+
+        var request = new VisualRequest();
+        _visualRequests[item] = request;
+        _ = LoadVisualAsync(item, request);
+    }
+
+    private void ReleaseVisual(ShelfItemViewModel item)
+    {
+        if (!_visualRequests.TryGetValue(item, out var request))
+        {
+            return;
+        }
+
+        request.RealizationCount--;
+        if (request.RealizationCount > 0)
+        {
+            return;
+        }
+
+        _visualRequests.Remove(item);
+        request.IsActive = false;
+        item.SetIcon(null, usedThumbnail: false);
+        request.Cancellation.Cancel();
+        request.Cancellation.Dispose();
+    }
+
+    private async Task LoadVisualAsync(ShelfItemViewModel item, VisualRequest request)
+    {
+        try
+        {
+            var result = await _visualCoordinator!.LoadAsync(item.Item, request.Cancellation.Token);
+            if (request.IsActive && !request.Cancellation.IsCancellationRequested)
+            {
+                item.SetIcon(result.Display, result.UsedThumbnail);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception) when (IsExpectedVisualFailure(exception))
+        {
+            // The fallback glyph remains visible when an expected shell visual failure occurs.
+        }
+    }
+
+    private static bool IsExpectedVisualFailure(Exception exception) =>
+        exception is COMException or IOException or UnauthorizedAccessException or Win32Exception;
+
+    private void CancelVisualRequests()
+    {
+        foreach (var (item, request) in _visualRequests)
+        {
+            request.IsActive = false;
+            item.SetIcon(null, usedThumbnail: false);
+            request.Cancellation.Cancel();
+            request.Cancellation.Dispose();
+        }
+
+        _visualRequests.Clear();
+        _itemRealizations.Clear();
+        _batchPreviews.Clear();
+    }
+
+    private BatchCardViewModel CreateBatchCard(ShelfBatch batch)
+    {
+        var items = batch.Items.Select(CreateShelfItemViewModel).ToArray();
         var first = items[0];
         var pinnedCount = items.Count(item => item.IsPinned);
         var subtitle = items.Length == 1
@@ -308,66 +447,39 @@ public sealed partial class MainPage : Page
             items.Length == 1 ? first.Name : $"{items.Length} items",
             subtitle,
             first.FallbackGlyph,
-            items.ElementAtOrDefault(0)?.Icon,
-            items.ElementAtOrDefault(1)?.Icon,
-            items.ElementAtOrDefault(2)?.Icon,
             items.Length > 1 ? Visibility.Visible : Visibility.Collapsed,
             items.Length > 2 ? Visibility.Visible : Visibility.Collapsed,
             items);
     }
 
-    private async Task<ShelfItemViewModel> CreateShelfItemViewModelAsync(ShelfItem item) => new(
+    private static ShelfItemViewModel CreateShelfItemViewModel(ShelfItem item) => new(
         item,
         item.Name,
         GetItemType(item),
-        item.IsFolder ? "\uE8B7" : "\uE8A5",
-        await LoadIconAsync(item));
+        item.IsFolder ? "\uE8B7" : "\uE8A5");
 
-    private async Task<ImageSource?> LoadIconAsync(ShelfItem item)
+    private IStorageItem? TryGetCachedStorageItem(ShelfItem item) =>
+        _storageItems.TryGetValue(item.Path, out var storageItem) ? storageItem : null;
+
+    private static bool IsImageShelfItem(ShelfItem item)
     {
-        if (_iconCache.TryGetValue(item.Path, out var cached))
+        if (item.IsFolder)
         {
-            return cached;
+            return false;
         }
 
-        try
+        return Path.GetExtension(item.Name).ToUpperInvariant() switch
         {
-            IStorageItem storageItem;
-            if (!_storageItems.TryGetValue(item.Path, out storageItem!))
-            {
-                storageItem = item.IsFolder
-                    ? await StorageFolder.GetFolderFromPathAsync(item.Path)
-                    : await StorageFile.GetFileFromPathAsync(item.Path);
-            }
+            ".AVIF" or ".BMP" or ".GIF" or ".HEIC" or ".JPEG" or ".JPG" or ".PNG" or ".TIF" or ".TIFF" or ".WEBP" => true,
+            _ => false,
+        };
+    }
 
-            using var thumbnail = storageItem switch
-            {
-                StorageFile file => await file.GetThumbnailAsync(
-                    ThumbnailMode.ListView,
-                    32,
-                    ThumbnailOptions.UseCurrentScale),
-                StorageFolder folder => await folder.GetThumbnailAsync(
-                    ThumbnailMode.ListView,
-                    32,
-                    ThumbnailOptions.UseCurrentScale),
-                _ => null,
-            };
-            if (thumbnail is null)
-            {
-                _iconCache[item.Path] = null;
-                return null;
-            }
-
-            var bitmap = new BitmapImage();
-            await bitmap.SetSourceAsync(thumbnail);
-            _iconCache[item.Path] = bitmap;
-            return bitmap;
-        }
-        catch
-        {
-            _iconCache[item.Path] = null;
-            return null;
-        }
+    private sealed class VisualRequest
+    {
+        public CancellationTokenSource Cancellation { get; } = new();
+        public bool IsActive { get; set; } = true;
+        public int RealizationCount { get; set; } = 1;
     }
 
     private void ResizeForBatchCount(int batchCount)
@@ -433,9 +545,9 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
     public string Title { get; }
     public string Subtitle { get; }
     public string FallbackGlyph { get; }
-    public ImageSource? PrimaryIcon { get; }
-    public ImageSource? SecondaryIcon { get; }
-    public ImageSource? TertiaryIcon { get; }
+    public ImageSource? PrimaryIcon => Items.ElementAtOrDefault(0)?.Icon;
+    public ImageSource? SecondaryIcon => Items.ElementAtOrDefault(1)?.Icon;
+    public ImageSource? TertiaryIcon => Items.ElementAtOrDefault(2)?.Icon;
     public Visibility SecondaryVisibility { get; }
     public Visibility TertiaryVisibility { get; }
     public IReadOnlyList<ShelfItemViewModel> Items { get; }
@@ -445,9 +557,6 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
         string title,
         string subtitle,
         string fallbackGlyph,
-        ImageSource? primaryIcon,
-        ImageSource? secondaryIcon,
-        ImageSource? tertiaryIcon,
         Visibility secondaryVisibility,
         Visibility tertiaryVisibility,
         IReadOnlyList<ShelfItemViewModel> items)
@@ -456,12 +565,13 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
         Title = title;
         Subtitle = subtitle;
         FallbackGlyph = fallbackGlyph;
-        PrimaryIcon = primaryIcon;
-        SecondaryIcon = secondaryIcon;
-        TertiaryIcon = tertiaryIcon;
         SecondaryVisibility = secondaryVisibility;
         TertiaryVisibility = tertiaryVisibility;
         Items = items;
+        foreach (var item in items)
+        {
+            item.PropertyChanged += OnItemPropertyChanged;
+        }
     }
 
     public bool IsExpanded
@@ -484,17 +594,58 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
     public string DragBatchAutomationName => $"Drag batch {Title}";
     public string RemoveBatchAutomationName => $"Remove batch {Title}";
     public string ToggleExpandAutomationName => IsExpanded ? $"Collapse {Title}" : $"Expand {Title}";
+
+    private void OnItemPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName != nameof(ShelfItemViewModel.Icon))
+        {
+            return;
+        }
+
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(PrimaryIcon)));
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(SecondaryIcon)));
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(TertiaryIcon)));
+    }
 }
 
-internal sealed record ShelfItemViewModel(
-    ShelfItem Item,
-    string Name,
-    string Type,
-    string FallbackGlyph,
-    ImageSource? Icon)
+internal sealed class ShelfItemViewModel : System.ComponentModel.INotifyPropertyChanged
 {
+    private ImageSource? _icon;
+    private bool _usedThumbnail;
+
+    public ShelfItemViewModel(ShelfItem item, string name, string type, string fallbackGlyph)
+    {
+        Item = item;
+        Name = name;
+        Type = type;
+        FallbackGlyph = fallbackGlyph;
+    }
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    public ShelfItem Item { get; }
+    public string Name { get; }
+    public string Type { get; }
+    public string FallbackGlyph { get; }
+    public ImageSource? Icon => _icon;
+    public bool IsThumbnail => _usedThumbnail;
     public bool IsPinned => Item.IsPinned;
+    public string VisualAutomationName => $"{Name} {(IsThumbnail ? "thumbnail" : "native icon")}";
     public string DragAutomationName => $"Drag {Name}";
     public string PinAutomationName => IsPinned ? $"Unpin {Name}" : $"Pin {Name}";
     public string RemoveAutomationName => $"Remove {Name}";
+
+    public void SetIcon(ImageSource? icon, bool usedThumbnail)
+    {
+        if (ReferenceEquals(_icon, icon) && _usedThumbnail == usedThumbnail)
+        {
+            return;
+        }
+
+        _icon = icon;
+        _usedThumbnail = usedThumbnail;
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Icon)));
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsThumbnail)));
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(VisualAutomationName)));
+    }
 }
