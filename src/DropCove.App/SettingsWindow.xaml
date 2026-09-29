@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="DropCove.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="DropCove Settings">
+    <ScrollViewer>
+        <StackPanel Padding="24" Spacing="16">
+            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Settings" />
+
+            <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Global hotkey" />
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <CheckBox x:Name="ControlCheckBox" Content="Ctrl" />
+                <CheckBox x:Name="AltCheckBox" Content="Alt" />
+                <CheckBox x:Name="ShiftCheckBox" Content="Shift" />
+                <CheckBox x:Name="WindowsCheckBox" Content="Win" />
+            </StackPanel>
+
+            <ComboBox
+                x:Name="KeyComboBox"
+                Header="Key"
+                HorizontalAlignment="Stretch"
+                DisplayMemberPath="Name" />
+
+            <ToggleSwitch
+                x:Name="StartWithWindowsToggle"
+                Header="Start with Windows"
+                OnContent="On"
+                OffContent="Off" />
+
+            <InfoBar
+                x:Name="ErrorInfoBar"
+                IsClosable="False"
+                IsOpen="False"
+                Severity="Warning" />
+
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                <Button Click="OnCancelClicked" Content="Cancel" />
+                <Button Style="{StaticResource AccentButtonStyle}" Click="OnSaveClicked" Content="Save" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>
