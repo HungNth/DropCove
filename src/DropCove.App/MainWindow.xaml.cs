@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     private readonly MainPage _page;
     private AppSettings _settings = AppSettings.Default;
     private SettingsWindow? _settingsWindow;
+    private EdgeRailWindow? _railWindow;
     private bool _disposed;
 
     /// <summary>Creates the resident Drop Shelf window and native integrations.</summary>
@@ -52,7 +53,7 @@ public sealed partial class MainWindow : Window
     /// <param name="startHidden">Whether this launch came from the sign-in startup registration.</param>
     public async Task InitializeAsync(bool startHidden)
     {
-        HideShelf();
+        HideAllSurfaces();
         var databasePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "DropCove",
@@ -60,7 +61,7 @@ public sealed partial class MainWindow : Window
         _manager = await DropShelfManager.OpenAsync(databasePath, DragDropService.CheckAvailability);
         await _page.InitializeAsync(
             _manager,
-            HideShelf,
+            DismissShelf,
             ShowSettings,
             () => WindowInterop.BeginMove(_windowHandle),
             (width, height) => WindowInterop.ResizeAnchored(_windowHandle, width, height),
@@ -83,7 +84,7 @@ public sealed partial class MainWindow : Window
 
         if (startHidden)
         {
-            HideShelf();
+            HideAllSurfaces();
         }
         else
         {
@@ -92,24 +93,40 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>Shows and activates the shelf on the monitor containing the cursor.</summary>
-    public void ShowShelf()
+    public void ShowShelf() => ShowShelfAt(null);
+
+    private void ShowShelfAt(ShelfRailPlacement? placement)
     {
         if (_manager is null)
         {
             return;
         }
 
+        HideRail();
+        _manager.ShowShelf();
         var (width, height) = GetShelfSize(_manager.Batches.Count);
-        WindowInterop.PositionOnCursorMonitor(_windowHandle, width, height);
+        if (placement is { HasMonitor: true })
+        {
+            WindowInterop.PositionOnMonitor(_windowHandle, placement.MonitorId, width, height);
+        }
+        else
+        {
+            WindowInterop.PositionOnCursorMonitor(_windowHandle, width, height);
+        }
+
         WindowInterop.ShowAndActivate(_windowHandle);
         _page.Focus(FocusState.Programmatic);
     }
 
-    private void ToggleShelf()
+    private async Task ToggleShelfAsync()
     {
-        if (WindowInterop.IsVisible(_windowHandle))
+        if (_railWindow is not null && WindowInterop.IsVisible(_railWindow.WindowHandle))
         {
-            HideShelf();
+            ShowShelf();
+        }
+        else if (WindowInterop.IsVisible(_windowHandle))
+        {
+            await DismissShelf();
         }
         else
         {
@@ -117,7 +134,42 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async Task DismissShelf()
+    {
+        if (_manager is null)
+        {
+            return;
+        }
+
+        var monitorId = WindowInterop.GetMonitorIdForWindow(_windowHandle);
+        HideShelf();
+
+        var placement = _manager.RailPlacement.HasMonitor
+            ? _manager.RailPlacement
+            : new ShelfRailPlacement(monitorId, ShelfRailEdge.Right);
+        var state = await _manager.DismissShelfAsync(placement);
+        if (state != ShelfDisplayState.EdgeDocked)
+        {
+            HideRail();
+            return;
+        }
+
+        _railWindow ??= new EdgeRailWindow(_manager.Batches, OpenShelfFromRail);
+        _railWindow.UpdateBatches(_manager.Batches);
+        _railWindow.Show(_manager.RailPlacement);
+    }
+
+    private void OpenShelfFromRail() => ShowShelfAt(_manager?.RailPlacement);
+
+    private void HideAllSurfaces()
+    {
+        HideShelf();
+        HideRail();
+    }
+
     private void HideShelf() => WindowInterop.Hide(_windowHandle);
+
+    private void HideRail() => _railWindow?.Hide();
 
     private void ShowSettings()
     {
@@ -171,7 +223,7 @@ public sealed partial class MainWindow : Window
     {
         if (_globalHotKey.Matches(message, wParam))
         {
-            ToggleShelf();
+            DispatcherQueue.TryEnqueue(async () => await ToggleShelfAsync());
             return WindowMessageResult.HandledZero;
         }
 
@@ -183,7 +235,7 @@ public sealed partial class MainWindow : Window
 
         if (message == WindowCloseMessage)
         {
-            HideShelf();
+            DispatcherQueue.TryEnqueue(async () => await DismissShelf());
             return WindowMessageResult.HandledZero;
         }
 
@@ -211,6 +263,8 @@ public sealed partial class MainWindow : Window
         }
 
         _trayIcon.Dispose();
+        _railWindow?.Close();
+        _railWindow = null;
         _globalHotKey.Dispose();
         _messageHook.Dispose();
         _disposed = true;

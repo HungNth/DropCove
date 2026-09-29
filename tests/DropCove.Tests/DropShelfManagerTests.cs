@@ -241,6 +241,47 @@ public sealed class DropShelfManagerTests
         Assert.AreEqual(@"C:\Work\Present.txt", manager.Batches[0].Items[0].Path);
     }
 
+    [TestMethod]
+    public void DismissShelf_UsesHiddenForEmptyAndEdgeDockedForNonEmpty()
+    {
+        var manager = new DropShelfManager();
+        var placement = new ShelfRailPlacement("DISPLAY2", ShelfRailEdge.Left);
+
+        manager.ShowShelf();
+        Assert.AreEqual(ShelfDisplayState.Hidden, manager.DismissShelf(placement));
+
+        manager.AcceptDrop([new(@"C:\Work\Item.txt", "Item.txt", false)]);
+        manager.ShowShelf();
+
+        Assert.AreEqual(ShelfDisplayState.EdgeDocked, manager.DismissShelf(placement));
+        Assert.AreEqual(placement, manager.RailPlacement);
+    }
+
+    [TestMethod]
+    public void RemovingLastBatch_HidesAnEdgeDockedShelf()
+    {
+        var manager = CreateManagerWithOneItem(out var item);
+        manager.ShowShelf();
+        manager.DismissShelf(new ShelfRailPlacement("DISPLAY1", ShelfRailEdge.Right));
+
+        Assert.IsTrue(manager.RemoveItem(item.Id));
+        Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
+    }
+
+    [TestMethod]
+    public void ShowingShelf_LeavesEdgePlacementAvailableForTheNextDismissal()
+    {
+        var manager = CreateManagerWithOneItem(out _);
+        var placement = new ShelfRailPlacement("DISPLAY1", ShelfRailEdge.Right);
+
+        manager.ShowShelf();
+        manager.DismissShelf(placement);
+        manager.ShowShelf();
+
+        Assert.AreEqual(ShelfDisplayState.UnifiedShelf, manager.DisplayState);
+        Assert.AreEqual(placement, manager.RailPlacement);
+    }
+
     private static DropShelfManager CreateManagerWithOneItem(out ShelfItem item)
     {
         var manager = new DropShelfManager();

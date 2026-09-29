@@ -463,13 +463,14 @@ Final V1 display-state model:
 public enum ShelfDisplayState
 {
     Hidden,
+    UnifiedShelf,
     EdgeDocked,
     Compact,
     Expanded
 }
 ```
 
-The enum above is the final V1 target. Stage 1 does not introduce `Compact` or `Expanded`; while the native workflow is being proven, the visible state uses one bounded unified Drop Shelf.
+`UnifiedShelf` is the bounded unified Drop Shelf presentation used through the Edge Rail stage. Stage 1 does not introduce `Compact` or `Expanded`; those remain later V1 presentations.
 
 ## Stage 1 bounded unified Drop Shelf
 

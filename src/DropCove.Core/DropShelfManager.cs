@@ -7,6 +7,8 @@ public sealed class DropShelfManager
     private readonly ShelfDatabase? _database;
     private readonly SemaphoreSlim _mutationGate = new(1, 1);
     private readonly Dictionary<Guid, HashSet<Guid>> _preparedBatchItems = [];
+    private ShelfDisplayState _displayState = ShelfDisplayState.Hidden;
+    private ShelfRailPlacement _railPlacement = ShelfRailPlacement.Default;
 
     /// <summary>Creates an in-memory manager for transient callers.</summary>
     public DropShelfManager()
@@ -17,10 +19,12 @@ public sealed class DropShelfManager
     private DropShelfManager(
         ShelfDatabase database,
         IReadOnlyList<ShelfBatch> batches,
+        ShelfRailPlacement railPlacement,
         string? recoveryBackupPath)
     {
         _database = database;
         _batches = [.. batches];
+        _railPlacement = railPlacement;
         RecoveryBackupPath = recoveryBackupPath;
     }
 
@@ -29,6 +33,51 @@ public sealed class DropShelfManager
 
     /// <summary>Gets the preserved failed database path when startup recovered from database failure.</summary>
     public string? RecoveryBackupPath { get; }
+
+    /// <summary>Gets the current shelf presentation state.</summary>
+    public ShelfDisplayState DisplayState => _displayState;
+
+    /// <summary>Gets the remembered Edge Rail placement.</summary>
+    public ShelfRailPlacement RailPlacement => _railPlacement;
+
+    /// <summary>Marks the bounded unified Drop Shelf as visible.</summary>
+    public void ShowShelf() => _displayState = ShelfDisplayState.UnifiedShelf;
+
+    /// <summary>Dismisses the shelf into Hidden or EdgeDocked based on held content.</summary>
+    /// <param name="placement">The monitor and edge to remember for a non-empty shelf.</param>
+    /// <returns>The resulting display state.</returns>
+    public ShelfDisplayState DismissShelf(ShelfRailPlacement placement)
+    {
+        ArgumentNullException.ThrowIfNull(placement);
+        if (_batches.Count == 0)
+        {
+            _displayState = ShelfDisplayState.Hidden;
+            return _displayState;
+        }
+
+        _railPlacement = placement;
+        _displayState = ShelfDisplayState.EdgeDocked;
+        return _displayState;
+    }
+
+    /// <summary>Dismisses the shelf and persists the remembered Edge Rail placement.</summary>
+    /// <param name="placement">The monitor and edge to remember for a non-empty shelf.</param>
+    /// <param name="cancellationToken">Cancels persistence.</param>
+    /// <returns>The resulting display state.</returns>
+    public async Task<ShelfDisplayState> DismissShelfAsync(
+        ShelfRailPlacement placement,
+        CancellationToken cancellationToken = default)
+    {
+        using var mutation = await LockMutationsAsync(cancellationToken);
+        var state = DismissShelf(placement);
+        if (state == ShelfDisplayState.EdgeDocked && _database is not null)
+        {
+            await _database.SaveRailPlacementAsync(_railPlacement, cancellationToken);
+        }
+
+        return state;
+    }
+
 
     /// <summary>Opens a persistent manager and restores its shelf state.</summary>
     /// <param name="databasePath">The per-user SQLite database path.</param>
@@ -51,7 +100,7 @@ public sealed class DropShelfManager
                 Availability = ClassifyRestoredPath(item.Path, classifyAvailability),
             }).ToArray(),
         }).ToArray();
-        return new DropShelfManager(database, batches, opened.RecoveryBackupPath);
+        return new DropShelfManager(database, batches, opened.RailPlacement, opened.RecoveryBackupPath);
     }
 
     /// <summary>Accepts and persists one incoming drop.</summary>
@@ -339,11 +388,14 @@ public sealed class DropShelfManager
         if (batch.Items.Count == 1)
         {
             _batches.RemoveAt(batchIndex);
-            return true;
+        }
+        else
+        {
+            var items = batch.Items.Where((_, index) => index != itemIndex).ToArray();
+            _batches[batchIndex] = batch with { Items = items };
         }
 
-        var items = batch.Items.Where((_, index) => index != itemIndex).ToArray();
-        _batches[batchIndex] = batch with { Items = items };
+        HideRailWhenEmpty();
         return true;
     }
 
@@ -370,6 +422,7 @@ public sealed class DropShelfManager
             }
         }
 
+        HideRailWhenEmpty();
         return changed;
     }
 
@@ -400,6 +453,7 @@ public sealed class DropShelfManager
         }
 
         _batches.RemoveAt(index);
+        HideRailWhenEmpty();
         return true;
     }
 
@@ -423,7 +477,16 @@ public sealed class DropShelfManager
             }
         }
 
+        HideRailWhenEmpty();
         return removedCount;
+    }
+
+    private void HideRailWhenEmpty()
+    {
+        if (_batches.Count == 0 && _displayState == ShelfDisplayState.EdgeDocked)
+        {
+            _displayState = ShelfDisplayState.Hidden;
+        }
     }
 
     /// <summary>Cleans up confirmed missing filesystem paths in a batch before drag-out begins, classifying availability.</summary>
@@ -477,6 +540,7 @@ public sealed class DropShelfManager
             }
         }
 
+        HideRailWhenEmpty();
         return new BatchDragPreparation(available, unavailable, missingCount);
     }
 
@@ -502,12 +566,14 @@ public sealed class DropShelfManager
         if (pinned.Length == 0)
         {
             _batches.RemoveAt(index);
+            HideRailWhenEmpty();
             return true;
         }
 
         if (pinned.Length != batch.Items.Count)
         {
             _batches[index] = batch with { Items = pinned };
+            HideRailWhenEmpty();
             return true;
         }
 

@@ -23,7 +23,7 @@ public sealed partial class MainPage : Page
     private DropShelfManager? _manager;
     private DragDropService? _dragDropService;
     private ShelfVisualCoordinator<ImageSource>? _visualCoordinator;
-    private Action? _hideShelf;
+    private Func<Task>? _dismissShelf;
     private Action? _showSettings;
     private Action? _beginWindowMove;
     private Action<int, int>? _resizeWindow;
@@ -38,7 +38,7 @@ public sealed partial class MainPage : Page
 
     internal async Task InitializeAsync(
         DropShelfManager manager,
-        Action hideShelf,
+        Func<Task> dismissShelf,
         Action showSettings,
         Action beginWindowMove,
         Action<int, int> resizeWindow,
@@ -49,7 +49,7 @@ public sealed partial class MainPage : Page
             new WindowsShelfVisualProvider(TryGetCachedStorageItem),
             IsImageShelfItem);
         _dragDropService = new DragDropService(manager, confirm);
-        _hideShelf = hideShelf;
+        _dismissShelf = dismissShelf;
         _showSettings = showSettings;
         _beginWindowMove = beginWindowMove;
         _resizeWindow = resizeWindow;
@@ -68,13 +68,23 @@ public sealed partial class MainPage : Page
 
     private void OnSettingsClicked(object sender, RoutedEventArgs e) => _showSettings?.Invoke();
 
-    private void OnCloseClicked(object sender, RoutedEventArgs e) => _hideShelf?.Invoke();
+    private async void OnCloseClicked(object sender, RoutedEventArgs e)
+    {
+        if (_dismissShelf is not null)
+        {
+            await _dismissShelf();
+        }
+    }
 
-    private void OnPageKeyDown(object sender, KeyRoutedEventArgs e)
+    private async void OnPageKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == Windows.System.VirtualKey.Escape)
         {
-            _hideShelf?.Invoke();
+            if (_dismissShelf is not null)
+            {
+                await _dismissShelf();
+            }
+
             e.Handled = true;
         }
     }

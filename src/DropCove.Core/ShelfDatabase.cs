@@ -17,6 +17,11 @@ internal sealed class ShelfDatabase(string databasePath)
     public Task<ShelfDatabaseOpenResult> OpenAndLoadAsync(CancellationToken cancellationToken) =>
         RunAsync(OpenAndLoad, cancellationToken);
 
+    public Task SaveRailPlacementAsync(
+        ShelfRailPlacement placement,
+        CancellationToken cancellationToken) =>
+        RunAsync(() => SaveRailPlacement(placement), cancellationToken);
+
     public Task AddBatchAsync(ShelfBatch batch, CancellationToken cancellationToken) =>
         RunAsync(() => AddBatch(batch), cancellationToken);
 
@@ -67,12 +72,12 @@ internal sealed class ShelfDatabase(string databasePath)
 
         try
         {
-            return new ShelfDatabaseOpenResult(LoadBatches(), null);
+            return new ShelfDatabaseOpenResult(LoadBatches(), LoadRailPlacement(), null);
         }
         catch (Exception exception) when (File.Exists(databasePath) && IsRecoverableDatabaseFailure(exception))
         {
             var backupPath = PreserveFailedDatabase();
-            return new ShelfDatabaseOpenResult(LoadBatches(), backupPath);
+            return new ShelfDatabaseOpenResult(LoadBatches(), LoadRailPlacement(), backupPath);
         }
     }
 
@@ -290,9 +295,57 @@ internal sealed class ShelfDatabase(string databasePath)
                 is_pinned INTEGER NOT NULL CHECK (is_pinned IN (0, 1)),
                 UNIQUE (batch_id, position)
             );
+            CREATE TABLE IF NOT EXISTS shelf_ui_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                rail_monitor TEXT NOT NULL,
+                rail_edge TEXT NOT NULL CHECK (rail_edge IN ('Left', 'Right'))
+            );
+            INSERT OR IGNORE INTO shelf_ui_state (id, rail_monitor, rail_edge)
+            VALUES (1, '', 'Right');
             """;
         command.ExecuteNonQuery();
     }
+
+    private ShelfRailPlacement LoadRailPlacement()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT rail_monitor, rail_edge FROM shelf_ui_state WHERE id = 1";
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+        {
+            return ShelfRailPlacement.Default;
+        }
+
+        var edge = Enum.TryParse<ShelfRailEdge>(reader.GetString(1), ignoreCase: true, out var parsed)
+            ? parsed
+            : ShelfRailEdge.Right;
+        return new ShelfRailPlacement(reader.GetString(0), edge);
+    }
+
+    private void SaveRailPlacement(ShelfRailPlacement placement)
+    {
+        ArgumentNullException.ThrowIfNull(placement);
+        if (placement.Edge is not (ShelfRailEdge.Left or ShelfRailEdge.Right))
+        {
+            throw new ArgumentOutOfRangeException(nameof(placement));
+        }
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO shelf_ui_state (id, rail_monitor, rail_edge)
+            VALUES (1, $monitor, $edge)
+            ON CONFLICT(id) DO UPDATE SET
+                rail_monitor = excluded.rail_monitor,
+                rail_edge = excluded.rail_edge
+            """;
+        command.Parameters.AddWithValue("$monitor", placement.MonitorId);
+        command.Parameters.AddWithValue("$edge", placement.Edge.ToString());
+        command.ExecuteNonQuery();
+    }
+
 
     private static IReadOnlyList<ShelfItem> LoadItems(SqliteConnection connection, Guid batchId)
     {
@@ -323,4 +376,5 @@ internal sealed class ShelfDatabase(string databasePath)
 
 internal sealed record ShelfDatabaseOpenResult(
     IReadOnlyList<ShelfBatch> Batches,
+    ShelfRailPlacement RailPlacement,
     string? RecoveryBackupPath);

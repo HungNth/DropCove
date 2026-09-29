@@ -6,6 +6,42 @@ namespace DropCove.Core;
 /// <param name="IsFolder">Whether the item is a folder.</param>
 public sealed record IncomingShelfItem(string Path, string Name, bool IsFolder);
 
+/// <summary>Describes the visible Drop Shelf presentation.</summary>
+public enum ShelfDisplayState
+{
+    /// <summary>No DropCove surface is visible.</summary>
+    Hidden,
+    /// <summary>The bounded unified Drop Shelf is visible.</summary>
+    UnifiedShelf,
+    /// <summary>The non-empty shelf is visible as the collapsed Edge Rail.</summary>
+    EdgeDocked,
+    /// <summary>Reserved for the later Compact presentation.</summary>
+    Compact,
+    /// <summary>Reserved for the later Expanded presentation.</summary>
+    Expanded,
+}
+
+/// <summary>Identifies the screen edge used by the collapsed Edge Rail.</summary>
+public enum ShelfRailEdge
+{
+    /// <summary>The left edge of the selected monitor.</summary>
+    Left,
+    /// <summary>The right edge of the selected monitor.</summary>
+    Right,
+}
+
+/// <summary>Describes the remembered Edge Rail monitor and edge.</summary>
+/// <param name="MonitorId">The Windows display device name, such as <c>\\.\DISPLAY1</c>.</param>
+/// <param name="Edge">The selected monitor edge.</param>
+public sealed record ShelfRailPlacement(string MonitorId, ShelfRailEdge Edge)
+{
+    /// <summary>Gets the default placement before the first non-empty dismissal.</summary>
+    public static ShelfRailPlacement Default { get; } = new(string.Empty, ShelfRailEdge.Right);
+
+    /// <summary>Gets whether a monitor has been selected.</summary>
+    public bool HasMonitor => !string.IsNullOrWhiteSpace(MonitorId);
+}
+
 /// <summary>Represents one file or folder reference inside a shelf batch.</summary>
 /// <param name="Id">The occurrence identity inside DropCove.</param>
 /// <param name="Path">The referenced filesystem path.</param>

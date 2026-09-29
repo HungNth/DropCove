@@ -216,6 +216,7 @@ public static class WindowInterop
     private const uint SwpShowWindow = 0x0040;
     private const int SwHide = 0;
     private const int SwShow = 5;
+    private const int SwShowNoActivate = 4;
     private const uint WmNcLButtonDown = 0x00A1;
     private const nuint HtCaption = 2;
     private const long WsCaption = 0x00C00000L;
@@ -272,6 +273,93 @@ public static class WindowInterop
         var x = monitorInfo.Work.Left + (monitorInfo.Work.Width - width) / 2;
         var y = monitorInfo.Work.Top + (monitorInfo.Work.Height - height) / 2;
         SetBounds(windowHandle, x, y, width, height, SwpNoActivate);
+    }
+
+    /// <summary>Gets the Windows display device name for a window's monitor.</summary>
+    /// <param name="windowHandle">The target window.</param>
+    /// <returns>The display device name, such as <c>\\.\DISPLAY1</c>.</returns>
+    public static string GetMonitorIdForWindow(nint windowHandle)
+    {
+        var monitor = MonitorFromWindow(windowHandle, MonitorDefaultToNearest);
+        if (monitor == 0)
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not resolve the window monitor.");
+        }
+
+        return GetMonitorInfo(monitor).DeviceName
+            ?? throw new InvalidOperationException("The monitor did not provide a display device name.");
+    }
+
+    /// <summary>Positions the unified shelf at the center of a remembered monitor.</summary>
+    /// <param name="windowHandle">The shelf window.</param>
+    /// <param name="monitorId">The remembered display device name.</param>
+    /// <param name="logicalWidth">The shelf width in logical pixels.</param>
+    /// <param name="logicalHeight">The shelf height in logical pixels.</param>
+    public static void PositionOnMonitor(
+        nint windowHandle,
+        string monitorId,
+        int logicalWidth,
+        int logicalHeight)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(monitorId);
+        ValidateLogicalSize(logicalWidth, logicalHeight);
+
+        var monitor = FindMonitor(monitorId);
+        if (monitor == 0)
+        {
+            monitor = MonitorFromWindow(windowHandle, MonitorDefaultToNearest);
+        }
+
+        if (monitor == 0)
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not resolve the shelf monitor.");
+        }
+
+        var monitorInfo = GetMonitorInfo(monitor);
+        var (width, height) = FitToWorkArea(logicalWidth, logicalHeight, GetMonitorDpi(monitor), monitorInfo.Work);
+        var x = monitorInfo.Work.Left + (monitorInfo.Work.Width - width) / 2;
+        var y = monitorInfo.Work.Top + (monitorInfo.Work.Height - height) / 2;
+        SetBounds(windowHandle, x, y, width, height, SwpNoActivate);
+    }
+
+
+    /// <summary>Positions a narrow, topmost Edge Rail over a monitor work area without activating it.</summary>
+    /// <param name="windowHandle">The rail window.</param>
+    /// <param name="monitorId">The remembered display device name.</param>
+    /// <param name="dockLeft">Whether to dock to the left edge; otherwise the right edge is used.</param>
+    /// <param name="logicalWidth">The rail width in logical pixels.</param>
+    public static void PositionEdgeRail(
+        nint windowHandle,
+        string monitorId,
+        bool dockLeft,
+        int logicalWidth)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(monitorId);
+        ValidateLogicalSize(logicalWidth, 1);
+
+        var monitor = FindMonitor(monitorId);
+        if (monitor == 0)
+        {
+            monitor = MonitorFromWindow(windowHandle, MonitorDefaultToNearest);
+        }
+
+        if (monitor == 0)
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not resolve the Edge Rail monitor.");
+        }
+
+        var monitorInfo = GetMonitorInfo(monitor);
+        var width = Math.Clamp(Scale(logicalWidth, GetMonitorDpi(monitor)), 1, monitorInfo.Monitor.Width);
+        var x = dockLeft ? monitorInfo.Monitor.Left : monitorInfo.Monitor.Right - width;
+        SetBounds(windowHandle, x, monitorInfo.Monitor.Top, width, monitorInfo.Monitor.Height, SwpNoActivate | SwpShowWindow);
+    }
+
+    /// <summary>Shows a topmost window without activating it.</summary>
+    /// <param name="windowHandle">The target window.</param>
+    public static void ShowNoActivate(nint windowHandle)
+    {
+        ShowWindow(windowHandle, SwShowNoActivate);
+        SetWindowPos(windowHandle, HwndTopmost, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoActivate | SwpShowWindow);
     }
 
     /// <summary>Resizes while retaining the top edge and clamping the window to its monitor work area.</summary>
@@ -408,6 +496,26 @@ public static class WindowInterop
         }
     }
 
+    private static nint FindMonitor(string monitorId)
+    {
+        nint found = 0;
+        EnumDisplayMonitors(
+            0,
+            0,
+            (monitor, _, _, _) =>
+            {
+                if (string.Equals(GetMonitorInfo(monitor).DeviceName ?? string.Empty, monitorId, StringComparison.OrdinalIgnoreCase))
+                {
+                    found = monitor;
+                    return false;
+                }
+
+                return true;
+            },
+            0);
+        return found;
+    }
+
     private static MonitorInfo GetMonitorInfo(nint monitor)
     {
         var info = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>() };
@@ -443,14 +551,17 @@ public static class WindowInterop
         public int Height => Bottom - Top;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct MonitorInfo
     {
         public uint Size;
         public Rect Monitor;
         public Rect Work;
         public uint Flags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string? DeviceName;
     }
+
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern nint GetWindowLongPtr(nint windowHandle, int index);
@@ -485,6 +596,16 @@ public static class WindowInterop
 
     [DllImport("user32.dll")]
     private static extern nint MonitorFromWindow(nint windowHandle, uint flags);
+
+    private delegate bool MonitorEnumProc(nint monitor, nint deviceContext, nint clipRectangle, nint data);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumDisplayMonitors(
+        nint deviceContext,
+        nint clipRectangle,
+        MonitorEnumProc callback,
+        nint data);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
