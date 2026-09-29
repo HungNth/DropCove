@@ -8,6 +8,8 @@
 
 !include "LogicLib.nsh"
 !include "WinMessages.nsh"
+!define WM_DROPCOVE_EXIT 0x8002
+!define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\DropCove"
 
 Name "DropCove"
 OutFile "..\artifacts\DropCove-Setup.exe"
@@ -23,6 +25,14 @@ Section "Install"
   SetRegView 64
   WriteRegStr HKCU "Software\DropCove" "InstallLocation" "$INSTDIR"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayName" "DropCove"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayVersion" "${APP_VERSION}"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "Publisher" "DropCove"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\DropCove.exe"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "QuietUninstallString" '$\"$INSTDIR\Uninstall.exe$\" /S'
+  WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoModify" 1
+  WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
   CreateDirectory "$SMPROGRAMS\DropCove"
   CreateShortcut "$SMPROGRAMS\DropCove\DropCove.lnk" "$INSTDIR\DropCove.exe"
 SectionEnd
@@ -34,6 +44,8 @@ Section "Uninstall"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir /r "$INSTDIR"
   DeleteRegKey HKCU "Software\DropCove"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "DropCove"
+  DeleteRegKey HKCU "${UNINSTALL_KEY}"
 SectionEnd
 
 Function .onInit
@@ -47,7 +59,7 @@ Function .onInit
   ; Check if DropCove is running and prompt/wait for it to close
   FindWindow $0 "" "DropCove"
   ${If} $0 != 0
-    SendMessage $0 ${WM_CLOSE} 0 0 /TIMEOUT=5000
+    SendMessage $0 ${WM_DROPCOVE_EXIT} 0 0 /TIMEOUT=5000
     StrCpy $1 0
     ${DoWhile} $1 < 25
       Sleep 200
@@ -73,7 +85,7 @@ Function un.onInit
     Return
   ${EndIf}
 
-  SendMessage $0 ${WM_CLOSE} 0 0 /TIMEOUT=5000
+  SendMessage $0 ${WM_DROPCOVE_EXIT} 0 0 /TIMEOUT=5000
   StrCpy $1 0
   ${DoWhile} $1 < 25
     Sleep 200
