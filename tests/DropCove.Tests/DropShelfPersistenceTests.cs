@@ -1,0 +1,230 @@
+using DropCove.Core;
+
+namespace DropCove.Tests;
+
+[TestClass]
+public sealed class DropShelfPersistenceTests
+{
+    private static readonly System.Collections.Concurrent.ConcurrentBag<string> TemporaryDirectories = [];
+
+    [ClassCleanup]
+    public static void CleanupTemporaryDatabases()
+    {
+        foreach (var directory in TemporaryDirectories)
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public async Task Restart_RestoresBatchOrderAndShelfItemMetadata()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await DropShelfManager.OpenAsync(databasePath, _ => ItemAvailability.Available);
+        var older = await manager.AcceptDropAsync(
+        [
+            new(@"C:\Work\First.txt", "First.txt", false),
+            new(@"C:\Work\Folder", "Folder", true),
+        ]);
+        var newer = await manager.AcceptDropAsync([new(@"C:\Work\Latest.txt", "Latest.txt", false)]);
+        await manager.SetPinnedAsync(older.Batch!.Items[1].Id, true);
+
+        var restored = await DropShelfManager.OpenAsync(databasePath, _ => ItemAvailability.Available);
+
+        Assert.HasCount(2, restored.Batches);
+        Assert.AreEqual(newer.Batch!.Id, restored.Batches[0].Id);
+        Assert.AreEqual(older.Batch.Id, restored.Batches[1].Id);
+        Assert.AreEqual(older.Batch.CreatedAt, restored.Batches[1].CreatedAt);
+        CollectionAssert.AreEqual(
+            older.Batch.Items.Select(item => item.Id).ToArray(),
+            restored.Batches[1].Items.Select(item => item.Id).ToArray());
+        Assert.IsTrue(restored.Batches[1].Items[1].IsFolder);
+        Assert.IsTrue(restored.Batches[1].Items[1].IsPinned);
+    }
+
+    [TestMethod]
+    public async Task CompletedMutations_AreCommittedImmediately()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var managed = (await manager.AcceptDropAsync(
+        [
+            new(@"C:\Work\Remove.txt", "Remove.txt", false),
+            new(@"C:\Work\Keep.txt", "Keep.txt", false),
+        ])).Batch!;
+        var temporaryBatch = (await manager.AcceptDropAsync(
+            [new(@"C:\Work\Temporary.txt", "Temporary.txt", false)])).Batch!;
+
+        await manager.SetPinnedAsync(managed.Items[1].Id, true);
+        manager = await OpenAsync(databasePath);
+        Assert.IsTrue(FindItem(manager, managed.Items[1].Id).IsPinned);
+
+        await manager.SetPinnedAsync(managed.Items[1].Id, false);
+        await manager.RemoveItemAsync(managed.Items[0].Id);
+        manager = await OpenAsync(databasePath);
+        Assert.IsFalse(FindItem(manager, managed.Items[1].Id).IsPinned);
+        Assert.IsFalse(ContainsItem(manager, managed.Items[0].Id));
+
+        await manager.SetPinnedAsync(managed.Items[1].Id, true);
+        Assert.AreEqual(1, await manager.ClearTemporaryItemsAsync());
+        manager = await OpenAsync(databasePath);
+        Assert.IsTrue(ContainsItem(manager, managed.Items[1].Id));
+        Assert.IsFalse(manager.Batches.Any(batch => batch.Id == temporaryBatch.Id));
+
+        Assert.IsTrue(await manager.RemoveBatchAsync(managed.Id));
+        manager = await OpenAsync(databasePath);
+        Assert.IsEmpty(manager.Batches);
+    }
+
+    [TestMethod]
+    public async Task MissingCleanupAndSuccessfulDragOut_AreDurable()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var itemBatch = (await manager.AcceptDropAsync(
+        [
+            new(@"C:\Work\Missing.txt", "Missing.txt", false),
+            new(@"C:\Work\Drag.txt", "Drag.txt", false),
+        ])).Batch!;
+
+        var preparation = await manager.PrepareBatchForDragAsync(
+            itemBatch.Id,
+            path => path.EndsWith("Missing.txt", StringComparison.Ordinal)
+                ? ItemAvailability.Missing
+                : ItemAvailability.Available);
+        Assert.AreEqual(1, preparation.MissingItemsRemovedCount);
+        Assert.IsTrue(await manager.CompleteItemDragAsync(itemBatch.Items[1].Id, DragOutOutcome.AcceptedCopy));
+
+        var batchDrag = (await manager.AcceptDropAsync(
+        [
+            new(@"C:\Work\BatchTemp.txt", "BatchTemp.txt", false),
+            new(@"C:\Work\BatchPinned.txt", "BatchPinned.txt", false),
+        ])).Batch!;
+        await manager.SetPinnedAsync(batchDrag.Items[1].Id, true);
+        await manager.PrepareBatchForDragAsync(batchDrag.Id, _ => ItemAvailability.Available);
+        Assert.IsTrue(await manager.CompleteBatchDragAsync(batchDrag.Id, DragOutOutcome.AcceptedCopy));
+
+        manager = await OpenAsync(databasePath);
+        Assert.IsFalse(ContainsItem(manager, itemBatch.Items[0].Id));
+        Assert.IsFalse(ContainsItem(manager, itemBatch.Items[1].Id));
+        Assert.IsFalse(ContainsItem(manager, batchDrag.Items[0].Id));
+        Assert.IsTrue(FindItem(manager, batchDrag.Items[1].Id).IsPinned);
+    }
+
+    [TestMethod]
+    public async Task CrashBeforeSuccessfulDragCommit_RestoresTemporaryReference()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var item = (await manager.AcceptDropAsync(
+            [new(@"C:\Work\Pending.txt", "Pending.txt", false)])).Batch!.Items[0];
+
+        var restored = await OpenAsync(databasePath);
+        Assert.AreEqual(item.Id, restored.Batches[0].Items[0].Id);
+        Assert.IsFalse(restored.Batches[0].Items[0].IsPinned);
+
+
+    }
+    [TestMethod]
+    public async Task Restart_ReclassifiesRestoredPaths()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        await manager.AcceptDropAsync(
+        [
+            new(@"C:\Work\Available.txt", "Available.txt", false),
+            new(@"C:\Work\Missing.txt", "Missing.txt", false),
+            new(@"Z:\Offline\Unavailable.txt", "Unavailable.txt", false),
+        ]);
+
+        var restored = await DropShelfManager.OpenAsync(databasePath, path => path switch
+        {
+            var value when value.EndsWith("Missing.txt", StringComparison.Ordinal) => ItemAvailability.Missing,
+            var value when value.EndsWith("Unavailable.txt", StringComparison.Ordinal) => ItemAvailability.Unavailable,
+            _ => ItemAvailability.Available,
+        });
+
+        CollectionAssert.AreEqual(
+            new[] { ItemAvailability.Available, ItemAvailability.Missing, ItemAvailability.Unavailable },
+            restored.Batches[0].Items.Select(item => item.Availability).ToArray());
+    }
+
+    [TestMethod]
+    public async Task CorruptDatabase_IsPreservedAndReplacedWithAnEmptyDatabase()
+    {
+        var databasePath = CreateDatabasePath();
+        var corruptBytes = "not a sqlite database"u8.ToArray();
+        await File.WriteAllBytesAsync(databasePath, corruptBytes);
+
+        var manager = await OpenAsync(databasePath);
+
+        Assert.IsEmpty(manager.Batches);
+        Assert.IsNotNull(manager.RecoveryBackupPath);
+        Assert.IsTrue(File.Exists(manager.RecoveryBackupPath));
+        CollectionAssert.AreEqual(corruptBytes, await File.ReadAllBytesAsync(manager.RecoveryBackupPath));
+        Assert.IsTrue(File.Exists(databasePath));
+
+        var reopened = await OpenAsync(databasePath);
+        Assert.IsEmpty(reopened.Batches);
+        Assert.IsNull(reopened.RecoveryBackupPath);
+    }
+
+    [TestMethod]
+    [DataRow(DragOutOutcome.Canceled)]
+    [DataRow(DragOutOutcome.Rejected)]
+    [DataRow(DragOutOutcome.Failed)]
+    public async Task UnsuccessfulPreparedBatchDrag_RetainsReferencesAfterRestart(DragOutOutcome outcome)
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var batch = (await manager.AcceptDropAsync(
+            [new(@"C:\Work\Retained.txt", "Retained.txt", false)])).Batch!;
+        await manager.PrepareBatchForDragAsync(batch.Id, _ => ItemAvailability.Available);
+
+        Assert.IsFalse(await manager.CompleteBatchDragAsync(batch.Id, outcome));
+        var restored = await OpenAsync(databasePath);
+
+        Assert.AreEqual(batch.Items[0].Id, restored.Batches[0].Items[0].Id);
+    }
+
+    [TestMethod]
+    public async Task AcceptedPartialBatchDrag_RetainsUnavailableReferencesAfterRestart()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var batch = (await manager.AcceptDropAsync(
+        [
+            new(@"C:\Work\Available.txt", "Available.txt", false),
+            new(@"Z:\Offline\Unavailable.txt", "Unavailable.txt", false),
+        ])).Batch!;
+        await manager.PrepareBatchForDragAsync(
+            batch.Id,
+            path => path.StartsWith(@"Z:\", StringComparison.Ordinal)
+                ? ItemAvailability.Unavailable
+                : ItemAvailability.Available);
+
+        Assert.IsTrue(await manager.CompleteBatchDragAsync(batch.Id, DragOutOutcome.AcceptedCopy));
+        var restored = await OpenAsync(databasePath);
+
+        Assert.HasCount(1, restored.Batches);
+        Assert.HasCount(1, restored.Batches[0].Items);
+        Assert.AreEqual(batch.Items[1].Id, restored.Batches[0].Items[0].Id);
+    }
+
+    private static Task<DropShelfManager> OpenAsync(string databasePath) =>
+        DropShelfManager.OpenAsync(databasePath, _ => ItemAvailability.Available);
+
+    private static bool ContainsItem(DropShelfManager manager, Guid itemId) =>
+        manager.Batches.SelectMany(batch => batch.Items).Any(item => item.Id == itemId);
+
+    private static ShelfItem FindItem(DropShelfManager manager, Guid itemId) =>
+        manager.Batches.SelectMany(batch => batch.Items).Single(item => item.Id == itemId);
+
+    private static string CreateDatabasePath()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "DropCove.Tests", Guid.NewGuid().ToString("N"));
+        TemporaryDirectories.Add(directory);
+        Directory.CreateDirectory(directory);
+        return Path.Combine(directory, "shelf.db");
+    }
+}
