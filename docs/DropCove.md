@@ -457,7 +457,7 @@ then the batch should be removed automatically.
 
 # 12. Display State
 
-Suggested display-state model:
+Final V1 display-state model:
 
 ```csharp
 public enum ShelfDisplayState
@@ -469,6 +469,27 @@ public enum ShelfDisplayState
 }
 ```
 
+The enum above is the final V1 target. Stage 1 does not introduce `Compact` or `Expanded`; while the native workflow is being proven, the visible state uses one bounded unified Drop Shelf.
+
+## Stage 1 bounded unified Drop Shelf
+
+The pre-mode Drop Shelf uses one vertical, newest-first Shelf Batch list. It is not `Compact` mode and has no separate management presentation.
+
+Exact logical-pixel window sizes:
+
+| Shelf Batches | Width | Height |
+| ---: | ---: | ---: |
+| 0–1 | 180 | 180 |
+| 2 | 180 | 236 |
+| 3 | 180 | 292 |
+| 4 or more | 180 | 348 |
+
+The window uses a 32-pixel integrated drag strip with Settings and Close controls. Its top edge remains anchored while it grows downward; placement shifts upward only when required to remain inside the current monitor work area. Resizing is immediate in Stage 1.
+
+Each Shelf Batch is one vertical summary card. Single-item batches show the native icon and truncated name; multi-item batches show a bounded stacked visual and item count. The whole content surface accepts drops: an empty shelf shows a drop prompt, while a populated shelf shows a drag-over overlay without reserving a permanent drop panel.
+
+Four recent batches are visible. Additional batches remain in the same window through vertical scrolling, with a `+N batches` indicator. A newly accepted batch appears first and returns the list to the top.
+
 ## Hidden
 
 Used whenever the floating shelf is not displayed. Before Edge Rail is implemented, `Hidden` may still contain items; the hotkey reopens the shelf without losing them.
@@ -477,13 +498,13 @@ Used whenever the floating shelf is not displayed. Before Edge Rail is implement
 
 Used after Edge Rail is implemented when the shelf is dismissed but still contains items.
 
-## Compact
+## Compact — Ticket 15 and later
 
-Used for the normal floating Drop Shelf.
+The final V1 quick-access presentation introduced by Ticket 15 after the native workflow is proven.
 
-## Expanded
+## Expanded — Ticket 15 and later
 
-Used when the user wants to inspect and manage all content.
+The final V1 management presentation used to inspect and manage all content.
 
 ---
 
@@ -500,30 +521,15 @@ public enum ShelfPlacement
 }
 ```
 
-Examples:
+Before Ticket 15, the bounded unified Drop Shelf combines with placement as follows:
 
-### Shake
+| Invocation | Presentation | Placement |
+| --- | --- | --- |
+| Shake | Bounded unified Drop Shelf | Cursor |
+| Global hotkey | Bounded unified Drop Shelf | Default |
+| Edge interaction | Bounded unified Drop Shelf | Docked |
 
-```text
-DisplayState = Compact
-Placement    = Cursor
-```
-
-### Global hotkey
-
-```text
-DisplayState = Compact
-Placement    = Default
-```
-
-### Edge interaction
-
-```text
-DisplayState = Compact
-Placement    = Docked
-```
-
-Separating display and placement avoids an oversized state enum and makes the behavior easier to maintain.
+Ticket 15 later replaces that single presentation with `Compact` and `Expanded`. Placement remains independent so display and monitor-position behavior do not become one oversized state model.
 
 ---
 
@@ -534,7 +540,7 @@ The hotkey toggles the shelf. `Esc` and the `×` button also dismiss it; losing 
 Before Edge Rail is implemented, dismissing always hides the shelf while preserving its content:
 
 ```text
-Compact → Hidden
+Bounded unified Drop Shelf → Hidden
 ```
 
 After Edge Rail is implemented:
@@ -548,11 +554,11 @@ The remaining items may be temporary, pinned, or a mixture of both.
 
 ---
 
-# 15. Compact Drop Shelf
+# 15. Compact Drop Shelf — Ticket 15 and later
 
-Compact mode should stay small and focus on recent batches.
+Ticket 15 introduces `Compact` as a distinct quick-access presentation only after the bounded unified Drop Shelf and native workflow are proven. It consumes the same shelf state as Expanded mode and does not change batch, drag, or persistence semantics.
 
-Example:
+Compact stays small and focuses on recent batches:
 
 ```text
 ╭────────────────────────────────────╮
@@ -560,21 +566,13 @@ Example:
 ╰────────────────────────────────────╯
 ```
 
-Each visual entry represents a `ShelfBatch`.
-
-Recommended visible batch count:
-
-```text
-4–6 recent batches
-```
-
-If more batches exist:
+Each visual entry represents a `ShelfBatch`. The target is 4–6 recent batches. When more batches exist, Compact exposes overflow without growing indefinitely:
 
 ```text
 🗂3  🖼  🗂5  🗂2  +4  ⤢
 ```
 
-Compact mode should not grow indefinitely.
+This post-Ticket-15 horizontal presentation is separate from the Stage 1 vertical, stepped-size bounded unified Drop Shelf.
 
 ---
 

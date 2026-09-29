@@ -21,3 +21,5 @@
 - 2026-09-28: The non-commercial Inno Setup compiler was removed. NSIS 3.12 was installed after its zlib/libpng commercial-use license was verified; its `makensis.exe` built the self-contained installer.
 - 2026-09-28: NSIS installer smoke passed: clean install, visible installed `DropCove` window, uninstall while the window was open, process closure, and install-directory removal. The installer was then reinstalled and DropCove remains open for inspection.
 - 2026-09-28: `dotnet test` now discovers and passes one test-runner smoke test. Application-seam behavior tests begin in Ticket 03.
+- 2026-09-29: User found that DropCove was absent from Windows Installed apps, so the existing uninstall acceptance was not actually satisfied by the prior installer.
+- 2026-09-29: NSIS now writes a per-user Windows uninstall entry with display metadata and uninstall commands. A fresh installer build/install exposed the registration, and silent uninstall removed the registration, process, and install directory.

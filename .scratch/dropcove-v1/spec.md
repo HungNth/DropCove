@@ -165,7 +165,7 @@ The first usable vertical slice proves the unpackaged EXE installation path, nat
 - Mixed incoming payloads accept supported paths and report the unsupported count. Empty accepted results do not create Shelf Batches.
 - DropCove never copies source contents into application storage and never moves, renames, overwrites, or deletes source filesystem objects.
 - New Shelf Items are Temporary Items. Pinning converts an item to a Pinned Item; unpinning returns it to temporary lifecycle.
-- Manual removal includes Remove Item, Remove Batch, and Clear Temporary Items. Bulk actions require confirmation and remove references only.
+- Manual removal includes Remove Item, Remove Batch, and Clear Temporary Items. Remove Item and Remove Batch operate directly on click for fast UX; Clear Temporary Items requires confirmation. All removal actions remove references only.
 - Drag-out offers the OLE `Copy` effect only.
 - A Successful Drag-Out is the destination accepting the operation with a non-empty Copy result. DropCove does not claim that the destination completes later internal processing.
 - Successful drag-out removes participating Temporary Items and retains participating Pinned Items. Cancel, rejection, and failure leave participating references unchanged.
@@ -187,6 +187,11 @@ The first usable vertical slice proves the unpackaged EXE installation path, nat
 - The floating shelf remains topmost and does not auto-hide merely because another application receives focus.
 - Before Edge Rail exists, Hidden may contain items. After Edge Rail exists, dismissing an empty shelf enters Hidden and dismissing a non-empty shelf enters EdgeDocked.
 - Hotkey placement uses the default work-area position on the monitor containing the cursor, with correct current-monitor DPI placement and sizing.
+- Before Ticket 15 introduces distinct Compact and Expanded modes, Stage 1 uses a **bounded unified Drop Shelf**; it is a single presentation over shelf state, not an early Compact mode.
+- The bounded unified Drop Shelf is `180 × 180` logical pixels with zero or one Shelf Batch, `180 × 236` with two, `180 × 292` with three, and `180 × 348` with four or more. Width remains fixed; content scrolls vertically beyond four visible batches.
+- Shelf Batches render newest-first in one vertical column. Single-item batches show the native icon and truncated name; multi-item batches use a bounded stacked visual and item count rather than expanding every item inline.
+- The content surface accepts drops. An empty shelf shows a native drop prompt; a populated shelf uses a drag-over overlay without reserving a permanent drop panel. Accepting a new batch returns the list to the newest batch and updates a `+N batches` overflow indicator.
+- The window uses a 32-logical-pixel integrated drag strip with Settings and Close controls. Growth keeps the top edge anchored, expands downward, and shifts upward only enough to remain inside the current monitor work area. Stage 1 resizing is immediate; animation remains deferred polish.
 - Edge Rail is an overlay rather than a Windows AppBar and does not reserve desktop work area.
 - Edge Rail docks by default to the Right side of the monitor where the shelf was dismissed, remembers monitor and side, and allows Left/Right and monitor configuration.
 - Edge Rail hover/direct drag does not activate DropCove. Opening the full shelf activates it.

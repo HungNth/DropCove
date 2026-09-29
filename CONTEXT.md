@@ -8,6 +8,10 @@ DropCove is a temporary drag-and-drop workspace for Windows. It holds references
 The floating surface where users hold and manage referenced files and folders.
 _Avoid_: Main window, drop zone
 
+**Bounded Unified Drop Shelf**:
+The single Stage 1 Drop Shelf presentation used before separate Compact and Expanded presentations exist. It keeps Shelf Batches available in one bounded surface without changing their lifecycle.
+_Avoid_: Pre-mode shelf, temporary shelf
+
 **Edge Rail**:
 The narrow screen-edge form of the shelf that remains directly usable while content is held.
 _Avoid_: Sidebar, launcher
