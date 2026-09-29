@@ -13,6 +13,14 @@ Apply these principles within the assigned role and approved scope. During ticke
 - Make architectural decisions for the long term. Do not accept a stopgap that only works for now and is meant to be replaced later.
 - Study how established products solve the problem before designing a solution. Adopt their proven patterns and conventions rather than inventing an approach from scratch.
 
+## CLI WinUI Toolchain
+
+Build DropCove through the .NET CLI with the official WinUI 3 C# templates, Windows Developer Mode, and NuGet-declared project dependencies. Do not add Visual Studio workloads, MSVC Build Tools, standalone MSBuild, or Visual Studio XAML tooling unless a concrete implementation requirement proves the CLI toolchain insufficient.
+
+Validate the toolchain with `dotnet new winui`, `dotnet restore`, `dotnet build`, and `dotnet run`. A globally accessible `msbuild.exe` or populated `dotnet workload list` is not required when `dotnet msbuild` and project builds succeed.
+
+Before adding any development tool, executable, SDK, or NuGet dependency, establish why it is necessary and its license. Prefer permissive dependencies; Microsoft SDKs that support commercial use without a developer-seat license are permitted.
+
 ## Agent Development Workflow
 
 This project uses Matt Pocock Skills for planning and delivery.
