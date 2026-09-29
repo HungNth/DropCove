@@ -1173,7 +1173,7 @@ Show shelf from resident process    p95 ≤ 150 ms
 Idle working set target             < 150 MB
 ```
 
-Thumbnail loading and SQLite I/O must not block the UI thread. V1 should remain responsive with at least 100 batches and 1,000 items by using lazy thumbnail loading and UI virtualization.
+Thumbnail loading and SQLite I/O must not block the UI thread. V1 should remain responsive with at least 100 batches and 1,000 items by using lazy thumbnail loading and UI virtualization. The shelf realizes only visible item elements; native icons are requested independently, and image thumbnails are discarded when their visible realization ends.
 
 ---
 
@@ -1332,7 +1332,7 @@ ShelfItem
 - Remove Item, Remove Batch, and Clear Temporary Items; bulk removal requires confirmation.
 - SQLite persistence and restore.
 - Missing/Unavailable handling.
-- Windows file/folder icons and Windows Shell thumbnails for images, loaded lazily with icon fallback.
+- Windows file/folder icons through the Windows Shell and Windows Shell thumbnails for images, loaded lazily from visible visual elements with icon fallback.
 - Minimal Settings for hotkey and startup.
 
 ## Stage 2 — Edge Rail
