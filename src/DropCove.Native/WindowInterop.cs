@@ -203,10 +203,158 @@ public sealed class GlobalHotKey : IDisposable
     private static extern bool UnregisterHotKey(nint windowHandle, int id);
 }
 
+/// <summary>Describes one display that can host the Edge Rail.</summary>
+/// <param name="Id">The Windows display device name.</param>
+/// <param name="Label">The user-visible display label.</param>
+public sealed record MonitorOption(string Id, string Label);
+
+/// <summary>Raises callbacks when the foreground window changes.</summary>
+public sealed class ForegroundWindowHook : IDisposable
+{
+    private const uint EventSystemForeground = 0x0003;
+    private const uint EventObjectLocationChange = 0x800B;
+    private const int ObjidWindow = 0;
+    private const uint WineventOutOfContext = 0;
+    private readonly WinEventDelegate _foregroundCallback;
+    private readonly WinEventDelegate _locationCallback;
+    private readonly Action _onForegroundChanged;
+    private nint _foregroundHook;
+    private nint _locationHook;
+    private bool _disposed;
+
+    /// <summary>Installs out-of-context hooks for foreground activation and in-place foreground resize.</summary>
+    /// <param name="onForegroundChanged">The callback invoked when the foreground window changes or resizes.</param>
+    public ForegroundWindowHook(Action onForegroundChanged)
+    {
+        ArgumentNullException.ThrowIfNull(onForegroundChanged);
+        _onForegroundChanged = onForegroundChanged;
+        _foregroundCallback = HandleForegroundChanged;
+        _locationCallback = HandleLocationChanged;
+
+        _foregroundHook = SetWinEventHook(
+            EventSystemForeground,
+            EventSystemForeground,
+            0,
+            _foregroundCallback,
+            0,
+            0,
+            WineventOutOfContext);
+        if (_foregroundHook == 0)
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not monitor foreground-window changes.");
+        }
+
+        _locationHook = SetWinEventHook(
+            EventObjectLocationChange,
+            EventObjectLocationChange,
+            0,
+            _locationCallback,
+            0,
+            0,
+            WineventOutOfContext);
+        if (_locationHook == 0)
+        {
+            UnhookWinEvent(_foregroundHook);
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not monitor foreground-window location changes.");
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_foregroundHook != 0)
+        {
+            UnhookWinEvent(_foregroundHook);
+            _foregroundHook = 0;
+        }
+
+        if (_locationHook != 0)
+        {
+            UnhookWinEvent(_locationHook);
+            _locationHook = 0;
+        }
+
+        _disposed = true;
+    }
+
+    private void HandleForegroundChanged(
+        nint hook,
+        uint eventType,
+        nint windowHandle,
+        int objectId,
+        int childId,
+        uint eventThreadId,
+        uint eventTime)
+    {
+        if (!_disposed)
+        {
+            _onForegroundChanged();
+        }
+    }
+
+    private void HandleLocationChanged(
+        nint hook,
+        uint eventType,
+        nint windowHandle,
+        int objectId,
+        int childId,
+        uint eventThreadId,
+        uint eventTime)
+    {
+        if (_disposed || objectId != ObjidWindow || windowHandle == 0)
+        {
+            return;
+        }
+
+        if (windowHandle == GetForegroundWindow())
+        {
+            _onForegroundChanged();
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
+    private delegate void WinEventDelegate(
+        nint hook,
+        uint eventType,
+        nint windowHandle,
+        int objectId,
+        int childId,
+        uint eventThreadId,
+        uint eventTime);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint SetWinEventHook(
+        uint eventMin,
+        uint eventMax,
+        nint moduleHandle,
+        WinEventDelegate callback,
+        uint processId,
+        uint threadId,
+        uint flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool UnhookWinEvent(nint hook);
+}
+
 /// <summary>Provides the minimal Win32 window operations required by the Drop Shelf.</summary>
 public static class WindowInterop
 {
+    /// <summary>Win32 mouse-move message.</summary>
+    public const uint MouseMoveMessage = 0x0200;
+
+    /// <summary>Win32 mouse-leave message.</summary>
+    public const uint MouseLeaveMessage = 0x02A3;
+
     private const int GwlStyle = -16;
+    private const int GwlExStyle = -20;
     private const nint HwndTopmost = -1;
     private const uint MonitorDefaultToNearest = 2;
     private const uint SwpNoActivate = 0x0010;
@@ -218,12 +366,16 @@ public static class WindowInterop
     private const int SwShow = 5;
     private const int SwShowNoActivate = 4;
     private const uint WmNcLButtonDown = 0x00A1;
+    private const uint WmMouseActivate = 0x0021;
+    private const nint MaNoActivate = 3;
     private const nuint HtCaption = 2;
     private const long WsCaption = 0x00C00000L;
     private const long WsThickFrame = 0x00040000L;
     private const long WsMinimizeBox = 0x00020000L;
     private const long WsMaximizeBox = 0x00010000L;
     private const long WsSysMenu = 0x00080000L;
+    private const long WsExNoActivate = 0x08000000L;
+    private const long WsExToolWindow = 0x00000080L;
 
     /// <summary>Removes standard caption and resize chrome from the HWND.</summary>
     /// <param name="windowHandle">The target HWND.</param>
@@ -240,6 +392,48 @@ public static class WindowInterop
             0,
             0,
             SwpNoMove | SwpNoSize | SwpNoActivate | SwpFrameChanged);
+    }
+
+    /// <summary>Marks an overlay window as a tool window that never activates from pointer input.</summary>
+    /// <param name="windowHandle">The target HWND.</param>
+    public static void MakeNoActivate(nint windowHandle)
+    {
+        var extendedStyle = GetWindowLongPtr(windowHandle, GwlExStyle).ToInt64();
+        extendedStyle |= WsExNoActivate | WsExToolWindow;
+        SetWindowLongPtr(windowHandle, GwlExStyle, new nint(extendedStyle));
+        SetWindowPos(
+            windowHandle,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SwpNoMove | SwpNoSize | SwpNoActivate | SwpFrameChanged);
+    }
+
+    /// <summary>Returns the native result that prevents mouse activation for an overlay window.</summary>
+    /// <param name="message">The window message.</param>
+    /// <returns>A handled no-activate result for <c>WM_MOUSEACTIVATE</c>; otherwise an unhandled result.</returns>
+    public static WindowMessageResult PreventMouseActivation(uint message) =>
+        message == WmMouseActivate ? new WindowMessageResult(true, MaNoActivate) : WindowMessageResult.Unhandled;
+
+    /// <summary>Gets the first native content child of a WinUI window.</summary>
+    /// <param name="windowHandle">The top-level WinUI window HWND.</param>
+    /// <returns>The content child HWND, or zero when none exists.</returns>
+    public static nint GetFirstChildWindow(nint windowHandle) =>
+        FindWindowEx(windowHandle, 0, null, null);
+
+    /// <summary>Requests a <c>WM_MOUSELEAVE</c> notification for an overlay window.</summary>
+    /// <param name="windowHandle">The target HWND.</param>
+    public static void TrackMouseLeave(nint windowHandle)
+    {
+        var tracking = new TrackMouseEventParameters
+        {
+            Size = (uint)Marshal.SizeOf<TrackMouseEventParameters>(),
+            Flags = 0x00000002,
+            WindowHandle = windowHandle,
+        };
+        TrackMouseEvent(ref tracking);
     }
 
     /// <summary>Begins a normal system window move from a custom drag strip.</summary>
@@ -290,6 +484,60 @@ public static class WindowInterop
             ?? throw new InvalidOperationException("The monitor did not provide a display device name.");
     }
 
+    /// <summary>Returns the currently connected displays in Windows enumeration order.</summary>
+    /// <returns>The display options available to Edge Rail settings.</returns>
+    public static IReadOnlyList<MonitorOption> GetMonitorOptions()
+    {
+        var monitors = new List<MonitorOption>();
+        EnumDisplayMonitors(
+            0,
+            0,
+            (monitor, _, _, _) =>
+            {
+                var info = GetMonitorInfo(monitor);
+                var id = info.DeviceName ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(id))
+                {
+                    monitors.Add(new MonitorOption(id, $"{id} ({info.Monitor.Width} × {info.Monitor.Height})"));
+                }
+
+                return true;
+            },
+            0);
+        return monitors;
+    }
+
+    /// <summary>Determines whether the foreground window occupies the bounds of the selected rail monitor.</summary>
+    /// <param name="monitorId">The selected Windows display device name.</param>
+    /// <returns><see langword="true"/> for a non-shell window covering the selected monitor; otherwise <see langword="false"/>.</returns>
+    public static bool IsForegroundWindowFullscreen(string monitorId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(monitorId);
+        var foregroundWindow = GetForegroundWindow();
+        if (foregroundWindow == 0 || IsShellWindow(foregroundWindow) || !GetWindowRect(foregroundWindow, out var windowRect))
+        {
+            return false;
+        }
+
+        var monitor = MonitorFromWindow(foregroundWindow, MonitorDefaultToNearest);
+        if (monitor == 0)
+        {
+            return false;
+        }
+
+        var monitorInfo = GetMonitorInfo(monitor);
+        if (!string.Equals(monitorInfo.DeviceName, monitorId, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var monitorBounds = monitorInfo.Monitor;
+        return windowRect.Left <= monitorBounds.Left &&
+               windowRect.Top <= monitorBounds.Top &&
+               windowRect.Right >= monitorBounds.Right &&
+               windowRect.Bottom >= monitorBounds.Bottom;
+    }
+
     /// <summary>Positions the unified shelf at the center of a remembered monitor.</summary>
     /// <param name="windowHandle">The shelf window.</param>
     /// <param name="monitorId">The remembered display device name.</param>
@@ -323,19 +571,21 @@ public static class WindowInterop
     }
 
 
-    /// <summary>Positions a narrow, topmost Edge Rail over a monitor work area without activating it.</summary>
+    /// <summary>Positions a bounded, topmost Edge Rail over a monitor work area without activating it.</summary>
     /// <param name="windowHandle">The rail window.</param>
     /// <param name="monitorId">The remembered display device name.</param>
     /// <param name="dockLeft">Whether to dock to the left edge; otherwise the right edge is used.</param>
     /// <param name="logicalWidth">The rail width in logical pixels.</param>
+    /// <param name="logicalHeight">The rail height in logical pixels.</param>
     public static void PositionEdgeRail(
         nint windowHandle,
         string monitorId,
         bool dockLeft,
-        int logicalWidth)
+        int logicalWidth,
+        int logicalHeight)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(monitorId);
-        ValidateLogicalSize(logicalWidth, 1);
+        ValidateLogicalSize(logicalWidth, logicalHeight);
 
         var monitor = FindMonitor(monitorId);
         if (monitor == 0)
@@ -349,9 +599,10 @@ public static class WindowInterop
         }
 
         var monitorInfo = GetMonitorInfo(monitor);
-        var width = Math.Clamp(Scale(logicalWidth, GetMonitorDpi(monitor)), 1, monitorInfo.Monitor.Width);
-        var x = dockLeft ? monitorInfo.Monitor.Left : monitorInfo.Monitor.Right - width;
-        SetBounds(windowHandle, x, monitorInfo.Monitor.Top, width, monitorInfo.Monitor.Height, SwpNoActivate | SwpShowWindow);
+        var (width, height) = FitToWorkArea(logicalWidth, logicalHeight, GetMonitorDpi(monitor), monitorInfo.Work);
+        var x = dockLeft ? monitorInfo.Work.Left : monitorInfo.Work.Right - width;
+        var y = monitorInfo.Work.Top + (monitorInfo.Work.Height - height) / 2;
+        SetBounds(windowHandle, x, y, width, height, SwpNoActivate | SwpShowWindow);
     }
 
     /// <summary>Shows a topmost window without activating it.</summary>
@@ -466,6 +717,19 @@ public static class WindowInterop
         SetWindowLongPtr(dialogHandle, -8 /* GWLP_HWNDPARENT */, ownerHandle);
     }
 
+    private static bool IsShellWindow(nint windowHandle)
+    {
+        var className = GetWindowClassName(windowHandle);
+        return className is "Progman" or "WorkerW" or "Shell_TrayWnd";
+    }
+
+    private static string GetWindowClassName(nint windowHandle)
+    {
+        var buffer = new System.Text.StringBuilder(64);
+        var length = GetClassName(windowHandle, buffer, buffer.Capacity);
+        return length == 0 ? string.Empty : buffer.ToString();
+    }
+
     private static void ValidateLogicalSize(int logicalWidth, int logicalHeight)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(logicalWidth);
@@ -562,6 +826,15 @@ public static class WindowInterop
         public string? DeviceName;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TrackMouseEventParameters
+    {
+        public uint Size;
+        public uint Flags;
+        public nint WindowHandle;
+        public uint HoverTime;
+    }
+
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern nint GetWindowLongPtr(nint windowHandle, int index);
@@ -579,6 +852,17 @@ public static class WindowInterop
         int width,
         int height,
         uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint FindWindowEx(
+        nint parentWindowHandle,
+        nint childAfter,
+        string? className,
+        string? windowName);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool TrackMouseEvent(ref TrackMouseEventParameters tracking);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -616,6 +900,12 @@ public static class WindowInterop
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(nint windowHandle);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(nint windowHandle, System.Text.StringBuilder className, int maxCount);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

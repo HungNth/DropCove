@@ -78,6 +78,23 @@ public sealed class DropShelfManager
         return state;
     }
 
+    /// <summary>Updates and persists the remembered Edge Rail placement.</summary>
+    /// <param name="placement">The monitor and edge to remember.</param>
+    /// <param name="cancellationToken">Cancels persistence.</param>
+    public async Task SetRailPlacementAsync(
+        ShelfRailPlacement placement,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(placement);
+        using var mutation = await LockMutationsAsync(cancellationToken);
+        if (_database is not null)
+        {
+            await _database.SaveRailPlacementAsync(placement, cancellationToken);
+        }
+
+        _railPlacement = placement;
+    }
+
 
     /// <summary>Opens a persistent manager and restores its shelf state.</summary>
     /// <param name="databasePath">The per-user SQLite database path.</param>

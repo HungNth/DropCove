@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using DropCove.Core;
 
 namespace DropCove.Services;
@@ -6,13 +7,18 @@ namespace DropCove.Services;
 /// <summary>Loads and atomically saves per-user DropCove settings.</summary>
 public sealed class SettingsStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        Converters = { new JsonStringEnumConverter() },
+    };
     private readonly string _settingsPath;
 
-    /// <summary>Initializes a settings store in the user's local application data directory.</summary>
-    public SettingsStore()
+    /// <summary>Initializes a settings store.</summary>
+    /// <param name="settingsPath">Optional settings path; omitted uses the user's local application data directory.</param>
+    public SettingsStore(string? settingsPath = null)
     {
-        _settingsPath = Path.Combine(
+        _settingsPath = settingsPath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "DropCove",
             "settings.json");

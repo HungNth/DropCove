@@ -258,6 +258,21 @@ public sealed class DropShelfManagerTests
     }
 
     [TestMethod]
+    public async Task RailPlacementCanBeUpdatedWhileShelfIsDocked()
+    {
+        var manager = CreateManagerWithOneItem(out _);
+        var initial = new ShelfRailPlacement("DISPLAY1", ShelfRailEdge.Right);
+        var updated = new ShelfRailPlacement("DISPLAY2", ShelfRailEdge.Left);
+
+        manager.ShowShelf();
+        manager.DismissShelf(initial);
+        await manager.SetRailPlacementAsync(updated);
+
+        Assert.AreEqual(ShelfDisplayState.EdgeDocked, manager.DisplayState);
+        Assert.AreEqual(updated, manager.RailPlacement);
+    }
+
+    [TestMethod]
     public void RemovingLastBatch_HidesAnEdgeDockedShelf()
     {
         var manager = CreateManagerWithOneItem(out var item);

@@ -228,6 +228,22 @@ public sealed class DropShelfPersistenceTests
         Assert.AreEqual(ShelfDisplayState.Hidden, restored.DisplayState);
     }
 
+    [TestMethod]
+    public async Task Restart_RestoresUpdatedRailPlacement()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        await manager.AcceptDropAsync([new(@"C:\Work\Docked.txt", "Docked.txt", false)]);
+        manager.ShowShelf();
+        await manager.DismissShelfAsync(new ShelfRailPlacement("DISPLAY1", ShelfRailEdge.Right));
+
+        var updated = new ShelfRailPlacement("DISPLAY2", ShelfRailEdge.Left);
+        await manager.SetRailPlacementAsync(updated);
+
+        var restored = await OpenAsync(databasePath);
+        Assert.AreEqual(updated, restored.RailPlacement);
+    }
+
     private static Task<DropShelfManager> OpenAsync(string databasePath) =>
         DropShelfManager.OpenAsync(databasePath, _ => ItemAvailability.Available);
 

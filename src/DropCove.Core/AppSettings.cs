@@ -20,7 +20,15 @@ public readonly record struct HotKeyDefinition(
 /// <summary>Contains the user-configurable resident utility settings.</summary>
 /// <param name="HotKey">The configured global hotkey.</param>
 /// <param name="StartWithWindows">Whether DropCove starts when the user signs in.</param>
-public sealed record AppSettings(HotKeyDefinition HotKey, bool StartWithWindows)
+/// <param name="RailEdge">The selected Edge Rail side.</param>
+/// <param name="RailMonitorId">The selected Windows display device name, or empty to use the remembered monitor.</param>
+/// <param name="ShowRailOverFullscreen">Whether the Edge Rail remains visible over fullscreen foreground windows.</param>
+public sealed record AppSettings(
+    HotKeyDefinition HotKey,
+    bool StartWithWindows,
+    ShelfRailEdge RailEdge = ShelfRailEdge.Right,
+    string RailMonitorId = "",
+    bool ShowRailOverFullscreen = false)
 {
     /// <summary>Gets the default settings for a new user.</summary>
     public static AppSettings Default { get; } = new(HotKeyDefinition.Default, true);

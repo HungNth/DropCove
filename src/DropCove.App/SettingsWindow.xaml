@@ -8,6 +8,21 @@
         <StackPanel Padding="24" Spacing="16">
             <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Settings" />
 
+            <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Edge Rail" />
+            <ComboBox
+                x:Name="RailEdgeComboBox"
+                Header="Docking edge"
+                DisplayMemberPath="Name" />
+            <ComboBox
+                x:Name="RailMonitorComboBox"
+                Header="Target monitor"
+                DisplayMemberPath="Label" />
+            <ToggleSwitch
+                x:Name="ShowRailOverFullscreenToggle"
+                Header="Show over fullscreen applications"
+                OnContent="On"
+                OffContent="Off" />
+
             <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Global hotkey" />
             <StackPanel Orientation="Horizontal" Spacing="12">
                 <CheckBox x:Name="ControlCheckBox" Content="Ctrl" />

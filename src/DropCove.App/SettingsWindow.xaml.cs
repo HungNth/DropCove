@@ -1,4 +1,5 @@
 using DropCove.Core;
+using DropCove.Native;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Windows.Graphics;
@@ -9,15 +10,37 @@ namespace DropCove;
 public sealed partial class SettingsWindow : Window
 {
     private readonly Func<AppSettings, Task<bool>> _applySettingsAsync;
+    private readonly IReadOnlyList<MonitorOption> _monitorOptions;
+    private readonly IReadOnlyList<RailEdgeChoice> _edgeChoices;
 
     /// <summary>Creates a settings window.</summary>
     /// <param name="settings">The current settings.</param>
+    /// <param name="monitorOptions">The currently connected displays.</param>
     /// <param name="applySettingsAsync">Applies and saves edited settings.</param>
-    public SettingsWindow(AppSettings settings, Func<AppSettings, Task<bool>> applySettingsAsync)
+    public SettingsWindow(
+        AppSettings settings,
+        IReadOnlyList<MonitorOption> monitorOptions,
+        Func<AppSettings, Task<bool>> applySettingsAsync)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(monitorOptions);
+        ArgumentNullException.ThrowIfNull(applySettingsAsync);
+
         InitializeComponent();
         _applySettingsAsync = applySettingsAsync;
-        AppWindow.Resize(new SizeInt32(380, 420));
+        _monitorOptions = monitorOptions;
+        _edgeChoices = Enum.GetValues<ShelfRailEdge>()
+            .Select(edge => new RailEdgeChoice(edge, edge.ToString()))
+            .ToArray();
+        AppWindow.Resize(new SizeInt32(420, 620));
+
+        RailEdgeComboBox.ItemsSource = _edgeChoices;
+        RailEdgeComboBox.SelectedItem = _edgeChoices.First(choice => choice.Edge == settings.RailEdge);
+        RailMonitorComboBox.ItemsSource = _monitorOptions;
+        RailMonitorComboBox.SelectedItem = _monitorOptions.FirstOrDefault(
+            option => string.Equals(option.Id, settings.RailMonitorId, StringComparison.OrdinalIgnoreCase))
+            ?? _monitorOptions.FirstOrDefault();
+        ShowRailOverFullscreenToggle.IsOn = settings.ShowRailOverFullscreen;
 
         ControlCheckBox.IsChecked = settings.HotKey.Control;
         AltCheckBox.IsChecked = settings.HotKey.Alt;
@@ -35,12 +58,14 @@ public sealed partial class SettingsWindow : Window
     private async void OnSaveClicked(object sender, RoutedEventArgs e)
     {
         if (KeyComboBox.SelectedItem is not HotKeyChoice key ||
+            RailEdgeComboBox.SelectedItem is not RailEdgeChoice edge ||
+            RailMonitorComboBox.SelectedItem is not MonitorOption monitor ||
             !(ControlCheckBox.IsChecked == true ||
               AltCheckBox.IsChecked == true ||
               ShiftCheckBox.IsChecked == true ||
               WindowsCheckBox.IsChecked == true))
         {
-            ShowError("Choose a key and at least one modifier.");
+            ShowError("Choose a rail edge, target monitor, key, and at least one modifier.");
             return;
         }
 
@@ -51,7 +76,10 @@ public sealed partial class SettingsWindow : Window
                 ShiftCheckBox.IsChecked == true,
                 WindowsCheckBox.IsChecked == true,
                 key.VirtualKey),
-            StartWithWindowsToggle.IsOn);
+            StartWithWindowsToggle.IsOn,
+            edge.Edge,
+            monitor.Id,
+            ShowRailOverFullscreenToggle.IsOn);
 
         try
         {
@@ -93,5 +121,6 @@ public sealed partial class SettingsWindow : Window
         return choices;
     }
 
+    private sealed record RailEdgeChoice(ShelfRailEdge Edge, string Name);
     private sealed record HotKeyChoice(string Name, uint VirtualKey);
 }

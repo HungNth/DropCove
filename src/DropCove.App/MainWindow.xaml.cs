@@ -141,12 +141,8 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var monitorId = WindowInterop.GetMonitorIdForWindow(_windowHandle);
         HideShelf();
-
-        var placement = _manager.RailPlacement.HasMonitor
-            ? _manager.RailPlacement
-            : new ShelfRailPlacement(monitorId, ShelfRailEdge.Right);
+        var placement = GetConfiguredRailPlacement(_settings);
         var state = await _manager.DismissShelfAsync(placement);
         if (state != ShelfDisplayState.EdgeDocked)
         {
@@ -156,7 +152,7 @@ public sealed partial class MainWindow : Window
 
         _railWindow ??= new EdgeRailWindow(_manager.Batches, OpenShelfFromRail);
         _railWindow.UpdateBatches(_manager.Batches);
-        _railWindow.Show(_manager.RailPlacement);
+        _railWindow.Show(_manager.RailPlacement, _settings.ShowRailOverFullscreen);
     }
 
     private void OpenShelfFromRail() => ShowShelfAt(_manager?.RailPlacement);
@@ -179,7 +175,10 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _settingsWindow = new SettingsWindow(_settings, ApplySettingsAsync);
+        _settingsWindow = new SettingsWindow(
+            _settings,
+            WindowInterop.GetMonitorOptions(),
+            ApplySettingsAsync);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Activate();
     }
@@ -206,14 +205,43 @@ public sealed partial class MainWindow : Window
             StartupRegistration.SetEnabled(settings.StartWithWindows);
             await _settingsStore.SaveAsync(settings);
             _settings = settings;
+
+            if (_manager is not null && _manager.Batches.Count > 0)
+            {
+                var placement = GetConfiguredRailPlacement(settings);
+                await _manager.SetRailPlacementAsync(placement);
+                if (_railWindow?.IsRequestedVisible == true)
+                {
+                    _railWindow.UpdateBatches(_manager.Batches);
+                    _railWindow.Show(placement, settings.ShowRailOverFullscreen);
+                }
+            }
+
             return true;
         }
         catch
         {
             TryRegisterHotKey(previous.HotKey);
             StartupRegistration.SetEnabled(previous.StartWithWindows);
+            await _settingsStore.SaveAsync(previous);
+            _settings = previous;
             throw;
         }
+    }
+
+    private ShelfRailPlacement GetConfiguredRailPlacement(AppSettings settings)
+    {
+        if (_manager is null)
+        {
+            throw new InvalidOperationException("The shelf manager has not been initialized.");
+        }
+
+        var monitorId = !string.IsNullOrWhiteSpace(settings.RailMonitorId)
+            ? settings.RailMonitorId
+            : _manager.RailPlacement.HasMonitor
+                ? _manager.RailPlacement.MonitorId
+                : WindowInterop.GetMonitorIdForWindow(_windowHandle);
+        return new ShelfRailPlacement(monitorId, settings.RailEdge);
     }
 
     private bool TryRegisterHotKey(HotKeyDefinition hotKey) =>
