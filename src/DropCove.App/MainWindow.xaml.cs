@@ -26,6 +26,7 @@ public sealed partial class MainWindow : Window
 
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly ShakeInputQueue _shakeInputQueue;
+    private readonly ShakeSessionCoordinator _shakeSession = new();
     private ShakeDetector? _shakeDetector;
     private LowLevelMouseHook? _shakeMouseHook;
     private ShakeRestoreState? _shakeRestore;
@@ -34,7 +35,6 @@ public sealed partial class MainWindow : Window
     private readonly SemaphoreSlim _shakeTransitionGate = new(1, 1);
     private bool _shakeButtonDown;
     private bool _shakeTriggeredForButton;
-    private bool _shakeAwaitingDropOutcome;
     private int _shakeSummonX;
     private int _shakeSummonY;
     private Task _shakeOperationTask = Task.CompletedTask;
@@ -161,6 +161,7 @@ public sealed partial class MainWindow : Window
             _shakeButtonDown = true;
             _shakeTriggeredForButton = false;
             _shakeDetector?.Reset();
+            _shakeSession.OnMouseButtonChanged(true);
             return;
         }
 
@@ -168,7 +169,7 @@ public sealed partial class MainWindow : Window
         {
             _shakeButtonDown = false;
             _shakeTriggeredForButton = false;
-            if (_shakeRestore is not null && !_shakeAwaitingDropOutcome)
+            if (_shakeSession.OnMouseButtonChanged(false) && _shakeRestore is not null)
             {
                 QueueShakeOperation(RestoreShakeStateAsync, "Shake restore failed");
             }
@@ -187,12 +188,15 @@ public sealed partial class MainWindow : Window
         {
             _shakeTriggeredForButton = false;
             _shakeDetector?.Reset();
+            _shakeSession.OnMouseButtonChanged(true);
         }
-        if (wasButtonDown && !_shakeButtonDown && _shakeRestore is not null && !_shakeAwaitingDropOutcome)
+        if (wasButtonDown && !_shakeButtonDown)
         {
-            QueueShakeOperation(RestoreShakeStateAsync, "Shake restore failed");
+            if (_shakeSession.OnMouseButtonChanged(false) && _shakeRestore is not null)
+            {
+                QueueShakeOperation(RestoreShakeStateAsync, "Shake restore failed");
+            }
         }
-
         if (_shakeButtonDown &&
             !_shakeTriggeredForButton &&
             _shakeRestore is null &&
@@ -231,7 +235,7 @@ public sealed partial class MainWindow : Window
             {
                 _shakeRestore = null;
                 _shakeRestoreInFlight = false;
-                _shakeAwaitingDropOutcome = false;
+                _shakeSession.Reset();
                 _manager?.HideShelf();
                 HideAllSurfaces();
             }
@@ -249,6 +253,13 @@ public sealed partial class MainWindow : Window
         {
             return;
         }
+
+        // Guard against race condition: if the user released the mouse before the queued summon task executes
+        if (!_shakeButtonDown || !_shakeSession.TrySummon())
+        {
+            return;
+        }
+
         _shakeSummonX = targetX;
         _shakeSummonY = targetY;
         var sessionVersion = ++_shakeSessionVersion;
@@ -284,18 +295,15 @@ public sealed partial class MainWindow : Window
 
     private void OnShakeDragStarted()
     {
-        if (_shakeRestore is not null || _shakeRestoreInFlight)
-        {
-            _shakeAwaitingDropOutcome = true;
-        }
+        _shakeSession.OnDragEnter();
     }
 
     private void OnShakeDragCanceled()
     {
-        _shakeAwaitingDropOutcome = false;
-        QueueShakeOperation(RestoreShakeStateAsync, "Shake restore failed");
+        // Cursor left the shelf window bounds. Do NOT restore here while left mouse button is held down.
+        // ShakeSessionCoordinator will trigger restore only when the button is released.
+        _shakeSession.OnDragLeave();
     }
-
     private async Task OnShakeDropCompletedAsync(bool accepted)
     {
         var restoreAfterRelease = false;
@@ -306,18 +314,18 @@ public sealed partial class MainWindow : Window
             {
                 return;
             }
-
-            _shakeAwaitingDropOutcome = false;
             if (accepted)
             {
                 _shakeSessionVersion++;
                 _shakeRestore = null;
                 _shakeRestoreInFlight = false;
                 _shakeDetector?.Reset();
+                _shakeSession.OnDropCompleted(true);
                 await ShowShelfNearCursorCoreAsync(null);
             }
             else if (_shakeRestore is not null)
             {
+                _shakeSession.OnDropCompleted(false);
                 restoreAfterRelease = true;
             }
         }
@@ -342,7 +350,7 @@ public sealed partial class MainWindow : Window
         var sessionVersion = ++_shakeSessionVersion;
         _shakeRestore = null;
         _shakeRestoreInFlight = true;
-        _shakeAwaitingDropOutcome = false;
+        _shakeSession.Reset();
         _shakeDetector?.Reset();
         HideAllSurfaces();
         await RestoreShakeStateCoreAsync(restore, sessionVersion);

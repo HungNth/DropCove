@@ -265,7 +265,7 @@ public sealed partial class MainPage : Page
             _manager is not null &&
             await _manager.RemoveItemAsync(item.Item.Id))
         {
-            await RefreshAfterMutationAsync();
+            await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
         }
     }
 
@@ -283,7 +283,7 @@ public sealed partial class MainPage : Page
         if (confirmed)
         {
             var count = await _manager.ClearTemporaryItemsAsync();
-            await RefreshAfterMutationAsync();
+            await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
             ShowDropMessage($"Cleared {count} temporary items.");
         }
     }
@@ -294,7 +294,7 @@ public sealed partial class MainPage : Page
             _manager is not null &&
             await _manager.RemoveBatchAsync(batchVm.Batch.Id))
         {
-            await RefreshAfterMutationAsync();
+            await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
         }
     }
 
