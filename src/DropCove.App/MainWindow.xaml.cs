@@ -95,7 +95,7 @@ public sealed partial class MainWindow : Window
     /// <summary>Shows and activates the shelf on the monitor containing the cursor.</summary>
     public void ShowShelf() => ShowShelfAt(null);
 
-    private void ShowShelfAt(ShelfRailPlacement? placement)
+    private async void ShowShelfAt(ShelfRailPlacement? placement)
     {
         if (_manager is null)
         {
@@ -103,6 +103,7 @@ public sealed partial class MainWindow : Window
         }
 
         HideRail();
+        await _page.RefreshAsync();
         _manager.ShowShelf();
         var (width, height) = GetShelfSize(_manager.Batches.Count);
         if (placement is { HasMonitor: true })
@@ -162,13 +163,14 @@ public sealed partial class MainWindow : Window
 
     private void OpenShelfFromRail() => ShowShelfAt(_manager?.RailPlacement);
 
-    private Task RefreshRailAfterMutationAsync()
+    private async Task RefreshRailAfterMutationAsync()
     {
         if (_manager is null || _railWindow is null)
         {
-            return Task.CompletedTask;
+            return;
         }
 
+        await _page.RefreshAsync();
         if (_manager.Batches.Count == 0)
         {
             _railWindow.Hide();
@@ -177,8 +179,6 @@ public sealed partial class MainWindow : Window
         {
             _railWindow.UpdateBatches(_manager.Batches);
         }
-
-        return Task.CompletedTask;
     }
 
     private void HideAllSurfaces()

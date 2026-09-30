@@ -290,6 +290,8 @@ public sealed partial class MainPage : Page
         }
     }
 
+    internal Task RefreshAsync() => RefreshAfterMutationAsync();
+
     private async Task RefreshAfterMutationAsync()
     {
         HideStatus();

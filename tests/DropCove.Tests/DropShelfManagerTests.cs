@@ -313,6 +313,25 @@ public sealed class DropShelfManagerTests
         Assert.AreEqual(ShelfDisplayState.UnifiedShelf, manager.DisplayState);
         Assert.AreEqual(placement, manager.RailPlacement);
     }
+    [TestMethod]
+    public void AcceptedDragFromRail_RemovesBatchBeforeShelfIsShownAgain()
+    {
+        var manager = CreateManagerWithOneItem(out var item);
+        var placement = new ShelfRailPlacement("DISPLAY1", ShelfRailEdge.Right);
+        manager.DismissShelf(placement);
+        Assert.AreEqual(ShelfDisplayState.EdgeDocked, manager.DisplayState);
+
+        // Simulate dragging and completing from the rail
+        var preparation = manager.PrepareBatchForDrag(manager.Batches[0].Id, _ => ItemAvailability.Available);
+        Assert.HasCount(1, preparation.AvailableItems);
+        Assert.IsTrue(manager.CompleteBatchDrag(manager.Batches[0].Id, DragOutOutcome.AcceptedCopy));
+        Assert.IsEmpty(manager.Batches);
+
+        // Now user re-opens the shelf
+        manager.ShowShelf();
+        Assert.IsEmpty(manager.Batches);
+    }
+
 
     private static DropShelfManager CreateManagerWithOneItem(out ShelfItem item)
     {
