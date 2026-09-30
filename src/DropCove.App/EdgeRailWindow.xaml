@@ -45,7 +45,11 @@
                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
-                            CornerRadius="5">
+                            CanDrag="True"
+                            CornerRadius="5"
+                            DragStarting="OnRailBatchDragStarting"
+                            DropCompleted="OnRailBatchDropCompleted"
+                            ToolTipService.ToolTip="Drag all items in batch">
                             <StackPanel HorizontalAlignment="Stretch" Spacing="2">
                                 <Grid Width="48" Height="28" HorizontalAlignment="Center">
                                     <FontIcon
@@ -77,6 +81,76 @@
                                     TextAlignment="Center"
                                     TextTrimming="CharacterEllipsis"
                                     TextWrapping="NoWrap" />
+                                <Button
+                                    AutomationProperties.Name="{Binding FlyoutAutomationName}"
+                                    ClickMode="Press"
+                                    Height="22"
+                                    HorizontalAlignment="Center"
+                                    Padding="6,0"
+                                    PointerPressed="OnBatchFlyoutButtonPointerPressed"
+                                    Visibility="{Binding FlyoutVisibility}"
+                                    ToolTipService.ToolTip="Show batch items">
+                                    <TextBlock FontSize="9" Text="Items" />
+                                    <Button.Flyout>
+                                        <Flyout
+                                            Closed="OnBatchFlyoutClosed"
+                                            Opened="OnBatchFlyoutOpened">
+                                            <ScrollViewer
+                                                Width="260"
+                                                MaxHeight="480"
+                                                HorizontalScrollBarVisibility="Disabled"
+                                                VerticalScrollBarVisibility="Auto">
+                                                <ItemsRepeater ItemsSource="{Binding Items}">
+                                                    <ItemsRepeater.Layout>
+                                                        <StackLayout Spacing="4" />
+                                                    </ItemsRepeater.Layout>
+                                                    <ItemsRepeater.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border
+                                                                Padding="6"
+                                                                AutomationProperties.Name="{Binding DragAutomationName}"
+                                                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                                                CanDrag="True"
+                                                                CornerRadius="4"
+                                                                DragStarting="OnRailItemDragStarting"
+                                                                DropCompleted="OnRailItemDropCompleted">
+                                                                <Grid ColumnSpacing="6">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="24" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                        <ColumnDefinition Width="Auto" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <Grid Width="24" Height="24" VerticalAlignment="Center">
+                                                                        <FontIcon FontSize="13" Glyph="{Binding Glyph}" />
+                                                                    </Grid>
+                                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                        <TextBlock
+                                                                            FontSize="10"
+                                                                            FontWeight="SemiBold"
+                                                                            Text="{Binding Name}"
+                                                                            TextTrimming="CharacterEllipsis"
+                                                                            TextWrapping="NoWrap" />
+                                                                        <TextBlock
+                                                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                                            FontSize="9"
+                                                                            Text="{Binding Type}"
+                                                                            TextTrimming="CharacterEllipsis"
+                                                                            TextWrapping="NoWrap" />
+                                                                    </StackPanel>
+                                                                    <TextBlock
+                                                                        Grid.Column="2"
+                                                                        FontSize="11"
+                                                                        Text="{Binding PinnedGlyph}"
+                                                                        VerticalAlignment="Center" />
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsRepeater.ItemTemplate>
+                                                </ItemsRepeater>
+                                            </ScrollViewer>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
                             </StackPanel>
                         </Border>
                     </DataTemplate>

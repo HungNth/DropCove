@@ -150,12 +150,36 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _railWindow ??= new EdgeRailWindow(_manager.Batches, OpenShelfFromRail);
+        _railWindow ??= new EdgeRailWindow(
+            _manager,
+            ShowConfirmDialogAsync,
+            RefreshRailAfterMutationAsync,
+            OpenShelfFromRail,
+            message => _trayIcon.ShowWarning("Edge Rail drag", message));
         _railWindow.UpdateBatches(_manager.Batches);
         _railWindow.Show(_manager.RailPlacement, _settings.ShowRailOverFullscreen);
     }
 
     private void OpenShelfFromRail() => ShowShelfAt(_manager?.RailPlacement);
+
+    private Task RefreshRailAfterMutationAsync()
+    {
+        if (_manager is null || _railWindow is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (_manager.Batches.Count == 0)
+        {
+            _railWindow.Hide();
+        }
+        else
+        {
+            _railWindow.UpdateBatches(_manager.Batches);
+        }
+
+        return Task.CompletedTask;
+    }
 
     private void HideAllSurfaces()
     {

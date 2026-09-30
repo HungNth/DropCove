@@ -223,6 +223,23 @@ public sealed class DropShelfManagerTests
     }
 
     [TestMethod]
+    public void PrepareThenAcceptedSingleItemBatchDrag_ConsumesTemporaryReference()
+    {
+        var manager = new DropShelfManager();
+        var batch = manager.AcceptDrop([
+            new(@"C:\Work\Only.txt", "Only.txt", false),
+        ]).Batch!;
+
+        var preparation = manager.PrepareBatchForDrag(
+            batch.Id,
+            _ => ItemAvailability.Available);
+
+        Assert.HasCount(1, preparation.AvailableItems);
+        Assert.IsTrue(manager.CompleteBatchDrag(batch.Id, DragOutOutcome.AcceptedCopy));
+        Assert.IsEmpty(manager.Batches);
+    }
+
+    [TestMethod]
     public void PrepareThenCanceledBatchDrag_RetainsAvailableItemsWithoutRestoringMissing()
     {
         var manager = new DropShelfManager();

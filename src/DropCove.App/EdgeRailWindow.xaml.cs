@@ -3,7 +3,9 @@ using DropCove.Native;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace DropCove;
 
@@ -17,6 +19,9 @@ public sealed partial class EdgeRailWindow : Window
     private readonly nint _windowHandle;
     private nint _inputWindowHandle;
     private readonly Action _openShelf;
+    private readonly Action<string> _notify;
+    private readonly Func<Task> _refreshAfterMutation;
+    private readonly DragDropService _dragDropService;
     private readonly DispatcherQueueTimer _expandTimer;
     private readonly DispatcherQueueTimer _collapseTimer;
     private readonly WindowMessageHook _windowMessageHook;
@@ -24,6 +29,7 @@ public sealed partial class EdgeRailWindow : Window
     private readonly ForegroundWindowHook _foregroundWindowHook;
     private readonly DispatcherQueue _dispatcherQueue;
     private ShelfRailPlacement? _placement;
+    private Flyout? _openFlyout;
     private bool _isExpanded;
     private bool _pointerInside;
     private bool _expandPending;
@@ -32,12 +38,23 @@ public sealed partial class EdgeRailWindow : Window
     private bool _showOverFullscreen;
 
     /// <summary>Creates an Edge Rail for the current Shelf Batches.</summary>
-    /// <param name="batches">The batches represented by the rail.</param>
+    /// <param name="manager">The shared shelf lifecycle manager.</param>
+    /// <param name="confirm">Confirms partial batch drag-out.</param>
+    /// <param name="refreshAfterMutation">Refreshes or hides the rail after a drag result.</param>
     /// <param name="openShelf">Opens and activates the unified Drop Shelf.</param>
-    public EdgeRailWindow(IReadOnlyList<ShelfBatch> batches, Action openShelf)
+    /// <param name="notify">Reports drag preparation warnings to the resident application.</param>
+    public EdgeRailWindow(
+        DropShelfManager manager,
+        Func<string, string, Task<bool>> confirm,
+        Func<Task> refreshAfterMutation,
+        Action openShelf,
+        Action<string> notify)
     {
-        ArgumentNullException.ThrowIfNull(batches);
+        ArgumentNullException.ThrowIfNull(manager);
+        ArgumentNullException.ThrowIfNull(confirm);
+        ArgumentNullException.ThrowIfNull(refreshAfterMutation);
         ArgumentNullException.ThrowIfNull(openShelf);
+        ArgumentNullException.ThrowIfNull(notify);
 
         InitializeComponent();
         _windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
@@ -52,9 +69,12 @@ public sealed partial class EdgeRailWindow : Window
         _collapseTimer.Interval = TimeSpan.FromMilliseconds(300);
         _collapseTimer.Tick += OnCollapseTimerTick;
         _foregroundWindowHook = new ForegroundWindowHook(() => _dispatcherQueue.TryEnqueue(ApplyVisibility));
+        _dragDropService = new DragDropService(manager, confirm);
+        _refreshAfterMutation = refreshAfterMutation;
         _openShelf = openShelf;
+        _notify = notify;
         Closed += (_, _) => DisposeNativeResources();
-        UpdateBatches(batches);
+        UpdateBatches(manager.Batches);
     }
 
 
@@ -82,8 +102,10 @@ public sealed partial class EdgeRailWindow : Window
         _showOverFullscreen = showOverFullscreen;
         _requestedVisible = true;
         _isExpanded = false;
-        _pointerInside = false;
+        _openFlyout?.Hide();
+        _openFlyout = null;
         _flyoutOpen = false;
+        _pointerInside = false;
         _expandPending = false;
         _expandTimer.Stop();
         _collapseTimer.Stop();
@@ -96,6 +118,9 @@ public sealed partial class EdgeRailWindow : Window
         _requestedVisible = false;
         _pointerInside = false;
         _expandPending = false;
+        _openFlyout?.Hide();
+        _openFlyout = null;
+        _flyoutOpen = false;
         _expandTimer.Stop();
         _collapseTimer.Stop();
         WindowInterop.Hide(_windowHandle);
@@ -244,6 +269,99 @@ public sealed partial class EdgeRailWindow : Window
         return WindowInterop.PreventMouseActivation(message);
     }
 
+    private void OnBatchFlyoutButtonPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Button { Flyout: Flyout flyout })
+        {
+            flyout.Placement = _placement?.Edge == ShelfRailEdge.Left
+                ? FlyoutPlacementMode.Right
+                : FlyoutPlacementMode.Left;
+        }
+    }
+
+    private void OnBatchFlyoutOpened(object sender, object e)
+    {
+        if (sender is Flyout flyout)
+        {
+            _openFlyout = flyout;
+        }
+
+        SetFlyoutOpen(true);
+    }
+
+    private void OnBatchFlyoutClosed(object sender, object e)
+    {
+        if (sender is Flyout flyout && ReferenceEquals(_openFlyout, flyout))
+        {
+            _openFlyout = null;
+        }
+
+        SetFlyoutOpen(false);
+    }
+
+    private async void OnRailBatchDragStarting(UIElement sender, DragStartingEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: RailBatchSummary summary })
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        var (error, missingRemoved, unavailableRetained) =
+            await _dragDropService.PrepareBatchDragAsync(summary.Batch, e);
+        if (missingRemoved > 0 && e.Cancel)
+        {
+            await _refreshAfterMutation();
+        }
+
+        if (error is not null)
+        {
+            _notify(error);
+        }
+        else if (unavailableRetained > 0)
+        {
+            _notify($"Dragging available items ({unavailableRetained} unavailable item(s) retained).");
+        }
+    }
+
+    private async void OnRailBatchDropCompleted(UIElement sender, DropCompletedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: RailBatchSummary summary })
+        {
+            return;
+        }
+
+        _openFlyout?.Hide();
+        await _dragDropService.CompleteBatchDragAsync(summary.Batch.Id, e.DropResult);
+        await _refreshAfterMutation();
+    }
+
+    private async void OnRailItemDragStarting(UIElement sender, DragStartingEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: RailItemSummary summary })
+        {
+            e.Cancel = true;
+            return;
+        }
+        var error = await _dragDropService.PrepareItemDragAsync(summary.Item, e);
+        if (error is not null)
+        {
+            _notify($"Could not drag {summary.Name}: {error}");
+        }
+    }
+
+    private async void OnRailItemDropCompleted(UIElement sender, DropCompletedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: RailItemSummary summary })
+        {
+            return;
+        }
+
+        _openFlyout?.Hide();
+        await _dragDropService.CompleteItemDragAsync(summary.Item.Id, e.DropResult);
+        await _refreshAfterMutation();
+    }
+
     private void OnOpenShelfClicked(object sender, RoutedEventArgs e)
     {
         Hide();
@@ -269,18 +387,43 @@ public sealed partial class EdgeRailWindow : Window
             ? first.IsFolder ? "Folder" : "File"
             : first.Name;
         var pinnedGlyph = batch.Items.Any(item => item.IsPinned) ? "\uE718" : string.Empty;
+        var items = batch.Items.Select(CreateItemSummary).ToArray();
         return new RailBatchSummary(
+            batch,
             title,
             subtitle,
             first.IsFolder ? "\uE8B7" : "\uE8A5",
             pinnedGlyph,
+            items,
             $"Edge Rail batch {title}");
     }
+
+    private static RailItemSummary CreateItemSummary(ShelfItem item) => new(
+        item,
+        item.Name,
+        item.IsFolder ? "Folder" : "File",
+        item.IsFolder ? "\uE8B7" : "\uE8A5",
+        item.IsPinned ? "\uE718" : string.Empty,
+        $"Drag {item.Name}");
 }
 
 internal sealed record RailBatchSummary(
+    ShelfBatch Batch,
     string Title,
     string Subtitle,
     string Glyph,
     string PinnedGlyph,
-    string AutomationName);
+    IReadOnlyList<RailItemSummary> Items,
+    string AutomationName)
+{
+    public Visibility FlyoutVisibility => Items.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+    public string FlyoutAutomationName => $"Show items in {Title}";
+}
+
+internal sealed record RailItemSummary(
+    ShelfItem Item,
+    string Name,
+    string Type,
+    string Glyph,
+    string PinnedGlyph,
+    string DragAutomationName);
