@@ -23,12 +23,16 @@ public readonly record struct HotKeyDefinition(
 /// <param name="RailEdge">The selected Edge Rail side.</param>
 /// <param name="RailMonitorId">The selected Windows display device name, or empty to use the remembered monitor.</param>
 /// <param name="ShowRailOverFullscreen">Whether the Edge Rail remains visible over fullscreen foreground windows.</param>
+/// <param name="ShakeEnabled">Whether the global shake gesture is active.</param>
+/// <param name="ShakeSensitivity">The configured shake movement sensitivity.</param>
 public sealed record AppSettings(
     HotKeyDefinition HotKey,
     bool StartWithWindows,
     ShelfRailEdge RailEdge = ShelfRailEdge.Right,
     string RailMonitorId = "",
-    bool ShowRailOverFullscreen = false)
+    bool ShowRailOverFullscreen = false,
+    bool ShakeEnabled = true,
+    ShakeSensitivity ShakeSensitivity = ShakeSensitivity.Normal)
 {
     /// <summary>Gets the default settings for a new user.</summary>
     public static AppSettings Default { get; } = new(HotKeyDefinition.Default, true);

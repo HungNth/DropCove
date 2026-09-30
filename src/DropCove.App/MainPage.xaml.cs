@@ -29,6 +29,9 @@ public sealed partial class MainPage : Page
     private Action? _beginWindowMove;
     private Action<int, int>? _resizeWindow;
     private Func<string, string, Task<bool>>? _confirm;
+    private Action? _shakeDragCanceled;
+    private Func<bool, Task>? _shakeDropCompleted;
+    private Action? _shakeDragStarted;
     private DispatcherTimer? _statusTimer;
     /// <summary>Initializes the page.</summary>
     public MainPage()
@@ -43,8 +46,14 @@ public sealed partial class MainPage : Page
         Action showSettings,
         Action beginWindowMove,
         Action<int, int> resizeWindow,
-        Func<string, string, Task<bool>> confirm)
+        Func<string, string, Task<bool>> confirm,
+        Action shakeDragStarted,
+        Action shakeDragCanceled,
+        Func<bool, Task> shakeDropCompleted)
     {
+        ArgumentNullException.ThrowIfNull(shakeDragStarted);
+        ArgumentNullException.ThrowIfNull(shakeDragCanceled);
+        ArgumentNullException.ThrowIfNull(shakeDropCompleted);
         _manager = manager;
         _visualCoordinator = new ShelfVisualCoordinator<ImageSource>(
             new WindowsShelfVisualProvider(TryGetCachedStorageItem),
@@ -56,8 +65,10 @@ public sealed partial class MainPage : Page
         _beginWindowMove = beginWindowMove;
         _resizeWindow = resizeWindow;
         _confirm = confirm;
-        await RebuildBatchCardsAsync();
-        ResizeForBatchCount(manager.Batches.Count);
+        _shakeDragCanceled = shakeDragCanceled;
+        _shakeDropCompleted = shakeDropCompleted;
+        _shakeDragStarted = shakeDragStarted;
+        await RefreshCardsAsync();
     }
     internal Task<DropAcceptance> AcceptStorageDropAsync(DataPackageView dataView) =>
         (_storageDropService ?? throw new InvalidOperationException("MainPage is not initialized.")).AcceptAsync(dataView);
@@ -93,11 +104,19 @@ public sealed partial class MainPage : Page
         }
     }
 
-    private void OnDragEnter(object sender, DragEventArgs e) => UpdateDragFeedback(e);
+    private void OnDragEnter(object sender, DragEventArgs e)
+    {
+        _shakeDragStarted?.Invoke();
+        UpdateDragFeedback(e);
+    }
 
     private void OnDragOver(object sender, DragEventArgs e) => UpdateDragFeedback(e);
 
-    private void OnDragLeave(object sender, DragEventArgs e) => DragOverlay.Visibility = Visibility.Collapsed;
+    private void OnDragLeave(object sender, DragEventArgs e)
+    {
+        DragOverlay.Visibility = Visibility.Collapsed;
+        _shakeDragCanceled?.Invoke();
+    }
 
     private void UpdateDragFeedback(DragEventArgs e)
     {
@@ -111,25 +130,32 @@ public sealed partial class MainPage : Page
 
     private async void OnDrop(object sender, DragEventArgs e)
     {
-        DragOverlay.Visibility = Visibility.Collapsed;
-        if (_manager is null || !StorageDropService.CanCopyStorageItems(e))
-        {
-            ShowDropMessage("No supported filesystem paths were found.", InfoBarSeverity.Warning);
-            return;
-        }
-
         var deferral = e.GetDeferral();
+        var shakeOutcomeReported = false;
         try
         {
-            var outcome = await AcceptStorageDropAsync(e.DataView);
-            if (outcome.Batch is null)
+            _shakeDragStarted?.Invoke();
+            DragOverlay.Visibility = Visibility.Collapsed;
+            if (_manager is null || !StorageDropService.CanCopyStorageItems(e))
             {
+                shakeOutcomeReported = true;
+                await (_shakeDropCompleted?.Invoke(false) ?? Task.CompletedTask);
                 ShowDropMessage("No supported filesystem paths were found.", InfoBarSeverity.Warning);
                 return;
             }
 
-            await RebuildBatchCardsAsync();
-            ResizeForBatchCount(_manager.Batches.Count);
+            var outcome = await AcceptStorageDropAsync(e.DataView);
+            if (outcome.Batch is null)
+            {
+                shakeOutcomeReported = true;
+                await (_shakeDropCompleted?.Invoke(false) ?? Task.CompletedTask);
+                ShowDropMessage("No supported filesystem paths were found.", InfoBarSeverity.Warning);
+                return;
+            }
+
+            shakeOutcomeReported = true;
+            await (_shakeDropCompleted?.Invoke(true) ?? Task.CompletedTask);
+            await RefreshCardsAsync();
             BatchScroller.ChangeView(null, 0, null, true);
 
             if (outcome.SkippedUnsupportedCount > 0)
@@ -145,6 +171,11 @@ public sealed partial class MainPage : Page
         }
         catch (Exception exception)
         {
+            if (!shakeOutcomeReported)
+            {
+                await (_shakeDropCompleted?.Invoke(false) ?? Task.CompletedTask);
+            }
+
             ShowDropMessage($"Drop failed: {exception.Message}", InfoBarSeverity.Error);
         }
         finally
@@ -175,7 +206,7 @@ public sealed partial class MainPage : Page
             _dragDropService is not null &&
             await _dragDropService.CompleteItemDragAsync(item.Item.Id, e.DropResult))
         {
-            await RefreshAfterMutationAsync();
+            await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
         }
     }
 
@@ -214,8 +245,8 @@ public sealed partial class MainPage : Page
         if (sender is FrameworkElement { DataContext: BatchCardViewModel batchVm } &&
             _dragDropService is not null)
         {
-            await _dragDropService.CompleteBatchDragAsync(batchVm.Batch.Id, e.DropResult);
-            await RefreshAfterMutationAsync();
+            var consumed = await _dragDropService.CompleteBatchDragAsync(batchVm.Batch.Id, e.DropResult);
+            await RefreshAfterMutationAsync(autoHideWhenEmpty: consumed);
         }
     }
     private async void OnPinClicked(object sender, RoutedEventArgs e)
@@ -275,20 +306,13 @@ public sealed partial class MainPage : Page
         }
     }
 
-    internal Task RefreshAsync() => RefreshAfterMutationAsync();
+    internal Task RefreshAsync() => RefreshCardsAsync();
 
-    private async Task RefreshAfterMutationAsync()
+    private Task RefreshCardsAsync()
     {
         HideStatus();
-        await RebuildBatchCardsAsync();
-        ResizeForBatchCount(_manager!.Batches.Count);
-    }
-
-    private Task RebuildBatchCardsAsync()
-    {
-        var manager = _manager!;
         CancelVisualRequests();
-        var cards = manager.Batches.Select(CreateBatchCard).ToArray();
+        var cards = _manager!.Batches.Select(CreateBatchCard).ToArray();
         BatchList.ItemsSource = cards;
         EmptyState.Visibility = cards.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         BatchScroller.Visibility = cards.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
@@ -296,7 +320,17 @@ public sealed partial class MainPage : Page
         var overflow = Math.Max(0, cards.Length - 4);
         OverflowLabel.Text = $"+{overflow} batch{(overflow == 1 ? string.Empty : "es")}";
         OverflowLabel.Visibility = overflow == 0 ? Visibility.Collapsed : Visibility.Visible;
+        ResizeForBatchCount(cards.Length);
         return Task.CompletedTask;
+    }
+
+    private async Task RefreshAfterMutationAsync(bool autoHideWhenEmpty = false)
+    {
+        await RefreshCardsAsync();
+        if (autoHideWhenEmpty && _manager?.Batches.Count == 0 && _dismissShelf is not null)
+        {
+            await _dismissShelf();
+        }
     }
 
     private void OnBatchElementPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)

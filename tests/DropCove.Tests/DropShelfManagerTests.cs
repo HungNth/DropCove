@@ -333,6 +333,24 @@ public sealed class DropShelfManagerTests
     }
 
     [TestMethod]
+    public void CompleteBatchDrag_WhenLastBatchConsumed_DismissTransitionsToHidden()
+    {
+        var manager = CreateManagerWithOneItem(out var item);
+        manager.ShowShelf();
+        Assert.AreEqual(ShelfDisplayState.UnifiedShelf, manager.DisplayState);
+
+        var preparation = manager.PrepareBatchForDrag(manager.Batches[0].Id, _ => ItemAvailability.Available);
+        Assert.IsTrue(manager.CompleteBatchDrag(manager.Batches[0].Id, DragOutOutcome.AcceptedCopy));
+        Assert.IsEmpty(manager.Batches);
+
+        // When last batch is consumed, dismissing the shelf must transition to Hidden (not EdgeDocked)
+        var placement = new ShelfRailPlacement("DISPLAY1", ShelfRailEdge.Right);
+        var state = manager.DismissShelf(placement);
+        Assert.AreEqual(ShelfDisplayState.Hidden, state);
+        Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
+    }
+
+    [TestMethod]
     public void EdgeDockedShelf_AcceptsSuccessiveDrops_MaintainsBatchOrdering()
     {
         var manager = CreateManagerWithOneItem(out _);
@@ -351,6 +369,18 @@ public sealed class DropShelfManagerTests
         Assert.AreSame(secondDrop.Batch, manager.Batches[0]);
         Assert.AreSame(firstDrop.Batch, manager.Batches[1]);
         Assert.AreEqual(ShelfDisplayState.EdgeDocked, manager.DisplayState);
+    }
+
+    [TestMethod]
+    public void HideShelf_RestoresHiddenStateWithoutChangingBatches()
+    {
+        var manager = CreateManagerWithOneItem(out _);
+        manager.ShowShelf();
+
+        manager.HideShelf();
+
+        Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
+        Assert.HasCount(1, manager.Batches);
     }
 
 

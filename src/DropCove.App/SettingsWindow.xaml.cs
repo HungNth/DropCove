@@ -12,6 +12,7 @@ public sealed partial class SettingsWindow : Window
     private readonly Func<AppSettings, Task<bool>> _applySettingsAsync;
     private readonly IReadOnlyList<MonitorOption> _monitorOptions;
     private readonly IReadOnlyList<RailEdgeChoice> _edgeChoices;
+    private readonly IReadOnlyList<ShakeSensitivityChoice> _shakeSensitivityChoices;
 
     /// <summary>Creates a settings window.</summary>
     /// <param name="settings">The current settings.</param>
@@ -32,7 +33,10 @@ public sealed partial class SettingsWindow : Window
         _edgeChoices = Enum.GetValues<ShelfRailEdge>()
             .Select(edge => new RailEdgeChoice(edge, edge.ToString()))
             .ToArray();
-        AppWindow.Resize(new SizeInt32(420, 620));
+        _shakeSensitivityChoices = Enum.GetValues<ShakeSensitivity>()
+            .Select(sensitivity => new ShakeSensitivityChoice(sensitivity, sensitivity.ToString()))
+            .ToArray();
+        AppWindow.Resize(new SizeInt32(420, 700));
 
         RailEdgeComboBox.ItemsSource = _edgeChoices;
         RailEdgeComboBox.SelectedItem = _edgeChoices.First(choice => choice.Edge == settings.RailEdge);
@@ -41,6 +45,9 @@ public sealed partial class SettingsWindow : Window
             option => string.Equals(option.Id, settings.RailMonitorId, StringComparison.OrdinalIgnoreCase))
             ?? _monitorOptions.FirstOrDefault();
         ShowRailOverFullscreenToggle.IsOn = settings.ShowRailOverFullscreen;
+        ShakeEnabledToggle.IsOn = settings.ShakeEnabled;
+        ShakeSensitivityComboBox.ItemsSource = _shakeSensitivityChoices;
+        ShakeSensitivityComboBox.SelectedItem = _shakeSensitivityChoices.First(choice => choice.Sensitivity == settings.ShakeSensitivity);
 
         ControlCheckBox.IsChecked = settings.HotKey.Control;
         AltCheckBox.IsChecked = settings.HotKey.Alt;
@@ -60,12 +67,13 @@ public sealed partial class SettingsWindow : Window
         if (KeyComboBox.SelectedItem is not HotKeyChoice key ||
             RailEdgeComboBox.SelectedItem is not RailEdgeChoice edge ||
             RailMonitorComboBox.SelectedItem is not MonitorOption monitor ||
+            ShakeSensitivityComboBox.SelectedItem is not ShakeSensitivityChoice sensitivity ||
             !(ControlCheckBox.IsChecked == true ||
               AltCheckBox.IsChecked == true ||
               ShiftCheckBox.IsChecked == true ||
               WindowsCheckBox.IsChecked == true))
         {
-            ShowError("Choose a rail edge, target monitor, key, and at least one modifier.");
+            ShowError("Choose a rail edge, target monitor, shake sensitivity, key, and at least one modifier.");
             return;
         }
 
@@ -79,7 +87,9 @@ public sealed partial class SettingsWindow : Window
             StartWithWindowsToggle.IsOn,
             edge.Edge,
             monitor.Id,
-            ShowRailOverFullscreenToggle.IsOn);
+            ShowRailOverFullscreenToggle.IsOn,
+            ShakeEnabledToggle.IsOn,
+            sensitivity.Sensitivity);
 
         try
         {
@@ -123,4 +133,5 @@ public sealed partial class SettingsWindow : Window
 
     private sealed record RailEdgeChoice(ShelfRailEdge Edge, string Name);
     private sealed record HotKeyChoice(string Name, uint VirtualKey);
+    private sealed record ShakeSensitivityChoice(ShakeSensitivity Sensitivity, string Name);
 }

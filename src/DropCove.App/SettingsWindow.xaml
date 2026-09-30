@@ -23,6 +23,17 @@
                 OnContent="On"
                 OffContent="Off" />
 
+            <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Shake-to-open" />
+            <ToggleSwitch
+                x:Name="ShakeEnabledToggle"
+                Header="Enable shake gesture"
+                OnContent="On"
+                OffContent="Off" />
+            <ComboBox
+                x:Name="ShakeSensitivityComboBox"
+                Header="Shake sensitivity"
+                DisplayMemberPath="Name" />
+
             <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Global hotkey" />
             <StackPanel Orientation="Horizontal" Spacing="12">
                 <CheckBox x:Name="ControlCheckBox" Content="Ctrl" />

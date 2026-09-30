@@ -21,7 +21,7 @@ public sealed class SettingsStoreTests
     }
 
     [TestMethod]
-    public async Task SaveAndLoad_RoundTripsEdgeRailSettings()
+    public async Task SaveAndLoad_RoundTripsEdgeRailAndShakeSettings()
     {
         var directory = CreateTemporaryDirectory();
         var store = new SettingsStore(Path.Combine(directory, "settings.json"));
@@ -30,7 +30,9 @@ public sealed class SettingsStoreTests
             false,
             ShelfRailEdge.Left,
             @"\\.\DISPLAY2",
-            true);
+            true,
+            false,
+            ShakeSensitivity.High);
 
         await store.SaveAsync(settings);
         var restored = await store.LoadAsync();
@@ -63,6 +65,34 @@ public sealed class SettingsStoreTests
         Assert.AreEqual(ShelfRailEdge.Right, restored.RailEdge);
         Assert.AreEqual(string.Empty, restored.RailMonitorId);
         Assert.IsFalse(restored.ShowRailOverFullscreen);
+        Assert.IsTrue(restored.ShakeEnabled);
+        Assert.AreEqual(ShakeSensitivity.Normal, restored.ShakeSensitivity);
+    }
+
+    [TestMethod]
+    public async Task Load_InvalidShakeSensitivityFallsBackToDefaults()
+    {
+        var directory = CreateTemporaryDirectory();
+        var path = Path.Combine(directory, "settings.json");
+        await File.WriteAllTextAsync(
+            path,
+            """
+            {
+              "HotKey": {
+                "Control": true,
+                "Alt": false,
+                "Shift": true,
+                "Windows": false,
+                "VirtualKey": 32
+              },
+              "StartWithWindows": true,
+              "ShakeSensitivity": 99
+            }
+            """);
+
+        var restored = await new SettingsStore(path).LoadAsync();
+
+        Assert.AreEqual(AppSettings.Default, restored);
     }
 
     [TestMethod]

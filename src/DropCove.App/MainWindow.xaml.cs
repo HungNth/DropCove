@@ -1,7 +1,9 @@
+using System.ComponentModel;
 using DropCove.Core;
 using DropCove.Native;
 using DropCove.Services;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Dispatching;
 
 namespace DropCove;
 
@@ -22,10 +24,26 @@ public sealed partial class MainWindow : Window
     private EdgeRailWindow? _railWindow;
     private bool _disposed;
 
+    private readonly DispatcherQueue _dispatcherQueue;
+    private readonly ShakeInputQueue _shakeInputQueue;
+    private ShakeDetector? _shakeDetector;
+    private LowLevelMouseHook? _shakeMouseHook;
+    private ShakeRestoreState? _shakeRestore;
+    private long _shakeSessionVersion;
+    private bool _shakeRestoreInFlight;
+    private readonly SemaphoreSlim _shakeTransitionGate = new(1, 1);
+    private bool _shakeButtonDown;
+    private bool _shakeTriggeredForButton;
+    private bool _shakeAwaitingDropOutcome;
+    private int _shakeSummonX;
+    private int _shakeSummonY;
+    private Task _shakeOperationTask = Task.CompletedTask;
     /// <summary>Creates the resident Drop Shelf window and native integrations.</summary>
     public MainWindow()
     {
         InitializeComponent();
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+        _shakeInputQueue = new(_dispatcherQueue, ProcessShakeInput);
         _windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
         WindowInterop.MakeBorderless(_windowHandle);
 
@@ -65,7 +83,10 @@ public sealed partial class MainWindow : Window
             ShowSettings,
             () => WindowInterop.BeginMove(_windowHandle),
             (width, height) => WindowInterop.ResizeAnchored(_windowHandle, width, height),
-            ShowConfirmDialogAsync);
+            ShowConfirmDialogAsync,
+            OnShakeDragStarted,
+            OnShakeDragCanceled,
+            OnShakeDropCompletedAsync);
         if (_manager.RecoveryBackupPath is not null)
         {
             _trayIcon.ShowWarning(
@@ -74,12 +95,22 @@ public sealed partial class MainWindow : Window
         }
 
         _settings = await _settingsStore.LoadAsync();
+        _shakeDetector = _settings.ShakeEnabled
+            ? new ShakeDetector(_settings.ShakeSensitivity)
+            : null;
         StartupRegistration.SetEnabled(_settings.StartWithWindows);
         if (!TryRegisterHotKey(_settings.HotKey))
         {
             _trayIcon.ShowWarning(
                 "Hotkey unavailable",
                 "DropCove is running. Open Settings from the tray and choose another hotkey.");
+        }
+
+        if (!TryConfigureShakeHook(_settings.ShakeEnabled))
+        {
+            _trayIcon.ShowWarning(
+                "Shake unavailable",
+                "DropCove is running, but the global shake hook could not be installed.");
         }
 
         if (startHidden)
@@ -119,6 +150,233 @@ public sealed partial class MainWindow : Window
         _page.Focus(FocusState.Programmatic);
     }
 
+    private void ProcessShakeInput(LowLevelMouseInput input)
+    {
+        if (_shakeMouseHook is null || _shakeDetector is null)
+        {
+            return;
+        }
+        if (input.Message == LowLevelMouseHook.LeftButtonDownMessage)
+        {
+            _shakeButtonDown = true;
+            _shakeTriggeredForButton = false;
+            _shakeDetector?.Reset();
+            return;
+        }
+
+        if (input.Message == LowLevelMouseHook.LeftButtonUpMessage)
+        {
+            _shakeButtonDown = false;
+            _shakeTriggeredForButton = false;
+            if (_shakeRestore is not null && !_shakeAwaitingDropOutcome)
+            {
+                QueueShakeOperation(RestoreShakeStateAsync, "Shake restore failed");
+            }
+
+            return;
+        }
+
+        if (input.Message != LowLevelMouseHook.MouseMoveMessage)
+        {
+            return;
+        }
+
+        var wasButtonDown = _shakeButtonDown;
+        _shakeButtonDown = input.LeftButtonDown;
+        if (!wasButtonDown && _shakeButtonDown)
+        {
+            _shakeTriggeredForButton = false;
+            _shakeDetector?.Reset();
+        }
+        if (wasButtonDown && !_shakeButtonDown && _shakeRestore is not null && !_shakeAwaitingDropOutcome)
+        {
+            QueueShakeOperation(RestoreShakeStateAsync, "Shake restore failed");
+        }
+
+        if (_shakeButtonDown &&
+            !_shakeTriggeredForButton &&
+            _shakeRestore is null &&
+            _shakeDetector?.Observe(new ShakeSample(input.X, input.Y, input.TimestampMilliseconds)) == true)
+        {
+            _shakeTriggeredForButton = true;
+            var targetX = input.X;
+            var targetY = input.Y;
+            QueueShakeOperation(() => SummonShelfByShakeCoreAsync(targetX, targetY), "Shake summon failed");
+        }
+    }
+
+    private void QueueShakeOperation(Func<Task> operation, string failureTitle) =>
+        _shakeOperationTask = RunQueuedShakeOperationAsync(_shakeOperationTask, operation, failureTitle);
+
+    private async Task RunQueuedShakeOperationAsync(Task previous, Func<Task> operation, string failureTitle)
+    {
+        try
+        {
+            await previous;
+            await operation();
+        }
+        catch (Exception exception)
+        {
+            Exception? restoreException = null;
+            try
+            {
+                await RestoreShakeStateAsync();
+            }
+            catch (Exception recoveryException)
+            {
+                restoreException = recoveryException;
+            }
+
+            if (restoreException is not null || _shakeRestoreInFlight)
+            {
+                _shakeRestore = null;
+                _shakeRestoreInFlight = false;
+                _shakeAwaitingDropOutcome = false;
+                _manager?.HideShelf();
+                HideAllSurfaces();
+            }
+
+            var message = restoreException is null
+                ? exception.Message
+                : $"{exception.Message} Restore failed: {restoreException.Message}";
+            _trayIcon.ShowWarning(failureTitle, message);
+        }
+    }
+
+    private async Task SummonShelfByShakeCoreAsync(int targetX, int targetY)
+    {
+        if (_manager is null || _shakeRestore is not null || _shakeRestoreInFlight || _manager.DisplayState == ShelfDisplayState.UnifiedShelf)
+        {
+            return;
+        }
+        _shakeSummonX = targetX;
+        _shakeSummonY = targetY;
+        var sessionVersion = ++_shakeSessionVersion;
+        _shakeRestore = new ShakeRestoreState(_manager.DisplayState, _manager.RailPlacement);
+        _shakeDetector?.Reset();
+        HideAllSurfaces();
+        await ShowShelfNearPointCoreAsync(targetX, targetY, sessionVersion);
+    }
+
+    private Task ShowShelfNearCursorCoreAsync(long? sessionVersion) =>
+        ShowShelfNearPointCoreAsync(_shakeSummonX, _shakeSummonY, sessionVersion);
+    private async Task ShowShelfNearPointCoreAsync(int targetX, int targetY, long? sessionVersion)
+    {
+        if (_manager is null ||
+            sessionVersion is not null && (sessionVersion != _shakeSessionVersion || _shakeRestore is null))
+        {
+            return;
+        }
+
+        HideRail();
+        await _page.RefreshAsync();
+        if (sessionVersion is not null && (sessionVersion != _shakeSessionVersion || _shakeRestore is null))
+        {
+            return;
+        }
+
+        _manager.ShowShelf();
+        var (width, height) = GetShelfSize(_manager.Batches.Count);
+        WindowInterop.PositionNearPoint(_windowHandle, targetX, targetY, width, height);
+        WindowInterop.ShowAndActivate(_windowHandle);
+        _page.Focus(FocusState.Programmatic);
+    }
+
+    private void OnShakeDragStarted()
+    {
+        if (_shakeRestore is not null || _shakeRestoreInFlight)
+        {
+            _shakeAwaitingDropOutcome = true;
+        }
+    }
+
+    private void OnShakeDragCanceled()
+    {
+        _shakeAwaitingDropOutcome = false;
+        QueueShakeOperation(RestoreShakeStateAsync, "Shake restore failed");
+    }
+
+    private async Task OnShakeDropCompletedAsync(bool accepted)
+    {
+        var restoreAfterRelease = false;
+        await _shakeTransitionGate.WaitAsync();
+        try
+        {
+            if (_shakeRestore is null && !_shakeRestoreInFlight)
+            {
+                return;
+            }
+
+            _shakeAwaitingDropOutcome = false;
+            if (accepted)
+            {
+                _shakeSessionVersion++;
+                _shakeRestore = null;
+                _shakeRestoreInFlight = false;
+                _shakeDetector?.Reset();
+                await ShowShelfNearCursorCoreAsync(null);
+            }
+            else if (_shakeRestore is not null)
+            {
+                restoreAfterRelease = true;
+            }
+        }
+        finally
+        {
+            _shakeTransitionGate.Release();
+        }
+
+        if (restoreAfterRelease)
+        {
+            await RestoreShakeStateAsync();
+        }
+    }
+
+    private async Task RestoreShakeStateAsync()
+    {
+        if (_shakeRestore is not { } restore)
+        {
+            return;
+        }
+
+        var sessionVersion = ++_shakeSessionVersion;
+        _shakeRestore = null;
+        _shakeRestoreInFlight = true;
+        _shakeAwaitingDropOutcome = false;
+        _shakeDetector?.Reset();
+        HideAllSurfaces();
+        await RestoreShakeStateCoreAsync(restore, sessionVersion);
+        if (sessionVersion == _shakeSessionVersion)
+        {
+            _shakeRestoreInFlight = false;
+        }
+    }
+
+    private async Task RestoreShakeStateCoreAsync(ShakeRestoreState restore, long sessionVersion)
+    {
+        await _shakeTransitionGate.WaitAsync();
+        try
+        {
+            if (sessionVersion != _shakeSessionVersion || _manager is null)
+            {
+                return;
+            }
+
+            if (restore.DisplayState == ShelfDisplayState.EdgeDocked)
+            {
+                await DismissShelfAtPlacement(restore.RailPlacement, sessionVersion);
+            }
+            else
+            {
+                _manager.HideShelf();
+            }
+        }
+        finally
+        {
+            _shakeTransitionGate.Release();
+        }
+    }
+
     private async Task ToggleShelfAsync()
     {
         if (_railWindow is not null && WindowInterop.IsVisible(_railWindow.WindowHandle))
@@ -142,9 +400,23 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        await DismissShelfAtPlacement(GetConfiguredRailPlacement(_settings));
+    }
+
+    private async Task DismissShelfAtPlacement(ShelfRailPlacement placement, long? shakeSessionVersion = null)
+    {
+        if (_manager is null || shakeSessionVersion is not null && shakeSessionVersion != _shakeSessionVersion)
+        {
+            return;
+        }
+
         HideShelf();
-        var placement = GetConfiguredRailPlacement(_settings);
         var state = await _manager.DismissShelfAsync(placement);
+        if (shakeSessionVersion is not null && shakeSessionVersion != _shakeSessionVersion)
+        {
+            return;
+        }
+
         if (state != ShelfDisplayState.EdgeDocked)
         {
             HideRail();
@@ -227,6 +499,14 @@ public sealed partial class MainWindow : Window
 
         try
         {
+            if (!TryConfigureShakeHook(settings.ShakeEnabled))
+            {
+                throw new InvalidOperationException("The global shake hook could not be installed.");
+            }
+
+            _shakeDetector = settings.ShakeEnabled
+                ? new ShakeDetector(settings.ShakeSensitivity)
+                : null;
             StartupRegistration.SetEnabled(settings.StartWithWindows);
             await _settingsStore.SaveAsync(settings);
             _settings = settings;
@@ -244,9 +524,41 @@ public sealed partial class MainWindow : Window
 
             return true;
         }
-        catch
+        catch (Exception exception)
         {
             TryRegisterHotKey(previous.HotKey);
+            var restoredShake = TryConfigureShakeHook(previous.ShakeEnabled);
+            if (!restoredShake)
+            {
+                var retainedHook = _shakeMouseHook is not null;
+                var retainedSettings = previous with
+                {
+                    ShakeEnabled = retainedHook,
+                    ShakeSensitivity = retainedHook ? settings.ShakeSensitivity : previous.ShakeSensitivity,
+                };
+                _shakeDetector = retainedHook
+                    ? new ShakeDetector(retainedSettings.ShakeSensitivity)
+                    : null;
+                StartupRegistration.SetEnabled(previous.StartWithWindows);
+                _settings = retainedSettings;
+                try
+                {
+                    await _settingsStore.SaveAsync(retainedSettings);
+                }
+                catch (Exception persistenceException)
+                {
+                    _trayIcon.ShowWarning("Shake rollback", persistenceException.Message);
+                }
+
+                _trayIcon.ShowWarning(
+                    retainedHook ? "Shake remains enabled" : "Shake disabled",
+                    $"Settings could not be rolled back safely: {exception.Message}");
+                throw;
+            }
+
+            _shakeDetector = previous.ShakeEnabled
+                ? new ShakeDetector(previous.ShakeSensitivity)
+                : null;
             StartupRegistration.SetEnabled(previous.StartWithWindows);
             await _settingsStore.SaveAsync(previous);
             _settings = previous;
@@ -271,6 +583,49 @@ public sealed partial class MainWindow : Window
 
     private bool TryRegisterHotKey(HotKeyDefinition hotKey) =>
         _globalHotKey.TrySet(ToNativeModifiers(hotKey), hotKey.VirtualKey);
+
+    private bool TryConfigureShakeHook(bool enabled)
+    {
+        if (!enabled)
+        {
+            try
+            {
+                _shakeMouseHook?.Dispose();
+                _shakeMouseHook = null;
+            }
+            catch (Win32Exception)
+            {
+                return false;
+            }
+
+            _shakeInputQueue.Clear();
+            _shakeButtonDown = false;
+            _shakeTriggeredForButton = false;
+            _shakeDetector = null;
+            if (_shakeRestore is not null)
+            {
+                QueueShakeOperation(RestoreShakeStateAsync, "Shake restore failed");
+            }
+
+            return true;
+        }
+
+        if (_shakeMouseHook is not null)
+        {
+            return true;
+        }
+
+        try
+        {
+            _shakeMouseHook = new LowLevelMouseHook(_shakeInputQueue.Enqueue);
+            return true;
+        }
+        catch (Win32Exception)
+        {
+            _shakeMouseHook = null;
+            return false;
+        }
+    }
 
     private WindowMessageResult HandleWindowMessage(uint message, nuint wParam, nint lParam)
     {
@@ -318,6 +673,15 @@ public sealed partial class MainWindow : Window
         _trayIcon.Dispose();
         _railWindow?.Close();
         _railWindow = null;
+        try
+        {
+            _shakeMouseHook?.Dispose();
+            _shakeMouseHook = null;
+        }
+        catch (Win32Exception exception)
+        {
+            _trayIcon.ShowWarning("Shake shutdown", exception.Message);
+        }
         _globalHotKey.Dispose();
         _messageHook.Dispose();
         _disposed = true;
@@ -332,6 +696,10 @@ public sealed partial class MainWindow : Window
         if (hotKey.Windows) modifiers |= HotKeyModifiers.Windows;
         return modifiers;
     }
+
+    private readonly record struct ShakeRestoreState(
+        ShelfDisplayState DisplayState,
+        ShelfRailPlacement RailPlacement);
 
     private static (int Width, int Height) GetShelfSize(int batchCount) => batchCount switch
     {

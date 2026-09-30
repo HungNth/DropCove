@@ -43,6 +43,9 @@ public sealed class DropShelfManager
     /// <summary>Marks the bounded unified Drop Shelf as visible.</summary>
     public void ShowShelf() => _displayState = ShelfDisplayState.UnifiedShelf;
 
+    /// <summary>Marks the shelf as hidden without changing held Shelf Batches.</summary>
+    public void HideShelf() => _displayState = ShelfDisplayState.Hidden;
+
     /// <summary>Dismisses the shelf into Hidden or EdgeDocked based on held content.</summary>
     /// <param name="placement">The monitor and edge to remember for a non-empty shelf.</param>
     /// <returns>The resulting display state.</returns>

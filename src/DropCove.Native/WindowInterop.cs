@@ -469,6 +469,48 @@ public static class WindowInterop
         SetBounds(windowHandle, x, y, width, height, SwpNoActivate);
     }
 
+    /// <summary>Positions the shelf around the cursor on its current monitor.</summary>
+    /// <param name="windowHandle">The shelf window.</param>
+    /// <param name="logicalWidth">Width in logical pixels.</param>
+    /// <param name="logicalHeight">Height in logical pixels.</param>
+    /// <summary>Positions the shelf around a specific screen coordinate on its current monitor.</summary>
+    /// <param name="windowHandle">The shelf window.</param>
+    /// <param name="screenX">Screen horizontal coordinate.</param>
+    /// <param name="screenY">Screen vertical coordinate.</param>
+    /// <param name="logicalWidth">Width in logical pixels.</param>
+    /// <param name="logicalHeight">Height in logical pixels.</param>
+    public static void PositionNearPoint(nint windowHandle, int screenX, int screenY, int logicalWidth, int logicalHeight)
+    {
+        ValidateLogicalSize(logicalWidth, logicalHeight);
+        var target = new Point(screenX, screenY);
+        var monitor = MonitorFromPoint(target, MonitorDefaultToNearest);
+        if (monitor == 0)
+        {
+            throw new Win32Exception("Could not resolve the target point monitor.");
+        }
+
+        var monitorInfo = GetMonitorInfo(monitor);
+        var (width, height) = FitToWorkArea(logicalWidth, logicalHeight, GetMonitorDpi(monitor), monitorInfo.Work);
+        var x = Math.Clamp(screenX - width / 2, monitorInfo.Work.Left, monitorInfo.Work.Right - width);
+        var y = Math.Clamp(screenY - height / 2, monitorInfo.Work.Top, monitorInfo.Work.Bottom - height);
+        SetBounds(windowHandle, x, y, width, height, SwpNoActivate);
+    }
+
+    /// <summary>Positions the shelf around the cursor on its current monitor.</summary>
+    /// <param name="windowHandle">The shelf window.</param>
+    /// <param name="logicalWidth">Width in logical pixels.</param>
+    /// <param name="logicalHeight">Height in logical pixels.</param>
+    public static void PositionNearCursor(nint windowHandle, int logicalWidth, int logicalHeight)
+    {
+        ValidateLogicalSize(logicalWidth, logicalHeight);
+        if (!GetCursorPos(out var cursor))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not read the cursor position.");
+        }
+
+        PositionNearPoint(windowHandle, cursor.X, cursor.Y, logicalWidth, logicalHeight);
+    }
+
     /// <summary>Gets the Windows display device name for a window's monitor.</summary>
     /// <param name="windowHandle">The target window.</param>
     /// <returns>The display device name, such as <c>\\.\DISPLAY1</c>.</returns>
@@ -802,6 +844,12 @@ public static class WindowInterop
     {
         public readonly int X;
         public readonly int Y;
+
+        public Point(int x, int y)
+        {
+            X = x;
+            Y = y;
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

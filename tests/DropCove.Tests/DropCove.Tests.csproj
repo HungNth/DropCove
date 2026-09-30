@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\DropCove.Core\DropCove.Core.csproj" />
     <ProjectReference Include="..\..\src\DropCove.Services\DropCove.Services.csproj" />
+    <ProjectReference Include="..\..\src\DropCove.Native\DropCove.Native.csproj" />
   </ItemGroup>
 
   <ItemGroup>
