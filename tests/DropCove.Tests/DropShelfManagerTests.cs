@@ -332,6 +332,27 @@ public sealed class DropShelfManagerTests
         Assert.IsEmpty(manager.Batches);
     }
 
+    [TestMethod]
+    public void EdgeDockedShelf_AcceptsSuccessiveDrops_MaintainsBatchOrdering()
+    {
+        var manager = CreateManagerWithOneItem(out _);
+        var placement = new ShelfRailPlacement("DISPLAY1", ShelfRailEdge.Right);
+        manager.DismissShelf(placement);
+        Assert.AreEqual(ShelfDisplayState.EdgeDocked, manager.DisplayState);
+
+        var firstDrop = manager.AcceptDrop([
+            new(@"C:\Work\RailFirst.txt", "RailFirst.txt", false),
+        ]);
+        var secondDrop = manager.AcceptDrop([
+            new(@"C:\Work\RailSecond.txt", "RailSecond.txt", false),
+        ]);
+
+        Assert.HasCount(3, manager.Batches);
+        Assert.AreSame(secondDrop.Batch, manager.Batches[0]);
+        Assert.AreSame(firstDrop.Batch, manager.Batches[1]);
+        Assert.AreEqual(ShelfDisplayState.EdgeDocked, manager.DisplayState);
+    }
+
 
     private static DropShelfManager CreateManagerWithOneItem(out ShelfItem item)
     {

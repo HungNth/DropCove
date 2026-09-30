@@ -21,6 +21,7 @@ public sealed partial class EdgeRailWindow : Window
     private readonly Action _openShelf;
     private readonly Action<string> _notify;
     private readonly Func<Task> _refreshAfterMutation;
+    private readonly Func<DataPackageView, Task<DropAcceptance>> _acceptStorageDrop;
     private readonly DragDropService _dragDropService;
     private readonly DispatcherQueueTimer _expandTimer;
     private readonly DispatcherQueueTimer _collapseTimer;
@@ -32,6 +33,7 @@ public sealed partial class EdgeRailWindow : Window
     private Flyout? _openFlyout;
     private bool _isExpanded;
     private bool _pointerInside;
+    private bool _dragInside;
     private bool _expandPending;
     private bool _flyoutOpen;
     private bool _requestedVisible;
@@ -40,18 +42,21 @@ public sealed partial class EdgeRailWindow : Window
     /// <summary>Creates an Edge Rail for the current Shelf Batches.</summary>
     /// <param name="manager">The shared shelf lifecycle manager.</param>
     /// <param name="confirm">Confirms partial batch drag-out.</param>
-    /// <param name="refreshAfterMutation">Refreshes or hides the rail after a drag result.</param>
+    /// <param name="acceptStorageDrop">Accepts storage-item drops through the shared Shelf seam.</param>
+    /// <param name="refreshAfterMutation">Refreshes or hides the rail after a mutation.</param>
     /// <param name="openShelf">Opens and activates the unified Drop Shelf.</param>
-    /// <param name="notify">Reports drag preparation warnings to the resident application.</param>
+    /// <param name="notify">Reports drag preparation and drop warnings to the resident application.</param>
     public EdgeRailWindow(
         DropShelfManager manager,
         Func<string, string, Task<bool>> confirm,
+        Func<DataPackageView, Task<DropAcceptance>> acceptStorageDrop,
         Func<Task> refreshAfterMutation,
         Action openShelf,
         Action<string> notify)
     {
         ArgumentNullException.ThrowIfNull(manager);
         ArgumentNullException.ThrowIfNull(confirm);
+        ArgumentNullException.ThrowIfNull(acceptStorageDrop);
         ArgumentNullException.ThrowIfNull(refreshAfterMutation);
         ArgumentNullException.ThrowIfNull(openShelf);
         ArgumentNullException.ThrowIfNull(notify);
@@ -70,6 +75,7 @@ public sealed partial class EdgeRailWindow : Window
         _collapseTimer.Tick += OnCollapseTimerTick;
         _foregroundWindowHook = new ForegroundWindowHook(() => _dispatcherQueue.TryEnqueue(ApplyVisibility));
         _dragDropService = new DragDropService(manager, confirm);
+        _acceptStorageDrop = acceptStorageDrop;
         _refreshAfterMutation = refreshAfterMutation;
         _openShelf = openShelf;
         _notify = notify;
@@ -106,6 +112,7 @@ public sealed partial class EdgeRailWindow : Window
         _openFlyout = null;
         _flyoutOpen = false;
         _pointerInside = false;
+        _dragInside = false;
         _expandPending = false;
         _expandTimer.Stop();
         _collapseTimer.Stop();
@@ -117,6 +124,7 @@ public sealed partial class EdgeRailWindow : Window
     {
         _requestedVisible = false;
         _pointerInside = false;
+        _dragInside = false;
         _expandPending = false;
         _openFlyout?.Hide();
         _openFlyout = null;
@@ -145,6 +153,51 @@ public sealed partial class EdgeRailWindow : Window
     {
         _pointerInside = true;
         _collapseTimer.Stop();
+        BeginExpandDelay();
+    }
+
+    private void OnRailPointerExited()
+    {
+        _pointerInside = false;
+        if (!_dragInside)
+        {
+            CancelExpandDelay();
+            StartCollapseTimer();
+        }
+    }
+
+    private void OnRailPointerMoved(object sender, PointerRoutedEventArgs e) => OnRailPointerEntered();
+
+    private void OnRailPointerExited(object sender, PointerRoutedEventArgs e) => OnRailPointerExited();
+
+    private void OnRailDragEnter(object sender, DragEventArgs e)
+    {
+        _dragInside = true;
+        _collapseTimer.Stop();
+        BeginExpandDelay();
+        UpdateDragFeedback(e);
+    }
+
+    private void OnRailDragOver(object sender, DragEventArgs e)
+    {
+        _dragInside = true;
+        UpdateDragFeedback(e);
+    }
+
+    private void OnRailDragLeave(object sender, DragEventArgs e) => EndDragInside();
+
+    private void EndDragInside()
+    {
+        _dragInside = false;
+        if (!_pointerInside)
+        {
+            CancelExpandDelay();
+            StartCollapseTimer();
+        }
+    }
+
+    private void BeginExpandDelay()
+    {
         if (!_isExpanded && !_expandPending)
         {
             _expandPending = true;
@@ -152,23 +205,26 @@ public sealed partial class EdgeRailWindow : Window
         }
     }
 
-    private void OnRailPointerExited()
+    private void CancelExpandDelay()
     {
-        _pointerInside = false;
         _expandPending = false;
         _expandTimer.Stop();
-        StartCollapseTimer();
     }
 
-    private void OnRailPointerMoved(object sender, PointerRoutedEventArgs e) => OnRailPointerEntered();
-
-    private void OnRailPointerExited(object sender, PointerRoutedEventArgs e) => OnRailPointerExited();
+    private static void UpdateDragFeedback(DragEventArgs e)
+    {
+        var acceptsCopy = StorageDropService.CanCopyStorageItems(e);
+        e.AcceptedOperation = acceptsCopy ? DataPackageOperation.Copy : DataPackageOperation.None;
+        e.DragUIOverride.Caption = acceptsCopy ? "Add to DropCove" : "Filesystem items with Copy support only";
+        e.DragUIOverride.IsCaptionVisible = true;
+        e.DragUIOverride.IsContentVisible = false;
+    }
 
     private void OnExpandTimerTick(DispatcherQueueTimer sender, object args)
     {
         sender.Stop();
         _expandPending = false;
-        if (_pointerInside && !_isExpanded)
+        if ((_pointerInside || _dragInside) && !_isExpanded)
         {
             SetExpanded(true);
         }
@@ -177,7 +233,7 @@ public sealed partial class EdgeRailWindow : Window
     private void OnCollapseTimerTick(DispatcherQueueTimer sender, object args)
     {
         sender.Stop();
-        if (!_pointerInside && !_flyoutOpen && _isExpanded)
+        if (!_pointerInside && !_dragInside && !_flyoutOpen && _isExpanded)
         {
             SetExpanded(false);
         }
@@ -185,7 +241,7 @@ public sealed partial class EdgeRailWindow : Window
 
     private void StartCollapseTimer()
     {
-        if (!_pointerInside && !_flyoutOpen && _isExpanded)
+        if (!_pointerInside && !_dragInside && !_flyoutOpen && _isExpanded)
         {
             _collapseTimer.Start();
         }
@@ -298,6 +354,43 @@ public sealed partial class EdgeRailWindow : Window
 
         SetFlyoutOpen(false);
     }
+    private async void OnRailDrop(object sender, DragEventArgs e)
+    {
+        if (!StorageDropService.CanCopyStorageItems(e))
+        {
+            _notify("No supported filesystem paths were found.");
+            EndDragInside();
+            return;
+        }
+
+        var deferral = e.GetDeferral();
+        try
+        {
+            var outcome = await _acceptStorageDrop(e.DataView);
+            if (outcome.Batch is null)
+            {
+                _notify("No supported filesystem paths were found.");
+                return;
+            }
+
+            await _refreshAfterMutation();
+            if (outcome.SkippedUnsupportedCount > 0)
+            {
+                _notify($"Added {outcome.AcceptedCount}; skipped {outcome.SkippedUnsupportedCount} unsupported item(s).");
+            }
+        }
+        catch (Exception exception)
+        {
+            _notify($"Drop failed: {exception.Message}");
+        }
+        finally
+        {
+            EndDragInside();
+
+            deferral.Complete();
+        }
+    }
+
 
     private async void OnRailBatchDragStarting(UIElement sender, DragStartingEventArgs e)
     {

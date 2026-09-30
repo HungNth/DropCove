@@ -7,7 +7,12 @@
     <Grid
         x:Name="RailRoot"
         Padding="4"
+        AllowDrop="True"
         Background="{ThemeResource LayerFillColorDefaultBrush}"
+        DragEnter="OnRailDragEnter"
+        DragLeave="OnRailDragLeave"
+        DragOver="OnRailDragOver"
+        Drop="OnRailDrop"
         PointerMoved="OnRailPointerMoved"
         PointerExited="OnRailPointerExited">
         <Grid.RowDefinitions>

@@ -22,6 +22,7 @@ public sealed partial class MainPage : Page
     private readonly Dictionary<UIElement, IReadOnlyList<ShelfItemViewModel>> _batchPreviews = [];
     private DropShelfManager? _manager;
     private DragDropService? _dragDropService;
+    private StorageDropService? _storageDropService;
     private ShelfVisualCoordinator<ImageSource>? _visualCoordinator;
     private Func<Task>? _dismissShelf;
     private Action? _showSettings;
@@ -49,6 +50,7 @@ public sealed partial class MainPage : Page
             new WindowsShelfVisualProvider(TryGetCachedStorageItem),
             IsImageShelfItem);
         _dragDropService = new DragDropService(manager, confirm);
+        _storageDropService = new StorageDropService(manager, storageItem => _storageItems[storageItem.Path] = storageItem);
         _dismissShelf = dismissShelf;
         _showSettings = showSettings;
         _beginWindowMove = beginWindowMove;
@@ -57,6 +59,8 @@ public sealed partial class MainPage : Page
         await RebuildBatchCardsAsync();
         ResizeForBatchCount(manager.Batches.Count);
     }
+    internal Task<DropAcceptance> AcceptStorageDropAsync(DataPackageView dataView) =>
+        (_storageDropService ?? throw new InvalidOperationException("MainPage is not initialized.")).AcceptAsync(dataView);
 
     private void OnDragRegionPointerPressed(object sender, PointerRoutedEventArgs e)
     {
@@ -97,7 +101,7 @@ public sealed partial class MainPage : Page
 
     private void UpdateDragFeedback(DragEventArgs e)
     {
-        var acceptsCopy = CanCopyStorageItems(e);
+        var acceptsCopy = StorageDropService.CanCopyStorageItems(e);
         e.AcceptedOperation = acceptsCopy ? DataPackageOperation.Copy : DataPackageOperation.None;
         e.DragUIOverride.Caption = acceptsCopy ? "Add to DropCove" : "Filesystem items with Copy support only";
         e.DragUIOverride.IsCaptionVisible = true;
@@ -108,7 +112,7 @@ public sealed partial class MainPage : Page
     private async void OnDrop(object sender, DragEventArgs e)
     {
         DragOverlay.Visibility = Visibility.Collapsed;
-        if (_manager is null || !CanCopyStorageItems(e))
+        if (_manager is null || !StorageDropService.CanCopyStorageItems(e))
         {
             ShowDropMessage("No supported filesystem paths were found.", InfoBarSeverity.Warning);
             return;
@@ -117,26 +121,7 @@ public sealed partial class MainPage : Page
         var deferral = e.GetDeferral();
         try
         {
-            var storageItems = await e.DataView.GetStorageItemsAsync();
-            var incomingItems = new List<IncomingShelfItem>(storageItems.Count);
-            var skipped = 0;
-
-            foreach (var storageItem in storageItems)
-            {
-                if (string.IsNullOrWhiteSpace(storageItem.Path))
-                {
-                    skipped++;
-                    continue;
-                }
-
-                _storageItems[storageItem.Path] = storageItem;
-                incomingItems.Add(new IncomingShelfItem(
-                    storageItem.Path,
-                    storageItem.Name,
-                    storageItem is StorageFolder));
-            }
-
-            var outcome = await _manager.AcceptDropAsync(incomingItems, skipped);
+            var outcome = await AcceptStorageDropAsync(e.DataView);
             if (outcome.Batch is null)
             {
                 ShowDropMessage("No supported filesystem paths were found.", InfoBarSeverity.Warning);
@@ -506,9 +491,6 @@ public sealed partial class MainPage : Page
         _resizeWindow?.Invoke(180, height);
     }
 
-    private static bool CanCopyStorageItems(DragEventArgs e) =>
-        e.DataView.Contains(StandardDataFormats.StorageItems) &&
-        (e.AllowedOperations & DataPackageOperation.Copy) != 0;
 
     private void ShowDropMessage(string message, InfoBarSeverity? severity = null)
     {

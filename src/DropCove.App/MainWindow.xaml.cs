@@ -154,6 +154,7 @@ public sealed partial class MainWindow : Window
         _railWindow ??= new EdgeRailWindow(
             _manager,
             ShowConfirmDialogAsync,
+            _page.AcceptStorageDropAsync,
             RefreshRailAfterMutationAsync,
             OpenShelfFromRail,
             message => _trayIcon.ShowWarning("Edge Rail drag", message));
