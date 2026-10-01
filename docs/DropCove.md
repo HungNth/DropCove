@@ -1577,3 +1577,9 @@ MVVM
 ```
 
 This architecture gives DropCove a modern Windows-native UI while retaining direct control over the native drag-and-drop, windowing, hotkey, edge-docking, and mouse interactions that define the product.
+
+# 48. MSIX / Microsoft Store Submission
+
+The unpackaged x64 self-contained EXE installer and the Store-oriented MSIX pipeline are separate delivery paths. The Store path is implemented by `scripts/build-msix.ps1` and documented in [`docs/store-msix.md`](store-msix.md).
+
+Development uses the distinct self-signed `DropCove.Development` identity. Production generation requires Partner Center `IdentityName` and `Publisher` inputs at build time and emits an unsigned x64 self-contained MSIX/MSIXBundle for Microsoft Store signing. Private keys and Partner Center secrets are never stored in the repository.
