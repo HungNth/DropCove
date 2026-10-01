@@ -2,7 +2,7 @@
 
 **What to build:** Produce a production-signable DropCove V1 release candidate whose complete reference, drag/drop, persistence, windowing, Edge Rail, shake, UI, performance, privacy, and packaging contracts have been exercised end to end.
 
-**Blocked by:** 16: Add motion, accessibility, and full multi-monitor polish; 17: Prepare self-contained MSIX for Microsoft Store.
+**Blocked by:** 16: Add motion, accessibility, and full multi-monitor polish; 17: Prepare self-contained MSIX for Microsoft Store; 19: Reduce installed Release idle Working Set below 150 MB.
 
 **Status:** ready-for-agent
 
