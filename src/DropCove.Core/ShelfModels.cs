@@ -11,14 +11,12 @@ public enum ShelfDisplayState
 {
     /// <summary>No DropCove surface is visible.</summary>
     Hidden,
-    /// <summary>The bounded unified Drop Shelf is visible.</summary>
-    UnifiedShelf,
+    /// <summary>The bounded quick-access shelf presentation is visible.</summary>
+    Compact,
+    /// <summary>The fixed management shelf presentation is visible.</summary>
+    Expanded,
     /// <summary>The non-empty shelf is visible as the collapsed Edge Rail.</summary>
     EdgeDocked,
-    /// <summary>Reserved for the later Compact presentation.</summary>
-    Compact,
-    /// <summary>Reserved for the later Expanded presentation.</summary>
-    Expanded,
 }
 
 /// <summary>Identifies the screen edge used by the collapsed Edge Rail.</summary>

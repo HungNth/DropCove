@@ -8,10 +8,403 @@
     IsTabStop="True"
     KeyDown="OnPageKeyDown"
     mc:Ignorable="d">
+    <Page.Resources>
+        <DataTemplate x:Key="CompactBatchTemplate">
+            <Border
+                Margin="0,0,0,4"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel>
+                    <Grid
+                        MinHeight="52"
+                        Padding="4"
+                        AutomationProperties.Name="{Binding DragBatchAutomationName}"
+                        CanDrag="True"
+                        ColumnSpacing="6"
+                        DragStarting="OnBatchDragStarting"
+                        DropCompleted="OnBatchDropCompleted"
+                        ToolTipService.ToolTip="Drag all items in batch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="42" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Width="42" Height="42" VerticalAlignment="Center">
+                            <Border
+                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="{Binding SingleItemVisibility}">
+                                <Grid CornerRadius="5">
+                                    <FontIcon FontSize="16" Glyph="{Binding FallbackGlyph}" />
+                                    <Image Source="{Binding PrimaryIcon}" Stretch="UniformToFill" />
+                                </Grid>
+                            </Border>
+                            <Grid Visibility="{Binding MultiItemVisibility}">
+                                <Border
+                                    Margin="5,0,0,5"
+                                    Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6">
+                                    <Grid CornerRadius="5">
+                                        <FontIcon FontSize="14" Glyph="{Binding FallbackGlyph}" />
+                                        <Image Source="{Binding TertiaryIcon}" Stretch="UniformToFill" />
+                                    </Grid>
+                                </Border>
+                                <Border
+                                    Margin="2,2,2,2"
+                                    Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6">
+                                    <Grid CornerRadius="5">
+                                        <FontIcon FontSize="14" Glyph="{Binding FallbackGlyph}" />
+                                        <Image Source="{Binding SecondaryIcon}" Stretch="UniformToFill" />
+                                    </Grid>
+                                </Border>
+                                <Border
+                                    Margin="0,5,5,0"
+                                    Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6">
+                                    <Grid CornerRadius="5">
+                                        <FontIcon FontSize="14" Glyph="{Binding FallbackGlyph}" />
+                                        <Image Source="{Binding PrimaryIcon}" Stretch="UniformToFill" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock
+                                FontSize="11"
+                                FontWeight="SemiBold"
+                                Text="{Binding Title}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                FontSize="9"
+                                Text="{Binding Subtitle}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
+                        </StackPanel>
+                        <StackPanel
+                            Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                            <ToggleButton
+                                Style="{StaticResource TitleBarToggleButtonStyle}"
+                                Width="24"
+                                Height="24"
+                                AutomationProperties.Name="{Binding SingleItemPinAutomationName}"
+                                Click="OnPinClicked"
+                                IsChecked="{Binding IsPinned, Mode=OneWay}"
+                                ToolTipService.ToolTip="Pin / Unpin"
+                                Visibility="{Binding SingleItemVisibility}">
+                                <FontIcon FontSize="11" Glyph="&#xE718;" />
+                            </ToggleButton>
+                            <Button
+                                Style="{StaticResource TitleBarButtonStyle}"
+                                Width="24"
+                                Height="24"
+                                AutomationProperties.Name="{Binding ToggleExpandAutomationName}"
+                                Click="OnToggleExpandClicked"
+                                ToolTipService.ToolTip="Expand/Collapse items"
+                                Visibility="{Binding MultiItemVisibility}">
+                                <FontIcon FontSize="9" Glyph="{Binding ExpandGlyph}" />
+                            </Button>
+                            <Button
+                                Style="{StaticResource TitleBarButtonStyle}"
+                                Width="24"
+                                Height="24"
+                                AutomationProperties.Name="{Binding RemoveBatchAutomationName}"
+                                Click="OnRemoveBatchClicked"
+                                Content="×"
+                                FontSize="14"
+                                ToolTipService.ToolTip="Remove Batch" />
+                        </StackPanel>
+                    </Grid>
+
+                    <ItemsRepeater
+                        Margin="4,0,4,4"
+                        ElementClearing="OnItemElementClearing"
+                        ElementPrepared="OnItemElementPrepared"
+                        ItemsSource="{Binding Items}"
+                        Visibility="{Binding ItemsVisibility}">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Spacing="4" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate>
+                                <Border
+                                    Margin="0,0,0,4"
+                                    Padding="4"
+                                    AutomationProperties.Name="{Binding DragAutomationName}"
+                                    Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                    CanDrag="True"
+                                    CornerRadius="4"
+                                    DragStarting="OnItemDragStarting"
+                                    DropCompleted="OnItemDropCompleted">
+                                    <Grid ColumnSpacing="4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="24" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Width="24" Height="24" VerticalAlignment="Center">
+                                            <FontIcon IsHitTestVisible="False" FontSize="13" Glyph="{Binding FallbackGlyph}" />
+                                            <Image AutomationProperties.Name="{Binding VisualAutomationName}" IsHitTestVisible="False" Source="{Binding Icon}" Stretch="UniformToFill" />
+                                        </Grid>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="2,0,0,0">
+                                            <TextBlock FontSize="10" FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                            <TextBlock
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                FontSize="9"
+                                                Text="{Binding DetailsLabel}"
+                                                TextTrimming="CharacterEllipsis"
+                                                TextWrapping="NoWrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <ToggleButton
+                                                Style="{StaticResource TitleBarToggleButtonStyle}"
+                                                Width="24"
+                                                Height="24"
+                                                AutomationProperties.Name="{Binding PinAutomationName}"
+                                                Click="OnPinClicked"
+                                                IsChecked="{Binding IsPinned, Mode=OneWay}"
+                                                ToolTipService.ToolTip="Pin / Unpin">
+                                                <FontIcon FontSize="11" Glyph="&#xE718;" />
+                                            </ToggleButton>
+                                            <Button
+                                                Style="{StaticResource TitleBarButtonStyle}"
+                                                Width="24"
+                                                Height="24"
+                                                AutomationProperties.Name="{Binding RemoveAutomationName}"
+                                                Click="OnRemoveItemClicked"
+                                                Content="×"
+                                                FontSize="14"
+                                                ToolTipService.ToolTip="Remove Item" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ExpandedBatchTemplate">
+            <Border
+                Margin="0,0,0,8"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <StackPanel>
+                    <Grid
+                        MinHeight="58"
+                        Padding="6"
+                        AutomationProperties.Name="{Binding DragBatchAutomationName}"
+                        CanDrag="True"
+                        ColumnSpacing="8"
+                        DragStarting="OnBatchDragStarting"
+                        DropCompleted="OnBatchDropCompleted"
+                        ToolTipService.ToolTip="Drag all available items in batch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="48" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Width="46" Height="46" VerticalAlignment="Center">
+                            <Border
+                                Margin="5,0,0,5"
+                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="{Binding MultiItemVisibility}">
+                                <Grid CornerRadius="5">
+                                    <FontIcon FontSize="15" Glyph="{Binding FallbackGlyph}" />
+                                    <Image Source="{Binding TertiaryIcon}" Stretch="UniformToFill" />
+                                </Grid>
+                            </Border>
+                            <Border
+                                Margin="2,2,2,2"
+                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="{Binding MultiItemVisibility}">
+                                <Grid CornerRadius="5">
+                                    <FontIcon FontSize="15" Glyph="{Binding FallbackGlyph}" />
+                                    <Image Source="{Binding SecondaryIcon}" Stretch="UniformToFill" />
+                                </Grid>
+                            </Border>
+                            <Border
+                                Margin="0,0,5,0"
+                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                                <Grid CornerRadius="5">
+                                    <FontIcon FontSize="16" Glyph="{Binding FallbackGlyph}" />
+                                    <Image Source="{Binding PrimaryIcon}" Stretch="UniformToFill" />
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Text="{Binding Title}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                FontSize="10"
+                                Text="{Binding Subtitle}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                FontSize="9"
+                                Text="{Binding CreatedLabel}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
+                        </StackPanel>
+                        <StackPanel
+                            Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                            <ToggleButton
+                                Style="{StaticResource TitleBarToggleButtonStyle}"
+                                Width="26"
+                                Height="26"
+                                AutomationProperties.Name="{Binding SingleItemPinAutomationName}"
+                                Click="OnPinClicked"
+                                IsChecked="{Binding IsPinned, Mode=OneWay}"
+                                ToolTipService.ToolTip="Pin / Unpin"
+                                Visibility="{Binding SingleItemVisibility}">
+                                <FontIcon FontSize="11" Glyph="&#xE718;" />
+                            </ToggleButton>
+                            <Button
+                                x:Name="ToggleExpandButton"
+                                Style="{StaticResource TitleBarButtonStyle}"
+                                Width="26"
+                                Height="26"
+                                AutomationProperties.Name="{Binding ToggleExpandAutomationName}"
+                                Click="OnToggleExpandClicked"
+                                ToolTipService.ToolTip="Expand/Collapse items"
+                                Visibility="{Binding MultiItemVisibility}">
+                                <FontIcon FontSize="9" Glyph="{Binding ExpandGlyph}" />
+                            </Button>
+                            <Button
+                                Style="{StaticResource TitleBarButtonStyle}"
+                                Width="26"
+                                Height="26"
+                                AutomationProperties.Name="{Binding RemoveBatchAutomationName}"
+                                Click="OnRemoveBatchClicked"
+                                Content="×"
+                                FontSize="14"
+                                ToolTipService.ToolTip="Remove Batch" />
+                        </StackPanel>
+                    </Grid>
+
+                    <ItemsRepeater
+                        Margin="6,0,6,6"
+                        ElementClearing="OnItemElementClearing"
+                        ElementPrepared="OnItemElementPrepared"
+                        ItemsSource="{Binding Items}"
+                        Visibility="{Binding ItemsVisibility}">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Spacing="4" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate>
+                                <Border
+                                    Padding="6"
+                                    AutomationProperties.Name="{Binding DragAutomationName}"
+                                    Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                    CanDrag="True"
+                                    CornerRadius="4"
+                                    DragStarting="OnItemDragStarting"
+                                    DropCompleted="OnItemDropCompleted">
+                                    <Grid ColumnSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="28" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Width="28" Height="28" VerticalAlignment="Center">
+                                            <FontIcon IsHitTestVisible="False" FontSize="14" Glyph="{Binding FallbackGlyph}" />
+                                            <Image
+                                                AutomationProperties.Name="{Binding VisualAutomationName}"
+                                                IsHitTestVisible="False"
+                                                Source="{Binding Icon}"
+                                                Stretch="UniformToFill" />
+                                        </Grid>
+                                        <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center" Margin="2,0,0,0">
+                                            <TextBlock
+                                                FontSize="11"
+                                                FontWeight="SemiBold"
+                                                Text="{Binding Name}"
+                                                TextTrimming="CharacterEllipsis"
+                                                TextWrapping="NoWrap" />
+                                            <TextBlock
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                FontSize="9"
+                                                Text="{Binding Path}"
+                                                TextTrimming="CharacterEllipsis"
+                                                TextWrapping="NoWrap" />
+                                            <TextBlock
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                FontSize="9"
+                                                Text="{Binding DetailsLabel}"
+                                                TextTrimming="CharacterEllipsis"
+                                                TextWrapping="NoWrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <ToggleButton
+                                                Style="{StaticResource TitleBarToggleButtonStyle}"
+                                                Width="28"
+                                                Height="28"
+                                                AutomationProperties.Name="{Binding PinAutomationName}"
+                                                Click="OnPinClicked"
+                                                IsChecked="{Binding IsPinned, Mode=OneWay}"
+                                                ToolTipService.ToolTip="Pin / Unpin">
+                                                <FontIcon FontSize="12" Glyph="&#xE718;" />
+                                            </ToggleButton>
+                                            <Button
+                                                Style="{StaticResource TitleBarButtonStyle}"
+                                                Width="28"
+                                                Height="28"
+                                                AutomationProperties.Name="{Binding RemoveAutomationName}"
+                                                Click="OnRemoveItemClicked"
+                                                Content="×"
+                                                FontSize="16"
+                                                ToolTipService.ToolTip="Remove Item" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </Page.Resources>
+
     <Grid Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="32" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
@@ -27,52 +420,29 @@
                 Background="Transparent"
                 PointerPressed="OnDragRegionPointerPressed" />
 
-            <TextBlock
-                x:Name="OverflowLabel"
+            <Button
+                x:Name="SettingsButton"
                 Grid.Column="1"
-                Margin="4,0"
-                VerticalAlignment="Center"
-                FontSize="11"
-                Text="+1 batch"
-                Visibility="Collapsed" />
+                Style="{StaticResource TitleBarButtonStyle}"
+                Width="32"
+                Height="32"
+                AutomationProperties.Name="Settings"
+                Click="OnSettingsClicked"
+                ToolTipService.ToolTip="Settings">
+                <FontIcon FontSize="12" Glyph="&#xE713;" />
+            </Button>
 
-            <StackPanel
+            <Button
+                x:Name="CloseButton"
                 Grid.Column="2"
-                Orientation="Horizontal"
-                VerticalAlignment="Stretch">
-                <Button
-                    x:Name="ClearTemporaryButton"
-                    Style="{StaticResource TitleBarButtonStyle}"
-                    Width="32"
-                    Height="32"
-                    AutomationProperties.Name="Clear Temporary Items"
-                    Click="OnClearTemporaryClicked"
-                    ToolTipService.ToolTip="Clear Temporary Items">
-                    <FontIcon FontSize="12" Glyph="&#xE74D;" />
-                </Button>
-
-                <Button
-                    x:Name="SettingsButton"
-                    Style="{StaticResource TitleBarButtonStyle}"
-                    Width="32"
-                    Height="32"
-                    AutomationProperties.Name="Settings"
-                    Click="OnSettingsClicked"
-                    ToolTipService.ToolTip="Settings">
-                    <FontIcon FontSize="12" Glyph="&#xE713;" />
-                </Button>
-
-                <Button
-                    x:Name="CloseButton"
-                    Style="{StaticResource TitleBarButtonStyle}"
-                    Width="36"
-                    Height="32"
-                    AutomationProperties.Name="Hide DropCove"
-                    Click="OnCloseClicked"
-                    ToolTipService.ToolTip="Hide DropCove">
-                    <FontIcon FontSize="11" Glyph="&#xE8BB;" />
-                </Button>
-            </StackPanel>
+                Style="{StaticResource TitleBarButtonStyle}"
+                Width="36"
+                Height="32"
+                AutomationProperties.Name="Hide DropCove"
+                Click="OnCloseClicked"
+                ToolTipService.ToolTip="Hide DropCove">
+                <FontIcon FontSize="11" Glyph="&#xE8BB;" />
+            </Button>
         </Grid>
 
         <Grid
@@ -84,7 +454,6 @@
             DragLeave="OnDragLeave"
             DragOver="OnDragOver"
             Drop="OnDrop">
-
             <StackPanel
                 x:Name="EmptyState"
                 HorizontalAlignment="Center"
@@ -98,191 +467,39 @@
                     TextAlignment="Center" />
             </StackPanel>
 
-            <ScrollViewer
-                x:Name="BatchScroller"
-                HorizontalScrollBarVisibility="Disabled"
-                VerticalScrollBarVisibility="Auto"
-                Visibility="Collapsed">
-                <ItemsRepeater
-                    x:Name="BatchList"
-                    ElementClearing="OnBatchElementClearing"
-                    ElementPrepared="OnBatchElementPrepared">
-                    <ItemsRepeater.Layout>
-                        <StackLayout Spacing="4" />
-                    </ItemsRepeater.Layout>
-                    <ItemsRepeater.ItemTemplate>
-                        <DataTemplate>
-                            <Border
-                                Margin="0,0,0,4"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6">
-                                <StackPanel>
-                                    <Grid
-                                        MinHeight="48"
-                                        Padding="4"
-                                        AutomationProperties.Name="{Binding DragBatchAutomationName}"
-                                        CanDrag="True"
-                                        ColumnSpacing="6"
-                                        DragStarting="OnBatchDragStarting"
-                                        DropCompleted="OnBatchDropCompleted"
-                                        ToolTipService.ToolTip="Drag all items in batch">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="36" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <Grid Width="36" Height="36" VerticalAlignment="Center">
-                                            <Border
-                                                Margin="6,0,0,6"
-                                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="6"
-                                                Visibility="{Binding TertiaryVisibility}">
-                                                <Grid CornerRadius="5">
-                                                    <FontIcon FontSize="14" Glyph="{Binding FallbackGlyph}" />
-                                                    <Image Source="{Binding TertiaryIcon}" Stretch="UniformToFill" />
-                                                </Grid>
-                                            </Border>
-                                            <Border
-                                                Margin="3,3,3,3"
-                                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="6"
-                                                Visibility="{Binding SecondaryVisibility}">
-                                                <Grid CornerRadius="5">
-                                                    <FontIcon FontSize="14" Glyph="{Binding FallbackGlyph}" />
-                                                    <Image Source="{Binding SecondaryIcon}" Stretch="UniformToFill" />
-                                                </Grid>
-                                            </Border>
-                                            <Border
-                                                Margin="0,6,6,0"
-                                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="6">
-                                                <Grid CornerRadius="5">
-                                                    <FontIcon FontSize="14" Glyph="{Binding FallbackGlyph}" />
-                                                    <Image Source="{Binding PrimaryIcon}" Stretch="UniformToFill" />
-                                                </Grid>
-                                            </Border>
-                                        </Grid>
+            <Grid x:Name="CompactSurface" Visibility="Collapsed">
+                <ScrollViewer
+                    x:Name="CompactBatchScroller"
+                    HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Auto">
+                    <ItemsRepeater
+                        x:Name="CompactBatchList"
+                        ElementClearing="OnBatchElementClearing"
+                        ElementPrepared="OnBatchElementPrepared"
+                        ItemTemplate="{StaticResource CompactBatchTemplate}">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Spacing="4" />
+                        </ItemsRepeater.Layout>
+                    </ItemsRepeater>
+                </ScrollViewer>
+            </Grid>
 
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="0">
-                                            <TextBlock
-                                                FontSize="11"
-                                                FontWeight="SemiBold"
-                                                Text="{Binding Title}"
-                                                TextTrimming="CharacterEllipsis"
-                                                TextWrapping="NoWrap" />
-                                            <TextBlock
-                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                FontSize="9"
-                                                Text="{Binding Subtitle}"
-                                                TextTrimming="CharacterEllipsis"
-                                                TextWrapping="NoWrap" />
-                                        </StackPanel>
-
-                                        <StackPanel
-                                            Grid.Column="2"
-                                            Orientation="Horizontal"
-                                            VerticalAlignment="Center">
-                                            <Button
-                                                Style="{StaticResource TitleBarButtonStyle}"
-                                                Width="22"
-                                                Height="22"
-                                                AutomationProperties.Name="{Binding RemoveBatchAutomationName}"
-                                                Click="OnRemoveBatchClicked"
-                                                Content="×"
-                                                FontSize="14"
-                                                ToolTipService.ToolTip="Remove Batch" />
-                                            <Button
-                                                Style="{StaticResource TitleBarButtonStyle}"
-                                                Width="22"
-                                                Height="22"
-                                                AutomationProperties.Name="{Binding ToggleExpandAutomationName}"
-                                                Click="OnToggleExpandClicked"
-                                                ToolTipService.ToolTip="Expand/Collapse">
-                                                <FontIcon FontSize="9" Glyph="{Binding ExpandGlyph}" />
-                                            </Button>
-                                        </StackPanel>
-                                    </Grid>
-
-                                    <ItemsRepeater
-                                        ElementClearing="OnItemElementClearing"
-                                        ElementPrepared="OnItemElementPrepared"
-                                        ItemsSource="{Binding Items}"
-                                        Margin="4,0,4,4"
-                                        Visibility="{Binding ItemsVisibility}">
-                                        <ItemsRepeater.Layout>
-                                            <StackLayout Spacing="4" />
-                                        </ItemsRepeater.Layout>
-                                        <ItemsRepeater.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border
-                                                    Margin="0,0,0,4"
-                                                    Padding="4"
-                                                    AutomationProperties.Name="{Binding DragAutomationName}"
-                                                    Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                                                    CanDrag="True"
-                                                    CornerRadius="4"
-                                                    DragStarting="OnItemDragStarting"
-                                                    DropCompleted="OnItemDropCompleted">
-                                                    <Grid ColumnSpacing="4">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="24" />
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-
-                                                        <Grid Width="24" Height="24" VerticalAlignment="Center">
-                                                            <FontIcon IsHitTestVisible="False" FontSize="13" Glyph="{Binding FallbackGlyph}" />
-                                                            <Image AutomationProperties.Name="{Binding VisualAutomationName}" IsHitTestVisible="False" Source="{Binding Icon}" Stretch="UniformToFill" />
-                                                        </Grid>
-                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="2,0,0,0">
-                                                            <TextBlock FontSize="10" FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                                                            <TextBlock
-                                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                                FontSize="9"
-                                                                Text="{Binding Type}"
-                                                                TextTrimming="CharacterEllipsis"
-                                                                TextWrapping="NoWrap" />
-                                                        </StackPanel>
-                                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                                            <ToggleButton
-                                                                Style="{StaticResource TitleBarToggleButtonStyle}"
-                                                                Width="22"
-                                                                Height="22"
-                                                                AutomationProperties.Name="{Binding PinAutomationName}"
-                                                                Click="OnPinClicked"
-                                                                IsChecked="{Binding IsPinned, Mode=OneWay}"
-                                                                ToolTipService.ToolTip="Pin / Unpin">
-                                                                <FontIcon FontSize="11" Glyph="&#xE718;" />
-                                                            </ToggleButton>
-                                                            <Button
-                                                                Style="{StaticResource TitleBarButtonStyle}"
-                                                                Width="22"
-                                                                Height="22"
-                                                                AutomationProperties.Name="{Binding RemoveAutomationName}"
-                                                                Click="OnRemoveItemClicked"
-                                                                Content="×"
-                                                                FontSize="14"
-                                                                ToolTipService.ToolTip="Remove" />
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsRepeater.ItemTemplate>
-                                    </ItemsRepeater>
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsRepeater.ItemTemplate>
-                </ItemsRepeater>
-            </ScrollViewer>
+            <Grid x:Name="ExpandedSurface" Visibility="Collapsed">
+                <ScrollViewer
+                    x:Name="ExpandedBatchScroller"
+                    HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Auto">
+                    <ItemsRepeater
+                        x:Name="ExpandedBatchList"
+                        ElementClearing="OnBatchElementClearing"
+                        ElementPrepared="OnBatchElementPrepared"
+                        ItemTemplate="{StaticResource ExpandedBatchTemplate}">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Spacing="4" />
+                        </ItemsRepeater.Layout>
+                    </ItemsRepeater>
+                </ScrollViewer>
+            </Grid>
 
             <Border
                 x:Name="DragOverlay"
@@ -330,6 +547,70 @@
                         FontSize="11" />
                 </Grid>
             </Border>
+        </Grid>
+
+        <!-- Bottom Actions / Footer -->
+        <Grid
+            x:Name="BottomActions"
+            Grid.Row="2"
+            Height="32"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            Padding="4,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Bottom-Left Trash Button -->
+            <Button
+                x:Name="ClearTemporaryButton"
+                Grid.Column="0"
+                HorizontalAlignment="Left"
+                Style="{StaticResource TitleBarButtonStyle}"
+                Width="28"
+                Height="28"
+                AutomationProperties.Name="Clear Temporary Items"
+                Click="OnClearTemporaryClicked"
+                ToolTipService.ToolTip="Clear Temporary Items"
+                Visibility="Collapsed">
+                <FontIcon FontSize="12" Glyph="&#xE74D;" />
+            </Button>
+
+            <!-- Bottom-Right Expand / Compact Button -->
+            <StackPanel
+                Grid.Column="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right">
+                <Button
+                    x:Name="ExpandModeButton"
+                    Style="{StaticResource TitleBarButtonStyle}"
+                    Height="28"
+                    Padding="6,0"
+                    AutomationProperties.Name="Open Expanded management view"
+                    Click="OnExpandedModeClicked"
+                    ToolTipService.ToolTip="Expand DropCove">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon FontSize="11" Glyph="&#xE740;" />
+                        <TextBlock FontSize="10" Text="Expand" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    x:Name="CompactModeButton"
+                    Style="{StaticResource TitleBarButtonStyle}"
+                    Height="28"
+                    Padding="6,0"
+                    AutomationProperties.Name="Return to Compact view"
+                    Click="OnCompactModeClicked"
+                    Visibility="Collapsed"
+                    ToolTipService.ToolTip="Compact DropCove">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon FontSize="11" Glyph="&#xE73F;" />
+                        <TextBlock FontSize="10" Text="Compact" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
         </Grid>
     </Grid>
 </Page>

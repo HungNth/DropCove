@@ -13,7 +13,7 @@ using Windows.Storage;
 
 namespace DropCove;
 
-/// <summary>Displays and accepts drops into the bounded unified Drop Shelf.</summary>
+/// <summary>Displays and accepts drops in the Compact and Expanded Drop Shelf presentations.</summary>
 public sealed partial class MainPage : Page
 {
     private readonly Dictionary<string, IStorageItem> _storageItems = new(StringComparer.OrdinalIgnoreCase);
@@ -27,12 +27,13 @@ public sealed partial class MainPage : Page
     private Func<Task>? _dismissShelf;
     private Action? _showSettings;
     private Action? _beginWindowMove;
-    private Action<int, int>? _resizeWindow;
+    private Action<ShelfDisplayState>? _resizeForPresentation;
     private Func<string, string, Task<bool>>? _confirm;
     private Action? _shakeDragCanceled;
     private Func<bool, Task>? _shakeDropCompleted;
     private Action? _shakeDragStarted;
     private DispatcherTimer? _statusTimer;
+    private ShelfDisplayState _presentation = ShelfDisplayState.Compact;
     /// <summary>Initializes the page.</summary>
     public MainPage()
     {
@@ -45,16 +46,20 @@ public sealed partial class MainPage : Page
         Func<Task> dismissShelf,
         Action showSettings,
         Action beginWindowMove,
-        Action<int, int> resizeWindow,
+        Action<ShelfDisplayState> resizeForPresentation,
         Func<string, string, Task<bool>> confirm,
         Action shakeDragStarted,
         Action shakeDragCanceled,
         Func<bool, Task> shakeDropCompleted)
     {
+        ArgumentNullException.ThrowIfNull(resizeForPresentation);
         ArgumentNullException.ThrowIfNull(shakeDragStarted);
         ArgumentNullException.ThrowIfNull(shakeDragCanceled);
         ArgumentNullException.ThrowIfNull(shakeDropCompleted);
         _manager = manager;
+        _presentation = manager.DisplayState == ShelfDisplayState.Expanded
+            ? ShelfDisplayState.Expanded
+            : ShelfDisplayState.Compact;
         _visualCoordinator = new ShelfVisualCoordinator<ImageSource>(
             new WindowsShelfVisualProvider(TryGetCachedStorageItem),
             IsImageShelfItem);
@@ -63,7 +68,7 @@ public sealed partial class MainPage : Page
         _dismissShelf = dismissShelf;
         _showSettings = showSettings;
         _beginWindowMove = beginWindowMove;
-        _resizeWindow = resizeWindow;
+        _resizeForPresentation = resizeForPresentation;
         _confirm = confirm;
         _shakeDragCanceled = shakeDragCanceled;
         _shakeDropCompleted = shakeDropCompleted;
@@ -156,7 +161,14 @@ public sealed partial class MainPage : Page
             shakeOutcomeReported = true;
             await (_shakeDropCompleted?.Invoke(true) ?? Task.CompletedTask);
             await RefreshCardsAsync();
-            BatchScroller.ChangeView(null, 0, null, true);
+            if (_presentation == ShelfDisplayState.Expanded)
+            {
+                ExpandedBatchScroller.ChangeView(null, 0, null, true);
+            }
+            else
+            {
+                CompactBatchScroller.ChangeView(null, 0, null, true);
+            }
 
             if (outcome.SkippedUnsupportedCount > 0)
             {
@@ -251,11 +263,19 @@ public sealed partial class MainPage : Page
     }
     private async void OnPinClicked(object sender, RoutedEventArgs e)
     {
-        if (sender is ToggleButton { DataContext: ShelfItemViewModel item } toggle &&
-            _manager is not null &&
-            await _manager.SetPinnedAsync(item.Item.Id, toggle.IsChecked == true))
+        if (sender is ToggleButton toggle && _manager is not null)
         {
-            await RefreshAfterMutationAsync();
+            var itemId = toggle.DataContext switch
+            {
+                ShelfItemViewModel item => item.Item.Id,
+                BatchCardViewModel { SingleItem: { } single } => single.Item.Id,
+                _ => (Guid?)null
+            };
+
+            if (itemId.HasValue && await _manager.SetPinnedAsync(itemId.Value, toggle.IsChecked == true))
+            {
+                await RefreshAfterMutationAsync();
+            }
         }
     }
 
@@ -297,12 +317,32 @@ public sealed partial class MainPage : Page
             await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
         }
     }
-
     private void OnToggleExpandClicked(object sender, RoutedEventArgs e)
     {
         if (sender is Button { DataContext: BatchCardViewModel batchVm })
         {
             batchVm.IsExpanded = !batchVm.IsExpanded;
+        }
+    }
+
+    private async void OnCompactModeClicked(object sender, RoutedEventArgs e) => await SetPresentationModeAsync(ShelfDisplayState.Compact);
+
+    private async void OnExpandedModeClicked(object sender, RoutedEventArgs e) => await SetPresentationModeAsync(ShelfDisplayState.Expanded);
+
+    private async void OnShowExpandedClicked(object sender, RoutedEventArgs e) => await SetPresentationModeAsync(ShelfDisplayState.Expanded);
+
+    private async Task SetPresentationModeAsync(ShelfDisplayState presentation)
+    {
+        if (_manager is null || presentation is not (ShelfDisplayState.Compact or ShelfDisplayState.Expanded))
+        {
+            return;
+        }
+
+        _manager.ShowShelf(presentation);
+        await RefreshCardsAsync();
+        if (presentation == ShelfDisplayState.Expanded)
+        {
+            ExpandedBatchScroller.ChangeView(null, 0, null, true);
         }
     }
 
@@ -312,16 +352,39 @@ public sealed partial class MainPage : Page
     {
         HideStatus();
         CancelVisualRequests();
-        var cards = _manager!.Batches.Select(CreateBatchCard).ToArray();
-        BatchList.ItemsSource = cards;
-        EmptyState.Visibility = cards.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-        BatchScroller.Visibility = cards.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        var batches = _manager!.Batches;
+        _presentation = _manager.DisplayState == ShelfDisplayState.Expanded
+            ? ShelfDisplayState.Expanded
+            : ShelfDisplayState.Compact;
+        var cards = batches.Select(CreateBatchCard).ToArray();
+        if (_presentation == ShelfDisplayState.Compact)
+        {
+            CompactBatchList.ItemsSource = cards;
+            ExpandedBatchList.ItemsSource = null;
+        }
+        else
+        {
+            CompactBatchList.ItemsSource = null;
+            ExpandedBatchList.ItemsSource = cards;
+        }
 
-        var overflow = Math.Max(0, cards.Length - 4);
-        OverflowLabel.Text = $"+{overflow} batch{(overflow == 1 ? string.Empty : "es")}";
-        OverflowLabel.Visibility = overflow == 0 ? Visibility.Collapsed : Visibility.Visible;
-        ResizeForBatchCount(cards.Length);
+        UpdatePresentationVisibility(batches.Count > 0);
+        if (_manager.DisplayState is ShelfDisplayState.Compact or ShelfDisplayState.Expanded)
+        {
+            _resizeForPresentation?.Invoke(_presentation);
+        }
+
         return Task.CompletedTask;
+    }
+    private void UpdatePresentationVisibility(bool hasBatches)
+    {
+        var isExpanded = _presentation == ShelfDisplayState.Expanded;
+        CompactSurface.Visibility = hasBatches && !isExpanded ? Visibility.Visible : Visibility.Collapsed;
+        ExpandedSurface.Visibility = hasBatches && isExpanded ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Visibility = hasBatches ? Visibility.Collapsed : Visibility.Visible;
+        ExpandModeButton.Visibility = isExpanded ? Visibility.Collapsed : Visibility.Visible;
+        CompactModeButton.Visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed;
+        ClearTemporaryButton.Visibility = hasBatches ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async Task RefreshAfterMutationAsync(bool autoHideWhenEmpty = false)
@@ -473,16 +536,15 @@ public sealed partial class MainPage : Page
             ? $"{(first.IsPinned ? "Pinned • " : string.Empty)}{first.Type}"
             : $"{string.Join(", ", items.Take(2).Select(item => item.Name))}{(pinnedCount > 0 ? $" • {pinnedCount} pinned" : string.Empty)}";
 
+        var isExpanded = _presentation == ShelfDisplayState.Expanded;
         return new BatchCardViewModel(
             batch,
             items.Length == 1 ? first.Name : $"{items.Length} items",
             subtitle,
             first.FallbackGlyph,
-            items.Length > 1 ? Visibility.Visible : Visibility.Collapsed,
-            items.Length > 2 ? Visibility.Visible : Visibility.Collapsed,
-            items);
+            items,
+            isExpanded);
     }
-
     private static ShelfItemViewModel CreateShelfItemViewModel(ShelfItem item) => new(
         item,
         item.Name,
@@ -513,17 +575,6 @@ public sealed partial class MainPage : Page
         public int RealizationCount { get; set; } = 1;
     }
 
-    private void ResizeForBatchCount(int batchCount)
-    {
-        var height = batchCount switch
-        {
-            <= 1 => 180,
-            2 => 236,
-            3 => 292,
-            _ => 348,
-        };
-        _resizeWindow?.Invoke(180, height);
-    }
 
 
     private void ShowDropMessage(string message, InfoBarSeverity? severity = null)
@@ -566,7 +617,6 @@ public sealed partial class MainPage : Page
 internal sealed class BatchCardViewModel : System.ComponentModel.INotifyPropertyChanged
 {
     private bool _isExpanded;
-
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 
     public ShelfBatch Batch { get; }
@@ -576,31 +626,15 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
     public ImageSource? PrimaryIcon => Items.ElementAtOrDefault(0)?.Icon;
     public ImageSource? SecondaryIcon => Items.ElementAtOrDefault(1)?.Icon;
     public ImageSource? TertiaryIcon => Items.ElementAtOrDefault(2)?.Icon;
-    public Visibility SecondaryVisibility { get; }
-    public Visibility TertiaryVisibility { get; }
+    public bool IsSingleItem => Items.Count == 1;
+    public Visibility SingleItemVisibility => IsSingleItem ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility MultiItemVisibility => Items.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+    public ShelfItemViewModel? SingleItem => Items.ElementAtOrDefault(0);
+    public bool IsPinned => SingleItem?.IsPinned ?? false;
+    public string SingleItemPinAutomationName => IsPinned ? $"Unpin {Title}" : $"Pin {Title}";
+    public string ItemCountLabel => $"{Items.Count} item{(Items.Count == 1 ? string.Empty : "s")}";
+    public string CreatedLabel => Batch.CreatedAt.ToLocalTime().ToString("g");
     public IReadOnlyList<ShelfItemViewModel> Items { get; }
-
-    public BatchCardViewModel(
-        ShelfBatch batch,
-        string title,
-        string subtitle,
-        string fallbackGlyph,
-        Visibility secondaryVisibility,
-        Visibility tertiaryVisibility,
-        IReadOnlyList<ShelfItemViewModel> items)
-    {
-        Batch = batch;
-        Title = title;
-        Subtitle = subtitle;
-        FallbackGlyph = fallbackGlyph;
-        SecondaryVisibility = secondaryVisibility;
-        TertiaryVisibility = tertiaryVisibility;
-        Items = items;
-        foreach (var item in items)
-        {
-            item.PropertyChanged += OnItemPropertyChanged;
-        }
-    }
 
     public bool IsExpanded
     {
@@ -613,26 +647,51 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsExpanded)));
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(ItemsVisibility)));
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(ExpandGlyph)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(ToggleExpandAutomationName)));
             }
         }
     }
 
     public Visibility ItemsVisibility => IsExpanded ? Visibility.Visible : Visibility.Collapsed;
     public string ExpandGlyph => IsExpanded ? "\uE70E" : "\uE70D";
+    public string ToggleExpandAutomationName => IsExpanded ? $"Collapse {Title}" : $"Expand {Title}";
+
+    public BatchCardViewModel(
+        ShelfBatch batch,
+        string title,
+        string subtitle,
+        string fallbackGlyph,
+        IReadOnlyList<ShelfItemViewModel> items,
+        bool isExpanded)
+    {
+        Batch = batch;
+        Title = title;
+        Subtitle = subtitle;
+        FallbackGlyph = fallbackGlyph;
+        Items = items;
+        _isExpanded = isExpanded;
+        foreach (var item in items)
+        {
+            item.PropertyChanged += OnItemPropertyChanged;
+        }
+    }
+
     public string DragBatchAutomationName => $"Drag batch {Title}";
     public string RemoveBatchAutomationName => $"Remove batch {Title}";
-    public string ToggleExpandAutomationName => IsExpanded ? $"Collapse {Title}" : $"Expand {Title}";
 
     private void OnItemPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        if (args.PropertyName != nameof(ShelfItemViewModel.Icon))
+        if (args.PropertyName == nameof(ShelfItemViewModel.Icon))
         {
-            return;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(PrimaryIcon)));
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(SecondaryIcon)));
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(TertiaryIcon)));
         }
-
-        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(PrimaryIcon)));
-        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(SecondaryIcon)));
-        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(TertiaryIcon)));
+        else if (args.PropertyName == nameof(ShelfItemViewModel.IsPinned))
+        {
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsPinned)));
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(SingleItemPinAutomationName)));
+        }
     }
 }
 
@@ -654,6 +713,15 @@ internal sealed class ShelfItemViewModel : System.ComponentModel.INotifyProperty
     public ShelfItem Item { get; }
     public string Name { get; }
     public string Type { get; }
+    public string Path => Item.Path;
+    public string AvailabilityText => Item.Availability switch
+    {
+        ItemAvailability.Available => "Available",
+        ItemAvailability.Missing => "Missing",
+        ItemAvailability.Unavailable => "Unavailable",
+        _ => "Unknown",
+    };
+    public string DetailsLabel => $"{AvailabilityText} • {(IsPinned ? "Pinned" : "Temporary")}";
     public string FallbackGlyph { get; }
     public ImageSource? Icon => _icon;
     public bool IsThumbnail => _usedThumbnail;

@@ -463,49 +463,31 @@ Final V1 display-state model:
 public enum ShelfDisplayState
 {
     Hidden,
-    UnifiedShelf,
-    EdgeDocked,
     Compact,
-    Expanded
+    Expanded,
+    EdgeDocked
 }
 ```
 
-`UnifiedShelf` is the bounded unified Drop Shelf presentation used through the Edge Rail stage. Stage 1 does not introduce `Compact` or `Expanded`; those remain later V1 presentations.
+`Compact` and `Expanded` are two presentations over the same `DropShelfManager.Batches` state. Neither presentation owns lifecycle, drag, or persistence rules.
 
-## Stage 1 bounded unified Drop Shelf
+## Compact
 
-The pre-mode Drop Shelf uses one vertical, newest-first Shelf Batch list. It is not `Compact` mode and has no separate management presentation.
+`Compact` is the quick-access presentation. It supports natural vertical scrolling across all Shelf Batches while keeping individual batch contents collapsed by default. It uses the native icon for a single-item batch and a stacked visual for a multi-item batch. The surface maintains a compact footprint with direct scrolling rather than truncating batches behind a Manage button.
 
-Exact logical-pixel window sizes:
+Compact dimensions remain bounded at `180 × 180` for zero or one batch, `180 × 236` for two batches, and `180 × 292` for three or more batches, with vertical scrolling enabled for additional batches. The header exposes Settings and dismissal. The footer bar provides `Clear Temporary Items` at the bottom-left and a dedicated `Expand / Compact` toggle at the bottom-right.
+## Expanded
 
-| Shelf Batches | Width | Height |
-| ---: | ---: | ---: |
-| 0–1 | 180 | 180 |
-| 2 | 180 | 236 |
-| 3 | 180 | 292 |
-| 4 or more | 180 | 348 |
+`Expanded` is the fixed `720 × 640` management presentation. It scrolls through every Shelf Batch and Shelf Item and shows each item's name, Path Reference, availability classification, Temporary/Pinned lifecycle, native visual, and management actions. Users can pin/unpin, Remove Item, Remove Batch, Clear Temporary Items, drag one item, or drag one whole batch.
 
-The window uses a 32-pixel integrated drag strip with Settings and Close controls. Its top edge remains anchored while it grows downward; placement shifts upward only when required to remain inside the current monitor work area. Resizing is immediate in Stage 1.
-
-Each Shelf Batch is one vertical summary card. Single-item batches show the native icon and truncated name; multi-item batches show a bounded stacked visual and item count. The whole content surface accepts drops: an empty shelf shows a drop prompt, while a populated shelf shows a drag-over overlay without reserving a permanent drop panel.
-
-Four recent batches are visible. Additional batches remain in the same window through vertical scrolling, with a `+N batches` indicator. A newly accepted batch appears first and returns the list to the top.
-
+Keyboard focus follows the native control order so Tab navigation reaches mode, cleanup, pin, remove, and dismissal actions; Enter or Space activates the focused button. Cross-batch multi-selection and file-launch actions are intentionally not part of this presentation.
 ## Hidden
 
-Used whenever the floating shelf is not displayed. Before Edge Rail is implemented, `Hidden` may still contain items; the hotkey reopens the shelf without losing them.
+Used whenever the floating shelf is not displayed. Hidden does not discard Shelf Batches; reopening the shelf starts in Compact mode and reuses the same manager state.
 
 ## EdgeDocked
 
-Used after Edge Rail is implemented when the shelf is dismissed but still contains items.
-
-## Compact — Ticket 15 and later
-
-The final V1 quick-access presentation introduced by Ticket 15 after the native workflow is proven.
-
-## Expanded — Ticket 15 and later
-
-The final V1 management presentation used to inspect and manage all content.
+Used after Edge Rail is implemented when the shelf is dismissed while it still contains items. Opening the shelf from the rail returns to Compact mode on the remembered monitor; emptying the last batch transitions back to Hidden.
 
 ---
 
@@ -522,15 +504,16 @@ public enum ShelfPlacement
 }
 ```
 
-Before Ticket 15, the bounded unified Drop Shelf combines with placement as follows:
+The shelf presentation is independent from monitor placement:
 
 | Invocation | Presentation | Placement |
 | --- | --- | --- |
-| Shake | Bounded unified Drop Shelf | Cursor |
-| Global hotkey | Bounded unified Drop Shelf | Default |
-| Edge interaction | Bounded unified Drop Shelf | Docked |
+| Shake | Compact | Cursor monitor / near cursor |
+| Global hotkey or tray activation | Compact | Cursor monitor / default work area |
+| Mode switch | Expanded or Compact | Current shelf monitor |
+| Edge interaction | Edge Rail | Remembered docked monitor and edge |
 
-Ticket 15 later replaces that single presentation with `Compact` and `Expanded`. Placement remains independent so display and monitor-position behavior do not become one oversized state model.
+Placement remains independent so display and monitor-position behavior do not become one oversized state model.
 
 ---
 
@@ -538,42 +521,32 @@ Ticket 15 later replaces that single presentation with `Compact` and `Expanded`.
 
 The hotkey toggles the shelf. `Esc` and the `×` button also dismiss it; losing focus does not.
 
-Before Edge Rail is implemented, dismissing always hides the shelf while preserving its content:
-
-```text
-Bounded unified Drop Shelf → Hidden
-```
-
-After Edge Rail is implemented:
+Dismissing Compact or Expanded preserves every Shelf Batch. With Edge Rail available, the resulting state is:
 
 ```text
 Items.Count == 0 → Hidden
 Items.Count > 0  → EdgeDocked
 ```
 
-The remaining items may be temporary, pinned, or a mixture of both.
+The remaining items may be Temporary, Pinned, or a mixture of both. Reopening from the rail starts in Compact mode; switching to Expanded does not change lifecycle or persistence state.
 
 ---
 
-# 15. Compact Drop Shelf — Ticket 15 and later
+# 15. Compact Drop Shelf
 
-Ticket 15 introduces `Compact` as a distinct quick-access presentation only after the bounded unified Drop Shelf and native workflow are proven. It consumes the same shelf state as Expanded mode and does not change batch, drag, or persistence semantics.
+`Compact` is the quick-access presentation. It consumes the same `DropShelfManager.Batches` state as `Expanded` and does not change batch, drag, or persistence semantics.
 
-Compact stays small and focuses on recent batches:
+Compact renders Shelf Batches in one vertical column with natural vertical scrolling. A single-item batch uses one native icon and truncated name; a multi-item batch uses a stacked visual and an item count. Individual batch contents remain collapsed by default and can be expanded on demand. Clicking the dedicated Expand toggle in the bottom-right footer switches to `Expanded` for a wider management surface.
 
-```text
-╭────────────────────────────────────╮
-│ 🗂3     🖼     🗂5     🗂2     ⤢  │
-╰────────────────────────────────────╯
-```
+Compact dimensions scale with recent batches up to the maximum bounded height:
 
-Each visual entry represents a `ShelfBatch`. The target is 4–6 recent batches. When more batches exist, Compact exposes overflow without growing indefinitely:
+| Recent batches shown | Width | Height |
+| ---: | ---: | ---: |
+| 0–1 | 180 | 180 |
+| 2 | 180 | 236 |
+| 3 | 180 | 292 |
 
-```text
-🗂3  🖼  🗂5  🗂2  +4  ⤢
-```
-
-This post-Ticket-15 horizontal presentation is separate from the Stage 1 vertical, stepped-size bounded unified Drop Shelf.
+The header exposes Settings and dismissal, while the footer bar provides `Clear Temporary Items` at the bottom-left and the `Expand / Compact` toggle at the bottom-right. Newly accepted batches are inserted first.
 
 ---
 
@@ -632,18 +605,17 @@ Example:
 ╰────────────────────────────────────────╯
 ```
 
-Expanded mode should support:
+Expanded mode supports:
 
-- viewing all batches;
-- viewing all items;
-- pinning/unpinning;
-- removing items;
-- clearing temporary items;
-- multi-selection;
-- dragging individual items;
-- displaying paths;
-- displaying file metadata;
-- dealing with larger numbers of files.
+- viewing all Shelf Batches and Shelf Items;
+- displaying each Path Reference and availability classification;
+- pinning and unpinning items;
+- removing an item or an entire batch;
+- clearing Temporary Items after confirmation;
+- dragging one item or one whole Shelf Batch;
+- keyboard focus and activation for native management controls.
+
+Cross-batch multi-selection and file-launch actions are intentionally not part of V1.
 
 ---
 

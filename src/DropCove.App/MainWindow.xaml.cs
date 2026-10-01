@@ -7,7 +7,7 @@ using Microsoft.UI.Dispatching;
 
 namespace DropCove;
 
-/// <summary>Hosts the resident bounded unified Drop Shelf.</summary>
+/// <summary>Hosts the resident Compact and Expanded Drop Shelf presentations.</summary>
 public sealed partial class MainWindow : Window
 {
     private const uint WindowCloseMessage = 0x0010;
@@ -82,7 +82,7 @@ public sealed partial class MainWindow : Window
             DismissShelf,
             ShowSettings,
             () => WindowInterop.BeginMove(_windowHandle),
-            (width, height) => WindowInterop.ResizeAnchored(_windowHandle, width, height),
+            ResizeShelfForPresentation,
             ShowConfirmDialogAsync,
             OnShakeDragStarted,
             OnShakeDragCanceled,
@@ -125,6 +125,16 @@ public sealed partial class MainWindow : Window
 
     /// <summary>Shows and activates the shelf on the monitor containing the cursor.</summary>
     public void ShowShelf() => ShowShelfAt(null);
+    private void ResizeShelfForPresentation(ShelfDisplayState presentation)
+    {
+        if (_manager is null || presentation is not (ShelfDisplayState.Compact or ShelfDisplayState.Expanded))
+        {
+            return;
+        }
+
+        var (width, height) = GetShelfSize(presentation, _manager.Batches.Count);
+        WindowInterop.ResizeAnchored(_windowHandle, width, height);
+    }
 
     private async void ShowShelfAt(ShelfRailPlacement? placement)
     {
@@ -134,9 +144,9 @@ public sealed partial class MainWindow : Window
         }
 
         HideRail();
+        _manager.ShowShelf(ShelfDisplayState.Compact);
         await _page.RefreshAsync();
-        _manager.ShowShelf();
-        var (width, height) = GetShelfSize(_manager.Batches.Count);
+        var (width, height) = GetShelfSize(_manager.DisplayState, _manager.Batches.Count);
         if (placement is { HasMonitor: true })
         {
             WindowInterop.PositionOnMonitor(_windowHandle, placement.MonitorId, width, height);
@@ -249,7 +259,10 @@ public sealed partial class MainWindow : Window
 
     private async Task SummonShelfByShakeCoreAsync(int targetX, int targetY)
     {
-        if (_manager is null || _shakeRestore is not null || _shakeRestoreInFlight || _manager.DisplayState == ShelfDisplayState.UnifiedShelf)
+        if (_manager is null ||
+            _shakeRestore is not null ||
+            _shakeRestoreInFlight ||
+            _manager.DisplayState is ShelfDisplayState.Compact or ShelfDisplayState.Expanded)
         {
             return;
         }
@@ -280,14 +293,14 @@ public sealed partial class MainWindow : Window
         }
 
         HideRail();
+        _manager.ShowShelf(ShelfDisplayState.Compact);
         await _page.RefreshAsync();
         if (sessionVersion is not null && (sessionVersion != _shakeSessionVersion || _shakeRestore is null))
         {
             return;
         }
 
-        _manager.ShowShelf();
-        var (width, height) = GetShelfSize(_manager.Batches.Count);
+        var (width, height) = GetShelfSize(_manager.DisplayState, _manager.Batches.Count);
         WindowInterop.PositionNearPoint(_windowHandle, targetX, targetY, width, height);
         WindowInterop.ShowAndActivate(_windowHandle);
         _page.Focus(FocusState.Programmatic);
@@ -709,11 +722,20 @@ public sealed partial class MainWindow : Window
         ShelfDisplayState DisplayState,
         ShelfRailPlacement RailPlacement);
 
-    private static (int Width, int Height) GetShelfSize(int batchCount) => batchCount switch
+    private static (int Width, int Height) GetShelfSize(ShelfDisplayState presentation, int batchCount)
     {
-        <= 1 => (180, 180),
-        2 => (180, 236),
-        3 => (180, 292),
-        _ => (180, 348),
-    };
+        if (presentation == ShelfDisplayState.Expanded)
+        {
+            return (720, 640);
+        }
+
+        var visibleBatchCount = Math.Clamp(batchCount, 0, 3);
+        var height = visibleBatchCount switch
+        {
+            <= 1 => 180,
+            2 => 236,
+            _ => 292,
+        };
+        return (180, height);
+    }
 }

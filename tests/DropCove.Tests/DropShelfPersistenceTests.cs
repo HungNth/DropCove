@@ -219,7 +219,7 @@ public sealed class DropShelfPersistenceTests
         await manager.AcceptDropAsync([new(@"C:\Work\Docked.txt", "Docked.txt", false)]);
         var placement = new ShelfRailPlacement("DISPLAY2", ShelfRailEdge.Left);
 
-        manager.ShowShelf();
+        manager.ShowShelf(ShelfDisplayState.Compact);
         Assert.AreEqual(ShelfDisplayState.EdgeDocked, await manager.DismissShelfAsync(placement));
 
         var restored = await OpenAsync(databasePath);
@@ -234,7 +234,7 @@ public sealed class DropShelfPersistenceTests
         var databasePath = CreateDatabasePath();
         var manager = await OpenAsync(databasePath);
         await manager.AcceptDropAsync([new(@"C:\Work\Docked.txt", "Docked.txt", false)]);
-        manager.ShowShelf();
+        manager.ShowShelf(ShelfDisplayState.Compact);
         await manager.DismissShelfAsync(new ShelfRailPlacement("DISPLAY1", ShelfRailEdge.Right));
 
         var updated = new ShelfRailPlacement("DISPLAY2", ShelfRailEdge.Left);
@@ -270,9 +270,9 @@ public sealed class DropShelfPersistenceTests
         // Simulate initial state: shelf is Hidden
         Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
 
-        // Simulate shake summon: shelf transitions to UnifiedShelf
-        manager.ShowShelf();
-        Assert.AreEqual(ShelfDisplayState.UnifiedShelf, manager.DisplayState);
+        // Simulate shake summon: shelf transitions to the Compact presentation
+        manager.ShowShelf(ShelfDisplayState.Compact);
+        Assert.AreEqual(ShelfDisplayState.Compact, manager.DisplayState);
 
         // Accept drop after shake: contains a regular file and a folder
         var dropResult = await manager.AcceptDropAsync([

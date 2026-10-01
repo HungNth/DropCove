@@ -1,6 +1,6 @@
 namespace DropCove.Core;
 
-/// <summary>Owns the in-memory Shelf Batch state used by the Stage 1 application seam.</summary>
+/// <summary>Owns the in-memory Shelf Batch state and display transitions used by the application seam.</summary>
 public sealed class DropShelfManager
 {
     private readonly List<ShelfBatch> _batches;
@@ -40,8 +40,17 @@ public sealed class DropShelfManager
     /// <summary>Gets the remembered Edge Rail placement.</summary>
     public ShelfRailPlacement RailPlacement => _railPlacement;
 
-    /// <summary>Marks the bounded unified Drop Shelf as visible.</summary>
-    public void ShowShelf() => _displayState = ShelfDisplayState.UnifiedShelf;
+    /// <summary>Marks the selected shelf presentation as visible.</summary>
+    /// <param name="presentation">The quick-access or management presentation to show.</param>
+    public void ShowShelf(ShelfDisplayState presentation)
+    {
+        if (presentation is not (ShelfDisplayState.Compact or ShelfDisplayState.Expanded))
+        {
+            throw new ArgumentOutOfRangeException(nameof(presentation), presentation, "Only Compact or Expanded shelf presentations can be shown.");
+        }
+
+        _displayState = presentation;
+    }
 
     /// <summary>Marks the shelf as hidden without changing held Shelf Batches.</summary>
     public void HideShelf() => _displayState = ShelfDisplayState.Hidden;
