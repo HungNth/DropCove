@@ -652,7 +652,7 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
         }
     }
 
-    public Visibility ItemsVisibility => IsExpanded ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility ItemsVisibility => (!IsSingleItem && IsExpanded) ? Visibility.Visible : Visibility.Collapsed;
     public string ExpandGlyph => IsExpanded ? "\uE70E" : "\uE70D";
     public string ToggleExpandAutomationName => IsExpanded ? $"Collapse {Title}" : $"Expand {Title}";
 
