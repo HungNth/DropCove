@@ -113,6 +113,11 @@ Composition should be used for:
 - compact-to-expanded transitions;
 - item insertion/removal animations.
 
+DropCove reads the Windows client-area animation preference before each transition. When Windows disables animation effects, non-essential Composition transitions are skipped while state changes, focus, and drag behavior remain available.
+
+Monitor placement uses PerMonitorV2-aware physical bounds. A remembered monitor is preferred when connected; if it is removed, the shelf and Edge Rail resolve to the current connected monitor and retry the remembered display when it returns. Display, device, and DPI changes trigger an event-driven reflow rather than background polling.
+
+
 ## Application architecture
 
 ```text

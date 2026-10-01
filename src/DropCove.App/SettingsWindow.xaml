@@ -11,14 +11,17 @@
             <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Edge Rail" />
             <ComboBox
                 x:Name="RailEdgeComboBox"
+                AutomationProperties.Name="Docking edge"
                 Header="Docking edge"
                 DisplayMemberPath="Name" />
             <ComboBox
                 x:Name="RailMonitorComboBox"
+                AutomationProperties.Name="Target monitor"
                 Header="Target monitor"
                 DisplayMemberPath="Label" />
             <ToggleSwitch
                 x:Name="ShowRailOverFullscreenToggle"
+                AutomationProperties.Name="Show Edge Rail over fullscreen applications"
                 Header="Show over fullscreen applications"
                 OnContent="On"
                 OffContent="Off" />
@@ -26,36 +29,53 @@
             <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Shake-to-open" />
             <ToggleSwitch
                 x:Name="ShakeEnabledToggle"
+                AutomationProperties.Name="Enable shake gesture"
                 Header="Enable shake gesture"
                 OnContent="On"
                 OffContent="Off" />
             <ComboBox
                 x:Name="ShakeSensitivityComboBox"
+                AutomationProperties.Name="Shake sensitivity"
                 Header="Shake sensitivity"
                 DisplayMemberPath="Name" />
 
             <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Global hotkey" />
             <StackPanel Orientation="Horizontal" Spacing="12">
-                <CheckBox x:Name="ControlCheckBox" Content="Ctrl" />
-                <CheckBox x:Name="AltCheckBox" Content="Alt" />
-                <CheckBox x:Name="ShiftCheckBox" Content="Shift" />
-                <CheckBox x:Name="WindowsCheckBox" Content="Win" />
+                <CheckBox
+                    x:Name="ControlCheckBox"
+                    AutomationProperties.Name="Control modifier"
+                    Content="Ctrl" />
+                <CheckBox
+                    x:Name="AltCheckBox"
+                    AutomationProperties.Name="Alt modifier"
+                    Content="Alt" />
+                <CheckBox
+                    x:Name="ShiftCheckBox"
+                    AutomationProperties.Name="Shift modifier"
+                    Content="Shift" />
+                <CheckBox
+                    x:Name="WindowsCheckBox"
+                    AutomationProperties.Name="Windows modifier"
+                    Content="Win" />
             </StackPanel>
 
             <ComboBox
                 x:Name="KeyComboBox"
+                AutomationProperties.Name="Global hotkey key"
                 Header="Key"
                 HorizontalAlignment="Stretch"
                 DisplayMemberPath="Name" />
 
             <ToggleSwitch
                 x:Name="StartWithWindowsToggle"
+                AutomationProperties.Name="Start DropCove with Windows"
                 Header="Start with Windows"
                 OnContent="On"
                 OffContent="Off" />
 
             <InfoBar
                 x:Name="ErrorInfoBar"
+                AutomationProperties.Name="Settings validation message"
                 IsClosable="False"
                 IsOpen="False"
                 Severity="Warning" />

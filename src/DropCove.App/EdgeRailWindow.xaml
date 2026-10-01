@@ -6,8 +6,9 @@
     Title="DropCove Edge Rail">
     <Grid
         x:Name="RailRoot"
-        Padding="4"
         AllowDrop="True"
+        Padding="4"
+        AutomationProperties.Name="Edge Rail"
         Background="{ThemeResource LayerFillColorDefaultBrush}"
         DragEnter="OnRailDragEnter"
         DragLeave="OnRailDragLeave"
@@ -25,6 +26,7 @@
             Width="56"
             Height="32"
             HorizontalAlignment="Center"
+            AutomationProperties.HelpText="Opens the full Drop Shelf and activates DropCove."
             AutomationProperties.Name="Open Shelf"
             Click="OnOpenShelfClicked"
             ToolTipService.ToolTip="Open Shelf">

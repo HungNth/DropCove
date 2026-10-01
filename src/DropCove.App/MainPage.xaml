@@ -446,6 +446,7 @@
         </Grid>
 
         <Grid
+            AutomationProperties.Name="Drop Shelf content and drop target"
             x:Name="ContentSurface"
             Grid.Row="1"
             Padding="8"
@@ -456,6 +457,7 @@
             Drop="OnDrop">
             <StackPanel
                 x:Name="EmptyState"
+                AutomationProperties.Name="Drop files here"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Spacing="8">
@@ -541,6 +543,7 @@
                         MinWidth="0"
                         Padding="0"
                         VerticalAlignment="Center"
+                        AutomationProperties.Name="Dismiss status message"
                         Background="Transparent"
                         Click="OnDismissStatusClicked"
                         Content="×"

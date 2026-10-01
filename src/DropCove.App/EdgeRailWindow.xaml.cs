@@ -96,7 +96,14 @@ public sealed partial class EdgeRailWindow : Window
     {
         ArgumentNullException.ThrowIfNull(batches);
         BatchList.ItemsSource = batches.Select(CreateBatchSummary).ToArray();
+        if (_requestedVisible)
+        {
+            ShelfMotion.PlayStateChange(BatchScroller);
+        }
     }
+
+    /// <summary>Reapplies the current monitor, DPI, fullscreen, and visibility state.</summary>
+    public void Reposition() => ApplyVisibility();
 
     /// <summary>Positions and shows the rail without activating DropCove.</summary>
     /// <param name="placement">The selected monitor and edge.</param>
@@ -257,6 +264,7 @@ public sealed partial class EdgeRailWindow : Window
         _isExpanded = expanded;
         UpdateScrollMode();
         ApplyVisibility();
+        ShelfMotion.PlayRailTransition(RailRoot, expanded);
     }
 
     private void UpdateScrollMode() =>
@@ -272,7 +280,8 @@ public sealed partial class EdgeRailWindow : Window
             return;
         }
 
-        if (!_showOverFullscreen && WindowInterop.IsForegroundWindowFullscreen(_placement.MonitorId))
+        var monitorId = WindowInterop.ResolveMonitorId(_placement.MonitorId, _windowHandle);
+        if (!_showOverFullscreen && WindowInterop.IsForegroundWindowFullscreen(monitorId))
         {
             _pointerInside = false;
             _expandPending = false;
@@ -284,7 +293,7 @@ public sealed partial class EdgeRailWindow : Window
 
         WindowInterop.PositionEdgeRail(
             _windowHandle,
-            _placement.MonitorId,
+            monitorId,
             _placement.Edge == ShelfRailEdge.Left,
             _isExpanded ? ExpandedWidth : CollapsedWidth,
             _isExpanded ? ExpandedHeight : CollapsedHeight);
@@ -312,6 +321,11 @@ public sealed partial class EdgeRailWindow : Window
 
     private WindowMessageResult HandleWindowMessage(uint message, nuint wParam, nint lParam)
     {
+        if (message is WindowInterop.DisplayChangeMessage or WindowInterop.DpiChangedMessage or WindowInterop.DeviceChangeMessage)
+        {
+            _dispatcherQueue.TryEnqueue(ApplyVisibility);
+        }
+
         if (message == WindowInterop.MouseMoveMessage)
         {
             WindowInterop.TrackMouseLeave(_inputWindowHandle == 0 ? _windowHandle : _inputWindowHandle);

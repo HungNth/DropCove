@@ -10,9 +10,10 @@ namespace DropCove;
 public sealed partial class SettingsWindow : Window
 {
     private readonly Func<AppSettings, Task<bool>> _applySettingsAsync;
-    private readonly IReadOnlyList<MonitorOption> _monitorOptions;
+    private IReadOnlyList<MonitorOption> _availableMonitorOptions;
     private readonly IReadOnlyList<RailEdgeChoice> _edgeChoices;
     private readonly IReadOnlyList<ShakeSensitivityChoice> _shakeSensitivityChoices;
+
 
     /// <summary>Creates a settings window.</summary>
     /// <param name="settings">The current settings.</param>
@@ -29,21 +30,26 @@ public sealed partial class SettingsWindow : Window
 
         InitializeComponent();
         _applySettingsAsync = applySettingsAsync;
-        _monitorOptions = monitorOptions;
+        _availableMonitorOptions = monitorOptions;
         _edgeChoices = Enum.GetValues<ShelfRailEdge>()
             .Select(edge => new RailEdgeChoice(edge, edge.ToString()))
             .ToArray();
         _shakeSensitivityChoices = Enum.GetValues<ShakeSensitivity>()
             .Select(sensitivity => new ShakeSensitivityChoice(sensitivity, sensitivity.ToString()))
             .ToArray();
-        AppWindow.Resize(new SizeInt32(420, 700));
+
+        var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        var dpi = WindowInterop.GetWindowDpi(windowHandle);
+        AppWindow.Resize(new SizeInt32(
+            WindowInterop.ScaleLogicalPixels(420, dpi),
+            WindowInterop.ScaleLogicalPixels(700, dpi)));
 
         RailEdgeComboBox.ItemsSource = _edgeChoices;
         RailEdgeComboBox.SelectedItem = _edgeChoices.First(choice => choice.Edge == settings.RailEdge);
-        RailMonitorComboBox.ItemsSource = _monitorOptions;
-        RailMonitorComboBox.SelectedItem = _monitorOptions.FirstOrDefault(
-            option => string.Equals(option.Id, settings.RailMonitorId, StringComparison.OrdinalIgnoreCase))
-            ?? _monitorOptions.FirstOrDefault();
+        var monitorChoices = CreateMonitorChoices(settings.RailMonitorId);
+        RailMonitorComboBox.ItemsSource = monitorChoices;
+        RailMonitorComboBox.SelectedItem = monitorChoices.First(choice =>
+            string.Equals(choice.Id, settings.RailMonitorId, StringComparison.OrdinalIgnoreCase));
         ShowRailOverFullscreenToggle.IsOn = settings.ShowRailOverFullscreen;
         ShakeEnabledToggle.IsOn = settings.ShakeEnabled;
         ShakeSensitivityComboBox.ItemsSource = _shakeSensitivityChoices;
@@ -60,7 +66,36 @@ public sealed partial class SettingsWindow : Window
             ?? KeyChoices[0];
     }
 
+    internal void UpdateMonitorOptions(IReadOnlyList<MonitorOption> monitorOptions)
+    {
+        ArgumentNullException.ThrowIfNull(monitorOptions);
+        var selectedId = (RailMonitorComboBox.SelectedItem as MonitorOption)?.Id ?? string.Empty;
+        _availableMonitorOptions = monitorOptions;
+        var monitorChoices = CreateMonitorChoices(selectedId);
+        RailMonitorComboBox.ItemsSource = monitorChoices;
+        RailMonitorComboBox.SelectedItem = monitorChoices.First(choice =>
+            string.Equals(choice.Id, selectedId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private IReadOnlyList<MonitorOption> CreateMonitorChoices(string? selectedMonitorId)
+    {
+        var choices = new List<MonitorOption>
+        {
+            new(string.Empty, "Use remembered monitor"),
+        };
+        choices.AddRange(_availableMonitorOptions);
+        if (!string.IsNullOrWhiteSpace(selectedMonitorId) &&
+            choices.All(choice => !string.Equals(choice.Id, selectedMonitorId, StringComparison.OrdinalIgnoreCase)))
+        {
+            choices.Add(new MonitorOption(selectedMonitorId, $"{selectedMonitorId} (currently unavailable)"));
+        }
+
+        return choices;
+    }
+
+
     private static IReadOnlyList<HotKeyChoice> KeyChoices { get; } = CreateKeyChoices();
+
 
     private async void OnSaveClicked(object sender, RoutedEventArgs e)
     {

@@ -20,6 +20,8 @@ public sealed partial class MainPage : Page
     private readonly Dictionary<ShelfItemViewModel, VisualRequest> _visualRequests = [];
     private readonly Dictionary<UIElement, ShelfItemViewModel> _itemRealizations = [];
     private readonly Dictionary<UIElement, IReadOnlyList<ShelfItemViewModel>> _batchPreviews = [];
+    private readonly HashSet<Guid> _pendingBatchAnimations = [];
+    private HashSet<Guid> _knownBatchIds = [];
     private DropShelfManager? _manager;
     private DragDropService? _dragDropService;
     private StorageDropService? _storageDropService;
@@ -73,7 +75,7 @@ public sealed partial class MainPage : Page
         _shakeDragCanceled = shakeDragCanceled;
         _shakeDropCompleted = shakeDropCompleted;
         _shakeDragStarted = shakeDragStarted;
-        await RefreshCardsAsync();
+        await RefreshCardsAsync(animate: false);
     }
     internal Task<DropAcceptance> AcceptStorageDropAsync(DataPackageView dataView) =>
         (_storageDropService ?? throw new InvalidOperationException("MainPage is not initialized.")).AcceptAsync(dataView);
@@ -218,9 +220,17 @@ public sealed partial class MainPage : Page
             _dragDropService is not null &&
             await _dragDropService.CompleteItemDragAsync(item.Item.Id, e.DropResult))
         {
-            await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
+            try
+            {
+                await ShelfMotion.PlayExitAsync(sender);
+            }
+            finally
+            {
+                await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
+            }
         }
     }
+
 
     private async void OnBatchDragStarting(UIElement sender, DragStartingEventArgs e)
     {
@@ -257,10 +267,22 @@ public sealed partial class MainPage : Page
         if (sender is FrameworkElement { DataContext: BatchCardViewModel batchVm } &&
             _dragDropService is not null)
         {
+            var removesWholeBatch = batchVm.Batch.Items.All(item => !item.IsPinned);
             var consumed = await _dragDropService.CompleteBatchDragAsync(batchVm.Batch.Id, e.DropResult);
-            await RefreshAfterMutationAsync(autoHideWhenEmpty: consumed);
+            try
+            {
+                if (consumed && removesWholeBatch)
+                {
+                    await ShelfMotion.PlayExitAsync(sender);
+                }
+            }
+            finally
+            {
+                await RefreshAfterMutationAsync(autoHideWhenEmpty: consumed);
+            }
         }
     }
+
     private async void OnPinClicked(object sender, RoutedEventArgs e)
     {
         if (sender is ToggleButton toggle && _manager is not null)
@@ -281,13 +303,29 @@ public sealed partial class MainPage : Page
 
     private async void OnRemoveItemClicked(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { DataContext: ShelfItemViewModel item } &&
-            _manager is not null &&
-            await _manager.RemoveItemAsync(item.Item.Id))
+        if (sender is not Button { DataContext: ShelfItemViewModel item } || _manager is null)
         {
-            await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
+            return;
+        }
+
+        var animationTarget = FindAnimationTarget(sender);
+        if (await _manager.RemoveItemAsync(item.Item.Id))
+        {
+            try
+            {
+                if (animationTarget is not null)
+                {
+                    await ShelfMotion.PlayExitAsync(animationTarget);
+                }
+            }
+            finally
+            {
+                await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
+            }
         }
     }
+
+
 
     private async void OnClearTemporaryClicked(object sender, RoutedEventArgs e)
     {
@@ -310,13 +348,28 @@ public sealed partial class MainPage : Page
 
     private async void OnRemoveBatchClicked(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { DataContext: BatchCardViewModel batchVm } &&
-            _manager is not null &&
-            await _manager.RemoveBatchAsync(batchVm.Batch.Id))
+        if (sender is not Button { DataContext: BatchCardViewModel batchVm } || _manager is null)
         {
-            await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
+            return;
+        }
+
+        var animationTarget = FindAnimationTarget(sender);
+        if (await _manager.RemoveBatchAsync(batchVm.Batch.Id))
+        {
+            try
+            {
+                if (animationTarget is not null)
+                {
+                    await ShelfMotion.PlayExitAsync(animationTarget);
+                }
+            }
+            finally
+            {
+                await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
+            }
         }
     }
+
     private void OnToggleExpandClicked(object sender, RoutedEventArgs e)
     {
         if (sender is Button { DataContext: BatchCardViewModel batchVm })
@@ -346,13 +399,23 @@ public sealed partial class MainPage : Page
         }
     }
 
-    internal Task RefreshAsync() => RefreshCardsAsync();
+    internal Task RefreshAsync() => RefreshCardsAsync(animate: false);
 
-    private Task RefreshCardsAsync()
+    internal void PlayShelfAppearance() => ShelfMotion.PlayEntrance(ContentSurface);
+
+    private Task RefreshCardsAsync(bool animate = true)
     {
         HideStatus();
         CancelVisualRequests();
         var batches = _manager!.Batches;
+        var currentBatchIds = batches.Select(batch => batch.Id).ToHashSet();
+        _pendingBatchAnimations.Clear();
+        if (animate)
+        {
+            _pendingBatchAnimations.UnionWith(currentBatchIds.Except(_knownBatchIds));
+        }
+
+        _knownBatchIds = currentBatchIds;
         _presentation = _manager.DisplayState == ShelfDisplayState.Expanded
             ? ShelfDisplayState.Expanded
             : ShelfDisplayState.Compact;
@@ -374,8 +437,17 @@ public sealed partial class MainPage : Page
             _resizeForPresentation?.Invoke(_presentation);
         }
 
+        if (animate && batches.Count > 0 && _pendingBatchAnimations.Count == 0)
+        {
+            ShelfMotion.PlayStateChange(
+                _presentation == ShelfDisplayState.Expanded
+                    ? ExpandedSurface
+                    : CompactSurface);
+        }
+
         return Task.CompletedTask;
     }
+
     private void UpdatePresentationVisibility(bool hasBatches)
     {
         var isExpanded = _presentation == ShelfDisplayState.Expanded;
@@ -395,6 +467,25 @@ public sealed partial class MainPage : Page
             await _dismissShelf();
         }
     }
+    private static UIElement? FindAnimationTarget(object sender)
+    {
+        if (sender is not DependencyObject current)
+        {
+            return null;
+        }
+
+        while (current is not null)
+        {
+            if (current is Border border)
+            {
+                return border;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return sender as UIElement;
+    }
 
     private void OnBatchElementPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)
     {
@@ -408,6 +499,10 @@ public sealed partial class MainPage : Page
         foreach (var item in previewItems)
         {
             RealizeVisual(item);
+        }
+        if (_pendingBatchAnimations.Remove(batch.Batch.Id))
+        {
+            ShelfMotion.PlayInsertion(args.Element);
         }
     }
 

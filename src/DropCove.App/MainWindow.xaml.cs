@@ -23,6 +23,7 @@ public sealed partial class MainWindow : Window
     private SettingsWindow? _settingsWindow;
     private EdgeRailWindow? _railWindow;
     private bool _disposed;
+    private bool _surfaceReflowQueued;
 
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly ShakeInputQueue _shakeInputQueue;
@@ -149,7 +150,8 @@ public sealed partial class MainWindow : Window
         var (width, height) = GetShelfSize(_manager.DisplayState, _manager.Batches.Count);
         if (placement is { HasMonitor: true })
         {
-            WindowInterop.PositionOnMonitor(_windowHandle, placement.MonitorId, width, height);
+            var monitorId = WindowInterop.ResolveMonitorId(placement.MonitorId, _windowHandle);
+            WindowInterop.PositionOnMonitor(_windowHandle, monitorId, width, height);
         }
         else
         {
@@ -158,8 +160,8 @@ public sealed partial class MainWindow : Window
 
         WindowInterop.ShowAndActivate(_windowHandle);
         _page.Focus(FocusState.Programmatic);
+        _page.PlayShelfAppearance();
     }
-
     private void ProcessShakeInput(LowLevelMouseInput input)
     {
         if (_shakeMouseHook is null || _shakeDetector is null)
@@ -282,9 +284,9 @@ public sealed partial class MainWindow : Window
         await ShowShelfNearPointCoreAsync(targetX, targetY, sessionVersion);
     }
 
-    private Task ShowShelfNearCursorCoreAsync(long? sessionVersion) =>
-        ShowShelfNearPointCoreAsync(_shakeSummonX, _shakeSummonY, sessionVersion);
-    private async Task ShowShelfNearPointCoreAsync(int targetX, int targetY, long? sessionVersion)
+    private Task ShowShelfNearCursorCoreAsync(long? sessionVersion, bool refresh = true) =>
+        ShowShelfNearPointCoreAsync(_shakeSummonX, _shakeSummonY, sessionVersion, refresh);
+    private async Task ShowShelfNearPointCoreAsync(int targetX, int targetY, long? sessionVersion, bool refresh = true)
     {
         if (_manager is null ||
             sessionVersion is not null && (sessionVersion != _shakeSessionVersion || _shakeRestore is null))
@@ -294,7 +296,10 @@ public sealed partial class MainWindow : Window
 
         HideRail();
         _manager.ShowShelf(ShelfDisplayState.Compact);
-        await _page.RefreshAsync();
+        if (refresh)
+        {
+            await _page.RefreshAsync();
+        }
         if (sessionVersion is not null && (sessionVersion != _shakeSessionVersion || _shakeRestore is null))
         {
             return;
@@ -304,6 +309,10 @@ public sealed partial class MainWindow : Window
         WindowInterop.PositionNearPoint(_windowHandle, targetX, targetY, width, height);
         WindowInterop.ShowAndActivate(_windowHandle);
         _page.Focus(FocusState.Programmatic);
+        if (refresh)
+        {
+            _page.PlayShelfAppearance();
+        }
     }
 
     private void OnShakeDragStarted()
@@ -334,7 +343,7 @@ public sealed partial class MainWindow : Window
                 _shakeRestoreInFlight = false;
                 _shakeDetector?.Reset();
                 _shakeSession.OnDropCompleted(true);
-                await ShowShelfNearCursorCoreAsync(null);
+                await ShowShelfNearCursorCoreAsync(null, refresh: false);
             }
             else if (_shakeRestore is not null)
             {
@@ -650,6 +659,11 @@ public sealed partial class MainWindow : Window
 
     private WindowMessageResult HandleWindowMessage(uint message, nuint wParam, nint lParam)
     {
+        if (message is WindowInterop.DisplayChangeMessage or WindowInterop.DpiChangedMessage or WindowInterop.DeviceChangeMessage)
+        {
+            QueueSurfaceReflow();
+        }
+
         if (_globalHotKey.Matches(message, wParam))
         {
             DispatcherQueue.TryEnqueue(async () => await ToggleShelfAsync());
@@ -675,6 +689,41 @@ public sealed partial class MainWindow : Window
         }
 
         return WindowMessageResult.Unhandled;
+    }
+
+    private void QueueSurfaceReflow()
+    {
+        if (_surfaceReflowQueued)
+        {
+            return;
+        }
+
+        _surfaceReflowQueued = true;
+        if (!DispatcherQueue.TryEnqueue(() =>
+            {
+                _surfaceReflowQueued = false;
+                ReflowSurfaces();
+            }))
+        {
+            _surfaceReflowQueued = false;
+        }
+    }
+
+    private void ReflowSurfaces()
+    {
+        if (_manager is null)
+        {
+            return;
+        }
+
+        _settingsWindow?.UpdateMonitorOptions(WindowInterop.GetMonitorOptions());
+        if (WindowInterop.IsVisible(_windowHandle) &&
+            _manager.DisplayState is ShelfDisplayState.Compact or ShelfDisplayState.Expanded)
+        {
+            ResizeShelfForPresentation(_manager.DisplayState);
+        }
+
+        _railWindow?.Reposition();
     }
 
     private void ExitApplication()

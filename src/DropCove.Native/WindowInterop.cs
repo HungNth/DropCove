@@ -349,6 +349,15 @@ public static class WindowInterop
 {
     /// <summary>Win32 mouse-move message.</summary>
     public const uint MouseMoveMessage = 0x0200;
+    /// <summary>Win32 display-configuration change message.</summary>
+    public const uint DisplayChangeMessage = 0x007E;
+
+    /// <summary>Win32 per-monitor DPI change message.</summary>
+    public const uint DpiChangedMessage = 0x02E0;
+
+    /// <summary>Win32 device-arrival/removal message.</summary>
+    public const uint DeviceChangeMessage = 0x0219;
+
 
     /// <summary>Win32 mouse-leave message.</summary>
     public const uint MouseLeaveMessage = 0x02A3;
@@ -375,6 +384,8 @@ public static class WindowInterop
     private const long WsMaximizeBox = 0x00010000L;
     private const long WsSysMenu = 0x00080000L;
     private const long WsExNoActivate = 0x08000000L;
+    private const uint SpiGetClientAreaAnimation = 0x1042;
+
     private const long WsExToolWindow = 0x00000080L;
 
     /// <summary>Removes standard caption and resize chrome from the HWND.</summary>
@@ -525,6 +536,59 @@ public static class WindowInterop
         return GetMonitorInfo(monitor).DeviceName
             ?? throw new InvalidOperationException("The monitor did not provide a display device name.");
     }
+    /// <summary>Resolves a remembered monitor to a connected display or a safe fallback.</summary>
+    /// <param name="preferredMonitorId">The remembered display device name.</param>
+    /// <param name="fallbackWindowHandle">A window whose current monitor is used when the remembered display is unavailable.</param>
+    /// <returns>A connected display device name.</returns>
+    public static string ResolveMonitorId(string? preferredMonitorId, nint fallbackWindowHandle)
+    {
+        if (!string.IsNullOrWhiteSpace(preferredMonitorId) && FindMonitor(preferredMonitorId) != 0)
+        {
+            return preferredMonitorId;
+        }
+
+        if (fallbackWindowHandle != 0)
+        {
+            try
+            {
+                return GetMonitorIdForWindow(fallbackWindowHandle);
+            }
+            catch (Win32Exception)
+            {
+            }
+        }
+
+        var fallback = GetMonitorOptions().FirstOrDefault()?.Id;
+        return !string.IsNullOrWhiteSpace(fallback)
+            ? fallback
+            : throw new InvalidOperationException("No connected display is available.");
+    }
+
+    /// <summary>Gets the effective DPI for a native window, defaulting to 96 when Windows cannot provide it.</summary>
+    /// <param name="windowHandle">The target HWND.</param>
+    /// <returns>The effective horizontal DPI.</returns>
+    public static uint GetWindowDpi(nint windowHandle)
+    {
+        var dpi = GetDpiForWindow(windowHandle);
+        return dpi == 0 ? 96u : dpi;
+    }
+
+    /// <summary>Scales a logical pixel value using a Windows effective DPI.</summary>
+    /// <param name="logicalPixels">The logical pixel value.</param>
+    /// <param name="dpi">The effective DPI.</param>
+    /// <returns>The rounded physical pixel value.</returns>
+    public static int ScaleLogicalPixels(int logicalPixels, uint dpi) => Scale(logicalPixels, dpi);
+
+    /// <summary>Returns whether Windows allows non-essential client-area animations.</summary>
+    /// <returns><see langword="true" /> when animations should run; otherwise <see langword="false" />.</returns>
+    public static bool AreAnimationsEnabled()
+    {
+        var enabled = 1;
+        return SystemParametersInfo(SpiGetClientAreaAnimation, 0, ref enabled, 0)
+            ? enabled != 0
+            : true;
+    }
+
 
     /// <summary>Returns the currently connected displays in Windows enumeration order.</summary>
     /// <returns>The display options available to Edge Rail settings.</returns>
@@ -540,7 +604,10 @@ public static class WindowInterop
                 var id = info.DeviceName ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(id))
                 {
-                    monitors.Add(new MonitorOption(id, $"{id} ({info.Monitor.Width} × {info.Monitor.Height})"));
+                    var scalingPercent = (int)Math.Round(GetMonitorDpi(monitor) * 100d / 96d, MidpointRounding.AwayFromZero);
+                    monitors.Add(new MonitorOption(
+                        id,
+                        $"{id} ({info.Monitor.Width} × {info.Monitor.Height}, {scalingPercent}% scaling)"));
                 }
 
                 return true;
@@ -548,6 +615,7 @@ public static class WindowInterop
             0);
         return monitors;
     }
+
 
     /// <summary>Determines whether the foreground window occupies the bounds of the selected rail monitor.</summary>
     /// <param name="monitorId">The selected Windows display device name.</param>
@@ -971,9 +1039,18 @@ public static class WindowInterop
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsWindowVisible(nint windowHandle);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SystemParametersInfo(
+        uint action,
+        uint parameter,
+        ref int value,
+        uint updateFlags);
+
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool EnableWindow(nint windowHandle, [MarshalAs(UnmanagedType.Bool)] bool enable);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "MessageBoxW")]
     private static extern int MessageBox(nint windowHandle, string text, string caption, uint type);
 }
