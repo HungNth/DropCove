@@ -260,4 +260,50 @@ public sealed class DropShelfPersistenceTests
         Directory.CreateDirectory(directory);
         return Path.Combine(directory, "shelf.db");
     }
+
+    [TestMethod]
+    public async Task ShakeSummonDrop_PersistsBatchAndRetainsItemSemantics()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await DropShelfManager.OpenAsync(databasePath, _ => ItemAvailability.Available);
+
+        // Simulate initial state: shelf is Hidden
+        Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
+
+        // Simulate shake summon: shelf transitions to UnifiedShelf
+        manager.ShowShelf();
+        Assert.AreEqual(ShelfDisplayState.UnifiedShelf, manager.DisplayState);
+
+        // Accept drop after shake: contains a regular file and a folder
+        var dropResult = await manager.AcceptDropAsync([
+            new(@"C:\Files\Document.pdf", "Document.pdf", false),
+            new(@"C:\Files\ProjectFolder", "ProjectFolder", true),
+        ]);
+
+        Assert.IsNotNull(dropResult.Batch);
+        Assert.AreEqual(2, dropResult.AcceptedCount);
+        Assert.HasCount(1, manager.Batches);
+
+        // By default items are Temporary (IsPinned == false)
+        var item1 = dropResult.Batch.Items[0];
+        var item2 = dropResult.Batch.Items[1];
+        Assert.IsFalse(item1.IsPinned);
+        Assert.IsFalse(item2.IsPinned);
+        Assert.IsTrue(item2.IsFolder);
+
+        // User pins item 1
+        await manager.SetPinnedAsync(item1.Id, true);
+        Assert.IsTrue(FindItem(manager, item1.Id).IsPinned);
+
+        // Re-open from database to verify persistence across restarts
+        var restored = await DropShelfManager.OpenAsync(databasePath, _ => ItemAvailability.Available);
+        Assert.HasCount(1, restored.Batches);
+        Assert.AreEqual(dropResult.Batch.Id, restored.Batches[0].Id);
+        Assert.HasCount(2, restored.Batches[0].Items);
+        var restoredItem1 = restored.Batches[0].Items[0];
+        var restoredItem2 = restored.Batches[0].Items[1];
+        Assert.IsTrue(restoredItem1.IsPinned);
+        Assert.IsFalse(restoredItem2.IsPinned);
+        Assert.IsTrue(restoredItem2.IsFolder);
+    }
 }

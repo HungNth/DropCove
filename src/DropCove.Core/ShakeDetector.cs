@@ -21,6 +21,7 @@ public readonly record struct ShakeSample(int X, int Y, uint TimestampMillisecon
 public sealed class ShakeDetector
 {
     private const uint DetectionWindowMilliseconds = 600;
+    private const uint CooldownMilliseconds = 500;
     private readonly int _minimumMovement;
     private readonly int _requiredReversals;
     private ShakeDirection _lastDirection;
@@ -29,8 +30,9 @@ public sealed class ShakeDetector
     private uint _lastSampleTimestamp;
     private int _reversals;
     private uint _gestureStartTimestamp;
+    private uint _lastTriggerTimestamp;
+    private bool _hasTriggered;
     private bool _hasSample;
-    /// <summary>Creates a detector for one sensitivity profile.</summary>
     /// <param name="sensitivity">The movement sensitivity profile.</param>
     public ShakeDetector(ShakeSensitivity sensitivity)
     {
@@ -48,12 +50,17 @@ public sealed class ShakeDetector
     /// <returns><see langword="true"/> when the sample completes a shake gesture.</returns>
     public bool Observe(ShakeSample sample)
     {
-        if (!_hasSample)
+        if (_hasTriggered && unchecked(sample.TimestampMilliseconds - _lastTriggerTimestamp) < CooldownMilliseconds)
         {
             Remember(sample);
             return false;
         }
 
+        if (!_hasSample)
+        {
+            Remember(sample);
+            return false;
+        }
         var elapsed = unchecked(sample.TimestampMilliseconds - _lastSampleTimestamp);
         _lastSampleTimestamp = sample.TimestampMilliseconds;
         if (elapsed > DetectionWindowMilliseconds)
@@ -102,7 +109,8 @@ public sealed class ShakeDetector
         {
             return false;
         }
-
+        _lastTriggerTimestamp = sample.TimestampMilliseconds;
+        _hasTriggered = true;
         Reset();
         return true;
     }

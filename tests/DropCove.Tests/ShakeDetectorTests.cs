@@ -162,4 +162,29 @@ public sealed class ShakeDetectorTests
 
         Assert.IsTrue(triggered, "Dense sub-threshold samples must accumulate into swings and trigger on second reversal.");
     }
+
+    [TestMethod]
+    public void Observe_Cooldown_SuppressesImmediateRetriggerWithinWindow()
+    {
+        var detector = new ShakeDetector(ShakeSensitivity.Normal);
+
+        // First shake gesture succeeds at t = 150ms
+        Assert.IsFalse(detector.Observe(new ShakeSample(0, 0, 0)));
+        Assert.IsFalse(detector.Observe(new ShakeSample(20, 0, 50)));
+        Assert.IsFalse(detector.Observe(new ShakeSample(0, 0, 100)));
+        Assert.IsTrue(detector.Observe(new ShakeSample(20, 0, 150)));
+
+        // Continued or immediate subsequent shake reversals within cooldown window (e.g. 500ms after trigger)
+        // should NOT trigger a second summon
+        Assert.IsFalse(detector.Observe(new ShakeSample(0, 0, 200)));
+        Assert.IsFalse(detector.Observe(new ShakeSample(20, 0, 250)));
+        Assert.IsFalse(detector.Observe(new ShakeSample(0, 0, 300)));
+        Assert.IsFalse(detector.Observe(new ShakeSample(20, 0, 350)));
+
+        // After cooldown expires (e.g. at t = 1000ms), a new distinct shake gesture CAN trigger
+        Assert.IsFalse(detector.Observe(new ShakeSample(0, 0, 1000)));
+        Assert.IsFalse(detector.Observe(new ShakeSample(20, 0, 1050)));
+        Assert.IsFalse(detector.Observe(new ShakeSample(0, 0, 1100)));
+        Assert.IsTrue(detector.Observe(new ShakeSample(20, 0, 1150)));
+    }
 }
