@@ -279,6 +279,7 @@ public sealed partial class MainPage : Page
         finally
         {
             await RefreshAfterMutationAsync(autoHideWhenEmpty: consumed);
+            ShelfMotion.Reset(sender);
         }
     }
 
@@ -299,6 +300,7 @@ public sealed partial class MainPage : Page
             finally
             {
                 await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
+                ShelfMotion.Reset(sender);
             }
         }
     }
@@ -351,6 +353,10 @@ public sealed partial class MainPage : Page
             finally
             {
                 await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
+                if (animationTarget is not null)
+                {
+                    ShelfMotion.Reset(animationTarget);
+                }
             }
         }
     }
@@ -402,6 +408,10 @@ public sealed partial class MainPage : Page
             finally
             {
                 await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
+                if (animationTarget is not null)
+                {
+                    ShelfMotion.Reset(animationTarget);
+                }
             }
         }
     }
@@ -542,7 +552,7 @@ public sealed partial class MainPage : Page
 
     private void OnBatchElementPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)
     {
-        if (args.Element is not FrameworkElement { DataContext: BatchCardViewModel batch })
+        if (args.Element is not FrameworkElement { Tag: BatchCardViewModel batch })
         {
             return;
         }
@@ -569,7 +579,7 @@ public sealed partial class MainPage : Page
             }
         }
 
-        if (args.Element is FrameworkElement { DataContext: BatchCardViewModel batch })
+        if (args.Element is FrameworkElement { Tag: BatchCardViewModel batch })
         {
             foreach (var realization in _itemRealizations
                          .Where(pair => batch.Items.Contains(pair.Value))
@@ -583,7 +593,7 @@ public sealed partial class MainPage : Page
 
     private void OnItemElementPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)
     {
-        if (args.Element is not FrameworkElement { DataContext: ShelfItemViewModel item })
+        if (args.Element is not FrameworkElement { Tag: ShelfItemViewModel item })
         {
             return;
         }

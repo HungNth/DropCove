@@ -31,10 +31,7 @@ internal static class ShelfMotion
         ArgumentNullException.ThrowIfNull(element);
 
         var visual = ElementCompositionPreview.GetElementVisual(element);
-        visual.StopAnimation(nameof(Visual.Opacity));
-        visual.StopAnimation(nameof(Visual.Scale));
-        visual.Opacity = 1f;
-        visual.Scale = Vector3.One;
+        Reset(visual);
         if (!WindowInterop.AreAnimationsEnabled())
         {
             return Task.CompletedTask;
@@ -66,6 +63,14 @@ internal static class ShelfMotion
         batch.End();
         return completion.Task;
     }
+    /// <summary>Restores an element after an exit animation before it can be recycled.</summary>
+    /// <param name="element">The element whose composition state must return to its default.</param>
+    public static void Reset(UIElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        Reset(ElementCompositionPreview.GetElementVisual(element));
+    }
+
 
 
     /// <summary>Animates the Edge Rail after its expanded state changes.</summary>
@@ -79,10 +84,7 @@ internal static class ShelfMotion
         ArgumentNullException.ThrowIfNull(element);
 
         var visual = ElementCompositionPreview.GetElementVisual(element);
-        visual.StopAnimation(nameof(Visual.Opacity));
-        visual.StopAnimation(nameof(Visual.Scale));
-        visual.Opacity = 1f;
-        visual.Scale = Vector3.One;
+        Reset(visual);
 
         if (!WindowInterop.AreAnimationsEnabled())
         {
@@ -115,5 +117,13 @@ internal static class ShelfMotion
         visual.StartAnimation(nameof(Visual.Opacity), opacity);
         visual.StartAnimation(nameof(Visual.Scale), scale);
         batch.End();
+    }
+
+    private static void Reset(Visual visual)
+    {
+        visual.StopAnimation(nameof(Visual.Opacity));
+        visual.StopAnimation(nameof(Visual.Scale));
+        visual.Opacity = 1f;
+        visual.Scale = Vector3.One;
     }
 }
