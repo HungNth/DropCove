@@ -494,24 +494,14 @@ public sealed partial class EdgeRailWindow : Window
             ? first.IsFolder ? "Folder" : "File"
             : first.Name;
         var pinnedGlyph = batch.Items.Any(item => item.IsPinned) ? "\uE718" : string.Empty;
-        var items = batch.Items.Select(CreateItemSummary).ToArray();
         return new RailBatchSummary(
             batch,
             title,
             subtitle,
             first.IsFolder ? "\uE8B7" : "\uE8A5",
             pinnedGlyph,
-            items,
             $"Edge Rail batch {title}");
     }
-
-    private static RailItemSummary CreateItemSummary(ShelfItem item) => new(
-        item,
-        item.Name,
-        item.IsFolder ? "Folder" : "File",
-        item.IsFolder ? "\uE8B7" : "\uE8A5",
-        item.IsPinned ? "\uE718" : string.Empty,
-        $"Drag {item.Name}");
 }
 
 internal sealed record RailBatchSummary(
@@ -520,12 +510,22 @@ internal sealed record RailBatchSummary(
     string Subtitle,
     string Glyph,
     string PinnedGlyph,
-    IReadOnlyList<RailItemSummary> Items,
     string AutomationName)
 {
-    public Visibility FlyoutVisibility => Items.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+    private IReadOnlyList<RailItemSummary>? _items;
+
+    public IReadOnlyList<RailItemSummary> Items => _items ??= Batch.Items.Select(CreateItemSummary).ToArray();
+    public Visibility FlyoutVisibility => Batch.Items.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
     public string FlyoutAutomationName => $"Show items in {Title}";
-}
+
+    private static RailItemSummary CreateItemSummary(ShelfItem item) => new(
+        item,
+        item.Name,
+        item.IsFolder ? "Folder" : "File",
+        item.IsFolder ? "\uE8B7" : "\uE8A5",
+        item.IsPinned ? "\uE718" : string.Empty,
+        $"Drag {item.Name}");
+    }
 
 internal sealed record RailItemSummary(
     ShelfItem Item,

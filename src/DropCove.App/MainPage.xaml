@@ -5,11 +5,12 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="using:DropCove"
     IsTabStop="True"
     KeyDown="OnPageKeyDown"
     mc:Ignorable="d">
     <Page.Resources>
-        <DataTemplate x:Key="CompactBatchTemplate">
+        <DataTemplate x:Key="CompactBatchTemplate" x:DataType="local:BatchCardViewModel">
             <Border
                 Margin="0,0,0,4"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -20,11 +21,12 @@
                     <Grid
                         MinHeight="52"
                         Padding="4"
-                        AutomationProperties.Name="{Binding DragBatchAutomationName}"
+                        AutomationProperties.Name="{x:Bind DragBatchAutomationName, Mode=OneWay}"
                         CanDrag="True"
                         ColumnSpacing="6"
                         DragStarting="OnBatchDragStarting"
                         DropCompleted="OnBatchDropCompleted"
+                        Tag="{x:Bind}"
                         ToolTipService.ToolTip="Drag all items in batch">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="42" />
@@ -101,8 +103,9 @@
                                 Style="{StaticResource TitleBarToggleButtonStyle}"
                                 Width="24"
                                 Height="24"
-                                AutomationProperties.Name="{Binding SingleItemPinAutomationName}"
+                                AutomationProperties.Name="{x:Bind SingleItemPinAutomationName, Mode=OneWay}"
                                 Click="OnPinClicked"
+                                Tag="{x:Bind}"
                                 IsChecked="{Binding IsPinned, Mode=OneWay}"
                                 ToolTipService.ToolTip="Pin / Unpin"
                                 Visibility="{Binding SingleItemVisibility}">
@@ -112,8 +115,9 @@
                                 Style="{StaticResource TitleBarButtonStyle}"
                                 Width="24"
                                 Height="24"
-                                AutomationProperties.Name="{Binding ToggleExpandAutomationName}"
+                                AutomationProperties.Name="{x:Bind ToggleExpandAutomationName, Mode=OneWay}"
                                 Click="OnToggleExpandClicked"
+                                Tag="{x:Bind}"
                                 ToolTipService.ToolTip="Expand/Collapse items"
                                 Visibility="{Binding MultiItemVisibility}">
                                 <FontIcon FontSize="9" Glyph="{Binding ExpandGlyph}" />
@@ -122,8 +126,9 @@
                                 Style="{StaticResource TitleBarButtonStyle}"
                                 Width="24"
                                 Height="24"
-                                AutomationProperties.Name="{Binding RemoveBatchAutomationName}"
+                                AutomationProperties.Name="{x:Bind RemoveBatchAutomationName, Mode=OneWay}"
                                 Click="OnRemoveBatchClicked"
+                                Tag="{x:Bind}"
                                 Content="×"
                                 FontSize="14"
                                 ToolTipService.ToolTip="Remove Batch" />
@@ -131,25 +136,28 @@
                     </Grid>
 
                     <ItemsRepeater
+                        x:Name="CompactItemList"
+                        x:Load="{x:Bind IsExpanded, Mode=OneWay}"
                         Margin="4,0,4,4"
                         ElementClearing="OnItemElementClearing"
                         ElementPrepared="OnItemElementPrepared"
-                        ItemsSource="{Binding Items}"
-                        Visibility="{Binding ItemsVisibility}">
+                        ItemsSource="{x:Bind Items, Mode=OneWay}"
+                        Visibility="{x:Bind ItemsVisibility, Mode=OneWay}">
                         <ItemsRepeater.Layout>
                             <StackLayout Spacing="4" />
                         </ItemsRepeater.Layout>
                         <ItemsRepeater.ItemTemplate>
-                            <DataTemplate>
+                            <DataTemplate x:DataType="local:ShelfItemViewModel">
                                 <Border
                                     Margin="0,0,0,4"
                                     Padding="4"
-                                    AutomationProperties.Name="{Binding DragAutomationName}"
+                                    AutomationProperties.Name="{x:Bind DragAutomationName, Mode=OneWay}"
                                     Background="{ThemeResource ControlFillColorSecondaryBrush}"
                                     CanDrag="True"
                                     CornerRadius="4"
                                     DragStarting="OnItemDragStarting"
-                                    DropCompleted="OnItemDropCompleted">
+                                    DropCompleted="OnItemDropCompleted"
+                                    Tag="{x:Bind}">
                                     <Grid ColumnSpacing="4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="24" />
@@ -158,7 +166,7 @@
                                         </Grid.ColumnDefinitions>
                                         <Grid Width="24" Height="24" VerticalAlignment="Center">
                                             <FontIcon IsHitTestVisible="False" FontSize="13" Glyph="{Binding FallbackGlyph}" />
-                                            <Image AutomationProperties.Name="{Binding VisualAutomationName}" IsHitTestVisible="False" Source="{Binding Icon}" Stretch="UniformToFill" />
+                                            <Image AutomationProperties.Name="{x:Bind VisualAutomationName, Mode=OneWay}" IsHitTestVisible="False" Source="{Binding Icon}" Stretch="UniformToFill" />
                                         </Grid>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="2,0,0,0">
                                             <TextBlock FontSize="10" FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
@@ -174,8 +182,9 @@
                                                 Style="{StaticResource TitleBarToggleButtonStyle}"
                                                 Width="24"
                                                 Height="24"
-                                                AutomationProperties.Name="{Binding PinAutomationName}"
+                                                AutomationProperties.Name="{x:Bind PinAutomationName, Mode=OneWay}"
                                                 Click="OnPinClicked"
+                                                Tag="{x:Bind}"
                                                 IsChecked="{Binding IsPinned, Mode=OneWay}"
                                                 ToolTipService.ToolTip="Pin / Unpin">
                                                 <FontIcon FontSize="11" Glyph="&#xE718;" />
@@ -184,8 +193,9 @@
                                                 Style="{StaticResource TitleBarButtonStyle}"
                                                 Width="24"
                                                 Height="24"
-                                                AutomationProperties.Name="{Binding RemoveAutomationName}"
+                                                AutomationProperties.Name="{x:Bind RemoveAutomationName, Mode=OneWay}"
                                                 Click="OnRemoveItemClicked"
+                                                Tag="{x:Bind}"
                                                 Content="×"
                                                 FontSize="14"
                                                 ToolTipService.ToolTip="Remove Item" />
@@ -199,7 +209,7 @@
             </Border>
         </DataTemplate>
 
-        <DataTemplate x:Key="ExpandedBatchTemplate">
+        <DataTemplate x:Key="ExpandedBatchTemplate" x:DataType="local:BatchCardViewModel">
             <Border
                 Margin="0,0,0,8"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -210,11 +220,12 @@
                     <Grid
                         MinHeight="58"
                         Padding="6"
-                        AutomationProperties.Name="{Binding DragBatchAutomationName}"
+                        AutomationProperties.Name="{x:Bind DragBatchAutomationName, Mode=OneWay}"
                         CanDrag="True"
                         ColumnSpacing="8"
                         DragStarting="OnBatchDragStarting"
                         DropCompleted="OnBatchDropCompleted"
+                        Tag="{x:Bind}"
                         ToolTipService.ToolTip="Drag all available items in batch">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="48" />
@@ -286,8 +297,9 @@
                                 Style="{StaticResource TitleBarToggleButtonStyle}"
                                 Width="26"
                                 Height="26"
-                                AutomationProperties.Name="{Binding SingleItemPinAutomationName}"
+                                AutomationProperties.Name="{x:Bind SingleItemPinAutomationName, Mode=OneWay}"
                                 Click="OnPinClicked"
+                                Tag="{x:Bind}"
                                 IsChecked="{Binding IsPinned, Mode=OneWay}"
                                 ToolTipService.ToolTip="Pin / Unpin"
                                 Visibility="{Binding SingleItemVisibility}">
@@ -298,8 +310,9 @@
                                 Style="{StaticResource TitleBarButtonStyle}"
                                 Width="26"
                                 Height="26"
-                                AutomationProperties.Name="{Binding ToggleExpandAutomationName}"
+                                AutomationProperties.Name="{x:Bind ToggleExpandAutomationName, Mode=OneWay}"
                                 Click="OnToggleExpandClicked"
+                                Tag="{x:Bind}"
                                 ToolTipService.ToolTip="Expand/Collapse items"
                                 Visibility="{Binding MultiItemVisibility}">
                                 <FontIcon FontSize="9" Glyph="{Binding ExpandGlyph}" />
@@ -308,8 +321,9 @@
                                 Style="{StaticResource TitleBarButtonStyle}"
                                 Width="26"
                                 Height="26"
-                                AutomationProperties.Name="{Binding RemoveBatchAutomationName}"
+                                AutomationProperties.Name="{x:Bind RemoveBatchAutomationName, Mode=OneWay}"
                                 Click="OnRemoveBatchClicked"
+                                Tag="{x:Bind}"
                                 Content="×"
                                 FontSize="14"
                                 ToolTipService.ToolTip="Remove Batch" />
@@ -317,24 +331,27 @@
                     </Grid>
 
                     <ItemsRepeater
+                        x:Name="ExpandedItemList"
+                        x:Load="{x:Bind IsExpanded, Mode=OneWay}"
                         Margin="6,0,6,6"
                         ElementClearing="OnItemElementClearing"
                         ElementPrepared="OnItemElementPrepared"
-                        ItemsSource="{Binding Items}"
-                        Visibility="{Binding ItemsVisibility}">
+                        ItemsSource="{x:Bind Items, Mode=OneWay}"
+                        Visibility="{x:Bind ItemsVisibility, Mode=OneWay}">
                         <ItemsRepeater.Layout>
                             <StackLayout Spacing="4" />
                         </ItemsRepeater.Layout>
                         <ItemsRepeater.ItemTemplate>
-                            <DataTemplate>
+                            <DataTemplate x:DataType="local:ShelfItemViewModel">
                                 <Border
                                     Padding="6"
-                                    AutomationProperties.Name="{Binding DragAutomationName}"
+                                    AutomationProperties.Name="{x:Bind DragAutomationName, Mode=OneWay}"
                                     Background="{ThemeResource ControlFillColorSecondaryBrush}"
                                     CanDrag="True"
                                     CornerRadius="4"
                                     DragStarting="OnItemDragStarting"
-                                    DropCompleted="OnItemDropCompleted">
+                                    DropCompleted="OnItemDropCompleted"
+                                    Tag="{x:Bind}">
                                     <Grid ColumnSpacing="6">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="28" />
@@ -344,7 +361,7 @@
                                         <Grid Width="28" Height="28" VerticalAlignment="Center">
                                             <FontIcon IsHitTestVisible="False" FontSize="14" Glyph="{Binding FallbackGlyph}" />
                                             <Image
-                                                AutomationProperties.Name="{Binding VisualAutomationName}"
+                                                AutomationProperties.Name="{x:Bind VisualAutomationName, Mode=OneWay}"
                                                 IsHitTestVisible="False"
                                                 Source="{Binding Icon}"
                                                 Stretch="UniformToFill" />
@@ -374,8 +391,9 @@
                                                 Style="{StaticResource TitleBarToggleButtonStyle}"
                                                 Width="28"
                                                 Height="28"
-                                                AutomationProperties.Name="{Binding PinAutomationName}"
+                                                AutomationProperties.Name="{x:Bind PinAutomationName, Mode=OneWay}"
                                                 Click="OnPinClicked"
+                                                Tag="{x:Bind}"
                                                 IsChecked="{Binding IsPinned, Mode=OneWay}"
                                                 ToolTipService.ToolTip="Pin / Unpin">
                                                 <FontIcon FontSize="12" Glyph="&#xE718;" />
@@ -384,8 +402,9 @@
                                                 Style="{StaticResource TitleBarButtonStyle}"
                                                 Width="28"
                                                 Height="28"
-                                                AutomationProperties.Name="{Binding RemoveAutomationName}"
+                                                AutomationProperties.Name="{x:Bind RemoveAutomationName, Mode=OneWay}"
                                                 Click="OnRemoveItemClicked"
+                                                Tag="{x:Bind}"
                                                 Content="×"
                                                 FontSize="16"
                                                 ToolTipService.ToolTip="Remove Item" />

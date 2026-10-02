@@ -200,8 +200,14 @@ public sealed partial class MainPage : Page
 
     private async void OnItemDragStarting(UIElement sender, DragStartingEventArgs e)
     {
-        if (sender is not FrameworkElement { DataContext: ShelfItemViewModel item } ||
-            _dragDropService is null)
+        if (sender is not FrameworkElement element || _dragDropService is null)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        var item = element.Tag as ShelfItemViewModel ?? element.DataContext as ShelfItemViewModel;
+        if (item is null)
         {
             e.Cancel = true;
             return;
@@ -213,29 +219,16 @@ public sealed partial class MainPage : Page
             ShowDropMessage($"Could not drag {item.Name}: {error}", InfoBarSeverity.Warning);
         }
     }
-
-    private async void OnItemDropCompleted(UIElement sender, DropCompletedEventArgs e)
-    {
-        if (sender is FrameworkElement { DataContext: ShelfItemViewModel item } &&
-            _dragDropService is not null &&
-            await _dragDropService.CompleteItemDragAsync(item.Item.Id, e.DropResult))
-        {
-            try
-            {
-                await ShelfMotion.PlayExitAsync(sender);
-            }
-            finally
-            {
-                await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
-            }
-        }
-    }
-
-
     private async void OnBatchDragStarting(UIElement sender, DragStartingEventArgs e)
     {
-        if (sender is not FrameworkElement { DataContext: BatchCardViewModel batchVm } ||
-            _dragDropService is null)
+        if (sender is not FrameworkElement element || _dragDropService is null)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        var batchVm = element.Tag as BatchCardViewModel ?? element.DataContext as BatchCardViewModel;
+        if (batchVm is null)
         {
             e.Cancel = true;
             return;
@@ -261,38 +254,69 @@ public sealed partial class MainPage : Page
             ShowDropMessage($"Dragging available items ({unavailableRetained} unavailable items retained).", InfoBarSeverity.Informational);
         }
     }
-
     private async void OnBatchDropCompleted(UIElement sender, DropCompletedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: BatchCardViewModel batchVm } &&
-            _dragDropService is not null)
+        if (sender is not FrameworkElement element || _dragDropService is null)
         {
-            var removesWholeBatch = batchVm.Batch.Items.All(item => !item.IsPinned);
-            var consumed = await _dragDropService.CompleteBatchDragAsync(batchVm.Batch.Id, e.DropResult);
+            return;
+        }
+
+        var batchVm = element.Tag as BatchCardViewModel ?? element.DataContext as BatchCardViewModel;
+        if (batchVm is null)
+        {
+            return;
+        }
+
+        var removesWholeBatch = batchVm.Batch.Items.All(item => !item.IsPinned);
+        var consumed = await _dragDropService.CompleteBatchDragAsync(batchVm.Batch.Id, e.DropResult);
+        try
+        {
+            if (consumed && removesWholeBatch)
+            {
+                await ShelfMotion.PlayExitAsync(sender);
+            }
+        }
+        finally
+        {
+            await RefreshAfterMutationAsync(autoHideWhenEmpty: consumed);
+        }
+    }
+
+    private async void OnItemDropCompleted(UIElement sender, DropCompletedEventArgs e)
+    {
+        if (sender is not FrameworkElement element || _dragDropService is null)
+        {
+            return;
+        }
+
+        var item = element.Tag as ShelfItemViewModel ?? element.DataContext as ShelfItemViewModel;
+        if (item is not null && await _dragDropService.CompleteItemDragAsync(item.Item.Id, e.DropResult))
+        {
             try
             {
-                if (consumed && removesWholeBatch)
-                {
-                    await ShelfMotion.PlayExitAsync(sender);
-                }
+                await ShelfMotion.PlayExitAsync(sender);
             }
             finally
             {
-                await RefreshAfterMutationAsync(autoHideWhenEmpty: consumed);
+                await RefreshAfterMutationAsync(autoHideWhenEmpty: true);
             }
         }
     }
+
+
 
     private async void OnPinClicked(object sender, RoutedEventArgs e)
     {
         if (sender is ToggleButton toggle && _manager is not null)
         {
-            var itemId = toggle.DataContext switch
-            {
-                ShelfItemViewModel item => item.Item.Id,
-                BatchCardViewModel { SingleItem: { } single } => single.Item.Id,
-                _ => (Guid?)null
-            };
+            var itemId = (toggle.Tag as ShelfItemViewModel)?.Item.Id
+                ?? (toggle.Tag as BatchCardViewModel)?.SingleItem?.Item.Id
+                ?? toggle.DataContext switch
+                {
+                    ShelfItemViewModel item => item.Item.Id,
+                    BatchCardViewModel { SingleItem: { } single } => single.Item.Id,
+                    _ => (Guid?)null
+                };
 
             if (itemId.HasValue && await _manager.SetPinnedAsync(itemId.Value, toggle.IsChecked == true))
             {
@@ -303,7 +327,13 @@ public sealed partial class MainPage : Page
 
     private async void OnRemoveItemClicked(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { DataContext: ShelfItemViewModel item } || _manager is null)
+        if (sender is not Button button || _manager is null)
+        {
+            return;
+        }
+
+        var item = button.Tag as ShelfItemViewModel ?? button.DataContext as ShelfItemViewModel;
+        if (item is null)
         {
             return;
         }
@@ -348,7 +378,13 @@ public sealed partial class MainPage : Page
 
     private async void OnRemoveBatchClicked(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { DataContext: BatchCardViewModel batchVm } || _manager is null)
+        if (sender is not Button button || _manager is null)
+        {
+            return;
+        }
+
+        var batchVm = button.Tag as BatchCardViewModel ?? button.DataContext as BatchCardViewModel;
+        if (batchVm is null)
         {
             return;
         }
@@ -372,7 +408,13 @@ public sealed partial class MainPage : Page
 
     private void OnToggleExpandClicked(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { DataContext: BatchCardViewModel batchVm })
+        if (sender is not Button button)
+        {
+            return;
+        }
+
+        var batchVm = button.Tag as BatchCardViewModel ?? button.DataContext as BatchCardViewModel;
+        if (batchVm is not null)
         {
             batchVm.IsExpanded = !batchVm.IsExpanded;
         }
@@ -400,6 +442,17 @@ public sealed partial class MainPage : Page
     }
 
     internal Task RefreshAsync() => RefreshCardsAsync(animate: false);
+
+    internal void ReleasePresentation()
+    {
+        CompactBatchList.ItemsSource = null;
+        ExpandedBatchList.ItemsSource = null;
+        CancelVisualRequests();
+        _storageItems.Clear();
+        _knownBatchIds.Clear();
+        _pendingBatchAnimations.Clear();
+        HideStatus();
+    }
 
     internal void PlayShelfAppearance() => ShelfMotion.PlayEntrance(ContentSurface);
 
@@ -494,7 +547,7 @@ public sealed partial class MainPage : Page
             return;
         }
 
-        var previewItems = batch.Items.Take(3).ToArray();
+        var previewItems = batch.PreviewItems;
         _batchPreviews[args.Element] = previewItems;
         foreach (var item in previewItems)
         {
@@ -624,22 +677,44 @@ public sealed partial class MainPage : Page
 
     private BatchCardViewModel CreateBatchCard(ShelfBatch batch)
     {
-        var items = batch.Items.Select(CreateShelfItemViewModel).ToArray();
-        var first = items[0];
-        var pinnedCount = items.Count(item => item.IsPinned);
-        var subtitle = items.Length == 1
+        var previewItems = new ShelfItemViewModel[Math.Min(3, batch.Items.Count)];
+        for (var index = 0; index < previewItems.Length; index++)
+        {
+            previewItems[index] = CreateShelfItemViewModel(batch.Items[index]);
+        }
+
+        var first = previewItems[0];
+        var pinnedCount = batch.Items.Count(item => item.IsPinned);
+        var subtitle = batch.Items.Count == 1
             ? $"{(first.IsPinned ? "Pinned • " : string.Empty)}{first.Type}"
-            : $"{string.Join(", ", items.Take(2).Select(item => item.Name))}{(pinnedCount > 0 ? $" • {pinnedCount} pinned" : string.Empty)}";
+            : $"{string.Join(", ", batch.Items.Take(2).Select(item => item.Name))}{(pinnedCount > 0 ? $" • {pinnedCount} pinned" : string.Empty)}";
 
         var isExpanded = _presentation == ShelfDisplayState.Expanded;
         return new BatchCardViewModel(
             batch,
-            items.Length == 1 ? first.Name : $"{items.Length} items",
+            batch.Items.Count == 1 ? first.Name : $"{batch.Items.Count} items",
             subtitle,
             first.FallbackGlyph,
-            items,
+            previewItems,
+            () => CreateShelfItemViews(batch, previewItems),
             isExpanded);
     }
+
+    private static IReadOnlyList<ShelfItemViewModel> CreateShelfItemViews(
+        ShelfBatch batch,
+        IReadOnlyList<ShelfItemViewModel> previewItems)
+    {
+        var items = new ShelfItemViewModel[batch.Items.Count];
+        for (var index = 0; index < items.Length; index++)
+        {
+            items[index] = index < previewItems.Count
+                ? previewItems[index]
+                : CreateShelfItemViewModel(batch.Items[index]);
+        }
+
+        return items;
+    }
+
     private static ShelfItemViewModel CreateShelfItemViewModel(ShelfItem item) => new(
         item,
         item.Name,
@@ -711,25 +786,30 @@ public sealed partial class MainPage : Page
 
 internal sealed class BatchCardViewModel : System.ComponentModel.INotifyPropertyChanged
 {
+    private readonly IReadOnlyList<ShelfItemViewModel> _previewItems;
+    private readonly Func<IReadOnlyList<ShelfItemViewModel>> _createItems;
+    private IReadOnlyList<ShelfItemViewModel>? _items;
     private bool _isExpanded;
+
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 
     public ShelfBatch Batch { get; }
     public string Title { get; }
     public string Subtitle { get; }
     public string FallbackGlyph { get; }
-    public ImageSource? PrimaryIcon => Items.ElementAtOrDefault(0)?.Icon;
-    public ImageSource? SecondaryIcon => Items.ElementAtOrDefault(1)?.Icon;
-    public ImageSource? TertiaryIcon => Items.ElementAtOrDefault(2)?.Icon;
-    public bool IsSingleItem => Items.Count == 1;
+    public IReadOnlyList<ShelfItemViewModel> PreviewItems => _previewItems;
+    public ImageSource? PrimaryIcon => _previewItems.ElementAtOrDefault(0)?.Icon;
+    public ImageSource? SecondaryIcon => _previewItems.ElementAtOrDefault(1)?.Icon;
+    public ImageSource? TertiaryIcon => _previewItems.ElementAtOrDefault(2)?.Icon;
+    public bool IsSingleItem => Batch.Items.Count == 1;
     public Visibility SingleItemVisibility => IsSingleItem ? Visibility.Visible : Visibility.Collapsed;
-    public Visibility MultiItemVisibility => Items.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
-    public ShelfItemViewModel? SingleItem => Items.ElementAtOrDefault(0);
+    public Visibility MultiItemVisibility => IsSingleItem ? Visibility.Collapsed : Visibility.Visible;
+    public ShelfItemViewModel? SingleItem => _previewItems.ElementAtOrDefault(0);
     public bool IsPinned => SingleItem?.IsPinned ?? false;
     public string SingleItemPinAutomationName => IsPinned ? $"Unpin {Title}" : $"Pin {Title}";
-    public string ItemCountLabel => $"{Items.Count} item{(Items.Count == 1 ? string.Empty : "s")}";
+    public string ItemCountLabel => $"{Batch.Items.Count} item{(Batch.Items.Count == 1 ? string.Empty : "s")}";
     public string CreatedLabel => Batch.CreatedAt.ToLocalTime().ToString("g");
-    public IReadOnlyList<ShelfItemViewModel> Items { get; }
+    public IReadOnlyList<ShelfItemViewModel> Items => _items ?? _previewItems;
 
     public bool IsExpanded
     {
@@ -738,8 +818,18 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
         {
             if (_isExpanded != value)
             {
+                if (value)
+                {
+                    EnsureItems();
+                }
+                else
+                {
+                    ReleaseItems();
+                }
+
                 _isExpanded = value;
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsExpanded)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Items)));
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(ItemsVisibility)));
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(ExpandGlyph)));
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(ToggleExpandAutomationName)));
@@ -756,23 +846,64 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
         string title,
         string subtitle,
         string fallbackGlyph,
-        IReadOnlyList<ShelfItemViewModel> items,
+        IReadOnlyList<ShelfItemViewModel> previewItems,
+        Func<IReadOnlyList<ShelfItemViewModel>> createItems,
         bool isExpanded)
     {
         Batch = batch;
         Title = title;
         Subtitle = subtitle;
         FallbackGlyph = fallbackGlyph;
-        Items = items;
+        _previewItems = previewItems;
+        _createItems = createItems;
         _isExpanded = isExpanded;
+        SubscribeToItems(_previewItems);
+        if (isExpanded)
+        {
+            EnsureItems();
+        }
+    }
+
+    public string DragBatchAutomationName => $"Drag batch {Title}";
+    public string RemoveBatchAutomationName => $"Remove batch {Title}";
+
+    private void EnsureItems()
+    {
+        if (_items is not null)
+        {
+            return;
+        }
+
+        _items = _createItems();
+        for (var index = _previewItems.Count; index < _items.Count; index++)
+        {
+            _items[index].PropertyChanged += OnItemPropertyChanged;
+        }
+    }
+
+    private void ReleaseItems()
+    {
+        if (_items is null)
+        {
+            return;
+        }
+
+        for (var index = _previewItems.Count; index < _items.Count; index++)
+        {
+            _items[index].PropertyChanged -= OnItemPropertyChanged;
+        }
+
+        _items = null;
+    }
+
+    private void SubscribeToItems(IReadOnlyList<ShelfItemViewModel> items)
+    {
         foreach (var item in items)
         {
             item.PropertyChanged += OnItemPropertyChanged;
         }
     }
 
-    public string DragBatchAutomationName => $"Drag batch {Title}";
-    public string RemoveBatchAutomationName => $"Remove batch {Title}";
 
     private void OnItemPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {

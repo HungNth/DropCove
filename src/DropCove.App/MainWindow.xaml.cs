@@ -466,14 +466,13 @@ public sealed partial class MainWindow : Window
 
     private void OpenShelfFromRail() => ShowShelfAt(_manager?.RailPlacement);
 
-    private async Task RefreshRailAfterMutationAsync()
+    private Task RefreshRailAfterMutationAsync()
     {
         if (_manager is null || _railWindow is null)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        await _page.RefreshAsync();
         if (_manager.Batches.Count == 0)
         {
             _railWindow.Hide();
@@ -482,6 +481,8 @@ public sealed partial class MainWindow : Window
         {
             _railWindow.UpdateBatches(_manager.Batches);
         }
+
+        return Task.CompletedTask;
     }
 
     private void HideAllSurfaces()
@@ -490,7 +491,11 @@ public sealed partial class MainWindow : Window
         HideRail();
     }
 
-    private void HideShelf() => WindowInterop.Hide(_windowHandle);
+    private void HideShelf()
+    {
+        _page.ReleasePresentation();
+        WindowInterop.Hide(_windowHandle);
+    }
 
     private void HideRail() => _railWindow?.Hide();
 

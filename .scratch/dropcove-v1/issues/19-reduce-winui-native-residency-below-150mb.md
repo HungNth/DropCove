@@ -6,15 +6,15 @@
 
 **Blocked by:** 15: Add Compact and Expanded shelf modes.
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
-- [ ] The acceptance metric remains total process `WorkingSet64`; it is not replaced by private committed memory, private working set, installer size, or an explicitly trimmed value.
-- [ ] The installed self-contained x64 Release EXE is measured from a fresh process with the canonical 100 Shelf Batch / 1,000 Shelf Item seed and the existing five-sample idle protocol.
+- [x] The acceptance metric remains total process `WorkingSet64`; it is not replaced by private committed memory, private working set, installer size, or an explicitly trimmed value.
+- [x] The installed self-contained x64 Release EXE is measured from a fresh process with the canonical 100 Shelf Batch / 1,000 Shelf Item seed and the existing five-sample idle protocol.
 - [ ] Profiling attributes the scale-dependent resident pages before architecture changes are selected, distinguishing managed models, Compact/Expanded presentation state, Edge Rail summaries/flyouts, native WinUI/Windows App SDK modules, icons/thumbnails, and shared pages.
-- [ ] The chosen architecture removes or defers measured residency rather than hiding it behind `EmptyWorkingSet`, forced GC, GC configuration tuning without proof, manual process trimming, or a changed acceptance threshold.
+- [x] The chosen architecture removes or defers measured residency rather than hiding it behind `EmptyWorkingSet`, forced GC, GC configuration tuning without proof, manual process trimming, or a changed acceptance threshold.
 - [ ] Compact, Expanded, Edge Rail, shake summon, drag-in/out, pin/remove/clear, persistence, and current-monitor behavior remain unchanged.
 - [ ] Idle CPU remains at or below 0.1%, shelf-show latency remains p95 at or below 150 ms, and no periodic cursor polling or new idle work is introduced.
-- [ ] The default installed-Release performance run records an average idle Working Set below 150 MB with 100 Shelf Batches / 1,000 Shelf Items; any miss continues to block Ticket 18.
+- [x] The default installed-Release performance run records an average idle Working Set below 150 MB with 100 Shelf Batches / 1,000 Shelf Items; any miss continues to block Ticket 18.
 - [ ] Automated tests remain presentation-independent where possible, while installed-EXE smoke proves shelf show, dismissal into Edge Rail, rail reopen, and management behavior after the residency redesign.
 
 ## Architecture seam
@@ -45,3 +45,12 @@ Do not add a new public abstraction until profiling identifies behavior that gen
 - The batch-count delta dominates the item-count delta. A UI Automation probe observed eight realized main-shelf batch cards and zero child item rows at scale, so the failure is not explained by all 100 cards or all 1,000 rows being simultaneously realized.
 - A diagnostic-only `EmptyWorkingSet` probe paged resident memory out but did not establish a product optimization; explicit trimming is excluded from acceptance.
 - Clearing hidden MainPage presentation data and removing duplicate presentation construction did not produce a material reduction beyond run variance; those experiments are not the architecture decision.
+
+## Comments
+
+- 2026-10-01: Implemented the measured presentation-residency redesign. Compact batch cards retain only three preview item view models; full item projections are created when a batch expands. Nested item `ItemsRepeater` trees use WinUI `x:Load` with typed `x:Bind` state, and unload when collapsed. Edge Rail item summaries are deferred until a flyout requests them. Hiding the main shelf releases its presentation projection while `DropShelfManager` retains durable state. No GC forcing, `EmptyWorkingSet`, threshold change, or periodic polling was added.
+- 2026-10-01: Final installed self-contained Release default run after the collapse-release fix used `scripts/measure-stage1.ps1 -BatchCount 100 -ItemsPerBatch 10` against a fresh process and real temporary seed. `artifacts/ticket19-final-post-collapse-release.json` records `WorkingSet64` averages of 134.57 MB visible and 141.05 MB after dismissal into Edge Rail, five stable samples in each phase, and 0.00% CPU. This closes criteria 11, 12, 14, and 17; criterion 13 remains open because the repository evidence identifies projection-scale behavior but does not include a native-module/managed/icon/shared-page profiler breakdown.
+- 2026-10-01: Installed UI automation smoke verified the seeded expanded item projection, named/focusable Expand/Collapse and item controls, pin state transition (`Pin Item02.txt` → `Unpin Item02.txt`), removal of `Item03.txt`, collapse/reopen, Preview.png visual resolution, and pinned-item drag-out. `artifacts/ticket19-persistence-smoke.json` records `Seeded=true`, `InitialActions=true`, and `RestartActions=true` across different process IDs. The 30-second supplemental report records 0 unresponsive samples and `scaleCheckStatus=manual confirmation required`.
+- 2026-10-01: The supplemental interactive state held an expanded projection and measured 154.00 MB visible / 153.48 MB after dismissal; this is not substituted for the default acceptance metric. Drag-in from Explorer and Edge Rail UIA dismissal/reopen were not verified by the disposable harness, so criteria 15, 16, and 18 remain open and Ticket 18 remains blocked.
+
+- 2026-10-01: Post-fix expand/collapse smoke verified child item controls materialize while expanded, the named collapse control appears, and the child control is absent after collapse (`artifacts/ticket19-collapse-smoke.json`: all expected booleans true/false). Full MSTest remains 72/72 and Release build remains 0 errors.

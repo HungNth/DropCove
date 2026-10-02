@@ -1153,6 +1153,8 @@ Idle working set target             < 150 MB
 
 Thumbnail loading and SQLite I/O must not block the UI thread. V1 should remain responsive with at least 100 batches and 1,000 items by using lazy thumbnail loading and UI virtualization. The shelf realizes only visible item elements; native icons are requested independently, and image thumbnails are discarded when their visible realization ends.
 
+At the 100-batch / 1,000-item scale, `DropShelfManager` remains the durable in-memory state owner while WinUI presentations retain only their active projections. Collapsed batch item repeaters use WinUI `x:Load` and typed bindings, full item view models are created when a batch expands, Edge Rail item summaries are deferred until a flyout requests them, and hiding the Drop Shelf releases its presentation projection. The default installed Release measurement remains untrimmed and uses `WorkingSet64`.
+
 ---
 
 # 39. Core Architecture
