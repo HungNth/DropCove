@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: rejected
 ---
 
 # Gate native drag-out on acceptance evidence
@@ -17,3 +17,7 @@ The [controlled follow-up](../../.scratch/reliable-drag-acceptance/controlled-pr
 ## Real DropCove verification — 2026-10-05
 
 The user-approved test-profile seam enabled [real popup verification](../../.scratch/reliable-drag-acceptance/installed-profile-verdict.md) without replacing or mutating live user data. Actual DropCove WinUI passed the controlled 5×4 matrix over Reject backing; a further five attempts confirmed that acceptance by Copy backing legitimately consumes the participating Temporary reference after primary exit. Native replacement has no demonstrated advantage in these measured scenarios. Keep this ADR proposed and native production tickets blocked for a planning decision; do not infer which destination handled historical primary-only attempts or claim final installer/performance qualification.
+
+## Decision — 2026-10-05
+
+Rejected. Following controlled destination testing on native OLE, isolated WinUI, and real DropCove Release popup drags, the existing WinUI drag engine was proven to consistently retain Temporary references on destination rejection, cancellation, and unaccepted exits, while consuming references only when a destination genuinely receives and accepts the drop. Replacing the WinUI drag path with managed native OLE provided no measured reliability advantage and introduced unnecessary complexity. DropCove retains its existing WinUI drag implementation.

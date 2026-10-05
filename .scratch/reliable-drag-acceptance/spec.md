@@ -1,6 +1,6 @@
 # Reliable Native Drag Acceptance Specification
 
-Status: blocked for planning — the approved test-profile seam enables a real DropCove side-by-side Release matrix, which passes using the existing WinUI source engine. No native advantage is established; historical destination identity remains unknown. See [real-app verification](installed-profile-verdict.md). Native cutover requires a new planning decision.
+Status: retired — Decision on 2026-10-05: retain existing WinUI drag engine. Controlled testing confirmed WinUI reliably retains unaccepted drops and consumes only on genuine acceptance; managed native OLE cutover is rejected (see docs/adr/0003-gate-native-drag-out-on-acceptance-evidence.md).
 
 ## Problem Statement
 

@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** blocked for planning — controlled native and actual DropCove WinUI matrices pass; no native advantage is established. Historical destination identity is unknown. ADR remains proposed and production cutover must not start without a planning decision.
+**Status:** retired — Controlled testing completed. Native OLE demonstrated no advantage over WinUI in correlated destination acceptance; native cutover effort closed.
 
 **Testing seam:** Use a real OLE source and real controlled destination windows. Correlate one source result and one destination event stream with a unique attempt identifier. No mocked COM forwarding, file-existence inference, or later destination processing.
 
