@@ -1,0 +1,144 @@
+{
+  "normal_pid_at_start": 26020,
+  "normal_process_no_longer_present": true,
+  "no_normal_close_sent_during_qualification": true,
+  "normal_logical_counts_before": {
+    "shelf_batches": 0,
+    "shelf_items": 0
+  },
+  "normal_logical_counts_current_snapshot": {
+    "shelf_batches": 0,
+    "shelf_items": 0
+  },
+  "original_profile_not_replaced": true,
+  "monitor_identity_before": [
+    {
+      "handle": 66141,
+      "device": "\\\\.\\DISPLAY1",
+      "bounds": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        0,
+        1920,
+        1032
+      ]
+    },
+    {
+      "handle": 66203,
+      "device": "\\\\.\\DISPLAY2",
+      "bounds": [
+        1920,
+        0,
+        3840,
+        1080
+      ],
+      "work": [
+        1920,
+        0,
+        3840,
+        1032
+      ]
+    }
+  ],
+  "monitor_identity_after": [
+    {
+      "handle": 45419749,
+      "device": "\\\\.\\DISPLAY1",
+      "bounds": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        0,
+        1920,
+        1032
+      ]
+    },
+    {
+      "handle": 131741,
+      "device": "\\\\.\\DISPLAY2",
+      "bounds": [
+        1920,
+        0,
+        3840,
+        1080
+      ],
+      "work": [
+        1920,
+        0,
+        3840,
+        1032
+      ]
+    }
+  ],
+  "workarea_helper_exit_code": 0,
+  "workareas_reset": [
+    [
+      0,
+      0,
+      1920,
+      1032
+    ],
+    [
+      1920,
+      0,
+      3840,
+      1032
+    ]
+  ],
+  "geometry_error": "Manage 10 items was no longer visible; test shelf became EdgeDocked before action. No input sent after ownership became uncertain.",
+  "cause": "not established",
+  "application_event_log": [
+    {
+      "TimeCreated": "/Date(1791178793057)/",
+      "ProviderName": "Windows Error Reporting",
+      "Id": 1001,
+      "LevelDisplayName": "Information",
+      "Message": "Fault bucket 1350892708262780830, type 4\r\nEvent Name: APPCRASH\r\nResponse: Not available\r\nCab Id: 0\r\n\r\nProblem signature:\r\nP1: DropCove.exe\r\nP2: 1.0.0.0\r\nP3: 6a890000\r\nP4: combase.dll\r\nP5: 10.0.26100.9444\r\nP6: 8c05274d\r\nP7: 80004005\r\nP8: 00000000000579e4\r\nP9: \r\nP10: \r\n\r\nAttached files:\r\n\\\\?\\C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER.03c19e0d-b916-4b3d-918e-f3844a2ff0e2.tmp.WERInternalMetadata.xml\r\n\r\nThese files may be available here:\r\n\\\\?\\C:\\ProgramData\\Microsoft\\Windows\\WER\\ReportArchive\\AppCrash_DropCove.exe_b2844935cbd59ba4383fec6367641f1c48e310_7c58d10a_a059ac44-9f5f-4629-86da-c438837f6640\r\n\r\nAnalysis symbol: \r\nRechecking for solution: 0\r\nReport Id: b8d6d30a-0442-45c3-81f4-d77ec86dfa06\r\nReport Status: 268435456\r\nHashed bucket: a3abcb8a6f4b33ab52bf55c2c5ab1f9e\r\nCab Guid: 0"
+    },
+    {
+      "TimeCreated": "/Date(1791178790704)/",
+      "ProviderName": "Windows Error Reporting",
+      "Id": 1001,
+      "LevelDisplayName": "Information",
+      "Message": "Fault bucket , type 0\r\nEvent Name: APPCRASH\r\nResponse: Not available\r\nCab Id: 0\r\n\r\nProblem signature:\r\nP1: DropCove.exe\r\nP2: 1.0.0.0\r\nP3: 6a890000\r\nP4: combase.dll\r\nP5: 10.0.26100.9444\r\nP6: 8c05274d\r\nP7: 80004005\r\nP8: 00000000000579e4\r\nP9: \r\nP10: \r\n\r\nAttached files:\r\n\r\nThese files may be available here:\r\n\\\\?\\C:\\ProgramData\\Microsoft\\Windows\\WER\\ReportQueue\\AppCrash_DropCove.exe_b2844935cbd59ba4383fec6367641f1c48e310_7c58d10a_a059ac44-9f5f-4629-86da-c438837f6640\r\n\r\nAnalysis symbol: \r\nRechecking for solution: 0\r\nReport Id: b8d6d30a-0442-45c3-81f4-d77ec86dfa06\r\nReport Status: 4\r\nHashed bucket: \r\nCab Guid: 0"
+    },
+    {
+      "TimeCreated": "/Date(1791178788355)/",
+      "ProviderName": "Application Error",
+      "Id": 1000,
+      "LevelDisplayName": "Error",
+      "Message": "Faulting application name: DropCove.exe, version: 1.0.0.0, time stamp: 0x6a890000\r\nFaulting module name: CoreMessagingXP.dll, version: 10.0.27200.1054, time stamp: 0x1cff1018\r\nException code: 0xc000027b\r\nFault offset: 0x0000000000097976\r\nFaulting process id: 0x65A4\r\nFaulting application start time: 0x1DD54850637A71E\r\nFaulting application path: C:\\Users\\Hung\\AppData\\Local\\Programs\\DropCove\\DropCove.exe\r\nFaulting module path: C:\\Users\\Hung\\AppData\\Local\\Programs\\DropCove\\CoreMessagingXP.dll\r\nReport Id: b8d6d30a-0442-45c3-81f4-d77ec86dfa06\r\nFaulting package full name: \r\nFaulting package-relative application ID: "
+    }
+  ],
+  "foreground_process_metadata": {
+    "Pid": 27928,
+    "ParentPid": 17604,
+    "Name": "WindowsTerminal.exe",
+    "IsEncodedAutomationHelper": false
+  },
+  "confirmed_crash": {
+    "pid": 26020,
+    "pid_hex": "0x65A4",
+    "executable": "C:\\Users\\Hung\\AppData\\Local\\Programs\\DropCove\\DropCove.exe",
+    "application_error_module": "CoreMessagingXP.dll",
+    "application_error_exception": "0xc000027b",
+    "wer_module": "combase.dll",
+    "wer_hresult": "0x80004005",
+    "report_id": "b8d6d30a-0442-45c3-81f4-d77ec86dfa06",
+    "root_cause": "not established; temporal correlation with work-area exercise is not a proven code-level cause"
+  },
+  "qualification_status": "incomplete/blocked; keyboard and geometry observations before crash are not final acceptance",
+  "test_app_exited_normally": true,
+  "owned_observer_exited": true,
+  "live_before_and_after_snapshots": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Responsive-Qualification-zf_feld7",
+  "wer_archive_directory_no_readable_files": true
+}
