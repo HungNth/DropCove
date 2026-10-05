@@ -16,7 +16,7 @@
 - [x] Same normalized test profile shares its resident mutex/activation event; different test profiles coexist with each other and the normal instance. Default launch retains original paths and names.
 - [x] Test startup, Settings save, and rollback route through a policy that prevents Windows startup-registration writes; saved test settings survive restart.
 - [x] Real popup drag-out uses the existing WinUI engine and correlates exact offered path/item identity with primary and backing events; successful backing acceptance is not attributed to the failed primary.
-- [x] Live profile bytes and startup Run value remain unchanged, the normal resident process stays running, and automated regressions pass. No NSIS, resource, keyboard, full destination-matrix, or native release qualification is inferred.
+- [x] Live profile data state restored with user approval (1 batch / 1 item Ticket01.txt), `settings.json` and startup Run value remained byte-identical, the normal resident process is active (PID 26020), and automated regressions pass (163/163). No NSIS, resource, keyboard, full destination-matrix, or native release qualification is inferred.
 ## Comments
 
 ### Approved implementation and verification

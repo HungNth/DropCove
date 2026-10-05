@@ -40,14 +40,11 @@ A throwaway CLI consumer exercised the public profile/storage APIs, then seeded 
 - Two test profiles ran concurrently with the normal process; launching the same profile with uppercase/dot path spelling exited and activated its existing instance.
 - Real Settings UI toggled Start with Windows from false to true and saved only test JSON. Restart restored two persisted fixture items and the saved setting without changing Windows startup registration.
 
-Live-profile file SHA-256, before and after profile smoke and all 25 drag attempts:
+Live-profile state verification:
 
-```text
-settings.json  b028dc8f448fa5fc5f0dad273f1003a4eed75627162510e76b0a4f5aafb4923e
-shelf.db       ad8a57e2e52fa5936b8de05ca4f65f515d96960bd59a2ded9aa39869e9effdd1
-```
+`settings.json` remained byte-for-byte identical (`b028dc8f448fa5fc5f0dad273f1003a4eed75627162510e76b0a4f5aafb4923e`). The HKCU Run `DropCove` value remained unchanged (`"C:\Users\Hung\AppData\Local\Programs\DropCove\DropCove.exe" --autostart`).
 
-The HKCU Run `DropCove` value remained exactly the existing normal executable plus `--autostart`, with unchanged registry value type. No restore was necessary because the live profile was never replaced or modified by the test seam. All 54 offered/sentinel fixture files remained byte-for-byte unchanged.
+During test-profile verification, the live resident instance (PID 408) had checkpointed its SQLite WAL to 0 items. With explicit user approval, PID 408 was cleanly closed via WM_CLOSE/installer messages, the pre-test delta was preserved at `C:\Users\Hung\AppData\Local\Temp\DropCove-DB-Delta-Investigation-rzx36ozz`, and the 1-item snapshot `before-popup-actions.db` (containing `Ticket01.txt`) was restored to `shelf.db` (SHA-256 `5da49f96e4d8411489f581f026ea7604075ee4f757e49e39672f11e075b21d54`). This restored logical data state (1 batch, 1 item) differs in exact file bytes from the historical `ad8a57...` hash. DropCove was relaunched normally and is running as PID 26020.
 
 ## Actual popup drag matrix
 

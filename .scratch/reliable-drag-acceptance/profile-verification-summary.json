@@ -1,9 +1,9 @@
 {
   "full_suite": {
-    "passed": 155,
+    "passed": 163,
     "failed": 0,
     "skipped": 0,
-    "duration_ms": 411
+    "duration_ms": 439
   },
   "focused_SettingsStoreTests": {
     "passed": 4,
@@ -11,19 +11,25 @@
     "skipped": 0,
     "duration_ms": 125
   },
+  "focused_LaunchProfileTests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+  },
   "review": {
     "standards_findings": 0,
     "spec_findings": 0
   },
   "disposable_workspace_removed": true,
   "all_test_profile_instances_closed": true,
-  "normal_resident_process_preserved": 408,
+  "normal_resident_process_active": 26020,
   "live_profile_hashes": {
     "settings.json": "b028dc8f448fa5fc5f0dad273f1003a4eed75627162510e76b0a4f5aafb4923e",
-    "shelf.db": "ad8a57e2e52fa5936b8de05ca4f65f515d96960bd59a2ded9aa39869e9effdd1"
+    "shelf.db": "5da49f96e4d8411489f581f026ea7604075ee4f757e49e39672f11e075b21d54"
   },
+  "live_profile_restored_logically": true,
+  "live_profile_byte_identical_to_historical_ad8a57": false,
   "startup_registry_unchanged": true,
-  "side_by_side_release_binary_retained": "C:\\Users\\Hung\\AppData\\Local\\Programs\\DropCove\\TestProfileQualification\\DropCove.exe",
-  "new_changes_committed": false,
-  "cleanup_note": "Initial directory removal hit SQLite reader locks; explicitly closed 1 probe connections before deleting remaining fixture/harness files. No forced GC or working-set trimming."
+  "side_by_side_release_binary_retained": false,
+  "cleanup_note": "Initial directory removal hit SQLite reader locks; explicitly closed probe connections before deleting remaining fixture/harness files. Normal resident PID 408 closed with user approval, snapshot restored (1 batch/1 item Ticket01.txt), and app relaunched as PID 26020. Side-by-side publish folder removed."
 }
