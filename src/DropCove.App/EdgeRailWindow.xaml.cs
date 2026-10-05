@@ -294,26 +294,33 @@ public sealed partial class EdgeRailWindow : Window
             return;
         }
 
-        var monitorId = WindowInterop.ResolveMonitorId(_placement.MonitorId, _windowHandle);
-        if (!_showOverFullscreen && WindowInterop.IsForegroundWindowFullscreen(monitorId))
+        try
         {
-            _pointerInside = false;
-            _expandPending = false;
-            _expandTimer.Stop();
-            _collapseTimer.Stop();
-            WindowInterop.Hide(_windowHandle);
-            return;
-        }
+            var monitorId = WindowInterop.ResolveMonitorId(_placement.MonitorId, _windowHandle);
+            if (!_showOverFullscreen && WindowInterop.IsForegroundWindowFullscreen(monitorId))
+            {
+                _pointerInside = false;
+                _expandPending = false;
+                _expandTimer.Stop();
+                _collapseTimer.Stop();
+                WindowInterop.Hide(_windowHandle);
+                return;
+            }
 
-        WindowInterop.PositionEdgeRail(
-            _windowHandle,
-            monitorId,
-            _placement.Edge == ShelfRailEdge.Left,
-            _isExpanded ? ExpandedWidth : CollapsedWidth,
-            _isExpanded ? ExpandedHeight : CollapsedHeight);
-        WindowInterop.ShowNoActivate(_windowHandle);
-        EnsureInputWindowHook();
-        _dispatcherQueue.TryEnqueue(EnsureInputWindowHook);
+            WindowInterop.PositionEdgeRail(
+                _windowHandle,
+                monitorId,
+                _placement.Edge == ShelfRailEdge.Left,
+                _isExpanded ? ExpandedWidth : CollapsedWidth,
+                _isExpanded ? ExpandedHeight : CollapsedHeight);
+            WindowInterop.ShowNoActivate(_windowHandle);
+            EnsureInputWindowHook();
+            _dispatcherQueue.TryEnqueue(EnsureInputWindowHook);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ApplyVisibility] Handled transient display reconfiguration error: {ex}");
+        }
     }
 
     private void EnsureInputWindowHook()

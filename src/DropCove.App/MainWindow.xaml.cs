@@ -947,8 +947,14 @@ public sealed partial class MainWindow : Window
         _surfaceReflowQueued = true;
         if (!DispatcherQueue.TryEnqueue(() =>
             {
-                _surfaceReflowQueued = false;
-                ReflowSurfaces();
+                try
+                {
+                    ReflowSurfaces();
+                }
+                finally
+                {
+                    _surfaceReflowQueued = false;
+                }
             }))
         {
             _surfaceReflowQueued = false;
@@ -962,15 +968,37 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        _settingsWindow?.UpdateMonitorOptions(WindowInterop.GetMonitorOptions());
-        if (WindowInterop.IsVisible(_windowHandle) &&
-            _manager.DisplayState == ShelfDisplayState.Visible)
+        try
         {
-            var preferred = _manager.PreferredSize;
-            WindowInterop.ResizeAndClamp(_windowHandle, preferred.Width, preferred.Height);
+            _settingsWindow?.UpdateMonitorOptions(WindowInterop.GetMonitorOptions());
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ReflowSurfaces:Settings] {ex.Message}");
         }
 
-        _railWindow?.Reposition();
+        try
+        {
+            if (WindowInterop.IsVisible(_windowHandle) &&
+                _manager.DisplayState == ShelfDisplayState.Visible)
+            {
+                var preferred = _manager.PreferredSize;
+                WindowInterop.ResizeAndClamp(_windowHandle, preferred.Width, preferred.Height);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ReflowSurfaces:Shelf] {ex.Message}");
+        }
+
+        try
+        {
+            _railWindow?.Reposition();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ReflowSurfaces:Rail] {ex.Message}");
+        }
     }
     private void ExitApplication()
     {

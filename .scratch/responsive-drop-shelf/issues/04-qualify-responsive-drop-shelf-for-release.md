@@ -60,3 +60,20 @@ Controlled real-popup acceptance using the approved test profile passes the comp
 ### 2026-10-05 — Blocked: crash of normal installed instance PID 26020
 
 Ticket 04 qualification is blocked because prerequisite Ticket 03 was interrupted by an application crash of the user's normal installed instance (PID 26020; Event 1000 CoreMessagingXP.dll 0xc000027b, Event 1001 combase.dll 0x80004005). The 100-batch/1,000-item resource window and final NSIS packaging must not proceed until the crash cause is understood and Ticket 03 qualification is completed. Prior visible CPU gate failure (0.104% vs <=0.1% limit) remains unaddressed.
+
+### 2026-10-05 — Status on Transition to Ticket 04
+
+- Automated suite: `dotnet test tests/DropCove.Tests/DropCove.Tests.csproj` passed 163/163 tests (0 failed, 0 skipped, 458 ms).
+- Framework/Release build: `dotnet build src/DropCove.App/DropCove.csproj -c Release -p:Platform=x64` succeeded with 0 errors and 0 warnings.
+- Crash attribution investigation: PID 26020 mini-dump confirmed fail-fast in app-local `CoreMessagingXP.dll` (0xc000027b / 0x80004005), but missing 25 stowed stack frame addresses in the dump prevent proving whether application callbacks or WinAppSDK was the root cause.
+- Negative control in Windows Sandbox (isolated Windows build 26100, single monitor): exact installed and current builds survived two valid 280×200 AppBar reserve/reset cycles without crash and exited cleanly with code 0. Original crash was not reproduced due to environmental differences (host build 26300, two monitors).
+- Status: Ticket 04 remains strictly blocked. Resource qualification (100 batches / 1,000 items) and release claims are not executed while the crash cause is unassigned, visible CPU failure (0.104% vs <=0.1%) is unresolved, and final NSIS packaging is absent. Normal app PID 31784 continues running safely on the normal profile.
+
+### 2026-10-05 — Defensive Hardening of Display Change Handlers
+
+- Applied defensive containment in `MainWindow.ReflowSurfaces()` and `EdgeRailWindow.ApplyVisibility()`:
+  - `QueueSurfaceReflow()` wraps dispatcher execution in `try ... finally` to ensure `_surfaceReflowQueued` is reliably reset even if reflow encounters an unhandled exception.
+  - In `ReflowSurfaces()`, separate try-catch blocks guard Settings monitor options update, Shelf bounds `ResizeAndClamp()`, and Rail `Reposition()`, preventing a transient native display error in one surface from blocking or crashing the entire UI thread.
+  - In `EdgeRailWindow.ApplyVisibility()`, wrapped monitor resolution and rail placement in a guarded block to absorb transient Win32 errors when displays are dynamically resized.
+- Verification: Full test suite passes 163/163 (0 failed, 0 skipped, 444 ms); `dotnet build -c Release` completes with 0 errors and 0 warnings. Logging statements use `Debug.WriteLine` (debug-only containment; no persistent production sink introduced).
+- Residual status: While crash containment is hardened against unhandled exceptions during display change callbacks, the root cause of the initial fail-fast remains unassigned without a two-monitor matching reproduction or full crash dump. Ticket 04 resource qualification (100 batches / 1,000 items) and release readiness remain explicitly blocked.
