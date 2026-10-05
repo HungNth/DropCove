@@ -1,0 +1,2554 @@
+{
+  "fixture_sha256": "098ef1c679bd47b04b1be00205efc5686497272f0c8ccece7864f67c70621f12",
+  "driver_setup_attempt": {
+    "attempt": "copy-01",
+    "source": [
+      {
+        "attempt": "copy-01",
+        "role": "source",
+        "mode": "copy",
+        "kind": "ready",
+        "details": {
+          "hwnd": 329314
+        }
+      },
+      {
+        "attempt": "copy-01",
+        "role": "source",
+        "mode": "copy",
+        "kind": "start",
+        "details": {
+          "paths": [
+            "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+          ],
+          "allowed": 1
+        }
+      },
+      {
+        "attempt": "copy-01",
+        "role": "source",
+        "mode": "copy",
+        "kind": "result",
+        "details": {
+          "hr": 262400,
+          "effect": 0,
+          "accepted": false
+        }
+      }
+    ],
+    "target": [
+      {
+        "attempt": "copy-01",
+        "role": "target",
+        "mode": "copy",
+        "kind": "ready",
+        "details": {
+          "hwnd": 3475846
+        }
+      }
+    ],
+    "classification": "driver failure: relative movement did not reach target; retained, not counted as Copy acceptance"
+  },
+  "attempts": [
+    {
+      "summary": {
+        "attempt": "copy-01-retry",
+        "source": {
+          "hr": 262400,
+          "effect": 1,
+          "accepted": true
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "Drop_enter",
+          "Drop_return"
+        ],
+        "drop_paths": [
+          [
+            "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+          ]
+        ]
+      },
+      "source_events": [
+        {
+          "attempt": "copy-01-retry",
+          "role": "source",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 3147924
+          }
+        },
+        {
+          "attempt": "copy-01-retry",
+          "role": "source",
+          "mode": "copy",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "copy-01-retry",
+          "role": "source",
+          "mode": "copy",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 1,
+            "accepted": true
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "copy-01-retry",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 723394
+          }
+        },
+        {
+          "attempt": "copy-01-retry",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "copy-01-retry",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-01-retry",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-01-retry",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-01-retry",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-01-retry",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-01-retry",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-01-retry",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_enter",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "copy-01-retry",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "effect": 1
+          }
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "copy-02",
+        "source": {
+          "hr": 262400,
+          "effect": 1,
+          "accepted": true
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "Drop_enter",
+          "Drop_return"
+        ],
+        "drop_paths": [
+          [
+            "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+          ]
+        ]
+      },
+      "source_events": [
+        {
+          "attempt": "copy-02",
+          "role": "source",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 592832
+          }
+        },
+        {
+          "attempt": "copy-02",
+          "role": "source",
+          "mode": "copy",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "copy-02",
+          "role": "source",
+          "mode": "copy",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 1,
+            "accepted": true
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 657956
+          }
+        },
+        {
+          "attempt": "copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_enter",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "effect": 1
+          }
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "copy-03",
+        "source": {
+          "hr": 262400,
+          "effect": 1,
+          "accepted": true
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "Drop_enter",
+          "Drop_return"
+        ],
+        "drop_paths": [
+          [
+            "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+          ]
+        ]
+      },
+      "source_events": [
+        {
+          "attempt": "copy-03",
+          "role": "source",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 526868
+          }
+        },
+        {
+          "attempt": "copy-03",
+          "role": "source",
+          "mode": "copy",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "copy-03",
+          "role": "source",
+          "mode": "copy",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 1,
+            "accepted": true
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 526892
+          }
+        },
+        {
+          "attempt": "copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_enter",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "effect": 1
+          }
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "copy-04",
+        "source": {
+          "hr": 262400,
+          "effect": 1,
+          "accepted": true
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "Drop_enter",
+          "Drop_return"
+        ],
+        "drop_paths": [
+          [
+            "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+          ]
+        ]
+      },
+      "source_events": [
+        {
+          "attempt": "copy-04",
+          "role": "source",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1706800
+          }
+        },
+        {
+          "attempt": "copy-04",
+          "role": "source",
+          "mode": "copy",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "copy-04",
+          "role": "source",
+          "mode": "copy",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 1,
+            "accepted": true
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 3410068
+          }
+        },
+        {
+          "attempt": "copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_enter",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "effect": 1
+          }
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "copy-05",
+        "source": {
+          "hr": 262400,
+          "effect": 1,
+          "accepted": true
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "Drop_enter",
+          "Drop_return"
+        ],
+        "drop_paths": [
+          [
+            "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+          ]
+        ]
+      },
+      "source_events": [
+        {
+          "attempt": "copy-05",
+          "role": "source",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 789088
+          }
+        },
+        {
+          "attempt": "copy-05",
+          "role": "source",
+          "mode": "copy",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "copy-05",
+          "role": "source",
+          "mode": "copy",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 1,
+            "accepted": true
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 854976
+          }
+        },
+        {
+          "attempt": "copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_enter",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "effect": 1
+          }
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "reject-01",
+        "source": {
+          "hr": 262400,
+          "effect": 0,
+          "accepted": false
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragLeave"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "reject-01",
+          "role": "source",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1903408
+          }
+        },
+        {
+          "attempt": "reject-01",
+          "role": "source",
+          "mode": "reject",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "reject-01",
+          "role": "source",
+          "mode": "reject",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 0,
+            "accepted": false
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 658218
+          }
+        },
+        {
+          "attempt": "reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "reject-02",
+        "source": {
+          "hr": 262400,
+          "effect": 0,
+          "accepted": false
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragLeave"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "reject-02",
+          "role": "source",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 3804172
+          }
+        },
+        {
+          "attempt": "reject-02",
+          "role": "source",
+          "mode": "reject",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "reject-02",
+          "role": "source",
+          "mode": "reject",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 0,
+            "accepted": false
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 854778
+          }
+        },
+        {
+          "attempt": "reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "reject-03",
+        "source": {
+          "hr": 262400,
+          "effect": 0,
+          "accepted": false
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragLeave"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "reject-03",
+          "role": "source",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 789518
+          }
+        },
+        {
+          "attempt": "reject-03",
+          "role": "source",
+          "mode": "reject",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "reject-03",
+          "role": "source",
+          "mode": "reject",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 0,
+            "accepted": false
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1051232
+          }
+        },
+        {
+          "attempt": "reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "reject-04",
+        "source": {
+          "hr": 262400,
+          "effect": 0,
+          "accepted": false
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragLeave"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "reject-04",
+          "role": "source",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 4000780
+          }
+        },
+        {
+          "attempt": "reject-04",
+          "role": "source",
+          "mode": "reject",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "reject-04",
+          "role": "source",
+          "mode": "reject",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 0,
+            "accepted": false
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2165552
+          }
+        },
+        {
+          "attempt": "reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "reject-05",
+        "source": {
+          "hr": 262400,
+          "effect": 0,
+          "accepted": false
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragLeave"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "reject-05",
+          "role": "source",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 986126
+          }
+        },
+        {
+          "attempt": "reject-05",
+          "role": "source",
+          "mode": "reject",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "reject-05",
+          "role": "source",
+          "mode": "reject",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 0,
+            "accepted": false
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 985644
+          }
+        },
+        {
+          "attempt": "reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver",
+          "details": {
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "cancel-01",
+        "source": {
+          "hr": 262401,
+          "effect": 0,
+          "accepted": false
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragLeave"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "cancel-01",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1182458
+          }
+        },
+        {
+          "attempt": "cancel-01",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "cancel-01",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "result",
+          "details": {
+            "hr": 262401,
+            "effect": 0,
+            "accepted": false
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1051434
+          }
+        },
+        {
+          "attempt": "cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "cancel-02",
+        "source": {
+          "hr": 262401,
+          "effect": 0,
+          "accepted": false
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragLeave"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "cancel-02",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1117164
+          }
+        },
+        {
+          "attempt": "cancel-02",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "cancel-02",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "result",
+          "details": {
+            "hr": 262401,
+            "effect": 0,
+            "accepted": false
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 4262924
+          }
+        },
+        {
+          "attempt": "cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "cancel-03",
+        "source": {
+          "hr": 262401,
+          "effect": 0,
+          "accepted": false
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragLeave"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "cancel-03",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2493232
+          }
+        },
+        {
+          "attempt": "cancel-03",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "cancel-03",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "result",
+          "details": {
+            "hr": 262401,
+            "effect": 0,
+            "accepted": false
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1444448
+          }
+        },
+        {
+          "attempt": "cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "cancel-04",
+        "source": {
+          "hr": 262401,
+          "effect": 0,
+          "accepted": false
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragLeave"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "cancel-04",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2296456
+          }
+        },
+        {
+          "attempt": "cancel-04",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "cancel-04",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "result",
+          "details": {
+            "hr": 262401,
+            "effect": 0,
+            "accepted": false
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1444602
+          }
+        },
+        {
+          "attempt": "cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "cancel-05",
+        "source": {
+          "hr": 262401,
+          "effect": 0,
+          "accepted": false
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "DragEnter_return",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragOver",
+          "DragLeave"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "cancel-05",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1641408
+          }
+        },
+        {
+          "attempt": "cancel-05",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "cancel-05",
+          "role": "source",
+          "mode": "cancel",
+          "kind": "result",
+          "details": {
+            "hr": 262401,
+            "effect": 0,
+            "accepted": false
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1379308
+          }
+        },
+        {
+          "attempt": "cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_return",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "fail-01",
+        "source": {
+          "hr": 262400,
+          "effect": 1,
+          "accepted": true
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "intentional_exit_before_effect"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "fail-01",
+          "role": "source",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 4590604
+          }
+        },
+        {
+          "attempt": "fail-01",
+          "role": "source",
+          "mode": "fail",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "fail-01",
+          "role": "source",
+          "mode": "fail",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 1,
+            "accepted": true
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "fail-01",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2755376
+          }
+        },
+        {
+          "attempt": "fail-01",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "fail-01",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit_before_effect",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "fail-02",
+        "source": {
+          "hr": 262400,
+          "effect": 1,
+          "accepted": true
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "intentional_exit_before_effect"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "fail-02",
+          "role": "source",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1706746
+          }
+        },
+        {
+          "attempt": "fail-02",
+          "role": "source",
+          "mode": "fail",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "fail-02",
+          "role": "source",
+          "mode": "fail",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 1,
+            "accepted": true
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "fail-02",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 4656140
+          }
+        },
+        {
+          "attempt": "fail-02",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "fail-02",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit_before_effect",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "fail-03",
+        "source": {
+          "hr": 262400,
+          "effect": 1,
+          "accepted": true
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "intentional_exit_before_effect"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "fail-03",
+          "role": "source",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1772282
+          }
+        },
+        {
+          "attempt": "fail-03",
+          "role": "source",
+          "mode": "fail",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "fail-03",
+          "role": "source",
+          "mode": "fail",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 1,
+            "accepted": true
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "fail-03",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1509908
+          }
+        },
+        {
+          "attempt": "fail-03",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "fail-03",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit_before_effect",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "fail-04",
+        "source": {
+          "hr": 262400,
+          "effect": 1,
+          "accepted": true
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "intentional_exit_before_effect"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "fail-04",
+          "role": "source",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 4655252
+          }
+        },
+        {
+          "attempt": "fail-04",
+          "role": "source",
+          "mode": "fail",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "fail-04",
+          "role": "source",
+          "mode": "fail",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 1,
+            "accepted": true
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "fail-04",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1837818
+          }
+        },
+        {
+          "attempt": "fail-04",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "fail-04",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit_before_effect",
+          "details": null
+        }
+      ]
+    },
+    {
+      "summary": {
+        "attempt": "fail-05",
+        "source": {
+          "hr": 262400,
+          "effect": 1,
+          "accepted": true
+        },
+        "target_events": [
+          "ready",
+          "DragEnter",
+          "intentional_exit_before_effect"
+        ],
+        "drop_paths": []
+      },
+      "source_events": [
+        {
+          "attempt": "fail-05",
+          "role": "source",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1772052
+          }
+        },
+        {
+          "attempt": "fail-05",
+          "role": "source",
+          "mode": "fail",
+          "kind": "start",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Ole-Acceptance-5xqpdph8\\fixture.txt"
+            ],
+            "allowed": 1
+          }
+        },
+        {
+          "attempt": "fail-05",
+          "role": "source",
+          "mode": "fail",
+          "kind": "result",
+          "details": {
+            "hr": 262400,
+            "effect": 1,
+            "accepted": true
+          }
+        }
+      ],
+      "target_events": [
+        {
+          "attempt": "fail-05",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 4720788
+          }
+        },
+        {
+          "attempt": "fail-05",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter",
+          "details": null
+        },
+        {
+          "attempt": "fail-05",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit_before_effect",
+          "details": null
+        }
+      ]
+    }
+  ]
+}

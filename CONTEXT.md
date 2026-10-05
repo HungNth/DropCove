@@ -35,7 +35,7 @@ A Shelf Item retained after accepted drag-out operations for repeated reuse.
 _Avoid_: Permanent file, favorite
 
 **Successful Drag-Out**:
-A drag-out operation accepted by the destination. It does not guarantee that the destination completes later internal processing.
+A drag-out operation for which the destination confirms acceptance before the operation ends. If the destination rejects the operation, the user cancels it, or the destination stops before it confirms acceptance, the drag-out is not successful. Acceptance does not guarantee that the destination completes later internal processing.
 _Avoid_: File transfer completion
 
 ## Availability
