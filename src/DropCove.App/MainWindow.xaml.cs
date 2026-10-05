@@ -15,7 +15,8 @@ public sealed partial class MainWindow : Window
     private const uint WindowCloseMessage = 0x0010;
     private const uint InstallerExitMessage = 0x8002;
     private DropShelfManager? _manager;
-    private readonly SettingsStore _settingsStore = new();
+    private readonly LaunchProfile _launchProfile;
+    private readonly SettingsStore _settingsStore;
     private readonly nint _windowHandle;
     private readonly WindowMessageHook _messageHook;
     private readonly GlobalHotKey _globalHotKey;
@@ -51,9 +52,14 @@ public sealed partial class MainWindow : Window
     /// <summary>Raised when a native window resize operation begins.</summary>
     public event Action? ResizeStarted;
     /// <summary>Creates the resident Drop Shelf window and native integrations.</summary>
-    public MainWindow()
+    /// <param name="launchProfile">The storage and resident instance profile for this launch.</param>
+    public MainWindow(LaunchProfile launchProfile)
     {
+        ArgumentNullException.ThrowIfNull(launchProfile);
+        _launchProfile = launchProfile;
+        _settingsStore = new SettingsStore(launchProfile.SettingsPath);
         InitializeComponent();
+        if (launchProfile.IsTest) Title = "DropCove — Test profile";
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _shakeInputQueue = new(_dispatcherQueue, ProcessShakeInput);
         _windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
@@ -97,11 +103,7 @@ public sealed partial class MainWindow : Window
     public async Task InitializeAsync(bool startHidden)
     {
         HideAllSurfaces();
-        var databasePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DropCove",
-            "shelf.db");
-        _manager = await DropShelfManager.OpenAsync(databasePath, DragDropService.CheckAvailability);
+        _manager = await DropShelfManager.OpenAsync(_launchProfile.DatabasePath, DragDropService.CheckAvailability);
         await _page.InitializeAsync(
             _manager,
             _windowHandle,
@@ -122,7 +124,7 @@ public sealed partial class MainWindow : Window
         _shakeDetector = _settings.ShakeEnabled
             ? new ShakeDetector(_settings.ShakeSensitivity)
             : null;
-        StartupRegistration.SetEnabled(_settings.StartWithWindows);
+        ApplyStartupRegistration(_settings.StartWithWindows);
         if (!TryRegisterHotKey(_settings.HotKey))
         {
             _trayIcon.ShowWarning(
@@ -556,7 +558,7 @@ public sealed partial class MainWindow : Window
             _shakeDetector = settings.ShakeEnabled
                 ? new ShakeDetector(settings.ShakeSensitivity)
                 : null;
-            StartupRegistration.SetEnabled(settings.StartWithWindows);
+            ApplyStartupRegistration(settings.StartWithWindows);
             await _settingsStore.SaveAsync(settings);
             _settings = settings;
 
@@ -588,7 +590,7 @@ public sealed partial class MainWindow : Window
                 _shakeDetector = retainedHook
                     ? new ShakeDetector(retainedSettings.ShakeSensitivity)
                     : null;
-                StartupRegistration.SetEnabled(previous.StartWithWindows);
+                ApplyStartupRegistration(previous.StartWithWindows);
                 _settings = retainedSettings;
                 try
                 {
@@ -608,11 +610,16 @@ public sealed partial class MainWindow : Window
             _shakeDetector = previous.ShakeEnabled
                 ? new ShakeDetector(previous.ShakeSensitivity)
                 : null;
-            StartupRegistration.SetEnabled(previous.StartWithWindows);
+            ApplyStartupRegistration(previous.StartWithWindows);
             await _settingsStore.SaveAsync(previous);
             _settings = previous;
             throw;
         }
+    }
+
+    private void ApplyStartupRegistration(bool enabled)
+    {
+        if (!_launchProfile.IsTest) StartupRegistration.SetEnabled(enabled);
     }
 
     private ShelfRailPlacement GetConfiguredRailPlacement(AppSettings settings)

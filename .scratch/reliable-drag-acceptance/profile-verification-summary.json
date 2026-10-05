@@ -1,0 +1,29 @@
+{
+  "full_suite": {
+    "passed": 155,
+    "failed": 0,
+    "skipped": 0,
+    "duration_ms": 411
+  },
+  "focused_SettingsStoreTests": {
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0,
+    "duration_ms": 125
+  },
+  "review": {
+    "standards_findings": 0,
+    "spec_findings": 0
+  },
+  "disposable_workspace_removed": true,
+  "all_test_profile_instances_closed": true,
+  "normal_resident_process_preserved": 408,
+  "live_profile_hashes": {
+    "settings.json": "b028dc8f448fa5fc5f0dad273f1003a4eed75627162510e76b0a4f5aafb4923e",
+    "shelf.db": "ad8a57e2e52fa5936b8de05ca4f65f515d96960bd59a2ded9aa39869e9effdd1"
+  },
+  "startup_registry_unchanged": true,
+  "side_by_side_release_binary_retained": "C:\\Users\\Hung\\AppData\\Local\\Programs\\DropCove\\TestProfileQualification\\DropCove.exe",
+  "new_changes_committed": false,
+  "cleanup_note": "Initial directory removal hit SQLite reader locks; explicitly closed 1 probe connections before deleting remaining fixture/harness files. No forced GC or working-set trimming."
+}

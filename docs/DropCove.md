@@ -362,7 +362,7 @@ remove from DropCove
 
 A temporary item is removed only when the destination accepts its drag-out operation with the `Copy` effect. Cancellation, rejection, or failure keeps the reference in DropCove.
 
-**Unresolved Windows App SDK acceptance gap:** Installed testing found that a destination terminating during `DragEnter`, before setting an effect or receiving `Drop`, can still cause WinUI `DropCompleted` to report `Copy`. The current implementation then removes an unpinned reference. This violates the failure-retention requirement above; the responsive shelf is not release-qualified. Setting `RequestedOperation=None` also prevented legitimate accepted copies and was reverted. A reliable native/OLE acceptance signal or an explicit product decision is required; file existence and later destination processing are not acceptance signals.
+**Disappearing-destination investigation:** Historical installed attempts reported Copy after the instrumented primary target exited, but did not instrument or exclude the destination exposed underneath it. Controlled native and WinUI probes, followed by a clean DropCove Release run with an isolated test profile, retain temporary references when both destinations reject (5/5) and remove them when a backing destination actually accepts Drop (5/5). No native advantage is established by these tests, and the historical destination identity cannot be reconstructed from them. The responsive shelf remains unqualified pending its separate acceptance/performance gates and a planning decision on native cutover. `RequestedOperation=None` broke legitimate Copy and remains reverted; file existence and later processing are not acceptance signals.
 
 DropCove cannot atomically commit its local state together with another application's drop. If the destination accepts a drop and DropCove crashes before persisting the removal, the temporary reference may reappear after restart. V1 accepts this at-least-once behavior because an extra reference is safer than incorrectly losing one.
 
@@ -1355,6 +1355,18 @@ Before V1.0, verify drag-in from Explorer/Desktop and drag-out to Explorer, Edge
 ## Verification strategy
 
 Automated tests cover shelf state transitions and SQLite persistence. WinUI, OLE interoperability, global hotkeys, window activation, DPI, hooks, and cross-application behavior are verified with actual smoke scenarios against the installed EXE release build rather than mocks alone.
+
+### Isolated test-only launch
+
+```powershell
+DropCove.exe --test-profile "C:\Temp\DropCove-qualification"
+```
+
+- The explicit option places `shelf.db` and `settings.json` in the chosen absolute directory. Missing, relative, repeated, inline `--test-profile=...`, or normal-profile paths are rejected rather than silently using live data.
+- Normal launch keeps `%LOCALAPPDATA%\DropCove` and the existing resident mutex/activation event unchanged. Test launch derives separate mutex/event names from the normalized directory; repeated launches of the same test profile activate its existing instance, while different test profiles can coexist with the normal app.
+- A test window is titled `DropCove — Test profile`. Startup registration is never written on test startup, Settings save, or rollback; the setting can persist in test JSON without affecting the user's Windows Run entry.
+- Use a separate real directory, not filesystem aliases to the normal profile. This is a test-only storage/instance seam, not general user-profile support or an OS sandbox. Global hotkeys still follow normal registration/conflict behavior; use distinct test hotkeys when running profiles concurrently.
+- Drag acceptance evidence must correlate every destination that can receive the drop. A failed primary followed by a backing target's real Copy acceptance is a successful drag, not proof that the failed primary accepted it. Side-by-side published EXE smoke is not final NSIS installer qualification.
 
 ---
 

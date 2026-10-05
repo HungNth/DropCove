@@ -6,7 +6,7 @@
 
 **Blocked by:** 03: Cut over whole-Shelf-Batch drag-out.
 
-**Status:** blocked — Tickets 02–03 cannot start after the failed Ticket 01 gate. See [probe verdict](../probe-verdict.md). No installed native qualification claimed.
+**Status:** blocked — Tickets 02–03 await a planning decision; existing WinUI passes controlled real-app acceptance. See [real-app verdict](../installed-profile-verdict.md). No native/NSIS release qualification claimed.
 
 **Testing seam:** Run the complete automated suite once after source stabilization. Use installed Release UI Automation and direct pointer/keyboard interaction for source gestures, popup/flyout lifetime, real targets, and the disappearing-destination case. Use the established resource measurement procedure without changing its gates.
 

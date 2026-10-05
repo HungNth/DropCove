@@ -1,0 +1,14 @@
+{
+  "attempt": "profile-isolation",
+  "ready": {
+    "attempt": "profile-isolation",
+    "role": "winui-source",
+    "kind": "ready",
+    "details": {
+      "hwnd": 1115732,
+      "localData": "C:\\Users\\Hung\\AppData\\Local",
+      "localDataVariable": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Direct-Ole-tq5qujm_\\isolated-local-data"
+    }
+  },
+  "comparison": "LOCALAPPDATA override did not redirect GetFolderPath(LocalApplicationData); no profile I/O performed"
+}

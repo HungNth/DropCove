@@ -6,7 +6,7 @@
 
 **Blocked by:** 01: Prove a reliable native OLE acceptance signal.
 
-**Status:** blocked — Ticket 01 failed its acceptance gate; native source results do not distinguish Copy from destination exit during DragEnter. See [probe verdict](../probe-verdict.md). No production cutover started.
+**Status:** blocked for planning — actual DropCove WinUI passes the controlled matrix using the approved test profile; no native advantage is established. A planning decision is required before cutover. See [real-app verdict](../installed-profile-verdict.md). Production drag-out remains WinUI.
 
 **Testing seam:** Reuse the manager lifecycle and persistence seam for accepted versus non-successful outcomes. Test only decision-rich native result classification and resource lifetime below it. Use installed Release interaction for pointer threshold, drag image, cursor feedback, `Esc`, and real destination behavior.
 

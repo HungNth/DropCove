@@ -1,0 +1,12 @@
+{
+  "final_binary_sha256": "5fb6154a83f8f50dc14494b0eb0b7655fe9dc47ae8b7b20e7a31f0062b76f9d6",
+  "invalid_inline_error_exit_code": 1,
+  "invalid_dialog_driver_note": "UIA Invoke did not dismiss native OK pane; real mouse click dismissed it. No new invalid launch was substituted.",
+  "test_autostart_hidden": true,
+  "duplicate_activation_shows_existing_test_instance": true,
+  "restored_real_popup_visible": true,
+  "live_files_byte_identical": true,
+  "startup_registry_unchanged": true,
+  "original_process_alive": true,
+  "all_final_test_processes_closed": true
+}

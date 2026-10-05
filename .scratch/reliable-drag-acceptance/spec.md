@@ -1,6 +1,6 @@
 # Reliable Native Drag Acceptance Specification
 
-Status: blocked — Ticket 01 probe failed; no reliable native acceptance predicate established. See [probe verdict](probe-verdict.md).
+Status: blocked for planning — the approved test-profile seam enables a real DropCove side-by-side Release matrix, which passes using the existing WinUI source engine. No native advantage is established; historical destination identity remains unknown. See [real-app verification](installed-profile-verdict.md). Native cutover requires a new planning decision.
 
 ## Problem Statement
 
@@ -118,3 +118,7 @@ A native startup or execution error retains every valid participating Path Refer
 - The responsive Drop Shelf work remains blocked until failed-target retention is solved or the product contract changes. This specification keeps the contract.
 - ADR 0003 records the evidence gate and clean-cutover direction without claiming that a particular OLE result is already reliable.
 - All repository changes remain uncommitted until the user explicitly authorizes a commit.
+
+## Approved test-profile verification amendment — 2026-10-05
+
+The user approved an explicit test-only launch profile to safely investigate the installed-app premise: database/settings roots and mutex/activation names are profile-specific, while normal launch remains unchanged and test mode never writes Windows startup registration. This seam does not approve native production integration or change drag lifecycle semantics. A side-by-side clean self-contained Release run of the actual DropCove popup passed five attempts for each required outcome over Reject backing; five additional attempts proved genuine acceptance by Copy backing after primary exit. See [verdict](installed-profile-verdict.md) and [correlated evidence](installed-profile-evidence.json). No final NSIS, resource, or full destination-matrix qualification is claimed.

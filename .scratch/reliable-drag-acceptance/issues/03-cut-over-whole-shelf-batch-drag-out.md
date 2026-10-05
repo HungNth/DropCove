@@ -6,7 +6,7 @@
 
 **Blocked by:** 02: Cut over one-Shelf-Item drag-out.
 
-**Status:** blocked — Ticket 02 cannot start because Ticket 01 did not establish reliable native acceptance. See [probe verdict](../probe-verdict.md). No production cutover started.
+**Status:** blocked — Ticket 02 awaits a planning decision after native and actual DropCove WinUI both pass controlled acceptance. See [real-app verdict](../installed-profile-verdict.md). No production native cutover.
 
 **Testing seam:** Reuse the existing prepared-batch identity set and manager completion seam. Test multi-path payload/result decisions without duplicating item-level lifecycle tests. Use installed Release interaction for actual multi-file/folder payload delivery and transient UI behavior.
 

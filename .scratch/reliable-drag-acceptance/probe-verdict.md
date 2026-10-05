@@ -2,6 +2,8 @@
 
 Date: 2026-10-05. Ticket 01. Production drag-out unchanged.
 
+> **Correction:** This is the historical first-run report. Its false-positive inference is superseded by [the controlled destination follow-up](controlled-probe-verdict.md): it instrumented the primary target but did not exclude acceptance by a target underneath. Keep the measured tuples and raw logs; do not use the old inference as proof that native OLE or WinUI misclassified the complete drag. The design gate remains blocked pending isolated installed reproduction.
+
 ## Verdict
 
 `DoDragDrop` returning `DRAGDROP_S_DROP` (0x00040100) with `DROPEFFECT_COPY` (1) does **not** distinguish accepted Copy from a destination exiting during DragEnter. Both returned this exact tuple in 5/5 correlated attempts. No production cutover is authorized by this evidence; Tickets 02–04 remain blocked and ADR 0003 remains proposed.

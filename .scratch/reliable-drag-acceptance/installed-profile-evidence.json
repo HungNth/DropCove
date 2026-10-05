@@ -1,0 +1,5447 @@
+{
+  "deployment": "clean self-contained Release side-by-side subdirectory of existing installed app; not an NSIS installation/release qualification",
+  "executable": "C:\\Users\\Hung\\AppData\\Local\\Programs\\DropCove\\TestProfileQualification\\DropCove.exe",
+  "matrix_binary_sha256": "50bba2b33ccdf34ffa749f312ea52d176dd309e75649613938acbf7805b79d34",
+  "original_process_pid": 408,
+  "original_process_remained_running": true,
+  "live_profile_sha256_before": {
+    "settings.json": "b028dc8f448fa5fc5f0dad273f1003a4eed75627162510e76b0a4f5aafb4923e",
+    "shelf.db": "ad8a57e2e52fa5936b8de05ca4f65f515d96960bd59a2ded9aa39869e9effdd1"
+  },
+  "live_profile_sha256_after": {
+    "settings.json": "b028dc8f448fa5fc5f0dad273f1003a4eed75627162510e76b0a4f5aafb4923e",
+    "shelf.db": "ad8a57e2e52fa5936b8de05ca4f65f515d96960bd59a2ded9aa39869e9effdd1"
+  },
+  "startup_registry_before": [
+    "\"C:\\Users\\Hung\\AppData\\Local\\Programs\\DropCove\\DropCove.exe\" --autostart",
+    1
+  ],
+  "startup_registry_after": [
+    "\"C:\\Users\\Hung\\AppData\\Local\\Programs\\DropCove\\DropCove.exe\" --autostart",
+    1
+  ],
+  "source_fixture_sha256": {
+    "scope-a-01": "16573636387bd10cf724288d174ae0efadd267c5223f9f87f15dc6e3cf30118d",
+    "scope-b-01": "e7c1e912fc26580b5853fcc0bd814861be236e60026cf1d816e64d1dc69d589e",
+    "copy-01": "f0d905585e16a89b50f3340fdec09d1200fde5d52d6e980f6816d650f157fa99",
+    "copy-02": "f8884bce43ba2c51cb5423615bc833523e5784c1dfb81787ede41e39b3cf5859",
+    "copy-03": "95c644e07b8481a67e0986dfcee7a869a7f613075f092788f9e7f8a9493ff893",
+    "copy-04": "ee2d5608ecc112952b16c6fb0dd71b518c9f6e2c7a012b4bb3ba650eac56ceb6",
+    "copy-05": "a1ab5df6c5292421ac101492eda58025d65412fe89bc31fbe00873e724b55af2",
+    "reject-01": "c9b686d86e008103af477fe75517406c1605e899af1c35122cb7bc2d58fc0757",
+    "reject-02": "39b15c437a83e658f553416980c511661cfa4c9160e1ae9112350794a24bde7d",
+    "reject-03": "a6f858686f5b6c651484ddfa6bcbbe1b510532df414d49c87f519183d7ac466f",
+    "reject-04": "c7f91dc14ce24bba1afbee1cdbdad81aa8c482c8d9292ec9d8c9a9c6d363731f",
+    "reject-05": "2b511c35c9558ce5cf09e1ab804bf58774af2af196936ed628ec555c83cae554",
+    "cancel-01": "400bffd0894d06e85350535f6dd2b3a4bd6e478c70c46459ab9fb5ef69f3665a",
+    "cancel-02": "2ffc7a7574566db8c6eec047efb48a1160d9ef3b228813b96feb35ce5db99950",
+    "cancel-03": "d59845320ffd7dcd35c63a2874182605065ed95db15e19d2a87fa4f7d8831aac",
+    "cancel-04": "b4d8c469df3d06ceb94d127a6bbc9babeef8fd0f8f3ff893667985869040eaf8",
+    "cancel-05": "c92141d36ace6e30acd3740c846e3947303bbdc13d939809258e20990592f825",
+    "fail-01": "33799d9045f8160608401c0be7e4247041861910df058439d3aa4184be2785b2",
+    "fail-02": "588b049069a8344e4567bb2acf12a161b576afd811f1700729f468dc0fe83933",
+    "fail-03": "4a19a111fbea530764123b5fae16ef421a1b9b48bea215fa0fafe24735336c34",
+    "fail-04": "22e150fbaef4a1f90a31d1332c6c2e779477471d95c08a8f9c0e7256ed1c7dce",
+    "fail-05": "50af6fa970caf5231c34ac81d2bc2a351afc9e0ce57b311bc79bbeae1a1e43a5",
+    "fallback-copy-01": "2b65962f275572eea9492f1e40501dc9dff20d0fbd46143e31a7d3a2e8fad71d",
+    "fallback-copy-02": "c8b7a9d5223b90cb8b8fcbe0ff7f6ff317fb59d1d4520f394d75338863356ee0",
+    "fallback-copy-03": "0950833169fbf88608489f8293283eab7b2b2a7514d33336ba0960568e17cef4",
+    "fallback-copy-04": "ff039a7316ce700685bcbeb5307ad327c2c48c07029899e2ca079ffa849518e7",
+    "fallback-copy-05": "1bcc72f3f2d7038bba34ac3d12b73fe13dde48e5cece0fc453e709d8e2f4392e"
+  },
+  "runs": [
+    {
+      "attempt": "installed-copy-01",
+      "fixture": {
+        "id": "copy-01",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-01",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-01\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-01\\copy-01.txt",
+        "itemId": "21a5850d-977b-49dd-b3d6-644cc0dd33dc",
+        "batchId": "a723694c-421e-4cb3-a646-2545fd877463",
+        "sentinelId": "acad2307-e482-4c69-8aba-a76e6f13ed7e"
+      },
+      "before_count": 1,
+      "after_count": 0,
+      "sentinel_count": 1,
+      "popup_after": false,
+      "primary_events": [
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 3607076
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 806,
+            "Y": 351
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragLeave",
+          "details": null
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1025,
+            "Y": 292
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_paths",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-01\\copy-01.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "installed-copy-01",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-copy-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-copy-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 592742
+          }
+        }
+      ],
+      "driver_note": "Setup retries retained: popup closed between tool calls; untyped SetWindowPos failed; corrected native signature, placement and initial relative SendInput movement before accepted Copy."
+    },
+    {
+      "attempt": "installed-copy-02",
+      "fixture": {
+        "id": "copy-02",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-02",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-02\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-02\\copy-02.txt",
+        "itemId": "2faab119-187b-4611-a03e-ffd85fce0eb2",
+        "batchId": "0fca61f7-a3d9-44f7-819f-0540c56752af",
+        "sentinelId": "16647165-8085-49a6-b175-a370720bd109"
+      },
+      "before_count": 1,
+      "after_count": 0,
+      "sentinel_count": 1,
+      "popup_after": false,
+      "primary_mode": "copy",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 331594
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1000,
+            "Y": 328
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_paths",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-02\\copy-02.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "installed-copy-02",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-copy-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-copy-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 4918580
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-copy-03",
+      "fixture": {
+        "id": "copy-03",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-03",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-03\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-03\\copy-03.txt",
+        "itemId": "b1fa4f0a-6bad-4f01-8ecf-f682031b57bb",
+        "batchId": "578cdf14-82c3-46a6-b0c8-48ed047a31c3",
+        "sentinelId": "ab7869de-4b27-48ea-a5fd-f0bb9c93be9c"
+      },
+      "before_count": 1,
+      "after_count": 0,
+      "sentinel_count": 1,
+      "popup_after": false,
+      "primary_mode": "copy",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 3935172
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1031,
+            "Y": 308
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_paths",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-03\\copy-03.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "installed-copy-03",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-copy-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-copy-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 3214324
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-copy-04",
+      "fixture": {
+        "id": "copy-04",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-04",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-04\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-04\\copy-04.txt",
+        "itemId": "abf3c4d2-6fcf-4ff1-9441-d561a266d416",
+        "batchId": "c86fd248-5cad-4436-a682-84486afd1559",
+        "sentinelId": "f492250a-4425-4679-8fe3-c1937bcf71d2"
+      },
+      "before_count": 1,
+      "after_count": 0,
+      "sentinel_count": 1,
+      "popup_after": false,
+      "primary_mode": "copy",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 724068
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_paths",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-04\\copy-04.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "installed-copy-04",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-copy-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-copy-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 11012670
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-copy-05",
+      "fixture": {
+        "id": "copy-05",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-05",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-05\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-05\\copy-05.txt",
+        "itemId": "23826672-bf45-411b-93a3-db8775f59226",
+        "batchId": "b78f1cf4-c830-41aa-8159-9e5501115441",
+        "sentinelId": "24f71bd9-5710-419a-9a97-32fca3c64da4"
+      },
+      "before_count": 1,
+      "after_count": 0,
+      "sentinel_count": 1,
+      "popup_after": false,
+      "primary_mode": "copy",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 528202
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 307
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_paths",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\copy-05\\copy-05.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "installed-copy-05",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-copy-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-copy-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2231870
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-reject-01",
+      "fixture": {
+        "id": "reject-01",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-01",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-01\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-01\\reject-01.txt",
+        "itemId": "939cd9ba-c6f7-4478-8d8a-d20d71647164",
+        "batchId": "35966eb2-d54d-4bb4-8b74-ad2012a82ce9",
+        "sentinelId": "42db606b-fd61-4ce0-a88e-b8f2d28313f3"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "reject",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1445392
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-01",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-reject-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 6490330
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-reject-02",
+      "fixture": {
+        "id": "reject-02",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-02",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-02\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-02\\reject-02.txt",
+        "itemId": "6151ff8c-dfba-4d44-b6cb-533fd940ccf9",
+        "batchId": "dc17115d-38f6-47d3-b7f1-a15d0882cbe5",
+        "sentinelId": "4ab54f1f-db1f-48fa-bb92-08fb0d8d2214"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "reject",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 4197316
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-02",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-reject-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 3476468
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-reject-03",
+      "fixture": {
+        "id": "reject-03",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-03",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-03\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-03\\reject-03.txt",
+        "itemId": "23341447-21bd-446f-a48c-8d3acb442ddc",
+        "batchId": "bc7fc2fc-e23e-4e84-bdd9-4fff40d7ac68",
+        "sentinelId": "5a13c414-c418-4431-b56c-1f3015ee5e41"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "reject",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 724798
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 307
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-03",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-reject-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 11340350
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-reject-04",
+      "fixture": {
+        "id": "reject-04",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-04",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-04\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-04\\reject-04.txt",
+        "itemId": "c322b57d-efa6-4ec3-924c-b1c57ac24bc0",
+        "batchId": "d4bc3730-a5de-449e-ba74-cdfbb5ab6e51",
+        "sentinelId": "cb6a4717-28b8-48fd-9f98-dfae2122eb77"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "reject",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1314508
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-04",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-reject-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2100534
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-reject-05",
+      "fixture": {
+        "id": "reject-05",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-05",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-05\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\reject-05\\reject-05.txt",
+        "itemId": "b1652dbb-a5c5-49b4-974d-69e6b7a0236d",
+        "batchId": "5c400ec3-f89a-49a9-bf33-42eba2526932",
+        "sentinelId": "83c3fc14-063c-4acf-a598-a2ac146ced57"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "reject",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 5441774
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 307
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-05",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-reject-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-reject-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2821652
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-cancel-01",
+      "fixture": {
+        "id": "cancel-01",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-01",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-01\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-01\\cancel-01.txt",
+        "itemId": "b074102e-e8e6-40f5-9d76-465ce85c26fe",
+        "batchId": "73a87e80-c0fd-4769-960c-3dfb4effbc91",
+        "sentinelId": "ccc5bdb4-9a1e-4c5f-9593-71242b54974f"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "cancel",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1838608
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-01",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-cancel-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-cancel-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 6883546
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-cancel-02",
+      "fixture": {
+        "id": "cancel-02",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-02",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-02\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-02\\cancel-02.txt",
+        "itemId": "60c0ddb4-3fb2-46f1-bf93-b69e336e8f18",
+        "batchId": "4b48ab0a-30d5-4808-997a-06165056f4d4",
+        "sentinelId": "4b28be8d-ddaa-4c72-a86e-78d5d61f7fa2"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "cancel",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 4590532
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 307
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-02",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-cancel-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-cancel-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 3869684
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-cancel-03",
+      "fixture": {
+        "id": "cancel-03",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-03",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-03\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-03\\cancel-03.txt",
+        "itemId": "30e7df7b-c8c5-4fff-b106-2da69a036825",
+        "batchId": "777418dc-12a2-4a41-9017-631214356bbe",
+        "sentinelId": "63761282-a365-492e-96c2-a4345c2a2a58"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "cancel",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1118014
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-03",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-cancel-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-cancel-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 11733566
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-cancel-04",
+      "fixture": {
+        "id": "cancel-04",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-04",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-04\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-04\\cancel-04.txt",
+        "itemId": "48431392-6de5-43ce-a1fa-041f43310c37",
+        "batchId": "414556d7-44ec-4539-97fb-2d20ac1582bd",
+        "sentinelId": "0cd7270b-528a-4d7b-97a0-0369dd7332c4"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "cancel",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1707724
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-04",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-cancel-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-cancel-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2493750
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-cancel-05",
+      "fixture": {
+        "id": "cancel-05",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-05",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-05\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\cancel-05\\cancel-05.txt",
+        "itemId": "27d240a5-3f59-40f7-a4d7-7fad58e78632",
+        "batchId": "7011810d-8f66-4111-9b98-6a72cb05772b",
+        "sentinelId": "86e66244-43a1-40bb-925c-88fa347b03e5"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "cancel",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "ready",
+          "details": {
+            "hwnd": 5834990
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 307
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-cancel-05",
+          "role": "target",
+          "mode": "cancel",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-cancel-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-cancel-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 3214868
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-fail-01",
+      "fixture": {
+        "id": "fail-01",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-01",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-01\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-01\\fail-01.txt",
+        "itemId": "5fe2d2fc-e5a8-44e5-a65c-a0ee1d1aa248",
+        "batchId": "275167c5-320f-47c0-a982-33e25c676627",
+        "sentinelId": "24859d17-4c1c-4cf8-adf7-26d826630825"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "fail",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-fail-01",
+          "role": "target",
+          "mode": "fail",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-01",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2297360
+          }
+        },
+        {
+          "attempt": "installed-fail-01",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-fail-01",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 7276762
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1033,
+            "Y": 309
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-01-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-fail-02",
+      "fixture": {
+        "id": "fail-02",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-02",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-02\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-02\\fail-02.txt",
+        "itemId": "50a67780-1493-4ed4-9ff6-f019d36f9284",
+        "batchId": "be8e8ca2-fa88-42a8-b56a-2018f2a23f90",
+        "sentinelId": "02ba9c7b-8a6c-4cc0-ae87-0cb5db1942a1"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "fail",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-fail-02",
+          "role": "target",
+          "mode": "fail",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-02",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1510994
+          }
+        },
+        {
+          "attempt": "installed-fail-02",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 307
+          }
+        },
+        {
+          "attempt": "installed-fail-02",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 4262900
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1033,
+            "Y": 309
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-02-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-fail-03",
+      "fixture": {
+        "id": "fail-03",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-03",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-03\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-03\\fail-03.txt",
+        "itemId": "69bcc904-a1e6-4bcd-811c-4c7016d0e280",
+        "batchId": "72fd7793-e118-4478-af29-1dc2aac431c3",
+        "sentinelId": "d6badb5b-a6aa-40db-856d-262c3d5822c2"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "fail",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-fail-03",
+          "role": "target",
+          "mode": "fail",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-03",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1772906
+          }
+        },
+        {
+          "attempt": "installed-fail-03",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-fail-03",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 12126782
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1033,
+            "Y": 309
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-03-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-fail-04",
+      "fixture": {
+        "id": "fail-04",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-04",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-04\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-04\\fail-04.txt",
+        "itemId": "9fef24f0-4ae6-42ab-b7d7-a46ef912f54d",
+        "batchId": "a41a3882-4030-456b-8bf0-027d641e8805",
+        "sentinelId": "4cc5ba6c-3449-444c-9691-6d863d775705"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "fail",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-fail-04",
+          "role": "target",
+          "mode": "fail",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-04",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 9898720
+          }
+        },
+        {
+          "attempt": "installed-fail-04",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-fail-04",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2886966
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1033,
+            "Y": 309
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-04-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-fail-05",
+      "fixture": {
+        "id": "fail-05",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-05",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-05\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fail-05\\fail-05.txt",
+        "itemId": "61d094aa-1845-492c-8d90-592d6a6a1603",
+        "batchId": "4992e8c5-52b7-45f8-80bb-e8a507f6728d",
+        "sentinelId": "eaaebfa6-e5c5-49ee-bf57-635f90cf02f7"
+      },
+      "before_count": 1,
+      "after_count": 1,
+      "sentinel_count": 1,
+      "popup_after": true,
+      "primary_mode": "fail",
+      "backing_mode": "reject",
+      "primary_events": [
+        {
+          "attempt": "installed-fail-05",
+          "role": "target",
+          "mode": "fail",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-05",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1969708
+          }
+        },
+        {
+          "attempt": "installed-fail-05",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 307
+          }
+        },
+        {
+          "attempt": "installed-fail-05",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "ready",
+          "details": {
+            "hwnd": 3608084
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1033,
+            "Y": 309
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 0
+          }
+        },
+        {
+          "attempt": "installed-fail-05-backing",
+          "role": "target",
+          "mode": "reject",
+          "kind": "DragLeave",
+          "details": null
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-fallback-copy-01",
+      "fixture": {
+        "id": "fallback-copy-01",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-01",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-01\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-01\\fallback-copy-01.txt",
+        "itemId": "19e30c37-9e61-4701-8073-c705ddfe83f2",
+        "batchId": "4d8058ff-02ca-4c64-92b5-dc9151fb6870",
+        "sentinelId": "81dffadc-0d79-47c5-9fac-ec951be86a95"
+      },
+      "before_count": 1,
+      "after_count": 0,
+      "sentinel_count": 1,
+      "popup_after": false,
+      "primary_mode": "fail",
+      "backing_mode": "copy",
+      "primary_events": [
+        {
+          "attempt": "installed-fallback-copy-01",
+          "role": "target",
+          "mode": "fail",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 1838910
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 7669978
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1033,
+            "Y": 309
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_paths",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-01\\fallback-copy-01.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-01-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-fallback-copy-02",
+      "fixture": {
+        "id": "fallback-copy-02",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-02",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-02\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-02\\fallback-copy-02.txt",
+        "itemId": "93a51b87-963f-43c8-88d4-e3f5a56bca50",
+        "batchId": "17db0b38-d4a9-4bdf-a946-1f614f6b85cd",
+        "sentinelId": "8825fc98-aac0-45de-9347-7b7a1b48471e"
+      },
+      "before_count": 1,
+      "after_count": 0,
+      "sentinel_count": 1,
+      "popup_after": false,
+      "primary_mode": "fail",
+      "backing_mode": "copy",
+      "primary_events": [
+        {
+          "attempt": "installed-fallback-copy-02",
+          "role": "target",
+          "mode": "fail",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 5311428
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 307
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 5245418
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1033,
+            "Y": 309
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_paths",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-02\\fallback-copy-02.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-02-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-fallback-copy-03",
+      "fixture": {
+        "id": "fallback-copy-03",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-03",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-03\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-03\\fallback-copy-03.txt",
+        "itemId": "3ea680c1-eec5-4ef6-a6c5-80ec47a176b7",
+        "batchId": "b20638f0-b74c-49e5-b6f0-ff98018be5dd",
+        "sentinelId": "3b89dd06-c1f2-42fa-9348-4327025ded1c"
+      },
+      "before_count": 1,
+      "after_count": 0,
+      "sentinel_count": 1,
+      "popup_after": false,
+      "primary_mode": "fail",
+      "backing_mode": "copy",
+      "primary_events": [
+        {
+          "attempt": "installed-fallback-copy-03",
+          "role": "target",
+          "mode": "fail",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 4523614
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2035060
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1033,
+            "Y": 309
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_paths",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-03\\fallback-copy-03.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-03-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-fallback-copy-04",
+      "fixture": {
+        "id": "fallback-copy-04",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-04",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-04\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-04\\fallback-copy-04.txt",
+        "itemId": "bb485558-8467-4678-83c7-b9cfe57c85ee",
+        "batchId": "b922064d-9893-4cee-8cc0-396cef291c18",
+        "sentinelId": "9c20154b-049c-4e3f-8970-166b1b28b79e"
+      },
+      "before_count": 1,
+      "after_count": 0,
+      "sentinel_count": 1,
+      "popup_after": false,
+      "primary_mode": "fail",
+      "backing_mode": "copy",
+      "primary_events": [
+        {
+          "attempt": "installed-fallback-copy-04",
+          "role": "target",
+          "mode": "fail",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 7998236
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 307
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2297388
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1033,
+            "Y": 309
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_paths",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-04\\fallback-copy-04.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-04-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    },
+    {
+      "attempt": "installed-fallback-copy-05",
+      "fixture": {
+        "id": "fallback-copy-05",
+        "directory": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-05",
+        "database": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-05\\shelf.db",
+        "path": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-05\\fallback-copy-05.txt",
+        "itemId": "d475148b-b7ab-4b25-a94b-fc80ef75060b",
+        "batchId": "458e6fba-c925-485d-ab31-1e3090d6c057",
+        "sentinelId": "78e48031-45a7-4bab-89b5-b1b1586e6a9a"
+      },
+      "before_count": 1,
+      "after_count": 0,
+      "sentinel_count": 1,
+      "popup_after": false,
+      "primary_mode": "fail",
+      "backing_mode": "copy",
+      "primary_events": [
+        {
+          "attempt": "installed-fallback-copy-05",
+          "role": "target",
+          "mode": "fail",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05",
+          "role": "target",
+          "mode": "fail",
+          "kind": "ready",
+          "details": {
+            "hwnd": 2819650
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05",
+          "role": "target",
+          "mode": "fail",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1001,
+            "Y": 306
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05",
+          "role": "target",
+          "mode": "fail",
+          "kind": "intentional_exit",
+          "details": null
+        }
+      ],
+      "backing_events": [
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "registration",
+          "details": {
+            "hr": 0
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "ready",
+          "details": {
+            "hwnd": 6032438
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_entry",
+          "details": {
+            "effect": 1,
+            "keys": 1,
+            "X": 1033,
+            "Y": 309
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragEnter_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "DragOver_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_entry",
+          "details": {
+            "effect": 1
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_paths",
+          "details": {
+            "paths": [
+              "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-Installed-Isolation-78cafhjl\\profiles\\fallback-copy-05\\fallback-copy-05.txt"
+            ]
+          }
+        },
+        {
+          "attempt": "installed-fallback-copy-05-backing",
+          "role": "target",
+          "mode": "copy",
+          "kind": "Drop_return",
+          "details": {
+            "hr": 0,
+            "effect": 1
+          }
+        }
+      ],
+      "source_coordinates": [
+        338,
+        238
+      ],
+      "destination_coordinates": [
+        1158,
+        319
+      ]
+    }
+  ],
+  "profile_smoke": {
+    "invalid_arguments_rejected": 4,
+    "normalized_directory_identity_shared": true,
+    "distinct_profiles_simultaneous": true,
+    "default_launch_activated_existing_instance_and_exited": true,
+    "settings_save_StartWithWindows_true_without_registry_write": true,
+    "restart_loaded_two_items_and_saved_settings_without_registry_write": true
+  },
+  "setup_corrections": [
+    "Initial resident exit message was sent to Edge Rail HWND, not the main shelf; process did not exit, remained running, and no further exit messages were sent to it.",
+    "First popup driver had focus/placement retries; full logs and driver_note are preserved on installed-copy-01. Correct ctypes SetWindowPos signatures and relative SendInput drag threshold were used for remaining attempts."
+  ],
+  "source_completion_observation": "No production diagnostic logging was added. Outcome is persisted exact Shelf Item identity before/after, correlated against every controlled destination callback; raw WinUI DropResult was not instrumented."
+}
