@@ -11,12 +11,22 @@ public enum ShelfDisplayState
 {
     /// <summary>No DropCove surface is visible.</summary>
     Hidden,
-    /// <summary>The bounded quick-access shelf presentation is visible.</summary>
-    Compact,
-    /// <summary>The fixed management shelf presentation is visible.</summary>
-    Expanded,
+    /// <summary>The single resizable Drop Shelf presentation is visible.</summary>
+    Visible,
     /// <summary>The non-empty shelf is visible as the collapsed Edge Rail.</summary>
     EdgeDocked,
+}
+
+/// <summary>Represents the preferred logical size of the Drop Shelf.</summary>
+/// <param name="Width">The logical width in pixels.</param>
+/// <param name="Height">The logical height in pixels.</param>
+public readonly record struct ShelfSize(int Width, int Height)
+{
+    /// <summary>The default preferred size of 180x180 logical pixels.</summary>
+    public static ShelfSize Default => new(180, 180);
+
+    /// <summary>Gets whether this size satisfies the minimum logical dimensions of 180x180.</summary>
+    public bool IsValid => Width >= 180 && Height >= 180;
 }
 
 /// <summary>Identifies the screen edge used by the collapsed Edge Rail.</summary>

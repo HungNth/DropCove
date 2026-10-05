@@ -110,7 +110,7 @@ Composition should be used for:
 - scale;
 - translation;
 - hover effects;
-- compact-to-expanded transitions;
+- popup appearance and dismissal;
 - item insertion/removal animations.
 
 DropCove reads the Windows client-area animation preference before each transition. When Windows disables animation effects, non-essential Composition transitions are skipped while state changes, focus, and drag behavior remain available.
@@ -362,6 +362,8 @@ remove from DropCove
 
 A temporary item is removed only when the destination accepts its drag-out operation with the `Copy` effect. Cancellation, rejection, or failure keeps the reference in DropCove.
 
+**Unresolved Windows App SDK acceptance gap:** Installed testing found that a destination terminating during `DragEnter`, before setting an effect or receiving `Drop`, can still cause WinUI `DropCompleted` to report `Copy`. The current implementation then removes an unpinned reference. This violates the failure-retention requirement above; the responsive shelf is not release-qualified. Setting `RequestedOperation=None` also prevented legitimate accepted copies and was reverted. A reliable native/OLE acceptance signal or an explicit product decision is required; file existence and later destination processing are not acceptance signals.
+
 DropCove cannot atomically commit its local state together with another application's drop. If the destination accepts a drop and DropCove crashes before persisting the removal, the temporary reference may reappear after restart. V1 accepts this at-least-once behavior because an extra reference is safer than incorrectly losing one.
 
 ---
@@ -468,37 +470,30 @@ Final V1 display-state model:
 public enum ShelfDisplayState
 {
     Hidden,
-    Compact,
-    Expanded,
+    Visible,
     EdgeDocked
 }
 ```
 
-`Compact` and `Expanded` are two presentations over the same `DropShelfManager.Batches` state. Neither presentation owns lifecycle, drag, or persistence rules.
+DropCove uses a single continuous Drop Shelf presentation rather than separate modes. `Visible` represents the floating resizable shelf, `EdgeDocked` represents the screen-edge rail, and `Hidden` represents the dismissed state when no items remain or when the shelf is closed.
 
-## Compact
+## Visible
 
-`Compact` is the quick-access presentation. It supports natural vertical scrolling across all Shelf Batches while keeping individual batch contents collapsed by default. It uses the native icon for a single-item batch and a stacked visual for a multi-item batch. The surface maintains a compact footprint with direct scrolling rather than truncating batches behind a Manage button.
+`Visible` is the floating, responsive, resizable Drop Shelf. The user can resize the borderless window from every edge and corner down to a minimum of `180 × 180` logical pixels and up to the current monitor work area. Shelf Batches reflow within a responsive wrapping grid. Multi-item batches expose a non-modal anchored popup for detailed item inspection and actions.
 
-Compact dimensions remain bounded at `180 × 180` for zero or one batch, `180 × 236` for two batches, and `180 × 292` for three or more batches, with vertical scrolling enabled for additional batches. The header exposes Settings and dismissal. The footer bar provides `Clear Temporary Items` at the bottom-left and a dedicated `Expand / Compact` toggle at the bottom-right.
-## Expanded
-
-`Expanded` is the fixed `720 × 640` management presentation. It scrolls through every Shelf Batch and Shelf Item and shows each item's name, Path Reference, availability classification, Temporary/Pinned lifecycle, native visual, and management actions. Users can pin/unpin, Remove Item, Remove Batch, Clear Temporary Items, drag one item, or drag one whole batch.
-
-Keyboard focus follows the native control order so Tab navigation reaches mode, cleanup, pin, remove, and dismissal actions; Enter or Space activates the focused button. Cross-batch multi-selection and file-launch actions are intentionally not part of this presentation.
 ## Hidden
 
-Used whenever the floating shelf is not displayed. Hidden does not discard Shelf Batches; reopening the shelf starts in Compact mode and reuses the same manager state.
+Used whenever no floating shelf or Edge Rail is displayed. Dismissing an empty shelf or removing the final Shelf Item transitions to Hidden. Hidden preserves held batches if dismissed with content when Edge Rail is disabled, but under standard operation with Edge Rail enabled, non-empty dismissal transitions to `EdgeDocked`. Reopening the shelf restores the `Visible` state and reuses the same manager state.
 
 ## EdgeDocked
 
-Used after Edge Rail is implemented when the shelf is dismissed while it still contains items. Opening the shelf from the rail returns to Compact mode on the remembered monitor; emptying the last batch transitions back to Hidden.
+Used when the shelf is dismissed while it still contains items. Opening the shelf from the rail returns to `Visible` on the remembered monitor; emptying the last batch from either the Drop Shelf or Edge Rail transitions back to `Hidden`.
 
 ---
 
 # 13. Placement State
 
-Placement should be modeled separately from display state.
+Placement is modeled separately from display state.
 
 ```csharp
 public enum ShelfPlacement
@@ -513,10 +508,9 @@ The shelf presentation is independent from monitor placement:
 
 | Invocation | Presentation | Placement |
 | --- | --- | --- |
-| Shake | Compact | Cursor monitor / near cursor |
-| Global hotkey or tray activation | Compact | Cursor monitor / default work area |
-| Mode switch | Expanded or Compact | Current shelf monitor |
-| Edge interaction | Edge Rail | Remembered docked monitor and edge |
+| Shake | Drop Shelf (`Visible`) | Cursor monitor / near cursor |
+| Global hotkey or tray activation | Drop Shelf (`Visible`) | Cursor monitor / default work area |
+| Edge interaction | Edge Rail (`EdgeDocked`) | Remembered docked monitor and edge |
 
 Placement remains independent so display and monitor-position behavior do not become one oversized state model.
 
@@ -524,40 +518,60 @@ Placement remains independent so display and monitor-position behavior do not be
 
 # 14. Dismissing the Drop Shelf
 
-The hotkey toggles the shelf. `Esc` and the `×` button also dismiss it; losing focus does not.
+The hotkey toggles the shelf. `Esc` and the `×` button also dismiss it; losing focus does not. If an item popup is open, the first `Esc` closes the popup while keeping the shelf visible; a subsequent `Esc` dismisses the shelf.
 
-Dismissing Compact or Expanded preserves every Shelf Batch. With Edge Rail available, the resulting state is:
+Dismissing the visible shelf preserves every Shelf Batch. With Edge Rail available, the resulting state is:
 
 ```text
 Items.Count == 0 → Hidden
 Items.Count > 0  → EdgeDocked
 ```
 
-The remaining items may be Temporary, Pinned, or a mixture of both. Reopening from the rail starts in Compact mode; switching to Expanded does not change lifecycle or persistence state.
+The remaining items may be Temporary, Pinned, or a mixture of both. Reopening from the rail restores the single `Visible` Drop Shelf on the remembered monitor with its preferred size intact.
 
 ---
 
-# 15. Compact Drop Shelf
+# 15. Responsive Resizable Drop Shelf
 
-`Compact` is the quick-access presentation. It consumes the same `DropShelfManager.Batches` state as `Expanded` and does not change batch, drag, or persistence semantics.
+The Drop Shelf provides one resizable surface rather than fixed Compact and Expanded modes.
 
-Compact renders Shelf Batches in one vertical column with natural vertical scrolling. A single-item batch uses one native icon and truncated name; a multi-item batch uses a stacked visual and an item count. Individual batch contents remain collapsed by default and can be expanded on demand. Clicking the dedicated Expand toggle in the bottom-right footer switches to `Expanded` for a wider management surface.
+## Window resizing and geometry
 
-Compact dimensions scale with recent batches up to the maximum bounded height:
+The borderless window supports native pointer resizing from all eight borders and corners (left, top, right, bottom, and four corners) without aspect-ratio locking. The borderless resize hit target is approximately `8` logical pixels around the window perimeter. A subtle cursor and visual affordance appears on edge or corner hover.
 
-| Recent batches shown | Width | Height |
-| ---: | ---: | ---: |
-| 0–1 | 180 | 180 |
-| 2 | 180 | 236 |
-| 3 | 180 | 292 |
+Key sizing and geometry rules:
 
-The header exposes Settings and dismissal, while the footer bar provides `Clear Temporary Items` at the bottom-left and the `Expand / Compact` toggle at the bottom-right. Newly accepted batches are inserted first.
+- **Minimum dimensions**: The shelf has a minimum preferred size of `180 × 180` logical pixels. Resizing cannot shrink the shelf below this minimum unless the monitor work area itself is smaller than `180 × 180`, in which case keeping the full window reachable takes precedence.
+- **Maximum bounds**: The shelf expands up to the active monitor's work area. Resizing never permits actual window bounds to extend outside the current monitor work area.
+- **Initial sizing**: The first time the shelf opens, it uses `180 × 180` logical pixels.
+- **Preferred logical size vs. actual bounds**: The system tracks the user's unclamped **preferred logical size** separately from the DPI-scaled, work-area-clamped **actual bounds**. Clamping on a smaller monitor does not overwrite the preferred size; moving to a sufficiently large work area restores the full preferred size.
+- **Single shared preference**: One preferred size is shared across all monitors.
+- **Preference lifecycle & persistence**: Completed user resizes update the preferred logical size, which is persisted in SQLite while at least one Shelf Item exists. If the user resizes an empty shelf, accepting the first item makes that preferred size durable. Programmatic positioning, DPI changes, work-area clamping, and batch additions/removals do not change the preferred size.
+- **Final-item reset**: When the final Shelf Item is removed (via manual removal, Clear Temporary Items, drag-out, or Missing cleanup) from either the visible Drop Shelf or Edge Rail, the shelf transitions to `Hidden`, closes any open popup, and deletes the persisted preferred-size record, resetting the next opening to `180 × 180`.
+
+## Responsive layout
+
+Shelf Batches reflow within a responsive wrapping grid with natural vertical scrolling and disabled horizontal scrolling:
+
+- **Padding and gaps**: The content surface maintains `8` logical pixels of horizontal padding on each side (`16` logical pixels total) and a `4` logical-pixel gap between adjacent columns and rows.
+- **Card width**: Every batch card has a minimum width of `164` logical pixels. Cards stretch evenly to consume the available row width.
+- **Exact column boundaries**: Column count is the largest positive integer $n$ such that $n \times 164 + (n - 1) \times 4 \le \text{window width} - 16$:
+  - Width `180–347`: 1 column
+  - Width `348–515`: 2 columns
+  - Width `516–683`: 3 columns
+  - Continuing by the same formula for wider windows.
+- **Ordering**: Batches are ordered newest-first, filling left-to-right, then top-to-bottom.
+- **Header & footer**: The header exposes Settings and dismissal (`×`). The footer bar provides `Clear Temporary Items` at the bottom-left. No window-level expand or compact toggle controls exist.
 
 ---
 
 # 16. Batch Visuals
 
+Every batch card maintains a consistent compact presentation regardless of shelf width or column count.
+
 ## Single-item batch
+
+A single-item batch displays the item's icon/thumbnail and truncated name. It retains direct whole-card drag, Pin/Unpin, and Remove actions. It does not show a chevron or item popup trigger.
 
 Example:
 
@@ -570,58 +584,56 @@ Example:
 
 ## Multi-item batch
 
-Multi-item batches should use a stacked visual.
+A multi-item batch displays a stacked visual and item count to communicate grouped contents. It provides a whole-batch drag handle and a chevron toggle button that serves as the trigger for the item details popup. Inline expansion inside the shelf surface is not used.
 
 Example:
 
 ```text
 ╭──────────╮
 │ ╭────╮   │
-│╭────╮│   │
+│╭────╮│ ⌵ │
 ││ +4 ││   │
 │╰────╯╯   │
 ╰──────────╯
 ```
 
-The stacked treatment communicates that the visual represents one grouped drop operation rather than one file.
-
 ---
 
-# 17. Expanded Drop Shelf
+# 17. Multi-Item Batch Popup
 
-Expanded mode is the primary management view.
+Multi-item batches provide detailed inspection and item management through a non-modal anchored popup rather than inline list expansion or a separate management window.
 
-Example:
+## Popup lifecycle and placement
 
-```text
-╭────────────────────────────────────────╮
-│ DropCove                          ─  × │
-├────────────────────────────────────────┤
-│                                        │
-│ Drop #1                                │
-│ [ A.png ] [ B.png ] [ C.png 📌 ]      │
-│                                        │
-│ Drop #2                                │
-│ [ logo.svg 📌 ]                        │
-│                                        │
-│ Drop #3                                │
-│ [ X ] [ Y ] [ Z ] [ assets/ ]         │
-│                                        │
-╰────────────────────────────────────────╯
-```
+- **Anchoring**: The popup is anchored to its originating batch card. It is non-modal and allowed to extend outside the Drop Shelf window boundaries, but remains clamped inside the monitor work area (with at least `16` logical pixels of margin where work area permits).
+- **Placement preference**: Right of the card, then left, then below, then above, followed by work-area clamping.
+- **Single instance**: Exactly one batch popup can be open at a time across the entire shelf. Activating another batch's chevron replaces the current popup.
+- **Dimensions**: Width sizes to content between `320` and `480` logical pixels. Height sizes to content up to `480` logical pixels, with vertical scrolling enabled for additional items (horizontal scrolling disabled).
+- **Opening and dismissal**:
+  - Opens via pointer activation or keyboard `Enter` / `Space` on the batch chevron.
+  - Closes via clicking the same chevron, clicking outside the popup, or pressing `Esc`.
+  - Outside dismissal runs on pointer release, not press, so the underlying Settings/button action can activate with one click.
+  - Closes automatically when the Drop Shelf hides, when its owning batch is removed, when shelf resizing begins, or when whole-batch drag starts.
+  - Long names and paths truncate visually with full text accessible via tooltips and accessibility properties.
 
-Expanded mode supports:
+## Item management and drag interactions
 
-- viewing all Shelf Batches and Shelf Items;
-- displaying each Path Reference and availability classification;
-- pinning and unpinning items;
-- removing an item or an entire batch;
-- clearing Temporary Items after confirmation;
-- dragging one item or one whole Shelf Batch;
-- keyboard focus and activation for native management controls.
+- **Content**: Each popup row displays the item's icon/thumbnail, name, path reference, availability classification, and pinned indicator.
+- **Actions**: Users can Pin/Unpin individual items, Remove Item, or initiate native drag-out of an individual item directly from the popup row.
+- **Drag behavior**:
+  - Starting a drag of an individual item does not close the popup, allowing users to continue managing remaining items. Canceled drags leave references intact. Successful drag-out applies the standard Temporary/Pinned lifecycle and updates the popup (closing it if the batch becomes empty).
+  - While an individual native drag is active, outside pointer release, app deactivation, and `Esc` do not dismiss the popup. `Esc` cancels that drag; the next ordinary `Esc` closes the popup. Drag completion clears this lifetime guard, including rejected and canceled operations.
+  - Starting a drag of the entire batch from its card closes the popup immediately.
 
-Cross-batch multi-selection and file-launch actions are intentionally not part of V1.
+## Keyboard accessibility
 
+When opened via keyboard (`Enter` or `Space` on the chevron), focus moves into the popup onto the first available item or action. `Tab` traverses all popup controls and item actions. Pressing `Esc` closes the popup and restores keyboard focus to the originating chevron. A second `Esc` dismisses the Drop Shelf.
+
+Popup `Tab`/`Shift+Tab` traversal is scoped to item Pin/Unpin and Remove actions, wraps in both directions, and realizes the next offscreen row on demand. It does not depend on global next-focus lookup across the popup's native visual root and never resizes the Drop Shelf.
+
+## Deferred projections & performance
+
+Full item view models, visual elements, and thumbnail requests are deferred until the popup opens. Closing the popup, hiding the shelf, or removing the batch releases popup item projections. The compact batch card maintains only bounded preview metadata.
 ---
 
 # 18. Edge Rail
@@ -650,6 +662,10 @@ Example:
 Each cell represents one batch.
 
 The rail is an overlay, not a Windows AppBar, and does not reserve desktop work area. It is hidden over fullscreen applications by default; Settings can allow it to remain visible. Fullscreen detection must be event-driven.
+
+Foreground monitoring is installed only while the rail is requested and fullscreen exclusion is enabled. It remains active while a fullscreen application temporarily hides the requested rail, so leaving fullscreen restores it. Hiding the rail explicitly releases the hooks. Location notifications are scoped to the current foreground window's thread and retargeted on foreground changes; background-window location traffic does not enqueue rail repositions.
+
+If location-hook registration fails during a foreground notification, the native callback contains the `Win32Exception`, clears retry state, and retries on a later foreground notification. Initialization failures still report an exception after cleaning up the foreground hook.
 
 ---
 
@@ -715,7 +731,7 @@ Example:
 
 This remains a compact interaction mode.
 
-It is not yet the full Expanded Drop Shelf.
+It is not yet the full Drop Shelf.
 
 ---
 
@@ -870,16 +886,16 @@ Purpose:
 quick drag-and-drop
 ```
 
-## Level 3 — Expanded Drop Shelf
+## Level 3 — Drop Shelf
 
 ```text
-~500–700 px
+≥ 180 × 180 px (resizable to work area)
 ```
 
 Purpose:
 
 ```text
-management
+management and multi-column holding
 ```
 
 Typical progression:
@@ -889,16 +905,16 @@ Edge Rail
     ↓ hover
 
 Interactive Edge Rail
-    ↓ expand
+    ↓ open
 
-Expanded Drop Shelf
+Drop Shelf
 ```
 
 ---
 
 # 27. Shake State Restoration
 
-Shake invocation should temporarily override the current placement.
+Shake invocation temporarily overrides the current placement.
 
 Example:
 
@@ -907,13 +923,13 @@ EdgeDocked
    ↓
 drag + shake
    ↓
-Compact near cursor
+Drop Shelf near cursor
 ```
 
 If the user cancels the drag without dropping anything:
 
 ```text
-Compact near cursor
+Drop Shelf near cursor
    ↓
 restore previous state
    ↓
@@ -927,7 +943,7 @@ Hidden
  ↓
 drag + shake
  ↓
-Compact near cursor
+Drop Shelf near cursor
  ↓
 cancel
  ↓
@@ -935,7 +951,6 @@ Hidden
 ```
 
 The shake workflow does not permanently alter the shelf state unless a supported drop is accepted. Cancellation, an unsupported payload, or a false-positive shake restores the previous state. After an accepted drop, the shelf remains near the cursor so the user can inspect the new batch; dismissing it follows the normal Hidden/EdgeDocked rules.
-
 ---
 
 # 28. Storage Behavior
@@ -1088,14 +1103,14 @@ scale:   0.9 → 1
 
 Use translation and size animation.
 
-## Compact → Expanded
+## Popup appearance and dismissal
 
 Use:
 
-- translation;
-- scale;
-- opacity.
+- opacity;
+- scale.
 
+Resize animations must never lag behind pointer interaction or block active drag-and-drop.
 ## Item removal
 
 Use:
@@ -1153,7 +1168,7 @@ Idle working set target             < 150 MB
 
 Thumbnail loading and SQLite I/O must not block the UI thread. V1 should remain responsive with at least 100 batches and 1,000 items by using lazy thumbnail loading and UI virtualization. The shelf realizes only visible item elements; native icons are requested independently, and image thumbnails are discarded when their visible realization ends.
 
-At the 100-batch / 1,000-item scale, `DropShelfManager` remains the durable in-memory state owner while WinUI presentations retain only their active projections. Collapsed batch item repeaters use WinUI `x:Load` and typed bindings, full item view models are created when a batch expands, Edge Rail item summaries are deferred until a flyout requests them, and hiding the Drop Shelf releases its presentation projection. The default installed Release measurement remains untrimmed and uses `WorkingSet64`.
+At the 100-batch / 1,000-item scale, `DropShelfManager` remains the durable in-memory state owner while WinUI presentations retain only their active projections. Batch cards display compact preview summaries, full item view models and visuals are materialized only when a batch popup opens, Edge Rail item summaries are deferred until a flyout requests them, and closing a popup or hiding the Drop Shelf releases presentation projections. The default installed Release measurement remains untrimmed and uses `WorkingSet64`.
 
 ---
 
@@ -1237,8 +1252,7 @@ UI-specific components inside `DropCove.App` may be organized as:
 UI/
 ├── Shelf/
 │   ├── ShelfWindow.xaml
-│   ├── CompactShelf.xaml
-│   └── ExpandedShelf.xaml
+│   └── BatchPopup.xaml
 │
 ├── EdgeRail/
 │   ├── EdgeRail.xaml
@@ -1264,10 +1278,8 @@ DropShelfManager
 │
 ├── DisplayState
 │    ├── Hidden
-│    ├── EdgeDocked
-│    ├── Compact
-│    └── Expanded
-│
+│    ├── Visible
+│    └── EdgeDocked
 └── Placement
      ├── Docked
      ├── Default
@@ -1329,8 +1341,10 @@ ShelfItem
 
 ## Stage 4 — Final V1 UI and polish
 
-- Distinct Compact and Expanded shelf modes.
-- Multi-file stacked visuals and management view.
+- Responsive resizable Drop Shelf with native 8 px border hit-testing, minimum 180 × 180 logical bounds, and work-area clamping.
+- Responsive wrapping grid with min-card 164 px, 4 px gap, 8 px padding, and deterministic column boundaries.
+- Anchored non-modal multi-item batch popup with keyboard focus, outside-click dismissal, and deferred projections.
+- Multi-file stacked visuals and direct single/multi-item drag operations.
 - Composition animations added after behavior is stable and respecting reduced motion.
 - Full Edge Rail multi-monitor polish, accessibility, and installed-EXE release verification.
 

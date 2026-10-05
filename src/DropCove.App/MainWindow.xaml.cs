@@ -4,10 +4,12 @@ using DropCove.Native;
 using DropCove.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Input;
+using Windows.Graphics;
 
 namespace DropCove;
 
-/// <summary>Hosts the resident Compact and Expanded Drop Shelf presentations.</summary>
+/// <summary>Hosts the resident resizable Drop Shelf presentation.</summary>
 public sealed partial class MainWindow : Window
 {
     private const uint WindowCloseMessage = 0x0010;
@@ -19,6 +21,8 @@ public sealed partial class MainWindow : Window
     private readonly GlobalHotKey _globalHotKey;
     private readonly TrayIcon _trayIcon;
     private readonly MainPage _page;
+    private readonly InputNonClientPointerSource _nonClientPointerSource;
+    private readonly RectInt32[] _resizeRegion = new RectInt32[1];
     private AppSettings _settings = AppSettings.Default;
     private SettingsWindow? _settingsWindow;
     private EdgeRailWindow? _railWindow;
@@ -39,6 +43,13 @@ public sealed partial class MainWindow : Window
     private int _shakeSummonX;
     private int _shakeSummonY;
     private Task _shakeOperationTask = Task.CompletedTask;
+    private bool _isUserResizing;
+    private WindowBounds _sizeMoveStartBounds;
+    private bool _isResizeHovered;
+    private WindowResizeDirection _activeResizeDirection = WindowResizeDirection.None;
+
+    /// <summary>Raised when a native window resize operation begins.</summary>
+    public event Action? ResizeStarted;
     /// <summary>Creates the resident Drop Shelf window and native integrations.</summary>
     public MainWindow()
     {
@@ -46,7 +57,10 @@ public sealed partial class MainWindow : Window
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _shakeInputQueue = new(_dispatcherQueue, ProcessShakeInput);
         _windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
-        WindowInterop.MakeBorderless(_windowHandle);
+        var initialDpi = WindowInterop.GetWindowDpi(_windowHandle);
+        AppWindow.Resize(new SizeInt32(
+            WindowInterop.ScaleLogicalPixels(ShelfSize.Default.Width, initialDpi),
+            WindowInterop.ScaleLogicalPixels(ShelfSize.Default.Height, initialDpi)));
 
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
         if (File.Exists(iconPath))
@@ -56,7 +70,7 @@ public sealed partial class MainWindow : Window
 
         RootFrame.Navigate(typeof(MainPage));
         _page = (MainPage)RootFrame.Content;
-        _messageHook = new WindowMessageHook(_windowHandle, HandleWindowMessage);
+        ResizeStarted += _page.CloseBatchPopup;
         _globalHotKey = new GlobalHotKey(_windowHandle);
         _trayIcon = new TrayIcon(
             _windowHandle,
@@ -64,6 +78,16 @@ public sealed partial class MainWindow : Window
             ShowShelf,
             ShowSettings,
             ExitApplication);
+        _messageHook = new WindowMessageHook(_windowHandle, HandleWindowMessage);
+        WindowInterop.MakeResizableBorderless(_windowHandle);
+        _nonClientPointerSource = InputNonClientPointerSource.GetForWindowId(AppWindow.Id);
+        _nonClientPointerSource.PointerExited += (_, _) => ClearResizeHover();
+        AppWindow.Changed += (_, args) =>
+        {
+            if (args.DidPositionChange || args.DidSizeChange) _page.CloseBatchPopup();
+            if (args.DidSizeChange) UpdateResizeRegions();
+        };
+        UpdateResizeRegions();
 
         Closed += (_, _) => DisposeResidentResources();
     }
@@ -80,10 +104,9 @@ public sealed partial class MainWindow : Window
         _manager = await DropShelfManager.OpenAsync(databasePath, DragDropService.CheckAvailability);
         await _page.InitializeAsync(
             _manager,
+            _windowHandle,
             DismissShelf,
             ShowSettings,
-            () => WindowInterop.BeginMove(_windowHandle),
-            ResizeShelfForPresentation,
             ShowConfirmDialogAsync,
             OnShakeDragStarted,
             OnShakeDragCanceled,
@@ -126,16 +149,6 @@ public sealed partial class MainWindow : Window
 
     /// <summary>Shows and activates the shelf on the monitor containing the cursor.</summary>
     public void ShowShelf() => ShowShelfAt(null);
-    private void ResizeShelfForPresentation(ShelfDisplayState presentation)
-    {
-        if (_manager is null || presentation is not (ShelfDisplayState.Compact or ShelfDisplayState.Expanded))
-        {
-            return;
-        }
-
-        var (width, height) = GetShelfSize(presentation, _manager.Batches.Count);
-        WindowInterop.ResizeAnchored(_windowHandle, width, height);
-    }
 
     private async void ShowShelfAt(ShelfRailPlacement? placement)
     {
@@ -145,17 +158,17 @@ public sealed partial class MainWindow : Window
         }
 
         HideRail();
-        _manager.ShowShelf(ShelfDisplayState.Compact);
+        _manager.ShowShelf();
         await _page.RefreshAsync();
-        var (width, height) = GetShelfSize(_manager.DisplayState, _manager.Batches.Count);
+        var preferred = _manager.PreferredSize;
         if (placement is { HasMonitor: true })
         {
             var monitorId = WindowInterop.ResolveMonitorId(placement.MonitorId, _windowHandle);
-            WindowInterop.PositionOnMonitor(_windowHandle, monitorId, width, height);
+            WindowInterop.PositionOnMonitor(_windowHandle, monitorId, preferred.Width, preferred.Height);
         }
         else
         {
-            WindowInterop.PositionOnCursorMonitor(_windowHandle, width, height);
+            WindowInterop.PositionOnCursorMonitor(_windowHandle, preferred.Width, preferred.Height);
         }
 
         WindowInterop.ShowAndActivate(_windowHandle);
@@ -264,7 +277,7 @@ public sealed partial class MainWindow : Window
         if (_manager is null ||
             _shakeRestore is not null ||
             _shakeRestoreInFlight ||
-            _manager.DisplayState is ShelfDisplayState.Compact or ShelfDisplayState.Expanded)
+            _manager.DisplayState == ShelfDisplayState.Visible)
         {
             return;
         }
@@ -295,7 +308,7 @@ public sealed partial class MainWindow : Window
         }
 
         HideRail();
-        _manager.ShowShelf(ShelfDisplayState.Compact);
+        _manager.ShowShelf();
         if (refresh)
         {
             await _page.RefreshAsync();
@@ -305,8 +318,8 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var (width, height) = GetShelfSize(_manager.DisplayState, _manager.Batches.Count);
-        WindowInterop.PositionNearPoint(_windowHandle, targetX, targetY, width, height);
+        var preferred = _manager.PreferredSize;
+        WindowInterop.PositionNearPoint(_windowHandle, targetX, targetY, preferred.Width, preferred.Height);
         WindowInterop.ShowAndActivate(_windowHandle);
         _page.Focus(FocusState.Programmatic);
         if (refresh)
@@ -493,14 +506,15 @@ public sealed partial class MainWindow : Window
 
     private void HideShelf()
     {
+        ClearResizeHover();
         _page.ReleasePresentation();
         WindowInterop.Hide(_windowHandle);
     }
-
     private void HideRail() => _railWindow?.Hide();
 
     private void ShowSettings()
     {
+        _page.CloseBatchPopup();
         if (_settingsWindow is not null)
         {
             _settingsWindow.Activate();
@@ -664,9 +678,55 @@ public sealed partial class MainWindow : Window
 
     private WindowMessageResult HandleWindowMessage(uint message, nuint wParam, nint lParam)
     {
-        if (message is WindowInterop.DisplayChangeMessage or WindowInterop.DpiChangedMessage or WindowInterop.DeviceChangeMessage)
+        switch (message)
         {
-            QueueSurfaceReflow();
+            case 0x001C: // WM_ACTIVATEAPP: popup-owned HWND activation is not app deactivation.
+                if (wParam == 0 && !_page.IsItemDragInProgress) DispatcherQueue.TryEnqueue(_page.CloseBatchPopup);
+                break;
+            case WindowInterop.WmNcCalcSize:
+                return WindowMessageResult.HandledZero;
+
+            case WindowInterop.WmNcHitTest:
+                return HandleNcHitTest(lParam);
+
+            case WindowInterop.WmSetCursor:
+                if (HandleSetCursor(wParam, lParam))
+                {
+                    return WindowMessageResult.HandledZero;
+                }
+                break;
+
+            case WindowInterop.WmEnterSizeMove:
+                OnEnterSizeMove();
+                return WindowMessageResult.HandledZero;
+
+            case WindowInterop.WmExitSizeMove:
+                OnExitSizeMove();
+                return WindowMessageResult.HandledZero;
+
+            case WindowInterop.WmSizing:
+                HandleSizingMessage(wParam, lParam);
+                return WindowMessageResult.HandledZero;
+
+            case WindowInterop.WmGetMinMaxInfo:
+                HandleGetMinMaxInfoMessage(lParam);
+                return WindowMessageResult.HandledZero;
+
+            case WindowInterop.MouseMoveMessage:
+            case WindowInterop.WmNcMouseMove:
+                HandleMouseMoveMessage();
+                break;
+
+            case WindowInterop.MouseLeaveMessage:
+            case WindowInterop.WmNcMouseLeave:
+                ClearResizeHover();
+                break;
+
+            case WindowInterop.DisplayChangeMessage:
+            case WindowInterop.DpiChangedMessage:
+            case WindowInterop.DeviceChangeMessage:
+                QueueSurfaceReflow();
+                break;
         }
 
         if (_globalHotKey.Matches(message, wParam))
@@ -696,6 +756,180 @@ public sealed partial class MainWindow : Window
         return WindowMessageResult.Unhandled;
     }
 
+    private void UpdateResizeRegions()
+    {
+        var size = AppWindow.Size;
+        var border = WindowInterop.ScaleLogicalPixels(WindowInterop.DefaultResizeBorderThickness,
+            WindowInterop.GetWindowDpi(_windowHandle));
+        _resizeRegion[0] = new RectInt32(0, 0, size.Width, border);
+        _nonClientPointerSource.SetRegionRects(NonClientRegionKind.TopBorder, _resizeRegion);
+        _resizeRegion[0] = new RectInt32(0, size.Height - border, size.Width, border);
+        _nonClientPointerSource.SetRegionRects(NonClientRegionKind.BottomBorder, _resizeRegion);
+        _resizeRegion[0] = new RectInt32(0, 0, border, size.Height);
+        _nonClientPointerSource.SetRegionRects(NonClientRegionKind.LeftBorder, _resizeRegion);
+        _resizeRegion[0] = new RectInt32(size.Width - border, 0, border, size.Height);
+        _nonClientPointerSource.SetRegionRects(NonClientRegionKind.RightBorder, _resizeRegion);
+        var titleHeight = WindowInterop.ScaleLogicalPixels(32, WindowInterop.GetWindowDpi(_windowHandle));
+        var buttonsWidth = WindowInterop.ScaleLogicalPixels(68, WindowInterop.GetWindowDpi(_windowHandle));
+        _resizeRegion[0] = new RectInt32(border, border, Math.Max(1, size.Width - buttonsWidth - border),
+            Math.Max(1, titleHeight - border));
+        _nonClientPointerSource.SetRegionRects(NonClientRegionKind.Caption, _resizeRegion);
+    }
+
+    private WindowMessageResult HandleNcHitTest(nint lParam)
+    {
+        var screenX = (short)(lParam.ToInt64() & 0xFFFF);
+        var screenY = (short)((lParam.ToInt64() >> 16) & 0xFFFF);
+        var bounds = WindowInterop.GetWindowBounds(_windowHandle);
+        var dpi = WindowInterop.GetWindowDpi(_windowHandle);
+        var borderThickness = WindowInterop.ScaleLogicalPixels(WindowInterop.DefaultResizeBorderThickness, dpi);
+
+        var hitTest = WindowInterop.HitTestBorder(bounds, screenX, screenY, borderThickness);
+        UpdateResizeHover(hitTest.Direction);
+
+        if (hitTest.IsResizeBorder)
+        {
+            return new WindowMessageResult(true, hitTest.HitCode);
+        }
+
+        return WindowMessageResult.Unhandled;
+    }
+
+    private bool HandleSetCursor(nuint wParam, nint lParam)
+    {
+        var hitCode = (short)(lParam.ToInt64() & 0xFFFF);
+        var direction = WindowInterop.HitTestCodeToDirection(hitCode);
+        if (direction != WindowResizeDirection.None)
+        {
+            return WindowInterop.SetResizeCursor(direction);
+        }
+
+        if (_activeResizeDirection != WindowResizeDirection.None)
+        {
+            return WindowInterop.SetResizeCursor(_activeResizeDirection);
+        }
+
+        return false;
+    }
+
+
+    private void HandleMouseMoveMessage()
+    {
+        if (_isUserResizing)
+        {
+            return;
+        }
+
+        WindowInterop.TrackMouseLeave(_windowHandle);
+    }
+
+    private void UpdateResizeHover(WindowResizeDirection direction)
+    {
+        _activeResizeDirection = direction;
+        var isHovered = direction != WindowResizeDirection.None;
+        if (_isResizeHovered != isHovered)
+        {
+            _isResizeHovered = isHovered;
+            _page.SetResizeHover(isHovered);
+        }
+    }
+
+    private void ClearResizeHover()
+    {
+        _activeResizeDirection = WindowResizeDirection.None;
+        if (_isResizeHovered)
+        {
+            _isResizeHovered = false;
+            _page.SetResizeHover(false);
+        }
+    }
+
+    private void OnEnterSizeMove()
+    {
+        _sizeMoveStartBounds = WindowInterop.GetWindowBounds(_windowHandle);
+        _isUserResizing |= _activeResizeDirection != WindowResizeDirection.None;
+        ClearResizeHover();
+        if (_isUserResizing)
+        {
+            NotifyResizeStarted();
+        }
+    }
+
+    private void OnExitSizeMove()
+    {
+        var bounds = WindowInterop.GetWindowBounds(_windowHandle);
+        var sizeChanged = bounds.Width != _sizeMoveStartBounds.Width || bounds.Height != _sizeMoveStartBounds.Height;
+        if (_isUserResizing && sizeChanged)
+        {
+            PersistUserResizedBounds();
+        }
+
+        _isUserResizing = false;
+        ClearResizeHover();
+    }
+
+    private void NotifyResizeStarted()
+    {
+        ResizeStarted?.Invoke();
+    }
+
+    private void HandleSizingMessage(nuint wParam, nint lParam)
+    {
+        if (!_isUserResizing)
+        {
+            _isUserResizing = true;
+            NotifyResizeStarted();
+        }
+
+        var dpi = WindowInterop.GetWindowDpi(_windowHandle);
+        var workArea = WindowInterop.GetMonitorWorkAreaForWindow(_windowHandle);
+        WindowInterop.HandleSizing(
+            wParam,
+            lParam,
+            WindowInterop.MinimumShelfDimension,
+            WindowInterop.MinimumShelfDimension,
+            dpi,
+            workArea);
+    }
+
+    private void HandleGetMinMaxInfoMessage(nint lParam)
+    {
+        var dpi = WindowInterop.GetWindowDpi(_windowHandle);
+        var workArea = WindowInterop.GetMonitorWorkAreaForWindow(_windowHandle);
+        WindowInterop.HandleGetMinMaxInfo(
+            lParam,
+            WindowInterop.MinimumShelfDimension,
+            WindowInterop.MinimumShelfDimension,
+            dpi,
+            workArea);
+    }
+
+    private void PersistUserResizedBounds()
+    {
+        if (_manager is null)
+        {
+            return;
+        }
+
+        var bounds = WindowInterop.GetWindowBounds(_windowHandle);
+        var dpi = WindowInterop.GetWindowDpi(_windowHandle);
+        var logicalWidth = Math.Max(WindowInterop.MinimumShelfDimension, WindowInterop.UnscalePhysicalPixels(bounds.Width, dpi));
+        var logicalHeight = Math.Max(WindowInterop.MinimumShelfDimension, WindowInterop.UnscalePhysicalPixels(bounds.Height, dpi));
+        var preferredSize = new ShelfSize(logicalWidth, logicalHeight);
+
+        DispatcherQueue.TryEnqueue(async () =>
+        {
+            try
+            {
+                await _manager.SetPreferredSizeAsync(preferredSize);
+            }
+            catch (Exception exception)
+            {
+                _trayIcon.ShowWarning("Shelf resize", exception.Message);
+            }
+        });
+    }
+
     private void QueueSurfaceReflow()
     {
         if (_surfaceReflowQueued)
@@ -723,14 +957,14 @@ public sealed partial class MainWindow : Window
 
         _settingsWindow?.UpdateMonitorOptions(WindowInterop.GetMonitorOptions());
         if (WindowInterop.IsVisible(_windowHandle) &&
-            _manager.DisplayState is ShelfDisplayState.Compact or ShelfDisplayState.Expanded)
+            _manager.DisplayState == ShelfDisplayState.Visible)
         {
-            ResizeShelfForPresentation(_manager.DisplayState);
+            var preferred = _manager.PreferredSize;
+            WindowInterop.ResizeAndClamp(_windowHandle, preferred.Width, preferred.Height);
         }
 
         _railWindow?.Reposition();
     }
-
     private void ExitApplication()
     {
         _settingsWindow?.Close();
@@ -776,20 +1010,4 @@ public sealed partial class MainWindow : Window
         ShelfDisplayState DisplayState,
         ShelfRailPlacement RailPlacement);
 
-    private static (int Width, int Height) GetShelfSize(ShelfDisplayState presentation, int batchCount)
-    {
-        if (presentation == ShelfDisplayState.Expanded)
-        {
-            return (720, 640);
-        }
-
-        var visibleBatchCount = Math.Clamp(batchCount, 0, 3);
-        var height = visibleBatchCount switch
-        {
-            <= 1 => 180,
-            2 => 236,
-            _ => 292,
-        };
-        return (180, height);
-    }
 }

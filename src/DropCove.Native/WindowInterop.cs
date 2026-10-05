@@ -21,6 +21,54 @@ public enum HotKeyModifiers : uint
     NoRepeat = 0x4000,
 }
 
+/// <summary>Identifies the edge or corner being resized.</summary>
+public enum WindowResizeDirection
+{
+    /// <summary>No resize direction.</summary>
+    None = 0,
+    /// <summary>Left edge.</summary>
+    Left = 1,
+    /// <summary>Right edge.</summary>
+    Right = 2,
+    /// <summary>Top edge.</summary>
+    Top = 3,
+    /// <summary>Top-left corner.</summary>
+    TopLeft = 4,
+    /// <summary>Top-right corner.</summary>
+    TopRight = 5,
+    /// <summary>Bottom edge.</summary>
+    Bottom = 6,
+    /// <summary>Bottom-left corner.</summary>
+    BottomLeft = 7,
+    /// <summary>Bottom-right corner.</summary>
+    BottomRight = 8,
+}
+/// <summary>Represents a window rectangle in screen coordinates.</summary>
+/// <param name="Left">Left screen coordinate.</param>
+/// <param name="Top">Top screen coordinate.</param>
+/// <param name="Right">Right screen coordinate.</param>
+/// <param name="Bottom">Bottom screen coordinate.</param>
+public readonly record struct WindowBounds(int Left, int Top, int Right, int Bottom)
+{
+    /// <summary>Gets the width of the bounds.</summary>
+    public int Width => Right - Left;
+    /// <summary>Gets the height of the bounds.</summary>
+    public int Height => Bottom - Top;
+}
+
+/// <summary>Represents the result of testing cursor position against window resize borders.</summary>
+/// <param name="Direction">The resize edge or corner direction, or None if in client area.</param>
+/// <param name="HitCode">The Win32 hit-test code (HTLEFT, HTRIGHT, HTCLIENT, etc.).</param>
+public readonly record struct WindowHitTestResult(WindowResizeDirection Direction, nint HitCode)
+{
+    /// <summary>Gets a result indicating the client area.</summary>
+    public static WindowHitTestResult Client => new(WindowResizeDirection.None, WindowInterop.HtClient);
+
+    /// <summary>Whether this hit test represents a resize border or corner.</summary>
+    public bool IsResizeBorder => Direction != WindowResizeDirection.None;
+}
+
+
 /// <summary>Represents the outcome of a window-message callback.</summary>
 /// <param name="Handled">Whether the message was handled.</param>
 /// <param name="Result">The message result.</param>
@@ -43,7 +91,7 @@ public delegate WindowMessageResult WindowMessageHandler(uint message, nuint wPa
 /// <summary>Subclasses one existing window without replacing its original window procedure.</summary>
 public sealed class WindowMessageHook : IDisposable
 {
-    private const nuint SubclassId = 1;
+    private readonly nuint _subclassId;
     private readonly nint _windowHandle;
     private readonly WindowMessageHandler _handler;
     private readonly SubclassProc _subclassProc;
@@ -52,14 +100,15 @@ public sealed class WindowMessageHook : IDisposable
     /// <summary>Installs a message hook for an existing HWND.</summary>
     /// <param name="windowHandle">The target HWND.</param>
     /// <param name="handler">The message callback.</param>
-    public WindowMessageHook(nint windowHandle, WindowMessageHandler handler)
+    public WindowMessageHook(nint windowHandle, WindowMessageHandler handler, nuint subclassId = 1)
     {
         ArgumentNullException.ThrowIfNull(handler);
         _windowHandle = windowHandle;
         _handler = handler;
+        _subclassId = subclassId;
         _subclassProc = SubclassCallback;
 
-        if (!SetWindowSubclass(windowHandle, _subclassProc, SubclassId, 0))
+        if (!SetWindowSubclass(windowHandle, _subclassProc, _subclassId, 0))
         {
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not subclass the DropCove window.");
         }
@@ -73,7 +122,7 @@ public sealed class WindowMessageHook : IDisposable
             return;
         }
 
-        RemoveWindowSubclass(_windowHandle, _subclassProc, SubclassId);
+        RemoveWindowSubclass(_windowHandle, _subclassProc, _subclassId);
         _disposed = true;
     }
 
@@ -221,6 +270,7 @@ public sealed class ForegroundWindowHook : IDisposable
     private nint _foregroundHook;
     private nint _locationHook;
     private bool _disposed;
+    private uint _locationThreadId;
 
     /// <summary>Installs out-of-context hooks for foreground activation and in-place foreground resize.</summary>
     /// <param name="onForegroundChanged">The callback invoked when the foreground window changes or resizes.</param>
@@ -244,18 +294,14 @@ public sealed class ForegroundWindowHook : IDisposable
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not monitor foreground-window changes.");
         }
 
-        _locationHook = SetWinEventHook(
-            EventObjectLocationChange,
-            EventObjectLocationChange,
-            0,
-            _locationCallback,
-            0,
-            0,
-            WineventOutOfContext);
-        if (_locationHook == 0)
+        try
+        {
+            UpdateLocationHook();
+        }
+        catch
         {
             UnhookWinEvent(_foregroundHook);
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not monitor foreground-window location changes.");
+            throw;
         }
     }
 
@@ -293,6 +339,15 @@ public sealed class ForegroundWindowHook : IDisposable
     {
         if (!_disposed)
         {
+            try
+            {
+                UpdateLocationHook();
+            }
+            catch (Win32Exception)
+            {
+                _locationThreadId = 0;
+                return;
+            }
             _onForegroundChanged();
         }
     }
@@ -316,6 +371,42 @@ public sealed class ForegroundWindowHook : IDisposable
             _onForegroundChanged();
         }
     }
+
+    private void UpdateLocationHook()
+    {
+        var threadId = GetWindowThreadProcessId(GetForegroundWindow(), out _);
+        if (threadId == _locationThreadId) return;
+
+        if (_locationHook != 0)
+        {
+            UnhookWinEvent(_locationHook);
+            _locationHook = 0;
+        }
+
+        _locationThreadId = 0;
+        if (threadId == 0) return;
+
+        _locationHook = SetWinEventHook(
+            EventObjectLocationChange,
+            EventObjectLocationChange,
+            0,
+            _locationCallback,
+            0,
+            threadId,
+            WineventOutOfContext);
+        if (_locationHook == 0)
+        {
+            var error = Marshal.GetLastWin32Error();
+            // A foreground transition can retire the target thread while this event is dispatched.
+            if (GetWindowThreadProcessId(GetForegroundWindow(), out _) != threadId) return;
+            throw new Win32Exception(error, "Could not monitor foreground-window location changes.");
+        }
+
+        _locationThreadId = threadId;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(nint windowHandle, out uint processId);
 
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
@@ -349,6 +440,8 @@ public static class WindowInterop
 {
     /// <summary>Win32 mouse-move message.</summary>
     public const uint MouseMoveMessage = 0x0200;
+    /// <summary>Win32 non-client mouse-move message.</summary>
+    public const uint WmNcMouseMove = 0x00A0;
     /// <summary>Win32 display-configuration change message.</summary>
     public const uint DisplayChangeMessage = 0x007E;
 
@@ -361,6 +454,74 @@ public static class WindowInterop
 
     /// <summary>Win32 mouse-leave message.</summary>
     public const uint MouseLeaveMessage = 0x02A3;
+    /// <summary>Win32 non-client calculate size message.</summary>
+    public const uint WmNcCalcSize = 0x0083;
+    public const uint WmNcHitTest = 0x0084;
+    /// <summary>Win32 set-cursor message.</summary>
+    public const uint WmSetCursor = 0x0020;
+    /// <summary>Win32 enter size/move message.</summary>
+    public const uint WmEnterSizeMove = 0x0231;
+    /// <summary>Win32 exit size/move message.</summary>
+    public const uint WmExitSizeMove = 0x0232;
+    /// <summary>Win32 sizing message.</summary>
+    public const uint WmSizing = 0x0214;
+    /// <summary>Win32 get min/max info message.</summary>
+    public const uint WmGetMinMaxInfo = 0x0024;
+    /// <summary>Win32 non-client mouse-leave message.</summary>
+    public const uint WmNcMouseLeave = 0x02A2;
+
+    /// <summary>Non-client hit test code indicating transparent.</summary>
+    public const nint HtTransparent = -1;
+    /// <summary>Non-client hit test code for nowhere.</summary>
+    public const nint HtNowhere = 0;
+    /// <summary>Non-client hit test code for client area.</summary>
+    public const nint HtClient = 1;
+    /// <summary>Non-client hit test code for caption area.</summary>
+    public const nint HtCaptionCode = 2;
+    /// <summary>Left border hit test code.</summary>
+    public const nint HtLeft = 10;
+    /// <summary>Right border hit test code.</summary>
+    public const nint HtRight = 11;
+    /// <summary>Top border hit test code.</summary>
+    public const nint HtTop = 12;
+    /// <summary>Top-left corner hit test code.</summary>
+    public const nint HtTopLeft = 13;
+    /// <summary>Top-right corner hit test code.</summary>
+    public const nint HtTopRight = 14;
+    /// <summary>Bottom border hit test code.</summary>
+    public const nint HtBottom = 15;
+    /// <summary>Bottom-left corner hit test code.</summary>
+    public const nint HtBottomLeft = 16;
+    /// <summary>Bottom-right corner hit test code.</summary>
+    public const nint HtBottomRight = 17;
+
+    /// <summary>WMSZ left edge.</summary>
+    public const nuint WmszLeft = 1;
+    /// <summary>WMSZ right edge.</summary>
+    public const nuint WmszRight = 2;
+    /// <summary>WMSZ top edge.</summary>
+    public const nuint WmszTop = 3;
+    /// <summary>WMSZ top-left corner.</summary>
+    public const nuint WmszTopLeft = 4;
+    /// <summary>WMSZ top-right corner.</summary>
+    public const nuint WmszTopRight = 5;
+    /// <summary>WMSZ bottom edge.</summary>
+    public const nuint WmszBottom = 6;
+    /// <summary>WMSZ bottom-left corner.</summary>
+    public const nuint WmszBottomLeft = 7;
+    /// <summary>WMSZ bottom-right corner.</summary>
+    public const nuint WmszBottomRight = 8;
+
+    /// <summary>Default resize border thickness in logical pixels.</summary>
+    public const int DefaultResizeBorderThickness = 8;
+
+    /// <summary>Minimum shelf dimension in logical pixels.</summary>
+    public const int MinimumShelfDimension = 180;
+
+    private static readonly nint CursorSizeWe = LoadCursorW(0, 32644);
+    private static readonly nint CursorSizeNs = LoadCursorW(0, 32645);
+    private static readonly nint CursorSizeNwse = LoadCursorW(0, 32642);
+    private static readonly nint CursorSizeNesw = LoadCursorW(0, 32643);
 
     private const int GwlStyle = -16;
     private const int GwlExStyle = -20;
@@ -374,10 +535,8 @@ public static class WindowInterop
     private const int SwHide = 0;
     private const int SwShow = 5;
     private const int SwShowNoActivate = 4;
-    private const uint WmNcLButtonDown = 0x00A1;
     private const uint WmMouseActivate = 0x0021;
     private const nint MaNoActivate = 3;
-    private const nuint HtCaption = 2;
     private const long WsCaption = 0x00C00000L;
     private const long WsThickFrame = 0x00040000L;
     private const long WsMinimizeBox = 0x00020000L;
@@ -390,10 +549,24 @@ public static class WindowInterop
 
     /// <summary>Removes standard caption and resize chrome from the HWND.</summary>
     /// <param name="windowHandle">The target HWND.</param>
-    public static void MakeBorderless(nint windowHandle)
+    public static void MakeBorderless(nint windowHandle) => MakeBorderless(windowHandle, resizable: false);
+
+    /// <summary>Removes standard caption and chrome from the HWND, optionally retaining sizing borders.</summary>
+    /// <param name="windowHandle">The target HWND.</param>
+    /// <param name="resizable">Whether to retain sizing borders.</param>
+    public static void MakeBorderless(nint windowHandle, bool resizable)
     {
         var style = GetWindowLongPtr(windowHandle, GwlStyle).ToInt64();
-        style &= ~(WsCaption | WsThickFrame | WsMinimizeBox | WsMaximizeBox | WsSysMenu);
+        style &= ~(WsCaption | WsMinimizeBox | WsMaximizeBox | WsSysMenu);
+        if (resizable)
+        {
+            style |= WsThickFrame;
+        }
+        else
+        {
+            style &= ~WsThickFrame;
+        }
+
         SetWindowLongPtr(windowHandle, GwlStyle, new nint(style));
         SetWindowPos(
             windowHandle,
@@ -404,6 +577,10 @@ public static class WindowInterop
             0,
             SwpNoMove | SwpNoSize | SwpNoActivate | SwpFrameChanged);
     }
+
+    /// <summary>Removes standard caption and chrome while retaining resizable borders for the HWND.</summary>
+    /// <param name="windowHandle">The target HWND.</param>
+    public static void MakeResizableBorderless(nint windowHandle) => MakeBorderless(windowHandle, resizable: true);
 
     /// <summary>Marks an overlay window as a tool window that never activates from pointer input.</summary>
     /// <param name="windowHandle">The target HWND.</param>
@@ -432,7 +609,7 @@ public static class WindowInterop
     /// <param name="windowHandle">The top-level WinUI window HWND.</param>
     /// <returns>The content child HWND, or zero when none exists.</returns>
     public static nint GetFirstChildWindow(nint windowHandle) =>
-        FindWindowEx(windowHandle, 0, null, null);
+        FindWindowEx(windowHandle, 0, "Microsoft.UI.Content.DesktopChildSiteBridge", null);
 
     /// <summary>Requests a <c>WM_MOUSELEAVE</c> notification for an overlay window.</summary>
     /// <param name="windowHandle">The target HWND.</param>
@@ -445,14 +622,6 @@ public static class WindowInterop
             WindowHandle = windowHandle,
         };
         TrackMouseEvent(ref tracking);
-    }
-
-    /// <summary>Begins a normal system window move from a custom drag strip.</summary>
-    /// <param name="windowHandle">The target HWND.</param>
-    public static void BeginMove(nint windowHandle)
-    {
-        ReleaseCapture();
-        SendMessage(windowHandle, WmNcLButtonDown, HtCaption, 0);
     }
 
     /// <summary>Positions the window in the center of the cursor monitor and makes it topmost.</summary>
@@ -755,6 +924,433 @@ public static class WindowInterop
         var y = Math.Clamp(current.Top, monitorInfo.Work.Top, maxY);
         SetBounds(windowHandle, x, y, width, height, SwpNoActivate);
     }
+    /// <summary>Tests screen coordinates against the window's outer border to detect resize targets.</summary>
+    /// <param name="bounds">The window bounds in screen coordinates.</param>
+    /// <param name="screenX">Horizontal screen coordinate.</param>
+    /// <param name="screenY">Vertical screen coordinate.</param>
+    /// <param name="borderThickness">Border thickness in physical pixels.</param>
+    /// <returns>The hit-test result including direction and Win32 hit code.</returns>
+    public static WindowHitTestResult HitTestBorder(
+        WindowBounds bounds,
+        int screenX,
+        int screenY,
+        int borderThickness)
+    {
+        if (screenX < bounds.Left || screenX >= bounds.Right ||
+            screenY < bounds.Top || screenY >= bounds.Bottom)
+        {
+            return new WindowHitTestResult(WindowResizeDirection.None, HtNowhere);
+        }
+
+        var onLeft = screenX < bounds.Left + borderThickness;
+        var onRight = screenX >= bounds.Right - borderThickness;
+        var onTop = screenY < bounds.Top + borderThickness;
+        var onBottom = screenY >= bounds.Bottom - borderThickness;
+
+        if (onTop && onLeft) return new WindowHitTestResult(WindowResizeDirection.TopLeft, HtTopLeft);
+        if (onTop && onRight) return new WindowHitTestResult(WindowResizeDirection.TopRight, HtTopRight);
+        if (onBottom && onLeft) return new WindowHitTestResult(WindowResizeDirection.BottomLeft, HtBottomLeft);
+        if (onBottom && onRight) return new WindowHitTestResult(WindowResizeDirection.BottomRight, HtBottomRight);
+        if (onLeft) return new WindowHitTestResult(WindowResizeDirection.Left, HtLeft);
+        if (onRight) return new WindowHitTestResult(WindowResizeDirection.Right, HtRight);
+        if (onTop) return new WindowHitTestResult(WindowResizeDirection.Top, HtTop);
+        if (onBottom) return new WindowHitTestResult(WindowResizeDirection.Bottom, HtBottom);
+
+        return WindowHitTestResult.Client;
+    }
+
+    /// <summary>Converts a Win32 hit-test code to a window resize direction.</summary>
+    /// <param name="hitCode">The Win32 hit code (e.g. HTLEFT, HTRIGHT, etc.).</param>
+    /// <returns>The corresponding <see cref="WindowResizeDirection"/>.</returns>
+    public static WindowResizeDirection HitTestCodeToDirection(nint hitCode) => hitCode switch
+    {
+        HtLeft => WindowResizeDirection.Left,
+        HtRight => WindowResizeDirection.Right,
+        HtTop => WindowResizeDirection.Top,
+        HtTopLeft => WindowResizeDirection.TopLeft,
+        HtTopRight => WindowResizeDirection.TopRight,
+        HtBottom => WindowResizeDirection.Bottom,
+        HtBottomLeft => WindowResizeDirection.BottomLeft,
+        HtBottomRight => WindowResizeDirection.BottomRight,
+        _ => WindowResizeDirection.None,
+    };
+
+    /// <summary>Converts a <see cref="WindowResizeDirection"/> to the corresponding Win32 hit-test code.</summary>
+    /// <param name="direction">The resize direction.</param>
+    /// <returns>The Win32 hit code.</returns>
+    public static nint ToHitTestCode(WindowResizeDirection direction) => direction switch
+    {
+        WindowResizeDirection.Left => HtLeft,
+        WindowResizeDirection.Right => HtRight,
+        WindowResizeDirection.Top => HtTop,
+        WindowResizeDirection.TopLeft => HtTopLeft,
+        WindowResizeDirection.TopRight => HtTopRight,
+        WindowResizeDirection.Bottom => HtBottom,
+        WindowResizeDirection.BottomLeft => HtBottomLeft,
+        WindowResizeDirection.BottomRight => HtBottomRight,
+        _ => HtClient,
+    };
+
+    /// <summary>Sets the Win32 cursor appropriate for the given resize direction.</summary>
+    /// <param name="direction">The resize direction.</param>
+    /// <returns>True if a resize cursor was set; false if the direction is None.</returns>
+    public static bool SetResizeCursor(WindowResizeDirection direction)
+    {
+        var cursor = direction switch
+        {
+            WindowResizeDirection.Left or WindowResizeDirection.Right => CursorSizeWe,
+            WindowResizeDirection.Top or WindowResizeDirection.Bottom => CursorSizeNs,
+            WindowResizeDirection.TopLeft or WindowResizeDirection.BottomRight => CursorSizeNwse,
+            WindowResizeDirection.TopRight or WindowResizeDirection.BottomLeft => CursorSizeNesw,
+            _ => 0,
+        };
+
+        if (cursor != 0)
+        {
+            SetCursor(cursor);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Gets the current window rectangle in screen coordinates.</summary>
+    /// <param name="windowHandle">The target HWND.</param>
+    /// <returns>The window bounds.</returns>
+    public static WindowBounds GetWindowBounds(nint windowHandle)
+    {
+        if (!GetWindowRect(windowHandle, out var rect))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not read window bounds.");
+        }
+
+        return new WindowBounds(rect.Left, rect.Top, rect.Right, rect.Bottom);
+    }
+
+    /// <summary>Gets the work area rectangle for the monitor containing the window.</summary>
+    /// <param name="windowHandle">The target HWND.</param>
+    /// <returns>The monitor work area bounds.</returns>
+    public static WindowBounds GetMonitorWorkAreaForWindow(nint windowHandle)
+    {
+        var monitor = MonitorFromWindow(windowHandle, MonitorDefaultToNearest);
+        if (monitor == 0)
+        {
+            throw new Win32Exception("Could not resolve window monitor.");
+        }
+
+        var info = GetMonitorInfo(monitor);
+        return new WindowBounds(info.Work.Left, info.Work.Top, info.Work.Right, info.Work.Bottom);
+    }
+
+    /// <summary>Constrains candidate resize bounds to minimum dimensions and monitor work area.</summary>
+    /// <param name="candidate">The proposed window rectangle.</param>
+    /// <param name="direction">The active resize direction (or WMSZ code cast to direction).</param>
+    /// <param name="minLogicalWidth">Minimum width in logical pixels.</param>
+    /// <param name="minLogicalHeight">Minimum height in logical pixels.</param>
+    /// <param name="dpi">Effective monitor DPI.</param>
+    /// <param name="workArea">Monitor work area.</param>
+    /// <returns>Constrained bounds.</returns>
+    public static WindowBounds ConstrainResizeBounds(
+        WindowBounds candidate,
+        WindowResizeDirection direction,
+        int minLogicalWidth,
+        int minLogicalHeight,
+        uint dpi,
+        WindowBounds workArea)
+    {
+        var workAreaWidth = Math.Max(1, workArea.Width);
+        var workAreaHeight = Math.Max(1, workArea.Height);
+        var minWidth = Math.Min(Scale(minLogicalWidth, dpi), workAreaWidth);
+        var minHeight = Math.Min(Scale(minLogicalHeight, dpi), workAreaHeight);
+
+        var left = candidate.Left;
+        var top = candidate.Top;
+        var right = candidate.Right;
+        var bottom = candidate.Bottom;
+
+        var isLeft = direction is WindowResizeDirection.Left or WindowResizeDirection.TopLeft or WindowResizeDirection.BottomLeft;
+        var isTop = direction is WindowResizeDirection.Top or WindowResizeDirection.TopLeft or WindowResizeDirection.TopRight;
+
+        if (right - left < minWidth)
+        {
+            if (isLeft)
+            {
+                left = right - minWidth;
+            }
+            else
+            {
+                right = left + minWidth;
+            }
+        }
+
+        if (bottom - top < minHeight)
+        {
+            if (isTop)
+            {
+                top = bottom - minHeight;
+            }
+            else
+            {
+                bottom = top + minHeight;
+            }
+        }
+
+        // Clamp to work area
+        if (left < workArea.Left)
+        {
+            left = workArea.Left;
+            if (right - left < minWidth && workAreaWidth >= minWidth)
+            {
+                right = left + minWidth;
+            }
+        }
+
+        if (right > workArea.Right)
+        {
+            right = workArea.Right;
+            if (right - left < minWidth && workAreaWidth >= minWidth)
+            {
+                left = right - minWidth;
+            }
+        }
+
+        if (top < workArea.Top)
+        {
+            top = workArea.Top;
+            if (bottom - top < minHeight && workAreaHeight >= minHeight)
+            {
+                bottom = top + minHeight;
+            }
+        }
+
+        if (bottom > workArea.Bottom)
+        {
+            bottom = workArea.Bottom;
+            if (bottom - top < minHeight && workAreaHeight >= minHeight)
+            {
+                top = bottom - minHeight;
+            }
+        }
+
+        return new WindowBounds(left, top, right, bottom);
+    }
+
+    /// <summary>Handles WM_GETMINMAXINFO to enforce minimum physical size on the window.</summary>
+    /// <param name="lParam">Pointer to MINMAXINFO structure.</param>
+    /// <param name="minLogicalWidth">Minimum width in logical pixels.</param>
+    /// <param name="minLogicalHeight">Minimum height in logical pixels.</param>
+    /// <param name="dpi">Window DPI.</param>
+    /// <param name="workArea">Monitor work area bounds.</param>
+    public static void HandleGetMinMaxInfo(
+        nint lParam,
+        int minLogicalWidth,
+        int minLogicalHeight,
+        uint dpi,
+        WindowBounds workArea)
+    {
+        if (lParam == 0)
+        {
+            return;
+        }
+
+        var minWidth = Math.Min(Scale(minLogicalWidth, dpi), Math.Max(1, workArea.Width));
+        var minHeight = Math.Min(Scale(minLogicalHeight, dpi), Math.Max(1, workArea.Height));
+
+        var info = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+        info.MinTrackSize = new Point(minWidth, minHeight);
+        Marshal.StructureToPtr(info, lParam, false);
+    }
+
+    /// <summary>Handles WM_SIZING to dynamically clamp the sizing rectangle to minimums and monitor work area.</summary>
+    /// <param name="wParam">WMSZ edge code.</param>
+    /// <param name="lParam">Pointer to RECT structure.</param>
+    /// <param name="minLogicalWidth">Minimum width in logical pixels.</param>
+    /// <param name="minLogicalHeight">Minimum height in logical pixels.</param>
+    /// <param name="dpi">Window DPI.</param>
+    /// <param name="workArea">Monitor work area bounds.</param>
+    public static void HandleSizing(
+        nuint wParam,
+        nint lParam,
+        int minLogicalWidth,
+        int minLogicalHeight,
+        uint dpi,
+        WindowBounds workArea)
+    {
+        if (lParam == 0)
+        {
+            return;
+        }
+
+        var rect = Marshal.PtrToStructure<Rect>(lParam);
+        var direction = (WindowResizeDirection)wParam;
+        var candidate = new WindowBounds(rect.Left, rect.Top, rect.Right, rect.Bottom);
+        var constrained = ConstrainResizeBounds(candidate, direction, minLogicalWidth, minLogicalHeight, dpi, workArea);
+
+        rect.Left = constrained.Left;
+        rect.Top = constrained.Top;
+        rect.Right = constrained.Right;
+        rect.Bottom = constrained.Bottom;
+        Marshal.StructureToPtr(rect, lParam, false);
+    }
+
+    /// <summary>Unscales physical pixels back to logical pixels for the given DPI.</summary>
+    /// <param name="physicalPixels">Physical pixel count.</param>
+    /// <param name="dpi">Effective DPI.</param>
+    /// <returns>Logical pixels.</returns>
+    public static int UnscalePhysicalPixels(int physicalPixels, uint dpi) =>
+        (int)Math.Round(physicalPixels * 96d / (dpi == 0 ? 96u : dpi), MidpointRounding.AwayFromZero);
+
+    /// <summary>Places an anchored popup relative to an anchor card within the monitor work area.</summary>
+    /// <param name="anchor">The physical screen bounds of the anchor card.</param>
+    /// <param name="workArea">The physical screen bounds of the monitor work area.</param>
+    /// <param name="requestedLogicalWidth">The requested popup width in logical pixels.</param>
+    /// <param name="requestedLogicalHeight">The requested popup height in logical pixels.</param>
+    /// <param name="dpi">The effective monitor DPI.</param>
+    /// <returns>The calculated physical screen bounds for the popup.</returns>
+    public static WindowBounds PlaceAnchoredPopup(
+        WindowBounds anchor,
+        WindowBounds workArea,
+        int requestedLogicalWidth,
+        int requestedLogicalHeight,
+        uint dpi)
+    {
+        var effectiveDpi = dpi == 0 ? 96u : dpi;
+        var workAreaWidth = Math.Max(0, workArea.Width);
+        var workAreaHeight = Math.Max(0, workArea.Height);
+
+        const int minLogicalWidth = 320;
+        const int maxLogicalWidth = 480;
+        const int minLogicalHeight = 1;
+        const int maxLogicalHeight = 480;
+
+        var preferredMargin = Scale(16, effectiveDpi);
+        var marginX = Math.Min(preferredMargin, Math.Max(0, (workAreaWidth - 1) / 2));
+        var marginY = Math.Min(preferredMargin, Math.Max(0, (workAreaHeight - 1) / 2));
+        var availableWidth = workAreaWidth - 2 * marginX;
+        var availableHeight = workAreaHeight - 2 * marginY;
+
+        var minPhysicalWidth = Math.Min(Scale(minLogicalWidth, effectiveDpi), availableWidth);
+        var maxPhysicalWidth = Math.Min(Scale(maxLogicalWidth, effectiveDpi), availableWidth);
+        var targetPhysicalWidth = Math.Clamp(Scale(requestedLogicalWidth, effectiveDpi), minPhysicalWidth, maxPhysicalWidth);
+
+        var minPhysicalHeight = Math.Min(Scale(minLogicalHeight, effectiveDpi), availableHeight);
+        var maxPhysicalHeight = Math.Min(Scale(maxLogicalHeight, effectiveDpi), availableHeight);
+        var targetPhysicalHeight = Math.Clamp(Scale(requestedLogicalHeight, effectiveDpi), minPhysicalHeight, maxPhysicalHeight);
+
+        var safeLeft = workArea.Left + marginX;
+        var safeRight = workArea.Right - marginX;
+        var safeTop = workArea.Top + marginY;
+        var safeBottom = workArea.Bottom - marginY;
+
+        // Candidate 1: Right of anchor, top-aligned with anchor
+        var rightCandidate = new WindowBounds(
+            anchor.Right,
+            anchor.Top,
+            anchor.Right + targetPhysicalWidth,
+            anchor.Top + targetPhysicalHeight);
+
+        if (rightCandidate.Left >= safeLeft &&
+            rightCandidate.Right <= safeRight &&
+            rightCandidate.Top >= safeTop &&
+            rightCandidate.Bottom <= safeBottom)
+        {
+            return rightCandidate;
+        }
+
+        // Candidate 2: Left of anchor, top-aligned with anchor
+        var leftCandidate = new WindowBounds(
+            anchor.Left - targetPhysicalWidth,
+            anchor.Top,
+            anchor.Left,
+            anchor.Top + targetPhysicalHeight);
+
+        if (leftCandidate.Left >= safeLeft &&
+            leftCandidate.Right <= safeRight &&
+            leftCandidate.Top >= safeTop &&
+            leftCandidate.Bottom <= safeBottom)
+        {
+            return leftCandidate;
+        }
+
+        // Candidate 3: Below anchor, left-aligned with anchor
+        var belowCandidate = new WindowBounds(
+            anchor.Left,
+            anchor.Bottom,
+            anchor.Left + targetPhysicalWidth,
+            anchor.Bottom + targetPhysicalHeight);
+
+        if (belowCandidate.Left >= safeLeft &&
+            belowCandidate.Right <= safeRight &&
+            belowCandidate.Top >= safeTop &&
+            belowCandidate.Bottom <= safeBottom)
+        {
+            return belowCandidate;
+        }
+
+        // Candidate 4: Above anchor, left-aligned with anchor
+        var aboveCandidate = new WindowBounds(
+            anchor.Left,
+            anchor.Top - targetPhysicalHeight,
+            anchor.Left + targetPhysicalWidth,
+            anchor.Top);
+
+        if (aboveCandidate.Left >= safeLeft &&
+            aboveCandidate.Right <= safeRight &&
+            aboveCandidate.Top >= safeTop &&
+            aboveCandidate.Bottom <= safeBottom)
+        {
+            return aboveCandidate;
+        }
+
+        // Fallback: Clamp the right candidate within the work area respecting margins where possible.
+        var clampedMinX = workArea.Left + marginX;
+        var clampedMaxX = workArea.Right - marginX - targetPhysicalWidth;
+        var clampedLeft = Math.Clamp(rightCandidate.Left, clampedMinX, clampedMaxX);
+
+        var clampedMinY = workArea.Top + marginY;
+        var clampedMaxY = workArea.Bottom - marginY - targetPhysicalHeight;
+        var clampedTop = Math.Clamp(rightCandidate.Top, clampedMinY, clampedMaxY);
+
+        return new WindowBounds(
+            clampedLeft,
+            clampedTop,
+            clampedLeft + targetPhysicalWidth,
+            clampedTop + targetPhysicalHeight);
+    }
+
+    /// <summary>Sets the window position and size explicitly, clamped to work area.</summary>
+    /// <param name="windowHandle">The target HWND.</param>
+    /// <param name="logicalWidth">Width in logical pixels.</param>
+    /// <param name="logicalHeight">Height in logical pixels.</param>
+    public static void ResizeAndClamp(nint windowHandle, int logicalWidth, int logicalHeight)
+    {
+        ValidateLogicalSize(logicalWidth, logicalHeight);
+        if (!GetWindowRect(windowHandle, out var current))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not read window bounds.");
+        }
+
+        var monitor = MonitorFromWindow(windowHandle, MonitorDefaultToNearest);
+        if (monitor == 0)
+        {
+            throw new Win32Exception("Could not resolve window monitor.");
+        }
+
+        var monitorInfo = GetMonitorInfo(monitor);
+        var dpi = GetDpiForWindow(windowHandle);
+        if (dpi == 0)
+        {
+            dpi = GetMonitorDpi(monitor);
+        }
+
+        var (width, height) = FitToWorkArea(logicalWidth, logicalHeight, dpi, monitorInfo.Work);
+        var maxX = monitorInfo.Work.Right - width;
+        var maxY = monitorInfo.Work.Bottom - height;
+        var x = Math.Clamp(current.Left, monitorInfo.Work.Left, maxX);
+        var y = Math.Clamp(current.Top, monitorInfo.Work.Top, maxY);
+        SetBounds(windowHandle, x, y, width, height, SwpNoActivate);
+    }
+
 
     /// <summary>Shows, activates, and keeps the window topmost.</summary>
     /// <param name="windowHandle">The target HWND.</param>
@@ -921,14 +1517,32 @@ public static class WindowInterop
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private readonly struct Rect
+    private struct Rect
     {
-        public readonly int Left;
-        public readonly int Top;
-        public readonly int Right;
-        public readonly int Bottom;
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
         public int Width => Right - Left;
         public int Height => Bottom - Top;
+
+        public Rect(int left, int top, int right, int bottom)
+        {
+            Left = left;
+            Top = top;
+            Right = right;
+            Bottom = bottom;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public Point Reserved;
+        public Point MaxSize;
+        public Point MaxPosition;
+        public Point MinTrackSize;
+        public Point MaxTrackSize;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -979,13 +1593,6 @@ public static class WindowInterop
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool TrackMouseEvent(ref TrackMouseEventParameters tracking);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool ReleaseCapture();
-
-    [DllImport("user32.dll")]
-    private static extern nint SendMessage(nint windowHandle, uint message, nuint wParam, nint lParam);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -1053,4 +1660,10 @@ public static class WindowInterop
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "MessageBoxW")]
     private static extern int MessageBox(nint windowHandle, string text, string caption, uint type);
+
+    [DllImport("user32.dll")]
+    private static extern nint LoadCursorW(nint hInstance, int lpCursorName);
+
+    [DllImport("user32.dll")]
+    private static extern nint SetCursor(nint hCursor);
 }

@@ -22,8 +22,13 @@ internal sealed class ShelfDatabase(string databasePath)
         CancellationToken cancellationToken) =>
         RunAsync(() => SaveRailPlacement(placement), cancellationToken);
 
-    public Task AddBatchAsync(ShelfBatch batch, CancellationToken cancellationToken) =>
-        RunAsync(() => AddBatch(batch), cancellationToken);
+    public Task SavePreferredSizeAsync(
+        ShelfSize size,
+        CancellationToken cancellationToken) =>
+        RunAsync(() => SavePreferredSize(size), cancellationToken);
+
+    public Task AddBatchAsync(ShelfBatch batch, ShelfSize? preferredSize, CancellationToken cancellationToken) =>
+        RunAsync(() => AddBatch(batch, preferredSize), cancellationToken);
 
     public Task SetPinnedAsync(Guid itemId, bool isPinned, CancellationToken cancellationToken) =>
         RunAsync(() => SetPinned(itemId, isPinned), cancellationToken);
@@ -72,12 +77,18 @@ internal sealed class ShelfDatabase(string databasePath)
 
         try
         {
-            return new ShelfDatabaseOpenResult(LoadBatches(), LoadRailPlacement(), null);
+            var batches = LoadBatches();
+            var railPlacement = LoadRailPlacement();
+            var preferredSize = LoadPreferredSize(batches.Count > 0);
+            return new ShelfDatabaseOpenResult(batches, railPlacement, preferredSize, null);
         }
         catch (Exception exception) when (File.Exists(databasePath) && IsRecoverableDatabaseFailure(exception))
         {
             var backupPath = PreserveFailedDatabase();
-            return new ShelfDatabaseOpenResult(LoadBatches(), LoadRailPlacement(), backupPath);
+            var batches = LoadBatches();
+            var railPlacement = LoadRailPlacement();
+            var preferredSize = LoadPreferredSize(batches.Count > 0);
+            return new ShelfDatabaseOpenResult(batches, railPlacement, preferredSize, backupPath);
         }
     }
 
@@ -146,7 +157,7 @@ internal sealed class ShelfDatabase(string databasePath)
         }
     }
 
-    private void AddBatch(ShelfBatch batch)
+    private void AddBatch(ShelfBatch batch, ShelfSize? preferredSize)
     {
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
@@ -188,6 +199,11 @@ internal sealed class ShelfDatabase(string databasePath)
             itemCommand.ExecuteNonQuery();
         }
 
+        if (preferredSize is { } size)
+        {
+            SavePreferredSize(connection, transaction, size);
+        }
+
         transaction.Commit();
     }
 
@@ -221,16 +237,21 @@ internal sealed class ShelfDatabase(string databasePath)
         }
 
         DeleteEmptyBatches(connection, transaction);
+        DeleteSizeWhenEmpty(connection, transaction);
         transaction.Commit();
     }
 
     private void RemoveBatch(Guid batchId)
     {
         using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "DELETE FROM shelf_batches WHERE id = $id";
         command.Parameters.AddWithValue("$id", batchId.ToString("D"));
         command.ExecuteNonQuery();
+        DeleteSizeWhenEmpty(connection, transaction);
+        transaction.Commit();
     }
 
     private void ClearTemporaryItems()
@@ -242,6 +263,7 @@ internal sealed class ShelfDatabase(string databasePath)
         command.CommandText = "DELETE FROM shelf_items WHERE is_pinned = 0";
         command.ExecuteNonQuery();
         DeleteEmptyBatches(connection, transaction);
+        DeleteSizeWhenEmpty(connection, transaction);
         transaction.Commit();
     }
 
@@ -251,6 +273,14 @@ internal sealed class ShelfDatabase(string databasePath)
         command.Transaction = transaction;
         command.CommandText =
             "DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)";
+        command.ExecuteNonQuery();
+    }
+
+    private static void DeleteSizeWhenEmpty(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "DELETE FROM shelf_settings WHERE NOT EXISTS (SELECT 1 FROM shelf_items)";
         command.ExecuteNonQuery();
     }
     private SqliteConnection OpenConnection()
@@ -302,6 +332,11 @@ internal sealed class ShelfDatabase(string databasePath)
             );
             INSERT OR IGNORE INTO shelf_ui_state (id, rail_monitor, rail_edge)
             VALUES (1, '', 'Right');
+            CREATE TABLE IF NOT EXISTS shelf_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                preferred_width INTEGER NOT NULL,
+                preferred_height INTEGER NOT NULL
+            );
             """;
         command.ExecuteNonQuery();
     }
@@ -346,6 +381,61 @@ internal sealed class ShelfDatabase(string databasePath)
         command.ExecuteNonQuery();
     }
 
+    private ShelfSize LoadPreferredSize(bool hasBatches)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT preferred_width, preferred_height FROM shelf_settings WHERE id = 1";
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+        {
+            return ShelfSize.Default;
+        }
+
+        var width = reader.GetInt32(0);
+        var height = reader.GetInt32(1);
+        var size = new ShelfSize(width, height);
+
+        if (!hasBatches || !size.IsValid)
+        {
+            reader.Close();
+            using var deleteCommand = connection.CreateCommand();
+            deleteCommand.CommandText = "DELETE FROM shelf_settings WHERE id = 1";
+            deleteCommand.ExecuteNonQuery();
+            return ShelfSize.Default;
+        }
+
+        return size;
+    }
+
+    private void SavePreferredSize(ShelfSize size)
+    {
+        if (!size.IsValid)
+        {
+            throw new ArgumentOutOfRangeException(nameof(size), size, "Preferred size must be at least 180x180.");
+        }
+
+        using var connection = OpenConnection();
+        SavePreferredSize(connection, null, size);
+    }
+
+    private static void SavePreferredSize(SqliteConnection connection, SqliteTransaction? transaction, ShelfSize size)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO shelf_settings (id, preferred_width, preferred_height)
+            VALUES (1, $width, $height)
+            ON CONFLICT(id) DO UPDATE SET
+                preferred_width = excluded.preferred_width,
+                preferred_height = excluded.preferred_height
+            """;
+        command.Parameters.AddWithValue("$width", size.Width);
+        command.Parameters.AddWithValue("$height", size.Height);
+        command.ExecuteNonQuery();
+    }
+
 
     private static IReadOnlyList<ShelfItem> LoadItems(SqliteConnection connection, Guid batchId)
     {
@@ -377,4 +467,5 @@ internal sealed class ShelfDatabase(string databasePath)
 internal sealed record ShelfDatabaseOpenResult(
     IReadOnlyList<ShelfBatch> Batches,
     ShelfRailPlacement RailPlacement,
+    ShelfSize PreferredSize,
     string? RecoveryBackupPath);

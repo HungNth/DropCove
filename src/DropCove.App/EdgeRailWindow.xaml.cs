@@ -27,7 +27,7 @@ public sealed partial class EdgeRailWindow : Window
     private readonly DispatcherQueueTimer _collapseTimer;
     private readonly WindowMessageHook _windowMessageHook;
     private WindowMessageHook? _inputMessageHook;
-    private readonly ForegroundWindowHook _foregroundWindowHook;
+    private ForegroundWindowHook? _foregroundWindowHook;
     private readonly DispatcherQueue _dispatcherQueue;
     private ShelfRailPlacement? _placement;
     private Flyout? _openFlyout;
@@ -64,6 +64,10 @@ public sealed partial class EdgeRailWindow : Window
         InitializeComponent();
         _windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
         WindowInterop.MakeBorderless(_windowHandle);
+        var initialDpi = WindowInterop.GetWindowDpi(_windowHandle);
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(
+            WindowInterop.ScaleLogicalPixels(CollapsedWidth, initialDpi),
+            WindowInterop.ScaleLogicalPixels(CollapsedHeight, initialDpi)));
         WindowInterop.MakeNoActivate(_windowHandle);
         _windowMessageHook = new WindowMessageHook(_windowHandle, HandleWindowMessage);
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
@@ -73,7 +77,6 @@ public sealed partial class EdgeRailWindow : Window
         _collapseTimer = _dispatcherQueue.CreateTimer();
         _collapseTimer.Interval = TimeSpan.FromMilliseconds(300);
         _collapseTimer.Tick += OnCollapseTimerTick;
-        _foregroundWindowHook = new ForegroundWindowHook(() => _dispatcherQueue.TryEnqueue(ApplyVisibility));
         _dragDropService = new DragDropService(manager, confirm);
         _acceptStorageDrop = acceptStorageDrop;
         _refreshAfterMutation = refreshAfterMutation;
@@ -114,6 +117,15 @@ public sealed partial class EdgeRailWindow : Window
         _placement = placement;
         _showOverFullscreen = showOverFullscreen;
         _requestedVisible = true;
+        if (showOverFullscreen)
+        {
+            _foregroundWindowHook?.Dispose();
+            _foregroundWindowHook = null;
+        }
+        else
+        {
+            _foregroundWindowHook ??= new ForegroundWindowHook(() => _dispatcherQueue.TryEnqueue(ApplyVisibility));
+        }
         _isExpanded = false;
         _openFlyout?.Hide();
         _openFlyout = null;
@@ -130,6 +142,8 @@ public sealed partial class EdgeRailWindow : Window
     public void Hide()
     {
         _requestedVisible = false;
+        _foregroundWindowHook?.Dispose();
+        _foregroundWindowHook = null;
         _pointerInside = false;
         _dragInside = false;
         _expandPending = false;
@@ -481,7 +495,7 @@ public sealed partial class EdgeRailWindow : Window
         _collapseTimer.Stop();
         _windowMessageHook.Dispose();
         _inputMessageHook?.Dispose();
-        _foregroundWindowHook.Dispose();
+        _foregroundWindowHook?.Dispose();
     }
 
     private static RailBatchSummary CreateBatchSummary(ShelfBatch batch)

@@ -264,33 +264,27 @@ public sealed class DropShelfManagerTests
         var manager = new DropShelfManager();
         var placement = new ShelfRailPlacement("DISPLAY2", ShelfRailEdge.Left);
 
-        manager.ShowShelf(ShelfDisplayState.Compact);
+        manager.ShowShelf();
         Assert.AreEqual(ShelfDisplayState.Hidden, manager.DismissShelf(placement));
 
         manager.AcceptDrop([new(@"C:\Work\Item.txt", "Item.txt", false)]);
-        manager.ShowShelf(ShelfDisplayState.Compact);
+        manager.ShowShelf();
 
         Assert.AreEqual(ShelfDisplayState.EdgeDocked, manager.DismissShelf(placement));
         Assert.AreEqual(placement, manager.RailPlacement);
     }
 
     [TestMethod]
-    public void ShowShelf_SelectsCompactOrExpandedPresentationWithoutChangingBatches()
+    public void ShowShelf_SetsVisiblePresentationWithoutChangingBatches()
     {
         var manager = CreateManagerWithOneItem(out _);
         var batch = manager.Batches[0];
 
-        manager.ShowShelf(ShelfDisplayState.Compact);
+        manager.ShowShelf();
 
-        Assert.AreEqual(ShelfDisplayState.Compact, manager.DisplayState);
-        Assert.AreSame(batch, manager.Batches[0]);
-
-        manager.ShowShelf(ShelfDisplayState.Expanded);
-
-        Assert.AreEqual(ShelfDisplayState.Expanded, manager.DisplayState);
+        Assert.AreEqual(ShelfDisplayState.Visible, manager.DisplayState);
         Assert.AreSame(batch, manager.Batches[0]);
     }
-
     [TestMethod]
     public async Task RailPlacementCanBeUpdatedWhileShelfIsDocked()
     {
@@ -298,7 +292,7 @@ public sealed class DropShelfManagerTests
         var initial = new ShelfRailPlacement("DISPLAY1", ShelfRailEdge.Right);
         var updated = new ShelfRailPlacement("DISPLAY2", ShelfRailEdge.Left);
 
-        manager.ShowShelf(ShelfDisplayState.Compact);
+        manager.ShowShelf();
         manager.DismissShelf(initial);
         await manager.SetRailPlacementAsync(updated);
 
@@ -310,7 +304,7 @@ public sealed class DropShelfManagerTests
     public void RemovingLastBatch_HidesAnEdgeDockedShelf()
     {
         var manager = CreateManagerWithOneItem(out var item);
-        manager.ShowShelf(ShelfDisplayState.Compact);
+        manager.ShowShelf();
         manager.DismissShelf(new ShelfRailPlacement("DISPLAY1", ShelfRailEdge.Right));
 
         Assert.IsTrue(manager.RemoveItem(item.Id));
@@ -323,11 +317,11 @@ public sealed class DropShelfManagerTests
         var manager = CreateManagerWithOneItem(out _);
         var placement = new ShelfRailPlacement("DISPLAY1", ShelfRailEdge.Right);
 
-        manager.ShowShelf(ShelfDisplayState.Compact);
+        manager.ShowShelf();
         manager.DismissShelf(placement);
-        manager.ShowShelf(ShelfDisplayState.Compact);
+        manager.ShowShelf();
 
-        Assert.AreEqual(ShelfDisplayState.Compact, manager.DisplayState);
+        Assert.AreEqual(ShelfDisplayState.Visible, manager.DisplayState);
         Assert.AreEqual(placement, manager.RailPlacement);
     }
     [TestMethod]
@@ -345,7 +339,7 @@ public sealed class DropShelfManagerTests
         Assert.IsEmpty(manager.Batches);
 
         // Now user re-opens the shelf
-        manager.ShowShelf(ShelfDisplayState.Compact);
+        manager.ShowShelf();
         Assert.IsEmpty(manager.Batches);
     }
 
@@ -353,8 +347,8 @@ public sealed class DropShelfManagerTests
     public void CompleteBatchDrag_WhenLastBatchConsumed_DismissTransitionsToHidden()
     {
         var manager = CreateManagerWithOneItem(out var item);
-        manager.ShowShelf(ShelfDisplayState.Compact);
-        Assert.AreEqual(ShelfDisplayState.Compact, manager.DisplayState);
+        manager.ShowShelf();
+        Assert.AreEqual(ShelfDisplayState.Visible, manager.DisplayState);
 
         var preparation = manager.PrepareBatchForDrag(manager.Batches[0].Id, _ => ItemAvailability.Available);
         Assert.IsTrue(manager.CompleteBatchDrag(manager.Batches[0].Id, DragOutOutcome.AcceptedCopy));
@@ -392,12 +386,78 @@ public sealed class DropShelfManagerTests
     public void HideShelf_RestoresHiddenStateWithoutChangingBatches()
     {
         var manager = CreateManagerWithOneItem(out _);
-        manager.ShowShelf(ShelfDisplayState.Compact);
+        manager.ShowShelf();
 
         manager.HideShelf();
 
         Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
         Assert.HasCount(1, manager.Batches);
+    }
+
+    [TestMethod]
+    public void PreferredSize_DefaultsTo180x180()
+    {
+        var manager = new DropShelfManager();
+        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+    }
+
+    [TestMethod]
+    public async Task FinalItemRemoved_FromVisibleState_TransitionsToHiddenAndResetsPreferredSize()
+    {
+        var manager = CreateManagerWithOneItem(out var item);
+        manager.ShowShelf();
+        await manager.SetPreferredSizeAsync(new ShelfSize(200, 200));
+        Assert.AreEqual(ShelfDisplayState.Visible, manager.DisplayState);
+
+        Assert.IsTrue(manager.RemoveItem(item.Id));
+        Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
+        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+    }
+
+    [TestMethod]
+    public async Task FinalItemRemoved_ByClearTemporaryItems_TransitionsToHiddenAndResetsPreferredSize()
+    {
+        var manager = CreateManagerWithOneItem(out _);
+        manager.ShowShelf();
+        await manager.SetPreferredSizeAsync(new ShelfSize(250, 250));
+
+        var removed = manager.ClearTemporaryItems();
+        Assert.AreEqual(1, removed);
+        Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
+        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+    }
+
+    [TestMethod]
+    public async Task FinalItemRemoved_ByMissingCleanup_TransitionsToHiddenAndResetsPreferredSize()
+    {
+        var manager = CreateManagerWithOneItem(out _);
+        manager.ShowShelf();
+        await manager.SetPreferredSizeAsync(new ShelfSize(220, 220));
+
+        var prep = manager.PrepareBatchForDrag(manager.Batches[0].Id, _ => ItemAvailability.Missing);
+        Assert.AreEqual(1, prep.MissingItemsRemovedCount);
+        Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
+        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+    }
+
+    [TestMethod]
+    public async Task FinalItemRemoved_ByAcceptedDragOut_TransitionsToHiddenAndResetsPreferredSize()
+    {
+        var manager = CreateManagerWithOneItem(out var item);
+        manager.ShowShelf();
+        await manager.SetPreferredSizeAsync(new ShelfSize(220, 220));
+
+        Assert.IsTrue(manager.CompleteItemDrag(item.Id, DragOutOutcome.AcceptedCopy));
+        Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
+        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+    }
+
+    [TestMethod]
+    public async Task SetPreferredSize_RejectsInvalidSizes()
+    {
+        var manager = new DropShelfManager();
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.SetPreferredSizeAsync(new ShelfSize(179, 200)));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.SetPreferredSizeAsync(new ShelfSize(200, 179)));
     }
 
 

@@ -39,7 +39,7 @@
             Margin="0,4,0,0"
             HorizontalScrollBarVisibility="Disabled"
             VerticalScrollBarVisibility="Hidden">
-            <ItemsRepeater x:Name="BatchList">
+            <ItemsRepeater x:Name="BatchList" HorizontalCacheLength="0" VerticalCacheLength="0">
                 <ItemsRepeater.Layout>
                     <StackLayout Spacing="4" />
                 </ItemsRepeater.Layout>

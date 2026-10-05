@@ -9,7 +9,7 @@ public sealed class DropShelfManager
     private readonly Dictionary<Guid, HashSet<Guid>> _preparedBatchItems = [];
     private ShelfDisplayState _displayState = ShelfDisplayState.Hidden;
     private ShelfRailPlacement _railPlacement = ShelfRailPlacement.Default;
-
+    private ShelfSize _preferredSize = ShelfSize.Default;
     /// <summary>Creates an in-memory manager for transient callers.</summary>
     public DropShelfManager()
     {
@@ -20,11 +20,13 @@ public sealed class DropShelfManager
         ShelfDatabase database,
         IReadOnlyList<ShelfBatch> batches,
         ShelfRailPlacement railPlacement,
+        ShelfSize preferredSize,
         string? recoveryBackupPath)
     {
         _database = database;
         _batches = [.. batches];
         _railPlacement = railPlacement;
+        _preferredSize = preferredSize;
         RecoveryBackupPath = recoveryBackupPath;
     }
 
@@ -40,17 +42,32 @@ public sealed class DropShelfManager
     /// <summary>Gets the remembered Edge Rail placement.</summary>
     public ShelfRailPlacement RailPlacement => _railPlacement;
 
-    /// <summary>Marks the selected shelf presentation as visible.</summary>
-    /// <param name="presentation">The quick-access or management presentation to show.</param>
-    public void ShowShelf(ShelfDisplayState presentation)
+    /// <summary>Gets the preferred logical size of the Drop Shelf.</summary>
+    public ShelfSize PreferredSize => _preferredSize;
+
+    /// <summary>Sets and durably persists the user-selected preferred logical size while content exists.</summary>
+    /// <param name="size">The logical size selected by completed user resize.</param>
+    /// <param name="cancellationToken">Cancels persistence.</param>
+    public async Task SetPreferredSizeAsync(
+        ShelfSize size,
+        CancellationToken cancellationToken = default)
     {
-        if (presentation is not (ShelfDisplayState.Compact or ShelfDisplayState.Expanded))
+        if (!size.IsValid)
         {
-            throw new ArgumentOutOfRangeException(nameof(presentation), presentation, "Only Compact or Expanded shelf presentations can be shown.");
+            throw new ArgumentOutOfRangeException(nameof(size), size, "Preferred size must be at least 180x180.");
         }
 
-        _displayState = presentation;
+        using var mutation = await LockMutationsAsync(cancellationToken);
+        if (_batches.Count > 0 && _database is not null)
+        {
+            await _database.SavePreferredSizeAsync(size, cancellationToken).ConfigureAwait(false);
+        }
+
+        _preferredSize = size;
     }
+
+    /// <summary>Marks the resizable Drop Shelf as visible.</summary>
+    public void ShowShelf() => _displayState = ShelfDisplayState.Visible;
 
     /// <summary>Marks the shelf as hidden without changing held Shelf Batches.</summary>
     public void HideShelf() => _displayState = ShelfDisplayState.Hidden;
@@ -129,7 +146,7 @@ public sealed class DropShelfManager
                 Availability = ClassifyRestoredPath(item.Path, classifyAvailability),
             }).ToArray(),
         }).ToArray();
-        return new DropShelfManager(database, batches, opened.RailPlacement, opened.RecoveryBackupPath);
+        return new DropShelfManager(database, batches, opened.RailPlacement, opened.PreferredSize, opened.RecoveryBackupPath);
     }
 
     /// <summary>Accepts and persists one incoming drop.</summary>
@@ -144,7 +161,7 @@ public sealed class DropShelfManager
         {
             try
             {
-                await _database.AddBatchAsync(outcome.Batch, cancellationToken);
+                await _database.AddBatchAsync(outcome.Batch, _batches.Count == 1 ? _preferredSize : null, cancellationToken);
             }
             catch
             {
@@ -195,7 +212,6 @@ public sealed class DropShelfManager
         {
             await _database.RemoveItemsAsync([itemId], cancellationToken);
         }
-
         return RemoveItem(itemId);
     }
 
@@ -217,7 +233,6 @@ public sealed class DropShelfManager
         {
             await _database.RemoveItemsAsync([itemId], cancellationToken);
         }
-
         return RemoveItem(itemId);
     }
 
@@ -234,7 +249,6 @@ public sealed class DropShelfManager
         {
             await _database.RemoveBatchAsync(batchId, cancellationToken);
         }
-
         return RemoveBatch(batchId);
     }
 
@@ -252,7 +266,6 @@ public sealed class DropShelfManager
         {
             await _database.ClearTemporaryItemsAsync(cancellationToken);
         }
-
         ClearTemporaryItems();
         return removedCount;
     }
@@ -283,7 +296,6 @@ public sealed class DropShelfManager
         {
             await _database.RemoveItemsAsync(missingIds, cancellationToken);
         }
-
         var preparation = PrepareBatchForDrag(batchId, path => availability[path]);
         if (preparation.AvailableItems.Count == 0)
         {
@@ -329,7 +341,6 @@ public sealed class DropShelfManager
         {
             await _database.RemoveItemsAsync(temporaryIds, cancellationToken);
         }
-
         return RemoveItems(temporaryIds);
     }
 
@@ -424,7 +435,7 @@ public sealed class DropShelfManager
             _batches[batchIndex] = batch with { Items = items };
         }
 
-        HideRailWhenEmpty();
+        ResetOnEmpty();
         return true;
     }
 
@@ -451,7 +462,7 @@ public sealed class DropShelfManager
             }
         }
 
-        HideRailWhenEmpty();
+        ResetOnEmpty();
         return changed;
     }
 
@@ -482,7 +493,7 @@ public sealed class DropShelfManager
         }
 
         _batches.RemoveAt(index);
-        HideRailWhenEmpty();
+        ResetOnEmpty();
         return true;
     }
 
@@ -506,18 +517,21 @@ public sealed class DropShelfManager
             }
         }
 
-        HideRailWhenEmpty();
+        ResetOnEmpty();
         return removedCount;
     }
 
-    private void HideRailWhenEmpty()
+    private void ResetOnEmpty()
     {
-        if (_batches.Count == 0 && _displayState == ShelfDisplayState.EdgeDocked)
+        if (_batches.Count == 0)
         {
-            _displayState = ShelfDisplayState.Hidden;
+            if (_displayState is ShelfDisplayState.Visible or ShelfDisplayState.EdgeDocked)
+            {
+                _displayState = ShelfDisplayState.Hidden;
+            }
+            _preferredSize = ShelfSize.Default;
         }
     }
-
     /// <summary>Cleans up confirmed missing filesystem paths in a batch before drag-out begins, classifying availability.</summary>
     /// <param name="batchId">The batch identity.</param>
     /// <param name="checkAvailability">A func classifying path availability.</param>
@@ -569,7 +583,7 @@ public sealed class DropShelfManager
             }
         }
 
-        HideRailWhenEmpty();
+        ResetOnEmpty();
         return new BatchDragPreparation(available, unavailable, missingCount);
     }
 
@@ -595,14 +609,14 @@ public sealed class DropShelfManager
         if (pinned.Length == 0)
         {
             _batches.RemoveAt(index);
-            HideRailWhenEmpty();
+            ResetOnEmpty();
             return true;
         }
 
         if (pinned.Length != batch.Items.Count)
         {
             _batches[index] = batch with { Items = pinned };
-            HideRailWhenEmpty();
+            ResetOnEmpty();
             return true;
         }
 
