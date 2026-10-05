@@ -6,7 +6,7 @@
 
 **Blocked by:** 02: Cut over one-Shelf-Item drag-out.
 
-**Status:** retired — Effort closed. DropCove retains WinUI whole-batch drag-out.
+**Status:** wontfix — Effort closed. DropCove retains WinUI whole-batch drag-out.
 
 **Testing seam:** Reuse the existing prepared-batch identity set and manager completion seam. Test multi-path payload/result decisions without duplicating item-level lifecycle tests. Use installed Release interaction for actual multi-file/folder payload delivery and transient UI behavior.
 

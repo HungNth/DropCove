@@ -6,7 +6,7 @@
 
 **Blocked by:** 01: Prove a reliable native OLE acceptance signal.
 
-**Status:** retired — Effort closed. DropCove retains WinUI one-item drag-out.
+**Status:** wontfix — Effort closed. DropCove retains WinUI one-item drag-out.
 
 **Testing seam:** Reuse the manager lifecycle and persistence seam for accepted versus non-successful outcomes. Test only decision-rich native result classification and resource lifetime below it. Use installed Release interaction for pointer threshold, drag image, cursor feedback, `Esc`, and real destination behavior.
 

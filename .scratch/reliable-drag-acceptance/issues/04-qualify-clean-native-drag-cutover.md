@@ -6,7 +6,7 @@
 
 **Blocked by:** 03: Cut over whole-Shelf-Batch drag-out.
 
-**Status:** retired — Effort closed. No native drag qualification required.
+**Status:** wontfix — Effort closed. No native drag qualification required.
 
 **Testing seam:** Run the complete automated suite once after source stabilization. Use installed Release UI Automation and direct pointer/keyboard interaction for source gestures, popup/flyout lifetime, real targets, and the disappearing-destination case. Use the established resource measurement procedure without changing its gates.
 

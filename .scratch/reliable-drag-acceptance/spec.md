@@ -1,6 +1,6 @@
 # Reliable Native Drag Acceptance Specification
 
-Status: retired — Decision on 2026-10-05: retain existing WinUI drag engine. Controlled testing confirmed WinUI reliably retains unaccepted drops and consumes only on genuine acceptance; managed native OLE cutover is rejected (see docs/adr/0003-gate-native-drag-out-on-acceptance-evidence.md).
+Status: wontfix — Decision on 2026-10-05: retain existing WinUI drag engine. Controlled testing confirmed WinUI reliably retains unaccepted drops and consumes only on genuine acceptance; managed native OLE cutover is rejected (see [ADR 0003](../../docs/adr/0003-gate-native-drag-out-on-acceptance-evidence.md)).
 
 ## Problem Statement
 

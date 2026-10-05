@@ -16,7 +16,7 @@ The [controlled follow-up](../../.scratch/reliable-drag-acceptance/controlled-pr
 
 ## Real DropCove verification — 2026-10-05
 
-The user-approved test-profile seam enabled [real popup verification](../../.scratch/reliable-drag-acceptance/installed-profile-verdict.md) without replacing or mutating live user data. Actual DropCove WinUI passed the controlled 5×4 matrix over Reject backing; a further five attempts confirmed that acceptance by Copy backing legitimately consumes the participating Temporary reference after primary exit. Native replacement has no demonstrated advantage in these measured scenarios. Keep this ADR proposed and native production tickets blocked for a planning decision; do not infer which destination handled historical primary-only attempts or claim final installer/performance qualification.
+The user-approved test-profile seam enabled [real popup verification](../../.scratch/reliable-drag-acceptance/installed-profile-verdict.md) without replacing or mutating live user data. Actual DropCove WinUI passed the controlled 5×4 matrix over Reject backing; a further five attempts confirmed that acceptance by Copy backing legitimately consumes the participating Temporary reference after primary exit. Native replacement has no demonstrated advantage in these measured scenarios; see decision below.
 
 ## Decision — 2026-10-05
 
