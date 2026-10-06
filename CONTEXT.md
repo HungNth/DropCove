@@ -20,6 +20,16 @@ _Avoid_: Folder, collection
 One occurrence of a referenced file or folder inside a Shelf Batch.
 _Avoid_: File copy, attachment
 
+## Shelf sizing
+
+**Automatic Shelf Growth**:
+The Drop Shelf increases only its height to expose additional responsive-grid rows while no Manual Height Override applies. It does not change shelf width or introduce a separate presentation mode.
+_Avoid_: Size-to-content, automatic expansion mode
+
+**Manual Height Override**:
+A shelf height explicitly chosen through vertical resizing that suspends Automatic Shelf Growth until the shelf becomes empty. Width-only resizing does not create this override.
+_Avoid_: Manual mode, locked size
+
 ## References and lifecycle
 
 **Path Reference**:

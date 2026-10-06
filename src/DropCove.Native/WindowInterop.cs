@@ -649,6 +649,44 @@ public static class WindowInterop
         SetBounds(windowHandle, x, y, width, height, SwpNoActivate);
     }
 
+    /// <summary>Gets the fitted logical shelf width on the cursor monitor without moving a window.</summary>
+    /// <param name="logicalWidth">The preferred logical width.</param>
+    /// <returns>The physical fitted width expressed in logical pixels.</returns>
+    public static double GetOpeningWidthOnCursorMonitor(int logicalWidth)
+    {
+        if (!GetCursorPos(out var cursor))
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not read the cursor position.");
+        return GetOpeningWidth(MonitorFromPoint(cursor, MonitorDefaultToNearest), logicalWidth);
+    }
+
+    /// <summary>Gets fitted width on a remembered monitor, using the window monitor if that display disconnects.</summary>
+    /// <param name="windowHandle">The window supplying the fallback monitor.</param>
+    /// <param name="monitorId">The resolved connected monitor device name.</param>
+    /// <param name="logicalWidth">The preferred logical width.</param>
+    /// <returns>The physical fitted width expressed in logical pixels.</returns>
+    public static double GetOpeningWidthOnMonitor(nint windowHandle, string monitorId, int logicalWidth)
+    {
+        var monitor = FindMonitor(monitorId);
+        if (monitor == 0) monitor = MonitorFromWindow(windowHandle, MonitorDefaultToNearest);
+        return GetOpeningWidth(monitor, logicalWidth);
+    }
+
+    /// <summary>Gets the fitted logical shelf width on the monitor containing a screen point.</summary>
+    /// <param name="screenX">The screen horizontal coordinate.</param>
+    /// <param name="screenY">The screen vertical coordinate.</param>
+    /// <param name="logicalWidth">The preferred logical width.</param>
+    /// <returns>The physical fitted width expressed in logical pixels.</returns>
+    public static double GetOpeningWidthNearPoint(int screenX, int screenY, int logicalWidth) =>
+        GetOpeningWidth(MonitorFromPoint(new Point(screenX, screenY), MonitorDefaultToNearest), logicalWidth);
+
+    private static double GetOpeningWidth(nint monitor, int logicalWidth)
+    {
+        if (monitor == 0) throw new Win32Exception("Could not resolve the opening monitor.");
+        var dpi = GetMonitorDpi(monitor);
+        var (width, _) = FitToWorkArea(logicalWidth, MinimumShelfDimension, dpi, GetMonitorInfo(monitor).Work);
+        return width * 96.0 / dpi;
+    }
+
     /// <summary>Positions the shelf around the cursor on its current monitor.</summary>
     /// <param name="windowHandle">The shelf window.</param>
     /// <param name="logicalWidth">Width in logical pixels.</param>
@@ -894,11 +932,10 @@ public static class WindowInterop
 
     /// <summary>Resizes while retaining the top edge and clamping the window to its monitor work area.</summary>
     /// <param name="windowHandle">The target HWND.</param>
-    /// <param name="logicalWidth">Width in logical pixels.</param>
     /// <param name="logicalHeight">Height in logical pixels.</param>
-    public static void ResizeAnchored(nint windowHandle, int logicalWidth, int logicalHeight)
+    public static void ResizeAnchored(nint windowHandle, int logicalHeight)
     {
-        ValidateLogicalSize(logicalWidth, logicalHeight);
+        ValidateLogicalSize(MinimumShelfDimension, logicalHeight);
         if (!GetWindowRect(windowHandle, out var current))
         {
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not read the DropCove window bounds.");
@@ -917,12 +954,27 @@ public static class WindowInterop
             dpi = GetMonitorDpi(monitor);
         }
 
-        var (width, height) = FitToWorkArea(logicalWidth, logicalHeight, dpi, monitorInfo.Work);
-        var maxX = monitorInfo.Work.Right - width;
-        var maxY = monitorInfo.Work.Bottom - height;
-        var x = Math.Clamp(current.Left, monitorInfo.Work.Left, maxX);
-        var y = Math.Clamp(current.Top, monitorInfo.Work.Top, maxY);
-        SetBounds(windowHandle, x, y, width, height, SwpNoActivate);
+        var target = CalculateAnchoredGrowthBounds(
+            new WindowBounds(current.Left, current.Top, current.Right, current.Bottom),
+            new WindowBounds(monitorInfo.Work.Left, monitorInfo.Work.Top, monitorInfo.Work.Right, monitorInfo.Work.Bottom),
+            logicalHeight, dpi);
+        SetBounds(windowHandle, target.Left, target.Top, target.Width, target.Height, SwpNoActivate);
+    }
+
+    /// <summary>Calculates height-only growth, preserving the top edge unless reachability requires correction.</summary>
+    /// <param name="current">The current physical window bounds.</param>
+    /// <param name="workArea">The current physical monitor work area.</param>
+    /// <param name="logicalHeight">The requested logical height.</param>
+    /// <param name="dpi">The monitor DPI.</param>
+    /// <returns>The reachable physical target bounds.</returns>
+    public static WindowBounds CalculateAnchoredGrowthBounds(
+        WindowBounds current, WindowBounds workArea, int logicalHeight, uint dpi)
+    {
+        var width = Math.Min(current.Width, workArea.Width);
+        var height = Math.Min(ScaleLogicalPixels(logicalHeight, dpi), workArea.Height);
+        var x = Math.Clamp(current.Left, workArea.Left, workArea.Right - width);
+        var y = Math.Clamp(current.Top, workArea.Top, workArea.Bottom - height);
+        return new WindowBounds(x, y, x + width, y + height);
     }
     /// <summary>Tests screen coordinates against the window's outer border to detect resize targets.</summary>
     /// <param name="bounds">The window bounds in screen coordinates.</param>

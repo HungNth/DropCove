@@ -46,6 +46,8 @@ public sealed partial class MainWindow : Window
     private Task _shakeOperationTask = Task.CompletedTask;
     private bool _isUserResizing;
     private WindowBounds _sizeMoveStartBounds;
+    private WindowResizeDirection _sizeMoveDirection;
+    private uint _sizeMoveStartDpi;
     private bool _isResizeHovered;
     private WindowResizeDirection _activeResizeDirection = WindowResizeDirection.None;
 
@@ -65,8 +67,8 @@ public sealed partial class MainWindow : Window
         _windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
         var initialDpi = WindowInterop.GetWindowDpi(_windowHandle);
         AppWindow.Resize(new SizeInt32(
-            WindowInterop.ScaleLogicalPixels(ShelfSize.Default.Width, initialDpi),
-            WindowInterop.ScaleLogicalPixels(ShelfSize.Default.Height, initialDpi)));
+            WindowInterop.ScaleLogicalPixels(ShelfSizingState.Default.PreferredWidth, initialDpi),
+            WindowInterop.ScaleLogicalPixels(WindowInterop.MinimumShelfDimension, initialDpi)));
 
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
         if (File.Exists(iconPath))
@@ -77,6 +79,7 @@ public sealed partial class MainWindow : Window
         RootFrame.Navigate(typeof(MainPage));
         _page = (MainPage)RootFrame.Content;
         ResizeStarted += _page.CloseBatchPopup;
+        _page.ShelfBatchAccepted += GrowAfterAcceptedDrop;
         _globalHotKey = new GlobalHotKey(_windowHandle);
         _trayIcon = new TrayIcon(
             _windowHandle,
@@ -162,20 +165,45 @@ public sealed partial class MainWindow : Window
         HideRail();
         _manager.ShowShelf();
         await _page.RefreshAsync();
-        var preferred = _manager.PreferredSize;
+        var preferred = _manager.SizingState;
         if (placement is { HasMonitor: true })
         {
             var monitorId = WindowInterop.ResolveMonitorId(placement.MonitorId, _windowHandle);
-            WindowInterop.PositionOnMonitor(_windowHandle, monitorId, preferred.Width, preferred.Height);
+            var height = preferred.ManualHeightOverride ?? ShelfSizingPolicy.AutomaticHeight(
+                WindowInterop.GetOpeningWidthOnMonitor(_windowHandle, monitorId, preferred.PreferredWidth), _manager.Batches.Count);
+            WindowInterop.PositionOnMonitor(_windowHandle, monitorId, preferred.PreferredWidth, height);
         }
         else
         {
-            WindowInterop.PositionOnCursorMonitor(_windowHandle, preferred.Width, preferred.Height);
+            var height = preferred.ManualHeightOverride ?? ShelfSizingPolicy.AutomaticHeight(
+                WindowInterop.GetOpeningWidthOnCursorMonitor(preferred.PreferredWidth), _manager.Batches.Count);
+            WindowInterop.PositionOnCursorMonitor(_windowHandle, preferred.PreferredWidth, height);
         }
+        GrowAfterAcceptedDrop();
 
         WindowInterop.ShowAndActivate(_windowHandle);
         _page.Focus(FocusState.Programmatic);
         _page.PlayShelfAppearance();
+    }
+
+    private void GrowAfterAcceptedDrop()
+    {
+        if (_manager is null || _manager.DisplayState != ShelfDisplayState.Visible || _isUserResizing)
+        {
+            return;
+        }
+
+        var bounds = WindowInterop.GetWindowBounds(_windowHandle);
+        var dpi = WindowInterop.GetWindowDpi(_windowHandle);
+        var width = bounds.Width * 96.0 / dpi;
+        var height = WindowInterop.UnscalePhysicalPixels(bounds.Height, dpi);
+        var target = ShelfSizingPolicy.HeightAfterAcceptedDrop(width, height, _manager.Batches.Count,
+            _manager.SizingState.ManualHeightOverride);
+        if (target > height)
+        {
+            _page.CloseBatchPopup();
+            WindowInterop.ResizeAnchored(_windowHandle, target);
+        }
     }
     private void ProcessShakeInput(LowLevelMouseInput input)
     {
@@ -320,8 +348,11 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var preferred = _manager.PreferredSize;
-        WindowInterop.PositionNearPoint(_windowHandle, targetX, targetY, preferred.Width, preferred.Height);
+        var preferred = _manager.SizingState;
+        var height = preferred.ManualHeightOverride ?? ShelfSizingPolicy.AutomaticHeight(
+            WindowInterop.GetOpeningWidthNearPoint(targetX, targetY, preferred.PreferredWidth), _manager.Batches.Count);
+        WindowInterop.PositionNearPoint(_windowHandle, targetX, targetY, preferred.PreferredWidth, height);
+        GrowAfterAcceptedDrop();
         WindowInterop.ShowAndActivate(_windowHandle);
         _page.Focus(FocusState.Programmatic);
         if (refresh)
@@ -854,6 +885,8 @@ public sealed partial class MainWindow : Window
     private void OnEnterSizeMove()
     {
         _sizeMoveStartBounds = WindowInterop.GetWindowBounds(_windowHandle);
+        _sizeMoveDirection = _activeResizeDirection;
+        _sizeMoveStartDpi = WindowInterop.GetWindowDpi(_windowHandle);
         _isUserResizing |= _activeResizeDirection != WindowResizeDirection.None;
         ClearResizeHover();
         if (_isUserResizing)
@@ -882,6 +915,7 @@ public sealed partial class MainWindow : Window
 
     private void HandleSizingMessage(nuint wParam, nint lParam)
     {
+        _sizeMoveDirection = (WindowResizeDirection)wParam;
         if (!_isUserResizing)
         {
             _isUserResizing = true;
@@ -922,13 +956,18 @@ public sealed partial class MainWindow : Window
         var dpi = WindowInterop.GetWindowDpi(_windowHandle);
         var logicalWidth = Math.Max(WindowInterop.MinimumShelfDimension, WindowInterop.UnscalePhysicalPixels(bounds.Width, dpi));
         var logicalHeight = Math.Max(WindowInterop.MinimumShelfDimension, WindowInterop.UnscalePhysicalPixels(bounds.Height, dpi));
-        var preferredSize = new ShelfSize(logicalWidth, logicalHeight);
+        var startHeight = Math.Max(WindowInterop.MinimumShelfDimension,
+            WindowInterop.UnscalePhysicalPixels(_sizeMoveStartBounds.Height, _sizeMoveStartDpi));
+        var changesHeight = _sizeMoveDirection is WindowResizeDirection.Top or WindowResizeDirection.Bottom
+            or WindowResizeDirection.TopLeft or WindowResizeDirection.TopRight
+            or WindowResizeDirection.BottomLeft or WindowResizeDirection.BottomRight;
+        var sizingState = _manager.SizingState.AfterUserResize(logicalWidth, startHeight, logicalHeight, changesHeight);
 
         DispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
-                await _manager.SetPreferredSizeAsync(preferredSize);
+                await _manager.SetSizingStateAsync(sizingState);
             }
             catch (Exception exception)
             {
@@ -982,8 +1021,10 @@ public sealed partial class MainWindow : Window
             if (WindowInterop.IsVisible(_windowHandle) &&
                 _manager.DisplayState == ShelfDisplayState.Visible)
             {
-                var preferred = _manager.PreferredSize;
-                WindowInterop.ResizeAndClamp(_windowHandle, preferred.Width, preferred.Height);
+                var preferred = _manager.SizingState;
+                var bounds = WindowInterop.GetWindowBounds(_windowHandle);
+                var height = WindowInterop.UnscalePhysicalPixels(bounds.Height, WindowInterop.GetWindowDpi(_windowHandle));
+                WindowInterop.ResizeAndClamp(_windowHandle, preferred.PreferredWidth, preferred.ManualHeightOverride ?? height);
             }
         }
         catch (Exception ex)

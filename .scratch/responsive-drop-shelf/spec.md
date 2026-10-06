@@ -2,6 +2,8 @@
 
 Status: ready-for-agent
 
+> **Superseded in part:** [Automatic Shelf Growth](../automatic-shelf-growth/spec.md) replaces the requirements that Shelf Batch additions never resize the visible shelf, that all content mutations preserve stable bounds, that pointer resizing is the only window-level expansion behavior, and that automatic content-driven growth is out of scope. All other responsive layout, popup, resizing, persistence, Edge Rail, accessibility, and performance requirements remain governing unless the newer specification explicitly changes them.
+
 ## Problem Statement
 
 The Drop Shelf currently exposes separate Compact and Expanded presentations with fixed window sizes and footer controls for switching between them. This makes the surface feel like a mode-driven management window rather than a lightweight temporary drag-and-drop shelf. Users cannot shape the shelf to match their current workspace, monitor, or number of Shelf Batches.

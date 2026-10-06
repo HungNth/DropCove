@@ -395,69 +395,69 @@ public sealed class DropShelfManagerTests
     }
 
     [TestMethod]
-    public void PreferredSize_DefaultsTo180x180()
+    public void SizingState_DefaultsTo180x180()
     {
         var manager = new DropShelfManager();
-        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, manager.SizingState);
     }
 
     [TestMethod]
-    public async Task FinalItemRemoved_FromVisibleState_TransitionsToHiddenAndResetsPreferredSize()
+    public async Task FinalItemRemoved_FromVisibleState_TransitionsToHiddenAndResetsSizingState()
     {
         var manager = CreateManagerWithOneItem(out var item);
         manager.ShowShelf();
-        await manager.SetPreferredSizeAsync(new ShelfSize(200, 200));
+        await manager.SetSizingStateAsync(new ShelfSizingState(200, 200));
         Assert.AreEqual(ShelfDisplayState.Visible, manager.DisplayState);
 
         Assert.IsTrue(manager.RemoveItem(item.Id));
         Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
-        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, manager.SizingState);
     }
 
     [TestMethod]
-    public async Task FinalItemRemoved_ByClearTemporaryItems_TransitionsToHiddenAndResetsPreferredSize()
+    public async Task FinalItemRemoved_ByClearTemporaryItems_TransitionsToHiddenAndResetsSizingState()
     {
         var manager = CreateManagerWithOneItem(out _);
         manager.ShowShelf();
-        await manager.SetPreferredSizeAsync(new ShelfSize(250, 250));
+        await manager.SetSizingStateAsync(new ShelfSizingState(250, 250));
 
         var removed = manager.ClearTemporaryItems();
         Assert.AreEqual(1, removed);
         Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
-        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, manager.SizingState);
     }
 
     [TestMethod]
-    public async Task FinalItemRemoved_ByMissingCleanup_TransitionsToHiddenAndResetsPreferredSize()
+    public async Task FinalItemRemoved_ByMissingCleanup_TransitionsToHiddenAndResetsSizingState()
     {
         var manager = CreateManagerWithOneItem(out _);
         manager.ShowShelf();
-        await manager.SetPreferredSizeAsync(new ShelfSize(220, 220));
+        await manager.SetSizingStateAsync(new ShelfSizingState(220, 220));
 
         var prep = manager.PrepareBatchForDrag(manager.Batches[0].Id, _ => ItemAvailability.Missing);
         Assert.AreEqual(1, prep.MissingItemsRemovedCount);
         Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
-        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, manager.SizingState);
     }
 
     [TestMethod]
-    public async Task FinalItemRemoved_ByAcceptedDragOut_TransitionsToHiddenAndResetsPreferredSize()
+    public async Task FinalItemRemoved_ByAcceptedDragOut_TransitionsToHiddenAndResetsSizingState()
     {
         var manager = CreateManagerWithOneItem(out var item);
         manager.ShowShelf();
-        await manager.SetPreferredSizeAsync(new ShelfSize(220, 220));
+        await manager.SetSizingStateAsync(new ShelfSizingState(220, 220));
 
         Assert.IsTrue(manager.CompleteItemDrag(item.Id, DragOutOutcome.AcceptedCopy));
         Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
-        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, manager.SizingState);
     }
 
     [TestMethod]
-    public async Task SetPreferredSize_RejectsInvalidSizes()
+    public async Task SetSizingState_RejectsInvalidSizes()
     {
         var manager = new DropShelfManager();
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.SetPreferredSizeAsync(new ShelfSize(179, 200)));
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.SetPreferredSizeAsync(new ShelfSize(200, 179)));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.SetSizingStateAsync(new ShelfSizingState(179, 200)));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.SetSizingStateAsync(new ShelfSizingState(200, 179)));
     }
 
 

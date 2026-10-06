@@ -9,7 +9,7 @@ public sealed class DropShelfManager
     private readonly Dictionary<Guid, HashSet<Guid>> _preparedBatchItems = [];
     private ShelfDisplayState _displayState = ShelfDisplayState.Hidden;
     private ShelfRailPlacement _railPlacement = ShelfRailPlacement.Default;
-    private ShelfSize _preferredSize = ShelfSize.Default;
+    private ShelfSizingState _sizingState = ShelfSizingState.Default;
     /// <summary>Creates an in-memory manager for transient callers.</summary>
     public DropShelfManager()
     {
@@ -20,13 +20,13 @@ public sealed class DropShelfManager
         ShelfDatabase database,
         IReadOnlyList<ShelfBatch> batches,
         ShelfRailPlacement railPlacement,
-        ShelfSize preferredSize,
+        ShelfSizingState sizingState,
         string? recoveryBackupPath)
     {
         _database = database;
         _batches = [.. batches];
         _railPlacement = railPlacement;
-        _preferredSize = preferredSize;
+        _sizingState = sizingState;
         RecoveryBackupPath = recoveryBackupPath;
     }
 
@@ -42,28 +42,28 @@ public sealed class DropShelfManager
     /// <summary>Gets the remembered Edge Rail placement.</summary>
     public ShelfRailPlacement RailPlacement => _railPlacement;
 
-    /// <summary>Gets the preferred logical size of the Drop Shelf.</summary>
-    public ShelfSize PreferredSize => _preferredSize;
+    /// <summary>Gets durable width and optional explicit height.</summary>
+    public ShelfSizingState SizingState => _sizingState;
 
-    /// <summary>Sets and durably persists the user-selected preferred logical size while content exists.</summary>
-    /// <param name="size">The logical size selected by completed user resize.</param>
+    /// <summary>Records user-selected sizing intent, persisting it only while content exists.</summary>
+    /// <param name="state">The preferred width and optional manual height.</param>
     /// <param name="cancellationToken">Cancels persistence.</param>
-    public async Task SetPreferredSizeAsync(
-        ShelfSize size,
+    public async Task SetSizingStateAsync(
+        ShelfSizingState state,
         CancellationToken cancellationToken = default)
     {
-        if (!size.IsValid)
+        if (!state.IsValid)
         {
-            throw new ArgumentOutOfRangeException(nameof(size), size, "Preferred size must be at least 180x180.");
+            throw new ArgumentOutOfRangeException(nameof(state), state, "Selected dimensions must be at least 180 logical pixels.");
         }
 
         using var mutation = await LockMutationsAsync(cancellationToken);
         if (_batches.Count > 0 && _database is not null)
         {
-            await _database.SavePreferredSizeAsync(size, cancellationToken).ConfigureAwait(false);
+            await _database.SaveSizingStateAsync(state, cancellationToken).ConfigureAwait(false);
         }
 
-        _preferredSize = size;
+        _sizingState = state;
     }
 
     /// <summary>Marks the resizable Drop Shelf as visible.</summary>
@@ -146,7 +146,7 @@ public sealed class DropShelfManager
                 Availability = ClassifyRestoredPath(item.Path, classifyAvailability),
             }).ToArray(),
         }).ToArray();
-        return new DropShelfManager(database, batches, opened.RailPlacement, opened.PreferredSize, opened.RecoveryBackupPath);
+        return new DropShelfManager(database, batches, opened.RailPlacement, opened.SizingState, opened.RecoveryBackupPath);
     }
 
     /// <summary>Accepts and persists one incoming drop.</summary>
@@ -161,7 +161,7 @@ public sealed class DropShelfManager
         {
             try
             {
-                await _database.AddBatchAsync(outcome.Batch, _batches.Count == 1 ? _preferredSize : null, cancellationToken);
+                await _database.AddBatchAsync(outcome.Batch, _batches.Count == 1 ? _sizingState : null, cancellationToken);
             }
             catch
             {
@@ -529,7 +529,7 @@ public sealed class DropShelfManager
             {
                 _displayState = ShelfDisplayState.Hidden;
             }
-            _preferredSize = ShelfSize.Default;
+            _sizingState = ShelfSizingState.Default;
         }
     }
     /// <summary>Cleans up confirmed missing filesystem paths in a batch before drag-out begins, classifying availability.</summary>

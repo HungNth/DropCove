@@ -17,6 +17,62 @@ public sealed class DropShelfPersistenceTests
     }
 
     [TestMethod]
+    public async Task WidthOnlyResize_RestoresWidthWithoutManualHeight()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        await manager.AcceptDropAsync([new(@"C:\Work\Width.txt", "Width.txt", false)]);
+
+        await manager.SetSizingStateAsync(new ShelfSizingState(350, null));
+
+        var restored = await OpenAsync(databasePath);
+        Assert.AreEqual(350, restored.SizingState.PreferredWidth);
+        Assert.IsNull(restored.SizingState.ManualHeightOverride);
+    }
+
+    [TestMethod]
+    public async Task PendingWidth_FirstAcceptancePersistsNoManualHeight()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        await manager.SetSizingStateAsync(new ShelfSizingState(350, null));
+        var before = await OpenAsync(databasePath);
+        Assert.AreEqual(ShelfSizingState.Default, before.SizingState);
+
+        await manager.AcceptDropAsync([new(@"C:\Work\First.txt", "First.txt", false)]);
+
+        var restored = await OpenAsync(databasePath);
+        Assert.AreEqual(new ShelfSizingState(350, null), restored.SizingState);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task LegacySizing_CutoverPreservesOnlyRetainedContent(bool retainContent)
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        if (retainContent)
+        {
+            await manager.AcceptDropAsync([new(@"C:\Work\Legacy.txt", "Legacy.txt", false)]);
+        }
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath};Pooling=False"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "DROP TABLE shelf_settings; CREATE TABLE shelf_settings (id INTEGER PRIMARY KEY, preferred_width INTEGER NOT NULL, preferred_height INTEGER NOT NULL); INSERT INTO shelf_settings VALUES (1, 350, 180);";
+            command.ExecuteNonQuery();
+        }
+
+        var restored = await OpenAsync(databasePath);
+        var expected = retainContent ? new ShelfSizingState(350, 180) : ShelfSizingState.Default;
+        Assert.AreEqual(expected, restored.SizingState);
+        var reopened = await OpenAsync(databasePath);
+        Assert.AreEqual(expected, reopened.SizingState);
+        Assert.IsNull(reopened.RecoveryBackupPath);
+    }
+
+    [TestMethod]
     public async Task Restart_RestoresBatchOrderAndShelfItemMetadata()
     {
         var databasePath = CreateDatabasePath();
@@ -306,44 +362,44 @@ public sealed class DropShelfPersistenceTests
     }
 
     [TestMethod]
-    public async Task PreferredSize_PersistedWhileContentExists_RestoresAcrossRestart()
+    public async Task SizingState_PersistedWhileContentExists_RestoresAcrossRestart()
     {
         var databasePath = CreateDatabasePath();
         var manager = await OpenAsync(databasePath);
         await manager.AcceptDropAsync([new(@"C:\Work\Item.txt", "Item.txt", false)]);
 
-        var customSize = new ShelfSize(350, 420);
-        await manager.SetPreferredSizeAsync(customSize);
-        Assert.AreEqual(customSize, manager.PreferredSize);
+        var customSize = new ShelfSizingState(350, 420);
+        await manager.SetSizingStateAsync(customSize);
+        Assert.AreEqual(customSize, manager.SizingState);
 
         var restored = await OpenAsync(databasePath);
-        Assert.AreEqual(customSize, restored.PreferredSize);
+        Assert.AreEqual(customSize, restored.SizingState);
     }
 
     [TestMethod]
-    public async Task PreferredSize_ResizingEmptyShelf_PersistsWhenFirstItemAccepted()
+    public async Task SizingState_ResizingEmptyShelf_PersistsWhenFirstItemAccepted()
     {
         var databasePath = CreateDatabasePath();
         var manager = await OpenAsync(databasePath);
 
-        var customSize = new ShelfSize(240, 320);
-        await manager.SetPreferredSizeAsync(customSize);
-        Assert.AreEqual(customSize, manager.PreferredSize);
+        var customSize = new ShelfSizingState(240, 320);
+        await manager.SetSizingStateAsync(customSize);
+        Assert.AreEqual(customSize, manager.SizingState);
 
         // Empty shelf restart does not persist preferred size
         var restoredBeforeItem = await OpenAsync(databasePath);
-        Assert.AreEqual(ShelfSize.Default, restoredBeforeItem.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, restoredBeforeItem.SizingState);
 
         // Now accept first item on the manager that had preferred size set
         await manager.AcceptDropAsync([new(@"C:\Work\First.txt", "First.txt", false)]);
 
         // After accepting first item, customSize should be durable across restart
         var restoredAfterItem = await OpenAsync(databasePath);
-        Assert.AreEqual(customSize, restoredAfterItem.PreferredSize);
+        Assert.AreEqual(customSize, restoredAfterItem.SizingState);
     }
 
     [TestMethod]
-    public async Task FinalItemRemoved_DeletesPreferredSizeAndTransitionsToHidden()
+    public async Task FinalItemRemoved_DeletesSizingStateAndTransitionsToHidden()
     {
         var databasePath = CreateDatabasePath();
         var manager = await OpenAsync(databasePath);
@@ -351,21 +407,21 @@ public sealed class DropShelfPersistenceTests
         var itemId = drop.Batch!.Items[0].Id;
 
         manager.ShowShelf();
-        var customSize = new ShelfSize(300, 300);
-        await manager.SetPreferredSizeAsync(customSize);
+        var customSize = new ShelfSizingState(300, 300);
+        await manager.SetSizingStateAsync(customSize);
 
         // Remove the final item
         Assert.IsTrue(await manager.RemoveItemAsync(itemId));
         Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
-        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, manager.SizingState);
 
         // Restart confirms deletion in database
         var restored = await OpenAsync(databasePath);
-        Assert.AreEqual(ShelfSize.Default, restored.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, restored.SizingState);
     }
 
     [TestMethod]
-    public async Task FinalItemRemovedFromEdgeDocked_DeletesPreferredSize_PreservesRailPlacement()
+    public async Task FinalItemRemovedFromEdgeDocked_DeletesSizingState_PreservesRailPlacement()
     {
         var databasePath = CreateDatabasePath();
         var manager = await OpenAsync(databasePath);
@@ -374,58 +430,58 @@ public sealed class DropShelfPersistenceTests
 
         var placement = new ShelfRailPlacement("DISPLAY2", ShelfRailEdge.Left);
         manager.ShowShelf();
-        await manager.SetPreferredSizeAsync(new ShelfSize(250, 250));
+        await manager.SetSizingStateAsync(new ShelfSizingState(250, 250));
         Assert.AreEqual(ShelfDisplayState.EdgeDocked, await manager.DismissShelfAsync(placement));
 
         // Remove final item from EdgeDocked
         Assert.IsTrue(await manager.RemoveItemAsync(itemId));
         Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
-        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, manager.SizingState);
 
         // Restart confirms rail placement preserved, preferred size reset
         var restored = await OpenAsync(databasePath);
         Assert.AreEqual(placement, restored.RailPlacement);
-        Assert.AreEqual(ShelfSize.Default, restored.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, restored.SizingState);
     }
 
     [TestMethod]
-    public async Task ClearTemporaryItems_RemovingFinalItem_DeletesPreferredSize()
+    public async Task ClearTemporaryItems_RemovingFinalItem_DeletesSizingState()
     {
         var databasePath = CreateDatabasePath();
         var manager = await OpenAsync(databasePath);
         await manager.AcceptDropAsync([new(@"C:\Work\Temp.txt", "Temp.txt", false)]);
         manager.ShowShelf();
-        await manager.SetPreferredSizeAsync(new ShelfSize(220, 220));
+        await manager.SetSizingStateAsync(new ShelfSizingState(220, 220));
 
         var removed = await manager.ClearTemporaryItemsAsync();
         Assert.AreEqual(1, removed);
         Assert.AreEqual(ShelfDisplayState.Hidden, manager.DisplayState);
-        Assert.AreEqual(ShelfSize.Default, manager.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, manager.SizingState);
 
         var restored = await OpenAsync(databasePath);
-        Assert.AreEqual(ShelfSize.Default, restored.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, restored.SizingState);
     }
 
     [TestMethod]
-    public async Task StalePreferredSizeInEmptyDatabase_CleanedUpOnStartup()
+    public async Task StaleSizingStateWithoutItems_CleansUpEmptyBatchesOnStartup()
     {
         var databasePath = CreateDatabasePath();
         // Seed database with empty batches but a setting record directly
         var manager = await OpenAsync(databasePath);
         await manager.AcceptDropAsync([new(@"C:\Work\Temp.txt", "Temp.txt", false)]);
-        await manager.SetPreferredSizeAsync(new ShelfSize(300, 300));
+        await manager.SetSizingStateAsync(new ShelfSizingState(300, 300));
 
         // Manually delete items from sqlite to simulate stale state where items are gone
         using (var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath};Pooling=False"))
         {
             conn.Open();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "DELETE FROM shelf_items; DELETE FROM shelf_batches;";
+            cmd.CommandText = "DELETE FROM shelf_items;";
             cmd.ExecuteNonQuery();
         }
 
         var restored = await OpenAsync(databasePath);
-        Assert.AreEqual(ShelfSize.Default, restored.PreferredSize);
+        Assert.AreEqual(ShelfSizingState.Default, restored.SizingState);
         Assert.IsEmpty(restored.Batches);
 
         // Verify settings row was deleted from sqlite
@@ -438,12 +494,12 @@ public sealed class DropShelfPersistenceTests
         }
     }
     [TestMethod]
-    public async Task FinalRemoval_WhenPreferredSizeDeletionFails_RetainsPersistedItemAndSize()
+    public async Task FinalRemoval_WhenSizingStateDeletionFails_RetainsPersistedItemAndSize()
     {
         var databasePath = CreateDatabasePath();
         var manager = await OpenAsync(databasePath);
         var batch = (await manager.AcceptDropAsync([new(@"C:\Work\Keep.txt", "Keep.txt", false)])).Batch!;
-        await manager.SetPreferredSizeAsync(new ShelfSize(350, 420));
+        await manager.SetSizingStateAsync(new ShelfSizingState(350, 420));
         using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath};Pooling=False"))
         {
             connection.Open();
@@ -456,14 +512,14 @@ public sealed class DropShelfPersistenceTests
 
         var restored = await OpenAsync(databasePath);
         Assert.AreEqual(batch.Items[0].Id, restored.Batches.Single().Items.Single().Id);
-        Assert.AreEqual(new ShelfSize(350, 420), restored.PreferredSize);
+        Assert.AreEqual(new ShelfSizingState(350, 420), restored.SizingState);
     }
     [TestMethod]
-    public async Task FirstAcceptance_WhenPreferredSizeSaveFails_DoesNotPersistRejectedBatch()
+    public async Task FirstAcceptance_WhenSizingStateSaveFails_DoesNotPersistRejectedBatch()
     {
         var databasePath = CreateDatabasePath();
         var manager = await OpenAsync(databasePath);
-        await manager.SetPreferredSizeAsync(new ShelfSize(350, 420));
+        await manager.SetSizingStateAsync(new ShelfSizingState(350, 420));
         using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath};Pooling=False"))
         {
             connection.Open();
@@ -477,6 +533,6 @@ public sealed class DropShelfPersistenceTests
         var restored = await OpenAsync(databasePath);
         Assert.IsEmpty(restored.Batches);
         Assert.IsEmpty(manager.Batches);
-        Assert.AreEqual(new ShelfSize(350, 420), manager.PreferredSize);
+        Assert.AreEqual(new ShelfSizingState(350, 420), manager.SizingState);
     }
 }

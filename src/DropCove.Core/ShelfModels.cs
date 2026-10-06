@@ -17,16 +17,26 @@ public enum ShelfDisplayState
     EdgeDocked,
 }
 
-/// <summary>Represents the preferred logical size of the Drop Shelf.</summary>
-/// <param name="Width">The logical width in pixels.</param>
-/// <param name="Height">The logical height in pixels.</param>
-public readonly record struct ShelfSize(int Width, int Height)
-{
-    /// <summary>The default preferred size of 180x180 logical pixels.</summary>
-    public static ShelfSize Default => new(180, 180);
 
-    /// <summary>Gets whether this size satisfies the minimum logical dimensions of 180x180.</summary>
-    public bool IsValid => Width >= 180 && Height >= 180;
+/// <summary>Represents durable user sizing intent independently from actual window bounds.</summary>
+/// <param name="PreferredWidth">The preferred logical width.</param>
+/// <param name="ManualHeightOverride">The explicit logical height, or null for automatic height.</param>
+public readonly record struct ShelfSizingState(int PreferredWidth, int? ManualHeightOverride)
+{
+    /// <summary>Gets the compact width with automatic height enabled.</summary>
+    public static ShelfSizingState Default => new(180, null);
+
+    /// <summary>Gets whether all selected dimensions satisfy the logical minimum.</summary>
+    public bool IsValid => PreferredWidth >= 180 && (ManualHeightOverride is null or >= 180);
+
+    /// <summary>Resolves a completed native resize without locking automatic height on side-edge changes.</summary>
+    /// <param name="width">The final logical width.</param>
+    /// <param name="startHeight">The resize-start logical height.</param>
+    /// <param name="endHeight">The final logical height.</param>
+    /// <param name="verticalEdge">Whether the selected edge or corner permits vertical resizing.</param>
+    /// <returns>The updated user sizing intent.</returns>
+    public ShelfSizingState AfterUserResize(int width, int startHeight, int endHeight, bool verticalEdge) =>
+        new(width, verticalEdge && startHeight != endHeight ? endHeight : ManualHeightOverride);
 }
 
 /// <summary>Identifies the screen edge used by the collapsed Edge Rail.</summary>

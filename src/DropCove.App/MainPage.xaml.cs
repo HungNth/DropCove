@@ -76,14 +76,21 @@ public sealed partial class MainPage : Page
         _shakeDragStarted = shakeDragStarted;
         await RefreshCardsAsync(animate: false);
     }
-    internal Task<DropAcceptance> AcceptStorageDropAsync(DataPackageView dataView) =>
-        (_storageDropService ?? throw new InvalidOperationException("MainPage is not initialized.")).AcceptAsync(dataView);
+    internal event Action? ShelfBatchAccepted;
+
+    internal async Task<DropAcceptance> AcceptStorageDropAsync(DataPackageView dataView)
+    {
+        var outcome = await (_storageDropService ?? throw new InvalidOperationException("MainPage is not initialized.")).AcceptAsync(dataView);
+        if (outcome.Batch is not null)
+        {
+            ShelfBatchAccepted?.Invoke();
+        }
+        return outcome;
+    }
 
     private void OnContentSizeChanged(object sender, SizeChangedEventArgs args)
     {
-        // The column cap owns the 164-pixel minimum; Fill stretches the chosen columns.
-        var usableWidth = Math.Max(0, args.NewSize.Width - 16);
-        BatchGridLayout.MaximumRowsOrColumns = Math.Max(1, (int)Math.Floor((usableWidth + 4) / 168));
+        BatchGridLayout.MaximumRowsOrColumns = ShelfSizingPolicy.ColumnCount(args.NewSize.Width);
     }
 
     private void OnSettingsClicked(object sender, RoutedEventArgs e) => _showSettings?.Invoke();
