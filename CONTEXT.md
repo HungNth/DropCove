@@ -44,6 +44,10 @@ _Avoid_: Session item, unpinned item
 A Shelf Item retained after accepted drag-out operations for repeated reuse.
 _Avoid_: Permanent file, favorite
 
+**Bulk Pinning**:
+A lifecycle action that sets every Shelf Item in one Shelf Batch to the Pinned or Temporary lifecycle state together. Any all-pinned, all-temporary, or mixed status is derived from those items; the Shelf Batch never owns a pinned state.
+_Avoid_: Pinned Batch, Pin Batch, Batch-level pin
+
 **Successful Drag-Out**:
 A drag-out operation for which the destination confirms acceptance before the operation ends. If the destination rejects the operation, the user cancels it, or the destination stops before it confirms acceptance, the drag-out is not successful. Acceptance does not guarantee that the destination completes later internal processing.
 _Avoid_: File transfer completion

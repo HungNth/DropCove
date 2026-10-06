@@ -404,6 +404,13 @@ Unpin
 Temporary
 ```
 
+## Bulk Pinning
+
+Multi-item Shelf Batch cards expose a `24 × 24` bulk pin toggle before Manage and Remove. Its state is derived from the items: Off for all Temporary, On for all Pinned, and Indeterminate for Mixed. Activating Off or Mixed pins every item; activating On makes every item Temporary. Single-item cards keep their existing binary action, and the Edge Rail adds no pin controls.
+
+Bulk Pinning includes Available, Unavailable, and confirmed-Missing references still present in the batch. It changes only item lifecycle, never availability, batch order, source files, or shelf sizing. One atomic SQLite statement commits the change before the manager replaces its in-memory item collection; no batch pin field or schema migration exists. Persistence failure leaves memory and storage unchanged and reports “Couldn’t update pinning. Nothing changed.” without automatic retry. Successful pinning is shown through the controls and counts, not a success message.
+
+
 Pinned items are suitable for frequently reused assets such as:
 
 - logos;
@@ -621,6 +628,7 @@ Multi-item batches provide detailed inspection and item management through a non
 ## Item management and drag interactions
 
 - **Content**: Each popup row displays the item's icon/thumbnail, name, path reference, availability classification, and pinned indicator.
+- **Bulk Pinning header**: A fixed `X of N pinned` summary and tri-state bulk toggle sit above the item scroller. The header consumes part of the existing `480`-pixel overall height limit. It shares the card action's lifecycle, atomic persistence, accessible names, and Mixed pin badge. In-popup success or failure keeps the popup open and the bulk control focused; a card bulk action closes it under the normal outside-click rule.
 - **Actions**: Users can Pin/Unpin individual items, Remove Item, or initiate native drag-out of an individual item directly from the popup row.
 - **Drag behavior**:
   - Starting a drag of an individual item does not close the popup, allowing users to continue managing remaining items. Canceled drags leave references intact. Successful drag-out applies the standard Temporary/Pinned lifecycle and updates the popup (closing it if the batch becomes empty).
@@ -629,9 +637,9 @@ Multi-item batches provide detailed inspection and item management through a non
 
 ## Keyboard accessibility
 
-When opened via keyboard (`Enter` or `Space` on the chevron), focus moves into the popup onto the first available item or action. `Tab` traverses all popup controls and item actions. Pressing `Esc` closes the popup and restores keyboard focus to the originating chevron. A second `Esc` dismisses the Drop Shelf.
+When opened via keyboard (`Enter` or `Space` on the chevron), focus moves to the fixed header's bulk pin control. Pointer opening does not force focus into the popup. `Enter` and `Space` activate the focused bulk control. Pressing `Esc` closes the popup and restores keyboard focus to the originating chevron. A second `Esc` dismisses the Drop Shelf.
 
-Popup `Tab`/`Shift+Tab` traversal is scoped to item Pin/Unpin and Remove actions, wraps in both directions, and realizes the next offscreen row on demand. It does not depend on global next-focus lookup across the popup's native visual root and never resizes the Drop Shelf.
+Popup `Tab`/`Shift+Tab` traversal visits the fixed header first, then each item's Pin/Unpin and Remove actions, wraps in both directions, and realizes only the next offscreen row on demand. It does not depend on global next-focus lookup across the popup's native visual root and never resizes the Drop Shelf.
 
 ## Deferred projections & performance
 

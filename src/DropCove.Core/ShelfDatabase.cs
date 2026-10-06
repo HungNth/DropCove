@@ -33,6 +33,9 @@ internal sealed class ShelfDatabase(string databasePath)
     public Task SetPinnedAsync(Guid itemId, bool isPinned, CancellationToken cancellationToken) =>
         RunAsync(() => SetPinned(itemId, isPinned), cancellationToken);
 
+    public Task SetAllItemsPinnedAsync(Guid batchId, bool isPinned, CancellationToken cancellationToken) =>
+        RunAsync(() => SetAllItemsPinned(batchId, isPinned), cancellationToken);
+
     public Task RemoveItemsAsync(IReadOnlyCollection<Guid> itemIds, CancellationToken cancellationToken) =>
         RunAsync(() => RemoveItems(itemIds), cancellationToken);
 
@@ -220,6 +223,16 @@ internal sealed class ShelfDatabase(string databasePath)
         command.CommandText = "UPDATE shelf_items SET is_pinned = $isPinned WHERE id = $id";
         command.Parameters.AddWithValue("$isPinned", isPinned);
         command.Parameters.AddWithValue("$id", itemId.ToString("D"));
+        command.ExecuteNonQuery();
+    }
+
+    private void SetAllItemsPinned(Guid batchId, bool isPinned)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE shelf_items SET is_pinned = $isPinned WHERE batch_id = $batchId AND is_pinned <> $isPinned";
+        command.Parameters.AddWithValue("$isPinned", isPinned);
+        command.Parameters.AddWithValue("$batchId", batchId.ToString("D"));
         command.ExecuteNonQuery();
     }
 

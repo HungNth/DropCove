@@ -39,7 +39,7 @@ public sealed partial class MainPage : Page
     private Guid? _openPopupBatchId;
     private UIElement? _openPopupAnchor;
     private IReadOnlyList<ShelfItemViewModel>? _popupItemViewModels;
-    private bool _focusFirstPopupItemOnOpen;
+    private bool _focusPopupHeaderOnOpen;
     internal bool IsItemDragInProgress { get; private set; }
     public MainPage()
     {
@@ -135,7 +135,7 @@ public sealed partial class MainPage : Page
     private void MovePopupFocus(bool backward)
     {
         if (_popupItemViewModels is not { Count: > 0 } items) return;
-        var actionCount = items.Count * 2;
+        var actionCount = 1 + items.Count * 2;
 
         var focused = FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
         var row = focused;
@@ -145,14 +145,21 @@ public sealed partial class MainPage : Page
         }
 
         var rowIndex = row is UIElement element ? BatchPopupItemList.GetElementIndex(element) : -1;
-        var actionIndex = rowIndex < 0 ? (backward ? actionCount - 1 : 0) :
-            rowIndex * 2 + (focused is ToggleButton ? 0 : 1) + (backward ? -1 : 1);
-        actionIndex = (actionIndex + actionCount) % actionCount;
+        var currentIndex = ReferenceEquals(focused, BatchPopupBulkPin) ? 0 :
+            rowIndex >= 0 ? 1 + rowIndex * 2 + (focused is ToggleButton ? 0 : 1) :
+            backward ? 0 : actionCount - 1;
+        var actionIndex = (currentIndex + (backward ? -1 : 1) + actionCount) % actionCount;
+        if (actionIndex == 0)
+        {
+            BatchPopupBulkPin.Focus(FocusState.Keyboard);
+            return;
+        }
 
         // Realize only the next row; virtualized offscreen actions must remain keyboard reachable.
-        var targetRow = BatchPopupItemList.GetOrCreateElement(actionIndex / 2);
+        var rowActionIndex = actionIndex - 1;
+        var targetRow = BatchPopupItemList.GetOrCreateElement(rowActionIndex / 2);
         targetRow.UpdateLayout();
-        var target = actionIndex % 2 == 0 ? FocusManager.FindFirstFocusableElement(targetRow) :
+        var target = rowActionIndex % 2 == 0 ? FocusManager.FindFirstFocusableElement(targetRow) :
             FocusManager.FindLastFocusableElement(targetRow);
         if (target is Control control)
         {
@@ -370,6 +377,34 @@ public sealed partial class MainPage : Page
         }
     }
 
+    private async void OnBulkPinClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton { Tag: BatchCardViewModel card } toggle || _manager is null) return;
+
+        var target = card.BulkPinState != true;
+        toggle.IsChecked = card.BulkPinState;
+        var fromPopup = ReferenceEquals(toggle, BatchPopupBulkPin);
+        if (!fromPopup) CloseBatchPopup();
+        bool exists;
+        try
+        {
+            exists = await _manager.SetAllItemsPinnedAsync(card.Batch.Id, target);
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (!ReferenceEquals(toggle.Tag, card)) return;
+            ShowDropMessage("Couldn’t update pinning. Nothing changed.", InfoBarSeverity.Error);
+            toggle.IsChecked = card.BulkPinState;
+            if (fromPopup && BatchPopup.IsOpen) toggle.Focus(FocusState.Programmatic);
+            return;
+        }
+
+        if (exists) await RefreshAfterMutationAsync();
+        if (!ReferenceEquals(toggle.Tag, card)) return;
+        toggle.IsChecked = card.BulkPinState;
+        if (fromPopup && BatchPopup.IsOpen) toggle.Focus(FocusState.Programmatic);
+    }
+
     private async void OnRemoveItemClicked(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || _manager is null)
@@ -484,14 +519,16 @@ public sealed partial class MainPage : Page
             return;
         }
 
-        var focusFirst = false;
-        if (FocusManager.GetFocusedElement(XamlRoot) is DependencyObject focusedElement &&
-            (ReferenceEquals(focusedElement, button) || VisualTreeHelper.GetParent(focusedElement) != null))
-        {
-            focusFirst = true;
-        }
+        ToggleBatchPopup(batchVm, button, fromKeyboard: false);
+    }
 
-        ToggleBatchPopup(batchVm, button, focusFirst);
+    private void OnManageItemsKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key is not (Windows.System.VirtualKey.Enter or Windows.System.VirtualKey.Space) ||
+            sender is not FrameworkElement { Tag: BatchCardViewModel card } button || card.IsSingleItem) return;
+
+        ToggleBatchPopup(card, button, fromKeyboard: true);
+        e.Handled = true;
     }
 
     internal void CloseBatchPopup()
@@ -547,7 +584,8 @@ public sealed partial class MainPage : Page
 
         _openPopupBatchId = batchVm.Batch.Id;
         _openPopupAnchor = anchor;
-        _focusFirstPopupItemOnOpen = fromKeyboard;
+        _focusPopupHeaderOnOpen = fromKeyboard;
+        UpdatePopupHeader(batchVm);
 
         var fullItems = new ShelfItemViewModel[batchVm.Batch.Items.Count];
         for (var i = 0; i < fullItems.Length; i++)
@@ -573,11 +611,18 @@ public sealed partial class MainPage : Page
                 BatchPopupBorder.UpdateLayout();
             }
             UpdatePopupPlacement(anchor);
-            if (_focusFirstPopupItemOnOpen && FocusManager.FindFirstFocusableElement(BatchPopupBorder) is { } firstFocusable)
-            {
-                _ = FocusManager.TryFocusAsync(firstFocusable, FocusState.Programmatic);
-            }
+            if (_focusPopupHeaderOnOpen) BatchPopupBulkPin.Focus(FocusState.Keyboard);
         });
+    }
+
+    private void UpdatePopupHeader(BatchCardViewModel card)
+    {
+        BatchPopupPinCount.Text = card.BulkPinSummary;
+        BatchPopupBulkPin.Tag = card;
+        BatchPopupBulkPin.Content = card;
+        BatchPopupBulkPin.IsChecked = card.BulkPinState;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(BatchPopupBulkPin, card.BulkPinAutomationName);
+        ToolTipService.SetToolTip(BatchPopupBulkPin, card.BulkPinAutomationName);
     }
 
     private void UpdatePopupPlacement(FrameworkElement anchor, Windows.Foundation.Size? contentSize = null)
@@ -655,6 +700,8 @@ public sealed partial class MainPage : Page
         foreach (var item in _popupItemRealizations.Values) ReleaseVisual(item);
         _popupItemRealizations.Clear();
         _popupItemViewModels = null;
+        BatchPopupBulkPin.Tag = null;
+        BatchPopupBulkPin.Content = null;
     }
 
 
@@ -772,6 +819,12 @@ public sealed partial class MainPage : Page
         }
         _popupItemViewModels = fullItems;
         BatchPopupItemList.ItemsSource = _popupItemViewModels;
+        foreach (var card in _cards)
+        {
+            if (card.Batch.Id != batch.Id) continue;
+            UpdatePopupHeader(card);
+            break;
+        }
 
         if (_openPopupAnchor is FrameworkElement anchor && anchor.XamlRoot is not null)
         {
@@ -953,7 +1006,7 @@ public sealed partial class MainPage : Page
 
         if (existing is not null)
         {
-            existing.Update(batch, batch.Items.Count == 1 ? first.Name : $"{batch.Items.Count} items", subtitle, first.IsFolder ? "\uE8B7" : "\uE8A5", previewItems);
+            existing.Update(batch, batch.Items.Count == 1 ? first.Name : $"{batch.Items.Count} items", subtitle, first.IsFolder ? "\uE8B7" : "\uE8A5", previewItems, pinnedCount);
             return existing;
         }
 
@@ -962,7 +1015,8 @@ public sealed partial class MainPage : Page
             batch.Items.Count == 1 ? first.Name : $"{batch.Items.Count} items",
             subtitle,
             first.IsFolder ? "\uE8B7" : "\uE8A5",
-            previewItems);
+            previewItems,
+            pinnedCount);
     }
 
 
@@ -1074,6 +1128,13 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
     public ShelfItem? SingleItem => IsSingleItem ? Batch.Items[0] : null;
     public bool IsPinned => SingleItem?.IsPinned ?? false;
     public string SingleItemPinAutomationName => IsPinned ? $"Unpin {Title}" : $"Pin {Title}";
+    public int PinnedItemCount { get; private set; }
+    public bool? BulkPinState => PinnedItemCount == 0 ? false : PinnedItemCount == Batch.Items.Count ? true : null;
+    public Visibility MixedPinVisibility => BulkPinState is null ? Visibility.Visible : Visibility.Collapsed;
+    public string BulkPinSummary => $"{PinnedItemCount} of {Batch.Items.Count} pinned";
+    public string BulkPinAutomationName => BulkPinState == true
+        ? $"Unpin all {Batch.Items.Count} items"
+        : $"Pin all {Batch.Items.Count} items{(BulkPinState is null ? $", {PinnedItemCount} currently pinned" : string.Empty)}";
     public string ItemCountLabel => $"{Batch.Items.Count} item{(Batch.Items.Count == 1 ? string.Empty : "s")}";
     public string CreatedLabel => Batch.CreatedAt.ToLocalTime().ToString("g");
     public string ManageItemsAutomationName => $"Manage {Title}";
@@ -1085,17 +1146,19 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
         string title,
         string subtitle,
         string fallbackGlyph,
-        IReadOnlyList<BatchItemPreview> previewItems)
+        IReadOnlyList<BatchItemPreview> previewItems,
+        int pinnedItemCount)
     {
         Batch = batch;
         Title = title;
         Subtitle = subtitle;
         FallbackGlyph = fallbackGlyph;
         _previewItems = previewItems;
+        PinnedItemCount = pinnedItemCount;
         SubscribeToItems(_previewItems);
     }
 
-    public void Update(ShelfBatch batch, string title, string subtitle, string fallbackGlyph, IReadOnlyList<BatchItemPreview> previewItems)
+    public void Update(ShelfBatch batch, string title, string subtitle, string fallbackGlyph, IReadOnlyList<BatchItemPreview> previewItems, int pinnedItemCount)
     {
         foreach (var item in _previewItems) item.PropertyChanged -= OnItemPropertyChanged;
         Batch = batch;
@@ -1103,6 +1166,7 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
         Subtitle = subtitle;
         FallbackGlyph = fallbackGlyph;
         _previewItems = previewItems;
+        PinnedItemCount = pinnedItemCount;
         SubscribeToItems(_previewItems);
         PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(string.Empty));
     }

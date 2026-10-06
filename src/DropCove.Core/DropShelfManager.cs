@@ -199,6 +199,44 @@ public sealed class DropShelfManager
         return SetPinned(itemId, isPinned);
     }
 
+    /// <summary>Atomically updates and persists every Shelf Item's pinned lifecycle state in one batch.</summary>
+    /// <param name="batchId">The Shelf Batch identity.</param>
+    /// <param name="isPinned"><see langword="true"/> to retain every item after accepted drag-out; otherwise, <see langword="false"/>.</param>
+    /// <param name="cancellationToken">The token that cancels the operation before persistence commits.</param>
+    /// <returns><see langword="true"/> if the batch exists, including an unchanged target state; otherwise, <see langword="false"/>.</returns>
+    public async Task<bool> SetAllItemsPinnedAsync(
+        Guid batchId,
+        bool isPinned,
+        CancellationToken cancellationToken = default)
+    {
+        using var mutation = await LockMutationsAsync(cancellationToken);
+        var batchIndex = 0;
+        while (batchIndex < _batches.Count && _batches[batchIndex].Id != batchId) batchIndex++;
+        if (batchIndex == _batches.Count) return false;
+
+        var batch = _batches[batchIndex];
+        var changedIndex = 0;
+        while (changedIndex < batch.Items.Count && batch.Items[changedIndex].IsPinned == isPinned) changedIndex++;
+        if (changedIndex == batch.Items.Count) return true;
+
+        var items = new ShelfItem[batch.Items.Count];
+        for (var index = 0; index < items.Length; index++)
+        {
+            var item = batch.Items[index];
+            items[index] = item.IsPinned == isPinned ? item : item with { IsPinned = isPinned };
+        }
+        var replacement = batch with { Items = items };
+
+        if (_database is not null)
+        {
+            await _database.SetAllItemsPinnedAsync(batchId, isPinned, cancellationToken);
+        }
+
+        // Commit and local replacement are one outcome; do not observe cancellation after durable success.
+        _batches[batchIndex] = replacement;
+        return true;
+    }
+
     /// <summary>Removes and persists one Shelf Item reference.</summary>
     public async Task<bool> RemoveItemAsync(Guid itemId, CancellationToken cancellationToken = default)
     {

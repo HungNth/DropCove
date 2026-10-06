@@ -10,6 +10,21 @@
     KeyDown="OnPageKeyDown"
     mc:Ignorable="d">
     <Page.Resources>
+        <DataTemplate x:Key="BulkPinIconTemplate" x:DataType="local:BatchCardViewModel">
+            <Grid Width="14" Height="14">
+                <FontIcon FontSize="11" Glyph="&#xE718;" />
+                <Border
+                    Width="8"
+                    Height="5"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                    CornerRadius="1"
+                    Visibility="{x:Bind MixedPinVisibility, Mode=OneWay}">
+                    <Rectangle Width="6" Height="2" Fill="{ThemeResource TextFillColorPrimaryBrush}" />
+                </Border>
+            </Grid>
+        </DataTemplate>
         <DataTemplate x:Key="ShelfItemTemplate" x:DataType="local:ShelfItemViewModel">
             <Border
                 Margin="0,0,0,4"
@@ -182,6 +197,19 @@
                                 Visibility="{x:Bind SingleItemVisibility, Mode=OneWay}">
                                 <FontIcon FontSize="11" Glyph="&#xE718;" />
                             </ToggleButton>
+                            <ToggleButton
+                                Style="{StaticResource TitleBarToggleButtonStyle}"
+                                Width="24"
+                                Height="24"
+                                AutomationProperties.Name="{x:Bind BulkPinAutomationName, Mode=OneWay}"
+                                Click="OnBulkPinClicked"
+                                Tag="{x:Bind}"
+                                IsThreeState="True"
+                                IsChecked="{x:Bind BulkPinState, Mode=OneWay}"
+                                ToolTipService.ToolTip="{x:Bind BulkPinAutomationName, Mode=OneWay}"
+                                Visibility="{x:Bind MultiItemVisibility, Mode=OneWay}"
+                                Content="{x:Bind}"
+                                ContentTemplate="{StaticResource BulkPinIconTemplate}" />
                             <Button
                                 x:Name="ManageItemsButton"
                                 Style="{StaticResource TitleBarButtonStyle}"
@@ -189,6 +217,7 @@
                                 Height="24"
                                 AutomationProperties.Name="{x:Bind ManageItemsAutomationName, Mode=OneWay}"
                                 Click="OnManageItemsClicked"
+                                PreviewKeyDown="OnManageItemsKeyDown"
                                 Tag="{x:Bind}"
                                 ToolTipService.ToolTip="Manage items"
                                 Visibility="{x:Bind MultiItemVisibility, Mode=OneWay}">
@@ -409,22 +438,48 @@
                 BorderThickness="1"
                 CornerRadius="8"
                 Padding="6">
-                <ScrollViewer
-                    x:Name="BatchPopupScroller"
-                    HorizontalScrollBarVisibility="Disabled"
-                    VerticalScrollBarVisibility="Auto">
-                    <ItemsRepeater
-                        x:Name="BatchPopupItemList"
-                        HorizontalCacheLength="0"
-                        VerticalCacheLength="0"
-                        ElementClearing="OnPopupItemElementClearing"
-                        ElementPrepared="OnPopupItemElementPrepared"
-                        ItemTemplate="{StaticResource ShelfItemTemplate}">
-                        <ItemsRepeater.Layout>
-                            <StackLayout Spacing="4" />
-                        </ItemsRepeater.Layout>
-                    </ItemsRepeater>
-                </ScrollViewer>
+                <Grid RowSpacing="4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Name="BatchPopupPinCount"
+                            FontSize="12"
+                            VerticalAlignment="Center" />
+                        <ToggleButton
+                            x:Name="BatchPopupBulkPin"
+                            Grid.Column="1"
+                            Style="{StaticResource TitleBarToggleButtonStyle}"
+                            Width="24"
+                            Height="24"
+                            IsThreeState="True"
+                            Click="OnBulkPinClicked"
+                            ContentTemplate="{StaticResource BulkPinIconTemplate}" />
+                    </Grid>
+                    <ScrollViewer
+                        x:Name="BatchPopupScroller"
+                        Grid.Row="1"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+                        <ItemsRepeater
+                            x:Name="BatchPopupItemList"
+                            HorizontalCacheLength="0"
+                            VerticalCacheLength="0"
+                            ElementClearing="OnPopupItemElementClearing"
+                            ElementPrepared="OnPopupItemElementPrepared"
+                            ItemTemplate="{StaticResource ShelfItemTemplate}">
+                            <ItemsRepeater.Layout>
+                                <StackLayout Spacing="4" />
+                            </ItemsRepeater.Layout>
+                        </ItemsRepeater>
+                    </ScrollViewer>
+                </Grid>
             </Border>
         </Popup>
     </Grid>

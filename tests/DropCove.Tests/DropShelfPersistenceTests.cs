@@ -535,4 +535,193 @@ public sealed class DropShelfPersistenceTests
         Assert.IsEmpty(manager.Batches);
         Assert.AreEqual(new ShelfSizingState(350, 420), manager.SizingState);
     }
+
+    [TestMethod]
+    [DataRow(0, true)]
+    [DataRow(1, true)]
+    [DataRow(3, false)]
+    public async Task BulkPinning_RestoresEveryReferenceAndChangesOnlyTargetLifecycle(int initiallyPinned, bool target)
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var batch = (await manager.AcceptDropAsync([
+            new(@"C:\Work\Available.txt", "Available.txt", false),
+            new(@"C:\Work\Unavailable", "Unavailable", true),
+            new(@"C:\Work\Missing.txt", "Missing.txt", false),
+        ])).Batch!;
+        for (var index = 0; index < initiallyPinned; index++)
+            await manager.SetPinnedAsync(batch.Items[index].Id, true);
+        await manager.AcceptDropAsync([new(@"C:\Work\Other.txt", "Other.txt", false)]);
+        await manager.SetSizingStateAsync(new ShelfSizingState(350, 420));
+        static ItemAvailability Classify(string path) => Path.GetFileName(path) switch
+        {
+            "Unavailable" => ItemAvailability.Unavailable,
+            "Missing.txt" => ItemAvailability.Missing,
+            _ => ItemAvailability.Available,
+        };
+        manager = await DropShelfManager.OpenAsync(databasePath, Classify);
+        var before = manager.Batches.ToArray();
+        var expected = before[1].Items.Select(item => item with { IsPinned = target }).ToArray();
+
+        Assert.IsTrue(await manager.SetAllItemsPinnedAsync(batch.Id, target));
+
+        CollectionAssert.AreEqual(expected, manager.Batches[1].Items.ToArray());
+        Assert.AreSame(before[0], manager.Batches[0]);
+        var restored = await DropShelfManager.OpenAsync(databasePath, Classify);
+        CollectionAssert.AreEqual(expected, restored.Batches[1].Items.ToArray());
+        CollectionAssert.AreEqual(before[0].Items.ToArray(), restored.Batches[0].Items.ToArray());
+        Assert.AreEqual(before[1].Id, restored.Batches[1].Id);
+        Assert.AreEqual(before[1].CreatedAt, restored.Batches[1].CreatedAt);
+        Assert.AreEqual(new ShelfSizingState(350, 420), manager.SizingState);
+        Assert.AreEqual(new ShelfSizingState(350, 420), restored.SizingState);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task BulkPinning_MissingAndSatisfiedTargetsDoNotWrite(bool pinned)
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var batch = (await manager.AcceptDropAsync([
+            new(@"C:\Work\First.txt", "First.txt", false),
+            new(@"C:\Work\Second.txt", "Second.txt", false),
+        ])).Batch!;
+        await manager.SetAllItemsPinnedAsync(batch.Id, pinned);
+        var before = manager.Batches.Single();
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath};Pooling=False");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "CREATE TRIGGER reject_pin_update BEFORE UPDATE OF is_pinned ON shelf_items BEGIN SELECT RAISE(ABORT, 'unexpected write'); END";
+        command.ExecuteNonQuery();
+
+        Assert.IsFalse(await manager.SetAllItemsPinnedAsync(Guid.NewGuid(), !pinned));
+        Assert.IsTrue(await manager.SetAllItemsPinnedAsync(batch.Id, pinned));
+
+        Assert.AreSame(before, manager.Batches.Single());
+        var restored = await OpenAsync(databasePath);
+        CollectionAssert.AreEqual(before.Items.ToArray(), restored.Batches.Single().Items.ToArray());
+    }
+
+    [TestMethod]
+    public async Task BulkPinning_CancelledMutationPreservesMixedReferences()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var batch = (await manager.AcceptDropAsync([
+            new(@"C:\Work\Pinned.txt", "Pinned.txt", false),
+            new(@"C:\Work\Temporary.txt", "Temporary.txt", false),
+        ])).Batch!;
+        await manager.SetPinnedAsync(batch.Items[0].Id, true);
+        var before = manager.Batches.Single();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => manager.SetAllItemsPinnedAsync(batch.Id, true, cancellation.Token));
+
+        Assert.AreSame(before, manager.Batches.Single());
+        var restored = await OpenAsync(databasePath);
+        CollectionAssert.AreEqual(before.Items.ToArray(), restored.Batches.Single().Items.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(0, false)]
+    [DataRow(1, false)]
+    [DataRow(2, false)]
+    [DataRow(1, true)]
+    public async Task BulkPinning_AcceptedDragConsumesOnlyParticipatingTemporaryReferences(int lifecycle, bool unavailable)
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var batch = (await manager.AcceptDropAsync([
+            new(@"C:\Work\First.txt", "First.txt", false),
+            new(@"C:\Work\Second.txt", "Second.txt", false),
+            new(@"C:\Work\Third.txt", "Third.txt", false),
+        ])).Batch!;
+        await manager.SetAllItemsPinnedAsync(batch.Id, true);
+        if (lifecycle == 1) await manager.SetAllItemsPinnedAsync(batch.Id, false);
+        if (lifecycle == 2) await manager.SetPinnedAsync(batch.Items[0].Id, false);
+        ItemAvailability Classify(string path) => unavailable && path == @"C:\Work\Third.txt"
+            ? ItemAvailability.Unavailable : ItemAvailability.Available;
+        manager = await DropShelfManager.OpenAsync(databasePath, Classify);
+        await manager.PrepareBatchForDragAsync(batch.Id, Classify);
+        var prepared = manager.Batches.Single().Items;
+        ShelfItem[] expected = lifecycle switch
+        {
+            0 => [prepared[0], prepared[1], prepared[2]],
+            1 when unavailable => [prepared[2]],
+            1 => [],
+            _ => [prepared[1], prepared[2]],
+        };
+
+        Assert.AreEqual(lifecycle != 0, await manager.CompleteBatchDragAsync(batch.Id, DragOutOutcome.AcceptedCopy));
+
+        CollectionAssert.AreEqual(expected, manager.Batches.SelectMany(candidate => candidate.Items).ToArray());
+        var restored = await DropShelfManager.OpenAsync(databasePath, Classify);
+        CollectionAssert.AreEqual(expected, restored.Batches.SelectMany(candidate => candidate.Items).ToArray());
+        if (expected.Length == 0)
+        {
+            Assert.IsEmpty(manager.Batches);
+            Assert.IsEmpty(restored.Batches);
+        }
+    }
+
+    [TestMethod]
+    [DataRow(DragOutOutcome.Canceled)]
+    [DataRow(DragOutOutcome.Rejected)]
+    [DataRow(DragOutOutcome.Failed)]
+    public async Task BulkPinning_UnacceptedDragPreservesMixedReferences(DragOutOutcome outcome)
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var batch = (await manager.AcceptDropAsync([
+            new(@"C:\Work\First.txt", "First.txt", false),
+            new(@"C:\Work\Second.txt", "Second.txt", false),
+        ])).Batch!;
+        await manager.SetAllItemsPinnedAsync(batch.Id, true);
+        await manager.SetPinnedAsync(batch.Items[1].Id, false);
+        await manager.PrepareBatchForDragAsync(batch.Id, _ => ItemAvailability.Available);
+        var before = manager.Batches.Single();
+
+        Assert.IsFalse(await manager.CompleteBatchDragAsync(batch.Id, outcome));
+
+        Assert.AreSame(before, manager.Batches.Single());
+        var restored = await OpenAsync(databasePath);
+        CollectionAssert.AreEqual(before.Items.ToArray(), restored.Batches.Single().Items.ToArray());
+    }
+
+    [TestMethod]
+    public async Task BulkPinning_AbortPreservesMixedReferencesUntilManualRetry()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var batch = (await manager.AcceptDropAsync([
+            new(@"C:\Work\Pinned.txt", "Pinned.txt", false),
+            new(@"C:\Work\Temporary.txt", "Temporary.txt", false),
+            new(@"C:\Work\Folder", "Folder", true),
+        ])).Batch!;
+        await manager.SetPinnedAsync(batch.Items[0].Id, true);
+        var before = manager.Batches.Single();
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath};Pooling=False");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "CREATE TRIGGER reject_bulk_pin BEFORE UPDATE OF is_pinned ON shelf_items WHEN OLD.position = 2 BEGIN SELECT RAISE(ABORT, 'pinning failed'); END";
+        command.ExecuteNonQuery();
+
+        await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(() => manager.SetAllItemsPinnedAsync(batch.Id, true));
+
+        Assert.AreSame(before, manager.Batches.Single());
+        var restored = await OpenAsync(databasePath);
+        CollectionAssert.AreEqual(before.Items.ToArray(), restored.Batches.Single().Items.ToArray());
+        Assert.AreEqual(before.Id, restored.Batches.Single().Id);
+        Assert.AreEqual(before.CreatedAt, restored.Batches.Single().CreatedAt);
+
+        command.CommandText = "DROP TRIGGER reject_bulk_pin";
+        command.ExecuteNonQuery();
+        Assert.IsTrue(await manager.SetAllItemsPinnedAsync(batch.Id, true));
+        restored = await OpenAsync(databasePath);
+        var expected = before.Items.Select(item => item with { IsPinned = true }).ToArray();
+        CollectionAssert.AreEqual(expected, manager.Batches.Single().Items.ToArray());
+        CollectionAssert.AreEqual(expected, restored.Batches.Single().Items.ToArray());
+    }
 }
