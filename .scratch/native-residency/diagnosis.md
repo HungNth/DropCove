@@ -66,10 +66,23 @@ Evidence: [`artifacts/residency-current-attribution.json`](../../artifacts/resid
 
 ### Hypothesis ranking & evaluation
 
-1. **Private heap / managed or WinUI presentation retention (LEADING UNRESOLVED HYPOTHESIS - RANK #1)**:
-   - Across 30 show/dismiss cycles in the canonical 100×1,000 scenario, `privateHeapAndManagedMb` (MEM_PRIVATE) grew monotonically from **36.77 MB** to **57.89 MB** (**+21.15 MB**), accounting for **88.1% of the total 24.02 MB cycle accumulation**.
-   - By contrast, native image pages grew by only **+0.89 MB** (99.22 MB → 100.11 MB) and mapped files by **+2.01 MB**. Top resident modules (`nvwgf2umx.dll`, `System.Private.CoreLib.dll`, `Microsoft.ui.xaml.dll`, `Microsoft.Windows.SDK.NET.dll`) showed negligible residency deltas (+0.0 MB to +0.2 MB).
-   - *Crucial caveat*: `privateHeapAndManagedMb` is an aggregate category comprising both .NET managed GC heap and native C++/WinUI process heap pages. This measurement proves cycle retention is concentrated in private pages, consistent with retained presentation objects, element trees, or visual resources; isolating managed objects vs native XAML peer allocations remains a prerequisite before selecting an architecture fix.
+1. **Private heap / managed and native presentation object growth (STRONG WORKING HYPOTHESIS - RANK #1)**:
+   - Across 30 show/dismiss cycles in the canonical 100×1,000 scenario, `privateHeapAndManagedMb` (MEM_PRIVATE) grew by **+21.15 MB** (from 36.77 MB to 57.89 MB), accounting for 88.1% of total cycle growth.
+   - **Definitive `gcroot` and `-live` Heap Analysis (`dotnet-dump`)**:
+     - **Object Reachability Analysis**:
+       - After 10 cycles, `dumpheap -type DropCove.BatchCardViewModel` located **1,200 instances** on the heap.
+       - Running `gcroot` on arbitrary prior-cycle `BatchCardViewModel` instances returned **`Found 0 unique roots`**.
+       - Running `dumpheap -type DropCove.BatchCardViewModel -live` (calculating live objects from all 127 process GC roots) revealed that **0 of the 1,200 `BatchCardViewModel` instances are alive** (only the empty collection `ObservableCollection<BatchCardViewModel>` and its container arrays are rooted).
+       - Similarly, `dumpheap -type DropCove.BatchItemPreview -live` showed **0 live `BatchItemPreview` instances**.
+     - **Root Cause Established**:
+       - `ReleasePresentation()` successfully dereferences all card and preview view models (`_cards.Clear()`).
+       - However, because each show cycle creates 100 new `BatchCardViewModel` instances, up to 300 `BatchItemPreview` instances, arrays, and delegates, ~300 KB–1 MB of managed objects are allocated per cycle.
+       - Because total CLR allocations remain small (~13 MB) relative to system RAM, .NET Workstation GC does not trigger a Gen 2 collection across 30 rapid show/dismiss transitions.
+       - Consequently, dead presentation objects accumulate across cycles in committed heap segments, expanding CLR committed memory by +10.16 MB and native process heap pages accordingly.
+       - Because the product contract explicitly prohibits calling `GC.Collect()`, `EmptyWorkingSet`, or trimming APIs, memory accumulation across cycles cannot be solved by post-hoc collection.
+     - **Actionable Seam for Ticket 02**:
+       - **View-Model Reuse / Churn Elimination**: In `RefreshCardsAsync`, when the set of batches has not changed across hide/show, DropCove must **reuse existing `BatchCardViewModel` instances** in `_cards` rather than clearing and reconstructing 100 new view models on every `ShowShelf`.
+       - Bounded view-model retention avoids allocating 3,000 view models across 30 cycles, stopping CLR committed heap expansion and native WinUI peer churn at the source.
 2. **Scale-dependent baseline card realization (OBSERVED SCALE DELTA - RANK #2)**:
    - Comparing the 100×1,000 canonical fresh visible (154.41 MB) against the 1-batch control (140.50 MB) reveals an observed **+13.91 MB scale delta**.
    - The delta is split between **+7.80 MB private heap/managed** and **+6.11 MB shared native pages**, reflecting initial realization of 100 `BatchCardViewModel` instances, `ItemsRepeater` templates, and layout structures.

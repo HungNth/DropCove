@@ -121,17 +121,18 @@
                         </Grid.ColumnDefinitions>
                         <Grid Width="42" Height="42" VerticalAlignment="Center">
                             <Border
+                                x:Name="SingleIconBorder"
+                                x:Load="{x:Bind IsSingleItem, Mode=OneWay}"
                                 Background="{ThemeResource ControlFillColorSecondaryBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 BorderThickness="1"
-                                CornerRadius="6"
-                                Visibility="{x:Bind SingleItemVisibility, Mode=OneWay}">
+                                CornerRadius="6">
                                 <Grid CornerRadius="5">
                                     <FontIcon FontSize="16" Glyph="{x:Bind FallbackGlyph, Mode=OneWay}" />
                                     <Image Source="{x:Bind PrimaryIcon, Mode=OneWay}" Stretch="UniformToFill" />
                                 </Grid>
                             </Border>
-                            <Grid Visibility="{x:Bind MultiItemVisibility, Mode=OneWay}">
+                            <Grid x:Name="MultiIconGrid" x:Load="{x:Bind IsMultiItem, Mode=OneWay}">
                                 <Border
                                     Margin="5,0,0,5"
                                     Background="{ThemeResource ControlFillColorSecondaryBrush}"

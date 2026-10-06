@@ -3,6 +3,7 @@
     x:Class="DropCove.EdgeRailWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:DropCove"
     Title="DropCove Edge Rail">
     <Grid
         x:Name="RailRoot"
@@ -44,11 +45,11 @@
                     <StackLayout Spacing="4" />
                 </ItemsRepeater.Layout>
                 <ItemsRepeater.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:DataType="local:RailBatchSummary">
                         <Border
                             Padding="3"
                             HorizontalAlignment="Stretch"
-                            AutomationProperties.Name="{Binding AutomationName}"
+                            AutomationProperties.Name="{x:Bind AutomationName, Mode=OneTime}"
                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
@@ -63,19 +64,19 @@
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center"
                                         FontSize="17"
-                                        Glyph="{Binding Glyph}" />
+                                        Glyph="{x:Bind Glyph, Mode=OneTime}" />
                                     <TextBlock
                                         Margin="0,0,2,0"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Top"
                                         FontSize="10"
-                                        Text="{Binding PinnedGlyph}" />
+                                        Text="{x:Bind PinnedGlyph, Mode=OneTime}" />
                                 </Grid>
                                 <TextBlock
                                     HorizontalAlignment="Center"
                                     FontSize="10"
                                     FontWeight="SemiBold"
-                                    Text="{Binding Title}"
+                                    Text="{x:Bind Title, Mode=OneTime}"
                                     TextAlignment="Center"
                                     TextTrimming="CharacterEllipsis"
                                     TextWrapping="NoWrap" />
@@ -84,18 +85,18 @@
                                     HorizontalAlignment="Center"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     FontSize="8"
-                                    Text="{Binding Subtitle}"
+                                    Text="{x:Bind Subtitle, Mode=OneTime}"
                                     TextAlignment="Center"
                                     TextTrimming="CharacterEllipsis"
                                     TextWrapping="NoWrap" />
                                 <Button
-                                    AutomationProperties.Name="{Binding FlyoutAutomationName}"
+                                    AutomationProperties.Name="{x:Bind FlyoutAutomationName, Mode=OneTime}"
                                     ClickMode="Press"
                                     Height="22"
                                     HorizontalAlignment="Center"
                                     Padding="6,0"
                                     PointerPressed="OnBatchFlyoutButtonPointerPressed"
-                                    Visibility="{Binding FlyoutVisibility}"
+                                    Visibility="{x:Bind FlyoutVisibility, Mode=OneTime}"
                                     ToolTipService.ToolTip="Show batch items">
                                     <TextBlock FontSize="9" Text="Items" />
                                     <Button.Flyout>
@@ -112,10 +113,10 @@
                                                         <StackLayout Spacing="4" />
                                                     </ItemsRepeater.Layout>
                                                     <ItemsRepeater.ItemTemplate>
-                                                        <DataTemplate>
+                                                        <DataTemplate x:DataType="local:RailItemSummary">
                                                             <Border
                                                                 Padding="6"
-                                                                AutomationProperties.Name="{Binding DragAutomationName}"
+                                                                AutomationProperties.Name="{x:Bind DragAutomationName, Mode=OneTime}"
                                                                 Background="{ThemeResource ControlFillColorSecondaryBrush}"
                                                                 CanDrag="True"
                                                                 CornerRadius="4"
@@ -128,26 +129,26 @@
                                                                         <ColumnDefinition Width="Auto" />
                                                                     </Grid.ColumnDefinitions>
                                                                     <Grid Width="24" Height="24" VerticalAlignment="Center">
-                                                                        <FontIcon FontSize="13" Glyph="{Binding Glyph}" />
+                                                                        <FontIcon FontSize="13" Glyph="{x:Bind Glyph, Mode=OneTime}" />
                                                                     </Grid>
                                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                                         <TextBlock
                                                                             FontSize="10"
                                                                             FontWeight="SemiBold"
-                                                                            Text="{Binding Name}"
+                                                                            Text="{x:Bind Name, Mode=OneTime}"
                                                                             TextTrimming="CharacterEllipsis"
                                                                             TextWrapping="NoWrap" />
                                                                         <TextBlock
                                                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                                             FontSize="9"
-                                                                            Text="{Binding Type}"
+                                                                            Text="{x:Bind Type, Mode=OneTime}"
                                                                             TextTrimming="CharacterEllipsis"
                                                                             TextWrapping="NoWrap" />
                                                                     </StackPanel>
                                                                     <TextBlock
                                                                         Grid.Column="2"
                                                                         FontSize="11"
-                                                                        Text="{Binding PinnedGlyph}"
+                                                                        Text="{x:Bind PinnedGlyph, Mode=OneTime}"
                                                                         VerticalAlignment="Center" />
                                                                 </Grid>
                                                             </Border>

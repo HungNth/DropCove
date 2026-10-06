@@ -93,16 +93,31 @@ public sealed partial class EdgeRailWindow : Window
     /// <summary>Gets whether the rail is requested to remain available.</summary>
     public bool IsRequestedVisible => _requestedVisible;
 
+    private IReadOnlyList<ShelfBatch>? _lastBatches;
+
     /// <summary>Rebuilds the compact batch summaries.</summary>
     /// <param name="batches">The current Shelf Batches.</param>
     public void UpdateBatches(IReadOnlyList<ShelfBatch> batches)
     {
         ArgumentNullException.ThrowIfNull(batches);
-        BatchList.ItemsSource = batches.Select(CreateBatchSummary).ToArray();
+        if (_lastBatches is null || _lastBatches.Count != batches.Count || !AreBatchesEqual(_lastBatches, batches))
+        {
+            _lastBatches = batches;
+            BatchList.ItemsSource = batches.Select(CreateBatchSummary).ToArray();
+        }
         if (_requestedVisible)
         {
             ShelfMotion.PlayStateChange(BatchScroller);
         }
+    }
+
+    private static bool AreBatchesEqual(IReadOnlyList<ShelfBatch> a, IReadOnlyList<ShelfBatch> b)
+    {
+        for (var i = 0; i < a.Count; i++)
+        {
+            if (!ReferenceEquals(a[i], b[i])) return false;
+        }
+        return true;
     }
 
     /// <summary>Reapplies the current monitor, DPI, fullscreen, and visibility state.</summary>

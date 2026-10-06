@@ -12,16 +12,31 @@ namespace DropCove;
 internal sealed class WindowsShelfVisualProvider(Func<ShelfItem, IStorageItem?> getCachedItem)
     : IShelfVisualProvider<ImageSource>
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ImageSource> _iconCache = new(StringComparer.OrdinalIgnoreCase);
+
     public async Task<ImageSource?> LoadNativeIconAsync(
         ShelfItem item,
         CancellationToken cancellationToken)
     {
-        var icon = await ShellIconLoader.LoadAsync(item.Path, item.IsFolder, cancellationToken);
-        return icon is null
-            ? null
-            : await ToImageSourceAsync(icon, cancellationToken);
-    }
+        var cacheKey = item.IsFolder ? "__folder__" : Path.GetExtension(item.Path);
+        if (!string.IsNullOrEmpty(cacheKey) && _iconCache.TryGetValue(cacheKey, out var cached))
+        {
+            return cached;
+        }
 
+        var icon = await ShellIconLoader.LoadAsync(item.Path, item.IsFolder, cancellationToken);
+        if (icon is null)
+        {
+            return null;
+        }
+
+        var source = await ToImageSourceAsync(icon, cancellationToken);
+        if (source is not null && !string.IsNullOrEmpty(cacheKey))
+        {
+            _iconCache.TryAdd(cacheKey, source);
+        }
+        return source;
+    }
     public async Task<ImageSource?> LoadThumbnailAsync(
         ShelfItem item,
         CancellationToken cancellationToken)

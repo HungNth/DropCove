@@ -390,7 +390,7 @@ public sealed partial class MainPage : Page
         {
             exists = await _manager.SetAllItemsPinnedAsync(card.Batch.Id, target);
         }
-        catch (Microsoft.Data.Sqlite.SqliteException)
+        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or IOException or InvalidDataException)
         {
             if (!ReferenceEquals(toggle.Tag, card)) return;
             ShowDropMessage("Couldn’t update pinning. Nothing changed.", InfoBarSeverity.Error);
@@ -714,9 +714,7 @@ public sealed partial class MainPage : Page
         CloseBatchPopup();
         BatchList.ItemsSource = null;
         CancelVisualRequests();
-        _cards.Clear();
         _storageItems.Clear();
-        _knownBatchIds.Clear();
         _pendingBatchAnimations.Clear();
         HideStatus();
     }
@@ -992,29 +990,50 @@ public sealed partial class MainPage : Page
 
     private BatchCardViewModel CreateBatchCard(ShelfBatch batch, BatchCardViewModel? existing = null)
     {
-        var previewItems = new BatchItemPreview[Math.Min(3, batch.Items.Count)];
-        for (var index = 0; index < previewItems.Length; index++)
+        var previewCount = Math.Min(3, batch.Items.Count);
+        IReadOnlyList<BatchItemPreview> previewItems;
+        if (existing is not null && existing.PreviewItems.Count == previewCount)
         {
-            previewItems[index] = new BatchItemPreview();
+            previewItems = existing.PreviewItems;
+        }
+        else
+        {
+            var newPreviews = new BatchItemPreview[previewCount];
+            for (var index = 0; index < previewCount; index++)
+            {
+                newPreviews[index] = new BatchItemPreview();
+            }
+            previewItems = newPreviews;
         }
 
         var first = batch.Items[0];
         var pinnedCount = batch.Items.Count(item => item.IsPinned);
-        var subtitle = batch.Items.Count == 1
-            ? $"{(first.IsPinned ? "Pinned • " : string.Empty)}{GetItemType(first)}"
-            : $"{string.Join(", ", batch.Items.Take(2).Select(item => item.Name))}{(pinnedCount > 0 ? $" • {pinnedCount} pinned" : string.Empty)}";
+        string subtitle;
+        if (batch.Items.Count == 1)
+        {
+            subtitle = first.IsPinned ? $"Pinned • {GetItemType(first)}" : GetItemType(first);
+        }
+        else
+        {
+            var n1 = batch.Items[0].Name;
+            var n2 = batch.Items[1].Name;
+            subtitle = pinnedCount > 0 ? $"{n1}, {n2} • {pinnedCount} pinned" : $"{n1}, {n2}";
+        }
+
+        var title = batch.Items.Count == 1 ? first.Name : $"{batch.Items.Count} items";
+        var fallbackGlyph = first.IsFolder ? "\uE8B7" : "\uE8A5";
 
         if (existing is not null)
         {
-            existing.Update(batch, batch.Items.Count == 1 ? first.Name : $"{batch.Items.Count} items", subtitle, first.IsFolder ? "\uE8B7" : "\uE8A5", previewItems, pinnedCount);
+            existing.Update(batch, title, subtitle, fallbackGlyph, previewItems, pinnedCount);
             return existing;
         }
 
         return new BatchCardViewModel(
             batch,
-            batch.Items.Count == 1 ? first.Name : $"{batch.Items.Count} items",
+            title,
             subtitle,
-            first.IsFolder ? "\uE8B7" : "\uE8A5",
+            fallbackGlyph,
             previewItems,
             pinnedCount);
     }
@@ -1123,6 +1142,7 @@ internal sealed class BatchCardViewModel : System.ComponentModel.INotifyProperty
     public ImageSource? SecondaryIcon => _previewItems.ElementAtOrDefault(1)?.Icon;
     public ImageSource? TertiaryIcon => _previewItems.ElementAtOrDefault(2)?.Icon;
     public bool IsSingleItem => Batch.Items.Count == 1;
+    public bool IsMultiItem => Batch.Items.Count > 1;
     public Visibility SingleItemVisibility => IsSingleItem ? Visibility.Visible : Visibility.Collapsed;
     public Visibility MultiItemVisibility => IsSingleItem ? Visibility.Collapsed : Visibility.Visible;
     public ShelfItem? SingleItem => IsSingleItem ? Batch.Items[0] : null;

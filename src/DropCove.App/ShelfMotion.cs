@@ -56,6 +56,9 @@ internal static class ShelfMotion
             visual.StopAnimation(nameof(Visual.Scale));
             visual.Opacity = 0f;
             visual.Scale = new Vector3(0.98f);
+            opacity.Dispose();
+            scale.Dispose();
+            batch.Dispose();
             completion.TrySetResult(true);
         };
         visual.StartAnimation(nameof(Visual.Opacity), opacity);
@@ -113,6 +116,10 @@ internal static class ShelfMotion
             visual.StopAnimation(nameof(Visual.Scale));
             visual.Opacity = 1f;
             visual.Scale = Vector3.One;
+            opacity.Dispose();
+            scale.Dispose();
+            easing.Dispose();
+            batch.Dispose();
         };
         visual.StartAnimation(nameof(Visual.Opacity), opacity);
         visual.StartAnimation(nameof(Visual.Scale), scale);
