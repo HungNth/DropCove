@@ -145,7 +145,8 @@ public sealed partial class EdgeRailWindow : Window
         ArgumentNullException.ThrowIfNull(placement);
         _placement = placement;
         OpenShelfButton.HorizontalAlignment = placement.Edge == ShelfRailEdge.Left ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-        RailRoot.CornerRadius = placement.Edge == ShelfRailEdge.Left ? new CornerRadius(0, 16, 16, 0) : new CornerRadius(16, 0, 0, 16);
+        RailRoot.CornerRadius = placement.Edge == ShelfRailEdge.Left ? new CornerRadius(0, 8, 8, 0) : new CornerRadius(8, 0, 0, 8);
+        RailRoot.BorderThickness = placement.Edge == ShelfRailEdge.Left ? new Thickness(0, 1, 1, 1) : new Thickness(1, 1, 0, 1);
         _showOverFullscreen = showOverFullscreen;
         _requestedVisible = true;
         if (showOverFullscreen)
@@ -352,7 +353,7 @@ public sealed partial class EdgeRailWindow : Window
                 _isExpanded ? ExpandedWidth : CollapsedWidth,
                 _isExpanded ? _expandedHeight : CollapsedHeight);
             var size = AppWindow.Size;
-            var geometry = (Width: size.Width, Height: size.Height, Radius: WindowInterop.ScaleLogicalPixels(16, WindowInterop.GetWindowDpi(_windowHandle)), DockLeft: _placement.Edge == ShelfRailEdge.Left);
+            var geometry = (Width: size.Width, Height: size.Height, Radius: WindowInterop.ScaleLogicalPixels(8, WindowInterop.GetWindowDpi(_windowHandle)), DockLeft: _placement.Edge == ShelfRailEdge.Left);
             if (_cornerGeometry != geometry)
             {
                 WindowInterop.SetEdgeRailCorners(_windowHandle, geometry.Width, geometry.Height, geometry.Radius, geometry.DockLeft);
