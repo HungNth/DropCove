@@ -47,6 +47,7 @@
                 <ItemsRepeater.ItemTemplate>
                     <DataTemplate x:DataType="local:RailBatchSummary">
                         <Border
+                            DataContext="{x:Bind}"
                             Padding="3"
                             HorizontalAlignment="Stretch"
                             AutomationProperties.Name="{x:Bind AutomationName, Mode=OneTime}"
@@ -108,13 +109,14 @@
                                                 MaxHeight="480"
                                                 HorizontalScrollBarVisibility="Disabled"
                                                 VerticalScrollBarVisibility="Auto">
-                                                <ItemsRepeater ItemsSource="{Binding Items}">
+                                                <ItemsRepeater ItemsSource="{x:Bind Items}">
                                                     <ItemsRepeater.Layout>
                                                         <StackLayout Spacing="4" />
                                                     </ItemsRepeater.Layout>
                                                     <ItemsRepeater.ItemTemplate>
                                                         <DataTemplate x:DataType="local:RailItemSummary">
                                                             <Border
+                                                                DataContext="{x:Bind}"
                                                                 Padding="6"
                                                                 AutomationProperties.Name="{x:Bind DragAutomationName, Mode=OneTime}"
                                                                 Background="{ThemeResource ControlFillColorSecondaryBrush}"
