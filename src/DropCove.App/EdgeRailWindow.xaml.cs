@@ -15,6 +15,8 @@ public sealed partial class EdgeRailWindow : Window
     private const int CollapsedWidth = EdgeRailSizingPolicy.HandleWidth;
     private const int CollapsedHeight = EdgeRailSizingPolicy.HandleHeight;
     private const int ExpandedWidth = EdgeRailSizingPolicy.ExpandedWidth;
+    // The native region only shapes the input silhouette; a tighter radius keeps it from clipping the XAML corner's antialiased fringe.
+    private const int RegionCornerRadius = 5;
     private int _expandedHeight;
     private readonly nint _windowHandle;
     private nint _inputWindowHandle;
@@ -74,6 +76,8 @@ public sealed partial class EdgeRailWindow : Window
             WindowInterop.ScaleLogicalPixels(CollapsedHeight, initialDpi)));
         WindowInterop.MakeNoActivate(_windowHandle);
         _windowMessageHook = new WindowMessageHook(_windowHandle, HandleWindowMessage);
+        WindowInterop.EnableTransparentSurface(_windowHandle);
+        SystemBackdrop = new TransparentBackdrop();
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _expandTimer = _dispatcherQueue.CreateTimer();
         _expandTimer.Interval = TimeSpan.FromMilliseconds(200);
@@ -145,8 +149,10 @@ public sealed partial class EdgeRailWindow : Window
         ArgumentNullException.ThrowIfNull(placement);
         _placement = placement;
         OpenShelfButton.HorizontalAlignment = placement.Edge == ShelfRailEdge.Left ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-        RailRoot.CornerRadius = placement.Edge == ShelfRailEdge.Left ? new CornerRadius(0, 8, 8, 0) : new CornerRadius(8, 0, 0, 8);
-        RailRoot.BorderThickness = placement.Edge == ShelfRailEdge.Left ? new Thickness(0, 1, 1, 1) : new Thickness(1, 1, 0, 1);
+        var cornerRadius = placement.Edge == ShelfRailEdge.Left ? new CornerRadius(0, 8, 8, 0) : new CornerRadius(8, 0, 0, 8);
+        RailRoot.CornerRadius = cornerRadius;
+        RailSurface.CornerRadius = cornerRadius;
+        RailSurface.BorderThickness = placement.Edge == ShelfRailEdge.Left ? new Thickness(0, 1, 1, 1) : new Thickness(1, 1, 0, 1);
         _showOverFullscreen = showOverFullscreen;
         _requestedVisible = true;
         if (showOverFullscreen)
@@ -353,7 +359,7 @@ public sealed partial class EdgeRailWindow : Window
                 _isExpanded ? ExpandedWidth : CollapsedWidth,
                 _isExpanded ? _expandedHeight : CollapsedHeight);
             var size = AppWindow.Size;
-            var geometry = (Width: size.Width, Height: size.Height, Radius: WindowInterop.ScaleLogicalPixels(8, WindowInterop.GetWindowDpi(_windowHandle)), DockLeft: _placement.Edge == ShelfRailEdge.Left);
+            var geometry = (Width: size.Width, Height: size.Height, Radius: WindowInterop.ScaleLogicalPixels(RegionCornerRadius, WindowInterop.GetWindowDpi(_windowHandle)), DockLeft: _placement.Edge == ShelfRailEdge.Left);
             if (_cornerGeometry != geometry)
             {
                 WindowInterop.SetEdgeRailCorners(_windowHandle, geometry.Width, geometry.Height, geometry.Radius, geometry.DockLeft);
@@ -388,6 +394,11 @@ public sealed partial class EdgeRailWindow : Window
 
     private WindowMessageResult HandleWindowMessage(uint message, nuint wParam, nint lParam)
     {
+        if (message == WindowInterop.EraseBackgroundMessage)
+        {
+            return WindowInterop.ClearTransparentBackground(_windowHandle, (nint)wParam);
+        }
+
         if (message is WindowInterop.DisplayChangeMessage or WindowInterop.DpiChangedMessage or WindowInterop.DeviceChangeMessage)
         {
             _dispatcherQueue.TryEnqueue(ApplyVisibility);

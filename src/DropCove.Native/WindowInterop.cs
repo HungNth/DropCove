@@ -593,6 +593,42 @@ public static class WindowInterop
         return DwmSetWindowAttribute(windowHandle, cornerPreferenceAttribute, ref preference, sizeof(int)) >= 0;
     }
 
+    /// <summary>Win32 erase-background message.</summary>
+    public const uint EraseBackgroundMessage = 0x0014;
+
+    /// <summary>Lets DWM compose the client area with per-pixel alpha so XAML content can antialias against the desktop.</summary>
+    /// <param name="windowHandle">The borderless overlay HWND.</param>
+    /// <remarks>Pair with <see cref="ClearTransparentBackground"/> on <see cref="EraseBackgroundMessage"/>; GDI black is transparent under blur-behind.</remarks>
+    public static void EnableTransparentSurface(nint windowHandle)
+    {
+        var margins = default(Margins);
+        Marshal.ThrowExceptionForHR(DwmExtendFrameIntoClientArea(windowHandle, ref margins));
+        var emptyRegion = CreateRectRgn(-2, -2, -1, -1);
+        try
+        {
+            var blurBehind = new DwmBlurBehind { Flags = DwmBbEnable | DwmBbBlurRegion, Enable = true, BlurRegion = emptyRegion };
+            Marshal.ThrowExceptionForHR(DwmEnableBlurBehindWindow(windowHandle, ref blurBehind));
+        }
+        finally
+        {
+            DeleteObject(emptyRegion);
+        }
+    }
+
+    /// <summary>Clears the client area to transparent black for a surface prepared by <see cref="EnableTransparentSurface"/>.</summary>
+    /// <param name="windowHandle">The overlay HWND.</param>
+    /// <param name="deviceContext">The device context supplied by <see cref="EraseBackgroundMessage"/>.</param>
+    /// <returns>A handled result that suppresses the default opaque erase.</returns>
+    public static WindowMessageResult ClearTransparentBackground(nint windowHandle, nint deviceContext)
+    {
+        if (GetClientRect(windowHandle, out var clientRect))
+        {
+            FillRect(deviceContext, ref clientRect, GetStockObject(BlackBrush));
+        }
+
+        return new WindowMessageResult(true, 1);
+    }
+
     /// <summary>Marks an overlay window as a tool window that never activates from pointer input.</summary>
     /// <param name="windowHandle">The target HWND.</param>
     public static void MakeNoActivate(nint windowHandle)
@@ -1654,6 +1690,46 @@ public static class WindowInterop
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(nint windowHandle, int attribute, ref int value, int size);
+
+    private const uint DwmBbEnable = 0x1;
+    private const uint DwmBbBlurRegion = 0x2;
+    private const int BlackBrush = 4;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Margins
+    {
+        public int Left;
+        public int Right;
+        public int Top;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DwmBlurBehind
+    {
+        public uint Flags;
+        [MarshalAs(UnmanagedType.Bool)]
+        public bool Enable;
+        public nint BlurRegion;
+        [MarshalAs(UnmanagedType.Bool)]
+        public bool TransitionOnMaximized;
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmExtendFrameIntoClientArea(nint windowHandle, ref Margins margins);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmEnableBlurBehindWindow(nint windowHandle, ref DwmBlurBehind blurBehind);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetClientRect(nint windowHandle, out Rect rect);
+
+    [DllImport("user32.dll")]
+    private static extern int FillRect(nint deviceContext, ref Rect rect, nint brush);
+
+    [DllImport("gdi32.dll")]
+    private static extern nint GetStockObject(int index);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern nint GetWindowLongPtr(nint windowHandle, int index);

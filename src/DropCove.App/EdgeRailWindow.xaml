@@ -5,8 +5,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:DropCove"
     Title="DropCove Edge Rail">
+    <!-- The window surface is transparent so XAML antialiases the rounded corners; RailRoot restores the opaque base the window used to clear to. -->
+    <Border x:Name="RailRoot" Background="{ThemeResource RailBaseBrush}" CornerRadius="8,0,0,8">
     <Grid
-        x:Name="RailRoot"
+        x:Name="RailSurface"
         AllowDrop="True"
         Padding="4"
         AutomationProperties.Name="Edge Rail"
@@ -176,4 +178,5 @@
             <FontIcon FontSize="11" Glyph="&#xE74D;" />
         </Button>
     </Grid>
+    </Border>
 </Window>
