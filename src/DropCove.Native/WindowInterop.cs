@@ -582,6 +582,17 @@ public static class WindowInterop
     /// <param name="windowHandle">The target HWND.</param>
     public static void MakeResizableBorderless(nint windowHandle) => MakeBorderless(windowHandle, resizable: true);
 
+    /// <summary>Requests system-rounded corners without overriding DWM policy.</summary>
+    /// <param name="windowHandle">The target HWND after its window styles are applied.</param>
+    /// <returns><see langword="true" /> if DWM accepts the hint; otherwise, <see langword="false" />.</returns>
+    /// <remarks>An accepted hint does not guarantee visible rounding in policy-excluded window states.</remarks>
+    public static bool TryRoundWindowCorners(nint windowHandle)
+    {
+        const int cornerPreferenceAttribute = 33; // DWMWA_WINDOW_CORNER_PREFERENCE
+        var preference = 2; // DWMWCP_ROUND
+        return DwmSetWindowAttribute(windowHandle, cornerPreferenceAttribute, ref preference, sizeof(int)) >= 0;
+    }
+
     /// <summary>Marks an overlay window as a tool window that never activates from pointer input.</summary>
     /// <param name="windowHandle">The target HWND.</param>
     public static void MakeNoActivate(nint windowHandle)
@@ -1617,6 +1628,9 @@ public static class WindowInterop
         public uint HoverTime;
     }
 
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(nint windowHandle, int attribute, ref int value, int size);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern nint GetWindowLongPtr(nint windowHandle, int index);

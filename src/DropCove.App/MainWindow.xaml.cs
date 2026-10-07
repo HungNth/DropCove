@@ -89,7 +89,10 @@ public sealed partial class MainWindow : Window
             ExitApplication);
         _messageHook = new WindowMessageHook(_windowHandle, HandleWindowMessage);
         WindowInterop.MakeResizableBorderless(_windowHandle);
+        WindowInterop.TryRoundWindowCorners(_windowHandle);
         _nonClientPointerSource = InputNonClientPointerSource.GetForWindowId(AppWindow.Id);
+        _nonClientPointerSource.PointerEntered += OnNonClientPointerMoved;
+        _nonClientPointerSource.PointerMoved += OnNonClientPointerMoved;
         _nonClientPointerSource.PointerExited += (_, _) => ClearResizeHover();
         AppWindow.Changed += (_, args) =>
         {
@@ -750,16 +753,6 @@ public sealed partial class MainWindow : Window
                 HandleGetMinMaxInfoMessage(lParam);
                 return WindowMessageResult.HandledZero;
 
-            case WindowInterop.MouseMoveMessage:
-            case WindowInterop.WmNcMouseMove:
-                HandleMouseMoveMessage();
-                break;
-
-            case WindowInterop.MouseLeaveMessage:
-            case WindowInterop.WmNcMouseLeave:
-                ClearResizeHover();
-                break;
-
             case WindowInterop.DisplayChangeMessage:
             case WindowInterop.DpiChangedMessage:
             case WindowInterop.DeviceChangeMessage:
@@ -851,20 +844,32 @@ public sealed partial class MainWindow : Window
     }
 
 
-    private void HandleMouseMoveMessage()
+    private void OnNonClientPointerMoved(InputNonClientPointerSource sender, NonClientPointerEventArgs args)
     {
         if (_isUserResizing)
         {
             return;
         }
 
-        WindowInterop.TrackMouseLeave(_windowHandle);
+        if (!args.IsPointInRegion || args.RegionKind is not
+            (NonClientRegionKind.TopBorder or NonClientRegionKind.BottomBorder or
+             NonClientRegionKind.LeftBorder or NonClientRegionKind.RightBorder))
+        {
+            ClearResizeHover();
+            return;
+        }
+
+        SetResizeHover(true);
     }
 
     private void UpdateResizeHover(WindowResizeDirection direction)
     {
         _activeResizeDirection = direction;
-        var isHovered = direction != WindowResizeDirection.None;
+        SetResizeHover(direction != WindowResizeDirection.None);
+    }
+
+    private void SetResizeHover(bool isHovered)
+    {
         if (_isResizeHovered != isHovered)
         {
             _isResizeHovered = isHovered;
@@ -872,15 +877,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void ClearResizeHover()
-    {
-        _activeResizeDirection = WindowResizeDirection.None;
-        if (_isResizeHovered)
-        {
-            _isResizeHovered = false;
-            _page.SetResizeHover(false);
-        }
-    }
+    private void ClearResizeHover() => UpdateResizeHover(WindowResizeDirection.None);
 
     private void OnEnterSizeMove()
     {

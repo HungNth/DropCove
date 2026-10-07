@@ -542,9 +542,18 @@ The remaining items may be Temporary, Pinned, or a mixture of both. Reopening fr
 
 The Drop Shelf provides one resizable surface rather than fixed Compact and Expanded modes.
 
+## Shell appearance
+
+- The Drop Shelf uses the Edge Rail's theme-aware `LayerFillColorDefaultBrush` as one continuous surface. Header and footer backgrounds are transparent, with no contrasting bands or separators. Shelf Batch cards, Shelf Item rows, status surfaces, drag feedback, and popup surfaces retain their existing visual hierarchy.
+- Only the Drop Shelf requests native Windows 11 rounded corners through `DWMWCP_ROUND`. XAML fill and outline geometry use the system overlay corner radius; the actual window corners and shadow remain DWM-controlled. An accepted native hint is not proof of visible rounding. There is no Mica, Acrylic, custom shadow, transparent helper window, region, or clipping fallback, and Windows policy exceptions remain authoritative.
+- A theme-aware, one-logical-pixel neutral card-stroke outline overlays the shell. It is inset one pixel to stay inside DWM's outermost window-border pixel and never consumes content space or changes padding, responsive columns, or row fit. The existing accent resize outline uses the same overlay geometry.
+- Header and footer remain `32` logical pixels high. Settings, dismissal, and Clear Temporary Items retain `32 × 32`, `36 × 32`, and `28 × 28` interaction rectangles. Their glyph sizes are `11`, `10`, and `11` logical pixels, and only these three controls receive the standard rounded hover/pressed treatment and WinUI system focus brushes. Names, tooltips, commands, keyboard navigation, and shared card/popup action styles remain unchanged. The system focus brushes retain a legible keyboard cue in High Contrast instead of using a background-oriented accent-fill brush as a focus stroke.
+- This visual change does not restyle or resize the Edge Rail, change saved geometry, or alter the `180/236/292/348` Automatic Shelf Growth tiers. Same-build Light/Dark evidence runs on the isolated host profile; actual High Contrast shell, target rectangles, and keyboard focus evidence runs only in a disposable Windows Sandbox guest. Host contrast is never enabled by qualification, and its exact theme/contrast baseline is preserved. Unavailable DPI, monitor, and native-policy configurations remain unobserved, not inferred passes.
+
+
 ## Window resizing and geometry
 
-The borderless window supports native pointer resizing from all eight borders and corners (left, top, right, bottom, and four corners) without aspect-ratio locking. The borderless resize hit target is approximately `8` logical pixels around the window perimeter. A subtle cursor and visual affordance appears on edge or corner hover.
+The borderless window supports native pointer resizing from all eight borders and corners (left, top, right, bottom, and four corners) without aspect-ratio locking. The borderless resize hit target is approximately `8` logical pixels around the window perimeter. Pointer hover shows the directional resize cursor and an accent outline over the neutral boundary. Moving into the caption, content, or outside the window restores the neutral outline and normal cursor without moving content. Non-client region enter/move/exit events own this hover treatment, so a transition into the input-sink window cannot clear a still-active resize hover.
 
 Key sizing and geometry rules:
 
