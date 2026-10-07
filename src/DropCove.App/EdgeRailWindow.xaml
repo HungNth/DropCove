@@ -11,6 +11,8 @@
         Padding="4"
         AutomationProperties.Name="Edge Rail"
         Background="{ThemeResource LayerFillColorDefaultBrush}"
+        CornerRadius="16,0,0,16"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
         DragEnter="OnRailDragEnter"
         DragLeave="OnRailDragLeave"
         DragOver="OnRailDragOver"
@@ -20,35 +22,50 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Button
             x:Name="OpenShelfButton"
-            Width="56"
-            Height="32"
-            HorizontalAlignment="Center"
+            Width="28"
+            Height="28"
+            MinWidth="0"
+            Padding="0"
+            Visibility="Collapsed"
+            HorizontalAlignment="Left"
             AutomationProperties.HelpText="Opens the full Drop Shelf and activates DropCove."
             AutomationProperties.Name="Open Shelf"
             Click="OnOpenShelfClicked"
             ToolTipService.ToolTip="Open Shelf">
-            <FontIcon FontSize="14" Glyph="&#xE8A7;" />
+            <FontIcon FontSize="11" Glyph="&#xE8A7;" />
         </Button>
 
-        <ScrollViewer
-            x:Name="BatchScroller"
-            Grid.Row="1"
-            Margin="0,4,0,0"
-            HorizontalScrollBarVisibility="Disabled"
-            VerticalScrollBarVisibility="Hidden">
-            <ItemsRepeater x:Name="BatchList" HorizontalCacheLength="0" VerticalCacheLength="0">
-                <ItemsRepeater.Layout>
-                    <StackLayout Spacing="4" />
-                </ItemsRepeater.Layout>
-                <ItemsRepeater.ItemTemplate>
+        <ListView x:Name="BatchList" Grid.Row="1" Margin="0,4,0,4" Padding="0"
+                  Visibility="Collapsed" SelectionMode="None"
+                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                  ScrollViewer.VerticalScrollBarVisibility="Hidden">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Margin" Value="0" />
+                    <Setter Property="BorderThickness" Value="0" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="IsTabStop" Value="False" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <ItemsStackPanel Orientation="Vertical" CacheLength="0" />
+                </ItemsPanelTemplate>
+            </ListView.ItemsPanel>
+            <ListView.ItemTemplate>
                     <DataTemplate x:DataType="local:RailBatchSummary">
                         <Border
                             DataContext="{x:Bind}"
                             Padding="3"
+                            Margin="{x:Bind RowMargin, Mode=OneTime}"
+                            Height="64"
                             HorizontalAlignment="Stretch"
                             AutomationProperties.Name="{x:Bind AutomationName, Mode=OneTime}"
                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -59,37 +76,21 @@
                             DragStarting="OnRailBatchDragStarting"
                             DropCompleted="OnRailBatchDropCompleted"
                             ToolTipService.ToolTip="Drag all items in batch">
-                            <StackPanel HorizontalAlignment="Stretch" Spacing="2">
-                                <Grid Width="48" Height="28" HorizontalAlignment="Center">
-                                    <FontIcon
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        FontSize="17"
-                                        Glyph="{x:Bind Glyph, Mode=OneTime}" />
-                                    <TextBlock
-                                        Margin="0,0,2,0"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Top"
-                                        FontSize="10"
-                                        Text="{x:Bind PinnedGlyph, Mode=OneTime}" />
-                                </Grid>
-                                <TextBlock
-                                    HorizontalAlignment="Center"
-                                    FontSize="10"
-                                    FontWeight="SemiBold"
-                                    Text="{x:Bind Title, Mode=OneTime}"
-                                    TextAlignment="Center"
-                                    TextTrimming="CharacterEllipsis"
-                                    TextWrapping="NoWrap" />
-                                <TextBlock
-                                    MaxWidth="260"
-                                    HorizontalAlignment="Center"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    FontSize="8"
-                                    Text="{x:Bind Subtitle, Mode=OneTime}"
-                                    TextAlignment="Center"
-                                    TextTrimming="CharacterEllipsis"
-                                    TextWrapping="NoWrap" />
+                            <Grid ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="28" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" FontSize="17" Glyph="{x:Bind Glyph, Mode=OneTime}" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock FontSize="10" FontWeight="SemiBold" Text="{x:Bind Title, Mode=OneTime}"
+                                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                    <TextBlock FontSize="8" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Text="{x:Bind Subtitle, Mode=OneTime}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                    <TextBlock FontSize="10" HorizontalAlignment="Right" Text="{x:Bind PinnedGlyph, Mode=OneTime}" />
                                 <Button
                                     AutomationProperties.Name="{x:Bind FlyoutAutomationName, Mode=OneTime}"
                                     ClickMode="Press"
@@ -161,11 +162,17 @@
                                         </Flyout>
                                     </Button.Flyout>
                                 </Button>
-                            </StackPanel>
+                                </StackPanel>
+                            </Grid>
                         </Border>
                     </DataTemplate>
-                </ItemsRepeater.ItemTemplate>
-            </ItemsRepeater>
-        </ScrollViewer>
+            </ListView.ItemTemplate>
+        </ListView>
+        <Button x:Name="ClearTemporaryButton" Grid.Row="2" Width="28" Height="28" Visibility="Collapsed"
+                MinWidth="0" Padding="0"
+                HorizontalAlignment="Left" AutomationProperties.Name="Clear Temporary Items"
+                ToolTipService.ToolTip="Clear Temporary Items" Click="OnClearTemporaryClicked">
+            <FontIcon FontSize="11" Glyph="&#xE74D;" />
+        </Button>
     </Grid>
 </Window>

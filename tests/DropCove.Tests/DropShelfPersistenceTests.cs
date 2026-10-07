@@ -494,6 +494,34 @@ public sealed class DropShelfPersistenceTests
         }
     }
     [TestMethod]
+    public async Task ClearTemporaryItems_WhenDeleteFails_RetainsMixedBatchAcrossRestart()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var batch = (await manager.AcceptDropAsync([
+            new(@"C:\Work\Temp.txt", "Temp.txt", false),
+            new(@"C:\Work\Pinned.txt", "Pinned.txt", false)])).Batch!;
+        await manager.SetPinnedAsync(batch.Items[1].Id, true);
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath};Pooling=False"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TRIGGER reject_clear BEFORE DELETE ON shelf_items BEGIN SELECT RAISE(ABORT, 'clear failed'); END";
+            command.ExecuteNonQuery();
+        }
+
+        await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(() => manager.ClearTemporaryItemsAsync());
+        Assert.HasCount(2, manager.Batches.Single().Items);
+        Assert.IsFalse(manager.Batches.Single().Items[0].IsPinned);
+        Assert.IsTrue(manager.Batches.Single().Items[1].IsPinned);
+        var restored = await OpenAsync(databasePath);
+        CollectionAssert.AreEqual(manager.Batches.Single().Items.Select(item => item.Id).ToArray(),
+            restored.Batches.Single().Items.Select(item => item.Id).ToArray());
+        Assert.IsFalse(restored.Batches.Single().Items[0].IsPinned);
+        Assert.IsTrue(restored.Batches.Single().Items[1].IsPinned);
+    }
+
+    [TestMethod]
     public async Task FinalRemoval_WhenSizingStateDeletionFails_RetainsPersistedItemAndSize()
     {
         var databasePath = CreateDatabasePath();

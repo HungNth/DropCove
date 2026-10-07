@@ -449,14 +449,21 @@ public sealed partial class MainPage : Page
         }
 
         var confirmed = _confirm is not null && await _confirm(
-            "Clear Temporary Items",
-            "Remove all temporary item references from DropCove?\n\nSource files on disk will not be touched.");
+            ShelfConfirmationText.ClearTemporaryTitle,
+            ShelfConfirmationText.ClearTemporaryMessage);
 
         if (confirmed)
         {
-            var count = await _manager.ClearTemporaryItemsAsync();
-            await RefreshAfterMutationAsync();
-            ShowDropMessage($"Cleared {count} temporary items.");
+            try
+            {
+                var count = await _manager.ClearTemporaryItemsAsync();
+                await RefreshAfterMutationAsync();
+                ShowDropMessage($"Cleared {count} temporary items.");
+            }
+            catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or IOException or InvalidDataException)
+            {
+                ShowDropMessage("Couldn’t clear temporary items. Nothing changed.", InfoBarSeverity.Error);
+            }
         }
     }
 

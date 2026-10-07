@@ -933,6 +933,29 @@ public static class WindowInterop
         SetBounds(windowHandle, x, y, width, height, SwpNoActivate | SwpShowWindow);
     }
 
+    /// <summary>Clips only the desktop-facing corners of an Edge Rail window.</summary>
+    /// <param name="windowHandle">The rail HWND.</param>
+    /// <param name="width">Actual window width in physical pixels.</param>
+    /// <param name="height">Actual window height in physical pixels.</param>
+    /// <param name="radius">Corner radius in physical pixels.</param>
+    /// <param name="dockLeft">Whether the square edge is on the left.</param>
+    public static void SetEdgeRailCorners(nint windowHandle, int width, int height, int radius, bool dockLeft)
+    {
+        var rounded = CreateRoundRectRgn(0, 0, width + 1, height + 1, radius * 2, radius * 2);
+        var square = CreateRectRgn(dockLeft ? 0 : width / 2, 0, dockLeft ? (width + 1) / 2 : width, height);
+        try
+        {
+            if (rounded == 0 || square == 0 || CombineRgn(rounded, rounded, square, 2) == 0 || SetWindowRgn(windowHandle, rounded, true) == 0)
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not apply Edge Rail corner geometry.");
+            rounded = 0; // Successful SetWindowRgn transfers ownership to Windows.
+        }
+        finally
+        {
+            if (rounded != 0) DeleteObject(rounded);
+            if (square != 0) DeleteObject(square);
+        }
+    }
+
     /// <summary>Shows a topmost window without activating it.</summary>
     /// <param name="windowHandle">The target window.</param>
     public static void ShowNoActivate(nint windowHandle)
@@ -1732,4 +1755,19 @@ public static class WindowInterop
 
     [DllImport("user32.dll")]
     private static extern nint SetCursor(nint hCursor);
+    [DllImport("gdi32.dll")]
+    private static extern nint CreateRoundRectRgn(int left, int top, int right, int bottom, int ellipseWidth, int ellipseHeight);
+
+    [DllImport("gdi32.dll")]
+    private static extern nint CreateRectRgn(int left, int top, int right, int bottom);
+
+    [DllImport("gdi32.dll")]
+    private static extern int CombineRgn(nint destination, nint source1, nint source2, int mode);
+
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeleteObject(nint value);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int SetWindowRgn(nint windowHandle, nint region, [MarshalAs(UnmanagedType.Bool)] bool redraw);
 }

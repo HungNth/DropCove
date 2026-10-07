@@ -223,6 +223,18 @@ Users can:
 - drag new files into DropCove;
 - open the full Drop Shelf.
 
+### Compact Adaptive Edge Rail
+
+The Edge Rail uses a plain visible `16 × 96` logical-pixel Rail Handle. Hover or drag entry expands it after `200 ms`; leaving collapses it after `300 ms` unless a flyout or Clear confirmation remains open. Direct rail interaction does not activate the Drop Shelf.
+
+Expanded width is `280` logical pixels. Each Shelf Batch occupies one horizontal `64`-pixel row with `4`-pixel inter-row spacing. Target height is `min(640, 68 × batch count + 68)`: one through eight batches use `136/204/272/340/408/476/544/612`, and nine or more use `640` with vertical scrolling. New batches grow the expanded rail; removal holds its current height until the next expansion. Removing the final item hides the rail immediately.
+
+Both states remain centered on the selected monitor work area and clamp actual bounds after DPI scaling. Open Shelf sits at top-left for a right rail and top-right for a left rail. Clear Temporary Items sits at bottom-left, asks for confirmation, removes temporary references across the shelf, and preserves pinned references and source files.
+
+Only the two desktop-facing corners round; the screen-edge corners remain square. The Edge Rail uses a DPI-scaled native window region in addition to theme-aware XAML fill, so the actual HWND silhouette follows the approved selective geometry. This does not change Drop Shelf DWM rounding.
+
+**Qualification status:** Ticket 01 and 02 behaviors are verified. Release smoke at 96 DPI observes both edges, Rail Handle (16×96), expanded tiers (280-wide, 136–640), 8 complete 64px rows fit at 612px via virtualized ListView, selective GDI corner clipping (16px inward, square at screen edge), Open Shelf activation, Clear Temporary Items (cancel, accept, pinned retention, all-temporary hide, persistence-failure abort with warning capture), multi-item flyout lifecycle, and native OLE drag-out/cancel. Automated regression suite passes 226 tests. Same-payload performance evidence (100 batches / 1,000 items) records 0% CPU, show p95 7.20 ms; working set visible passes at 148.66 MB (<150 MB), while post-dismissal (150.50 MB) and post-30-cycles (157.99 MB) retain the independent V1 residency blocker, which is not waived. High Contrast verified in Windows Sandbox. Accepted-drop live growth, non-100% DPI, and short-work-area configurations remain unqualified.
+
 ---
 
 # 6. Shelf Data Model

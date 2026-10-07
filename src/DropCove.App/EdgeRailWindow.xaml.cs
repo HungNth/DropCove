@@ -12,10 +12,10 @@ namespace DropCove;
 /// <summary>Hosts the bounded collapsed or expanded Edge Rail overlay.</summary>
 public sealed partial class EdgeRailWindow : Window
 {
-    private const int CollapsedWidth = 64;
-    private const int CollapsedHeight = 112;
-    private const int ExpandedWidth = 320;
-    private const int ExpandedHeight = 640;
+    private const int CollapsedWidth = EdgeRailSizingPolicy.HandleWidth;
+    private const int CollapsedHeight = EdgeRailSizingPolicy.HandleHeight;
+    private const int ExpandedWidth = EdgeRailSizingPolicy.ExpandedWidth;
+    private int _expandedHeight;
     private readonly nint _windowHandle;
     private nint _inputWindowHandle;
     private readonly Action _openShelf;
@@ -23,6 +23,8 @@ public sealed partial class EdgeRailWindow : Window
     private readonly Func<Task> _refreshAfterMutation;
     private readonly Func<DataPackageView, Task<DropAcceptance>> _acceptStorageDrop;
     private readonly DragDropService _dragDropService;
+    private readonly DropShelfManager _manager;
+    private readonly Func<string, string, Task<bool>> _confirm;
     private readonly DispatcherQueueTimer _expandTimer;
     private readonly DispatcherQueueTimer _collapseTimer;
     private readonly WindowMessageHook _windowMessageHook;
@@ -36,12 +38,14 @@ public sealed partial class EdgeRailWindow : Window
     private bool _dragInside;
     private bool _expandPending;
     private bool _flyoutOpen;
+    private bool _clearInProgress;
     private bool _requestedVisible;
     private bool _showOverFullscreen;
+    private (int Width, int Height, int Radius, bool DockLeft) _cornerGeometry;
 
     /// <summary>Creates an Edge Rail for the current Shelf Batches.</summary>
     /// <param name="manager">The shared shelf lifecycle manager.</param>
-    /// <param name="confirm">Confirms partial batch drag-out.</param>
+    /// <param name="confirm">Confirms partial batch drag-out and Clear Temporary Items.</param>
     /// <param name="acceptStorageDrop">Accepts storage-item drops through the shared Shelf seam.</param>
     /// <param name="refreshAfterMutation">Refreshes or hides the rail after a mutation.</param>
     /// <param name="openShelf">Opens and activates the unified Drop Shelf.</param>
@@ -78,6 +82,8 @@ public sealed partial class EdgeRailWindow : Window
         _collapseTimer.Interval = TimeSpan.FromMilliseconds(300);
         _collapseTimer.Tick += OnCollapseTimerTick;
         _dragDropService = new DragDropService(manager, confirm);
+        _manager = manager;
+        _confirm = confirm;
         _acceptStorageDrop = acceptStorageDrop;
         _refreshAfterMutation = refreshAfterMutation;
         _openShelf = openShelf;
@@ -93,7 +99,7 @@ public sealed partial class EdgeRailWindow : Window
     /// <summary>Gets whether the rail is requested to remain available.</summary>
     public bool IsRequestedVisible => _requestedVisible;
 
-    private IReadOnlyList<ShelfBatch>? _lastBatches;
+    private IReadOnlyList<RailBatchSummary>? _lastBatches;
 
     /// <summary>Rebuilds the compact batch summaries.</summary>
     /// <param name="batches">The current Shelf Batches.</param>
@@ -102,20 +108,28 @@ public sealed partial class EdgeRailWindow : Window
         ArgumentNullException.ThrowIfNull(batches);
         if (_lastBatches is null || _lastBatches.Count != batches.Count || !AreBatchesEqual(_lastBatches, batches))
         {
-            _lastBatches = batches;
-            BatchList.ItemsSource = batches.Select(CreateBatchSummary).ToArray();
+            var summaries = new RailBatchSummary[batches.Count];
+            for (var index = 0; index < summaries.Length; index++)
+                summaries[index] = CreateBatchSummary(batches[index], index < summaries.Length - 1);
+            _lastBatches = summaries;
+            BatchList.ItemsSource = summaries;
+        }
+        if (_isExpanded)
+        {
+            _expandedHeight = EdgeRailSizingPolicy.HeightAfterMutation(_expandedHeight, batches.Count);
+            ApplyVisibility();
         }
         if (_requestedVisible)
         {
-            ShelfMotion.PlayStateChange(BatchScroller);
+            ShelfMotion.PlayStateChange(BatchList);
         }
     }
 
-    private static bool AreBatchesEqual(IReadOnlyList<ShelfBatch> a, IReadOnlyList<ShelfBatch> b)
+    private static bool AreBatchesEqual(IReadOnlyList<RailBatchSummary> a, IReadOnlyList<ShelfBatch> b)
     {
         for (var i = 0; i < a.Count; i++)
         {
-            if (!ReferenceEquals(a[i], b[i])) return false;
+            if (!ReferenceEquals(a[i].Batch, b[i])) return false;
         }
         return true;
     }
@@ -130,6 +144,8 @@ public sealed partial class EdgeRailWindow : Window
     {
         ArgumentNullException.ThrowIfNull(placement);
         _placement = placement;
+        OpenShelfButton.HorizontalAlignment = placement.Edge == ShelfRailEdge.Left ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        RailRoot.CornerRadius = placement.Edge == ShelfRailEdge.Left ? new CornerRadius(0, 16, 16, 0) : new CornerRadius(16, 0, 0, 16);
         _showOverFullscreen = showOverFullscreen;
         _requestedVisible = true;
         if (showOverFullscreen)
@@ -142,6 +158,9 @@ public sealed partial class EdgeRailWindow : Window
             _foregroundWindowHook ??= new ForegroundWindowHook(() => _dispatcherQueue.TryEnqueue(ApplyVisibility));
         }
         _isExpanded = false;
+        ClearTemporaryButton.Visibility = Visibility.Collapsed;
+        OpenShelfButton.Visibility = Visibility.Collapsed;
+        BatchList.Visibility = Visibility.Collapsed;
         _openFlyout?.Hide();
         _openFlyout = null;
         _flyoutOpen = false;
@@ -269,7 +288,7 @@ public sealed partial class EdgeRailWindow : Window
     private void OnCollapseTimerTick(DispatcherQueueTimer sender, object args)
     {
         sender.Stop();
-        if (!_pointerInside && !_dragInside && !_flyoutOpen && _isExpanded)
+        if (!_pointerInside && !_dragInside && !_flyoutOpen && !_clearInProgress && _isExpanded)
         {
             SetExpanded(false);
         }
@@ -277,7 +296,7 @@ public sealed partial class EdgeRailWindow : Window
 
     private void StartCollapseTimer()
     {
-        if (!_pointerInside && !_dragInside && !_flyoutOpen && _isExpanded)
+        if (!_pointerInside && !_dragInside && !_flyoutOpen && !_clearInProgress && _isExpanded)
         {
             _collapseTimer.Start();
         }
@@ -291,15 +310,19 @@ public sealed partial class EdgeRailWindow : Window
         }
 
         _isExpanded = expanded;
+        if (expanded) _expandedHeight = EdgeRailSizingPolicy.TargetExpandedHeight(_manager.Batches.Count);
+        OpenShelfButton.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        BatchList.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        ClearTemporaryButton.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
         UpdateScrollMode();
         ApplyVisibility();
         ShelfMotion.PlayRailTransition(RailRoot, expanded);
     }
 
     private void UpdateScrollMode() =>
-        BatchScroller.VerticalScrollBarVisibility = _isExpanded
+        ScrollViewer.SetVerticalScrollBarVisibility(BatchList, _isExpanded
             ? ScrollBarVisibility.Auto
-            : ScrollBarVisibility.Hidden;
+            : ScrollBarVisibility.Hidden);
 
     private void ApplyVisibility()
     {
@@ -327,7 +350,14 @@ public sealed partial class EdgeRailWindow : Window
                 monitorId,
                 _placement.Edge == ShelfRailEdge.Left,
                 _isExpanded ? ExpandedWidth : CollapsedWidth,
-                _isExpanded ? ExpandedHeight : CollapsedHeight);
+                _isExpanded ? _expandedHeight : CollapsedHeight);
+            var size = AppWindow.Size;
+            var geometry = (Width: size.Width, Height: size.Height, Radius: WindowInterop.ScaleLogicalPixels(16, WindowInterop.GetWindowDpi(_windowHandle)), DockLeft: _placement.Edge == ShelfRailEdge.Left);
+            if (_cornerGeometry != geometry)
+            {
+                WindowInterop.SetEdgeRailCorners(_windowHandle, geometry.Width, geometry.Height, geometry.Radius, geometry.DockLeft);
+                _cornerGeometry = geometry;
+            }
             WindowInterop.ShowNoActivate(_windowHandle);
             EnsureInputWindowHook();
             _dispatcherQueue.TryEnqueue(EnsureInputWindowHook);
@@ -505,6 +535,28 @@ public sealed partial class EdgeRailWindow : Window
         await _refreshAfterMutation();
     }
 
+    private async void OnClearTemporaryClicked(object sender, RoutedEventArgs e)
+    {
+        if (_manager.Batches.Count == 0 || _clearInProgress) return;
+        _clearInProgress = true;
+        _collapseTimer.Stop();
+        try
+        {
+            if (!await _confirm(ShelfConfirmationText.ClearTemporaryTitle, ShelfConfirmationText.ClearTemporaryMessage)) return;
+            await _manager.ClearTemporaryItemsAsync();
+            await _refreshAfterMutation();
+        }
+        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or IOException or InvalidDataException)
+        {
+            _notify("Couldn’t clear temporary items. Nothing changed.");
+        }
+        finally
+        {
+            _clearInProgress = false;
+            StartCollapseTimer();
+        }
+    }
+
     private void OnOpenShelfClicked(object sender, RoutedEventArgs e)
     {
         Hide();
@@ -520,7 +572,7 @@ public sealed partial class EdgeRailWindow : Window
         _foregroundWindowHook?.Dispose();
     }
 
-    private static RailBatchSummary CreateBatchSummary(ShelfBatch batch)
+    private static RailBatchSummary CreateBatchSummary(ShelfBatch batch, bool hasFollowingBatch)
     {
         var first = batch.Items[0];
         var title = batch.Items.Count == 1
@@ -536,7 +588,8 @@ public sealed partial class EdgeRailWindow : Window
             subtitle,
             first.IsFolder ? "\uE8B7" : "\uE8A5",
             pinnedGlyph,
-            $"Edge Rail batch {title}");
+            $"Edge Rail batch {title}",
+            hasFollowingBatch);
     }
 }
 
@@ -546,11 +599,13 @@ internal sealed record RailBatchSummary(
     string Subtitle,
     string Glyph,
     string PinnedGlyph,
-    string AutomationName)
+    string AutomationName,
+    bool HasFollowingBatch)
 {
     private IReadOnlyList<RailItemSummary>? _items;
 
     public IReadOnlyList<RailItemSummary> Items => _items ??= Batch.Items.Select(CreateItemSummary).ToArray();
+    public Thickness RowMargin => new(0, 0, 0, HasFollowingBatch ? EdgeRailSizingPolicy.Gap : 0);
     public Visibility FlyoutVisibility => Batch.Items.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
     public string FlyoutAutomationName => $"Show items in {Title}";
 
