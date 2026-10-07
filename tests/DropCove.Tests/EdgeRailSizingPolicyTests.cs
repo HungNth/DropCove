@@ -14,9 +14,9 @@ public sealed class EdgeRailSizingPolicyTests
         Assert.AreEqual(expected, EdgeRailSizingPolicy.TargetExpandedHeight(batchCount));
 
     [TestMethod]
-    [DataRow(1, 136)]
-    [DataRow(2, 204)]
-    [DataRow(3, 272)]
+    [DataRow(1, 280)]
+    [DataRow(2, 280)]
+    [DataRow(3, 280)]
     [DataRow(4, 340)]
     [DataRow(5, 408)]
     [DataRow(6, 476)]
@@ -38,11 +38,12 @@ public sealed class EdgeRailSizingPolicyTests
     [TestMethod]
     public void HeightAfterMutation_GrowsWhenNewTargetExceedsCurrentHeight()
     {
-        // 1 batch (136) growing to 2 batches (204)
-        Assert.AreEqual(204, EdgeRailSizingPolicy.HeightAfterMutation(136, 2));
+        // 1 batch (280) growing to 4 batches (340)
+        Assert.AreEqual(340, EdgeRailSizingPolicy.HeightAfterMutation(280, 4));
 
-        // 2 batches (204) growing to 5 batches (408)
-        Assert.AreEqual(408, EdgeRailSizingPolicy.HeightAfterMutation(204, 5));
+        // 2 batches (280) growing to 5 batches (408)
+        Assert.AreEqual(408, EdgeRailSizingPolicy.HeightAfterMutation(280, 5));
+
 
         // 8 batches (612) growing to 9 batches (640)
         Assert.AreEqual(640, EdgeRailSizingPolicy.HeightAfterMutation(612, 9));
@@ -51,14 +52,15 @@ public sealed class EdgeRailSizingPolicyTests
     [TestMethod]
     public void HeightAfterMutation_PreservesCurrentHeightWhenTargetShrinksOrRemainsSame()
     {
-        // 3 batches removed down to 2 while expanded at 272: hold at 272
-        Assert.AreEqual(272, EdgeRailSizingPolicy.HeightAfterMutation(272, 2));
+        // 4 batches removed down to 2 while expanded at 340: hold at 340
+        Assert.AreEqual(340, EdgeRailSizingPolicy.HeightAfterMutation(340, 2));
 
         // 8 batches removed down to 1 while expanded at 612: hold at 612
         Assert.AreEqual(612, EdgeRailSizingPolicy.HeightAfterMutation(612, 1));
 
-        // Equal target: remains 204
-        Assert.AreEqual(204, EdgeRailSizingPolicy.HeightAfterMutation(204, 2));
+        // Equal target: remains 280
+        Assert.AreEqual(280, EdgeRailSizingPolicy.HeightAfterMutation(280, 2));
+        Assert.AreEqual(280, EdgeRailSizingPolicy.HeightAfterMutation(280, 1));
 
         // Removal down to 0 while expanded: preserves current height (manager handles hide transition)
         Assert.AreEqual(272, EdgeRailSizingPolicy.HeightAfterMutation(272, 0));
@@ -68,16 +70,16 @@ public sealed class EdgeRailSizingPolicyTests
     public void TargetExpandedHeight_RecomputesFreshSmallerTargetOnNextExpansion()
     {
         // Demonstrates the lifecycle:
-        // Expanded with 3 batches: height is 272.
-        var currentHeight = EdgeRailSizingPolicy.TargetExpandedHeight(3);
-        Assert.AreEqual(272, currentHeight);
+        // Expanded with 5 batches: height is 408.
+        var currentHeight = EdgeRailSizingPolicy.TargetExpandedHeight(5);
+        Assert.AreEqual(408, currentHeight);
 
-        // One batch removed while expanded: HeightAfterMutation preserves 272 (no live shrink).
-        var heldHeight = EdgeRailSizingPolicy.HeightAfterMutation(currentHeight, 2);
-        Assert.AreEqual(272, heldHeight);
+        // One batch removed while expanded: HeightAfterMutation preserves 408 (no live shrink).
+        var heldHeight = EdgeRailSizingPolicy.HeightAfterMutation(currentHeight, 4);
+        Assert.AreEqual(408, heldHeight);
 
-        // Rail collapses and re-expands with the remaining 2 batches: target height recomputes to 204.
-        var recomputedHeight = EdgeRailSizingPolicy.TargetExpandedHeight(2);
-        Assert.AreEqual(204, recomputedHeight);
+        // Rail collapses and re-expands with the remaining 4 batches: target height recomputes to 340.
+        var recomputedHeight = EdgeRailSizingPolicy.TargetExpandedHeight(4);
+        Assert.AreEqual(340, recomputedHeight);
     }
 }

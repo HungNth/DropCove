@@ -7,7 +7,7 @@ public static class EdgeRailSizingPolicy
     public const int HandleWidth = 16;
 
     /// <summary>The resting Rail Handle height in logical pixels.</summary>
-    public const int HandleHeight = 96;
+    public const int HandleHeight = 280;
 
     /// <summary>The fixed expanded Edge Rail width in logical pixels.</summary>
     public const int ExpandedWidth = 280;
@@ -24,7 +24,7 @@ public static class EdgeRailSizingPolicy
     /// <summary>Calculates the expanded target height for a given Shelf Batch count.</summary>
     /// <param name="batchCount">The number of Shelf Batches.</param>
     /// <returns>
-    /// A positive logical height between 136 and 640 logical pixels when <paramref name="batchCount"/> is positive;
+    /// A positive logical height between 280 and 640 logical pixels when <paramref name="batchCount"/> is positive;
     /// otherwise, 0.
     /// </returns>
     public static int TargetExpandedHeight(int batchCount)
@@ -41,7 +41,7 @@ public static class EdgeRailSizingPolicy
             return MaxHeight;
         }
 
-        return 68 * batchCount + 68;
+        return Math.Max(HandleHeight, 68 * batchCount + 68);
     }
 
     /// <summary>Resolves grow-only height after an accepted mutation while expanded.</summary>
