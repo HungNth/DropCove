@@ -1,0 +1,44 @@
+{
+  "status": "blocked-not-qualified",
+  "ticket01": "Implementation applied; acceptance incomplete. Do not mark complete.",
+  "ticket02": "Pending; blocked by Ticket 01. Diagnostic observations do not open or complete qualification.",
+  "commit": "Not created; separate explicit approval required.",
+  "build": "dotnet build src/DropCove.App/DropCove.csproj -c Release --no-restore: succeeded, 0 warnings, 0 errors",
+  "tests": "dotnet test tests/DropCove.Tests/DropCove.Tests.csproj -c Release: 226 passed, 0 failed, 0 skipped",
+  "publish": "Self-contained Release published to artifacts/manage-items-release",
+  "installer": "Existing NSIS installer compiled; silent installation exit 0",
+  "fingerprintsSha256": {
+    "publishedAndInstalledExe": "1027c7f38bdf4b33273e9a0ec102e6d39853aa66a87ec1d4f9c8df2c7a438c55",
+    "publishedAndInstalledDll": "cc59ad6d526ef2ab55190c5a49920eb5d2ec991b3d688c58ef93c84cd445a40d"
+  },
+  "observed": [
+    "Installed isolated 4-item profile: responsive Drop Shelf, 16x280 right Rail Handle, 280x280 expanded rail, Manage Items opening and all 4 item Pin/Remove accessible actions observed; artifacts/installed-edge-rail-smoke-evidence.json",
+    "Same payload, Dark mode, right rail, 96 logical DPI: shelf/rail screenshots human reviewed for flat solid chrome, matching header/row presentation; artifacts/manage-items-shelf.png and artifacts/manage-items-rail.png",
+    "Installed mixed 20-item fixture: image, file, folder, pinned and temporary items; long name/path ellipsis, bounded list and visible vertical scrollbar captured; artifacts/manage-items-long-shelf.png and artifacts/manage-items-long-rail.png"
+  ],
+  "unverified": [
+    "Actual scroll movement and fixed-header behavior during scrolling",
+    "Keyboard opening, initial Bulk Pinning focus, traversal/wrapping and Escape focus restoration",
+    "Light and safely isolated High Contrast, left edge, alternate DPI/monitor configurations",
+    "Complete pointer/control-state, drag/lifecycle, reduced-motion and resource-lifetime matrix",
+    "Shelf-show latency and full 30-cycle canonical residency qualification"
+  ],
+  "automationBlocker": "Disposable input harness encountered intermittent collapsed rail after attempted physical hover. An earlier run opened the 20-item Flyout but the script read ScrollPattern state incorrectly; corrected script did not reach scrolling because hover did not expand. No application-code workaround added. Canonical measurement explicitly reports elevated-to-unelevated hotkey injection blocked.",
+  "performance": {
+    "artifact": "artifacts/manage-items-performance.json",
+    "fixture": "100 Shelf Batches / 1000 Shelf Items",
+    "visibleWorkingSetMbAverage": 152.59,
+    "hiddenWorkingSetMbAverage": 155.78,
+    "visibleAndHiddenCpuPercent": 0,
+    "currentReleaseGateMb": 150,
+    "gateResult": "FAIL; no threshold altered or waived",
+    "specConflict": "Parent spec uses <160 MB; current user/repository release gate is <150 MB. Both are retained as evidence; no release pass claimed.",
+    "summonStatus": "blocked",
+    "cleanup": "Measurement reported forced termination only after diagnostic graceful shutdown failed, not as a measurement manipulation. Profiles and owned smoke processes cleaned up."
+  },
+  "review": {
+    "standards": "0 findings; StandardsReview",
+    "specCode": "0 findings; SpecReview; runtime qualification remains incomplete"
+  },
+  "nextRequiredAction": "Run remaining input and theme qualification in an unelevated interactive Windows session or safely isolated test desktop; retain <150 MB release failure for a separate approved planning decision."
+}

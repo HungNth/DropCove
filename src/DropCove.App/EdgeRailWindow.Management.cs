@@ -93,15 +93,10 @@ public sealed partial class EdgeRailWindow
         Grid.SetRow(scroll, 1);
         _managementContent.Children.Add(scroll);
         _managementContent.KeyDown += OnManagementKeyDown;
-        var presenterStyle = new Style(typeof(FlyoutPresenter));
-        presenterStyle.Setters.Add(new Setter(FrameworkElement.MinWidthProperty, 320d));
-        presenterStyle.Setters.Add(new Setter(FrameworkElement.MaxWidthProperty, 480d));
-        presenterStyle.Setters.Add(new Setter(FrameworkElement.MaxHeightProperty, 480d));
-        presenterStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8)));
         _openFlyout = new Flyout
         {
             Content = _managementContent,
-            FlyoutPresenterStyle = presenterStyle,
+            FlyoutPresenterStyle = (Style)RailSurface.Resources["RailManagementPresenterStyle"],
             ShouldConstrainToRootBounds = false,
         };
         _openFlyout.Opened += OnManagementFlyoutOpened;
