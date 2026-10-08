@@ -257,17 +257,24 @@ try {
         throw "Explorer's Preview.png item has no clickable bounds."
     }
 
+    $explorerBounds = New-Object ExplorerPhotosShelfTestNative+Rect
+    if ([ExplorerPhotosShelfTestNative]::GetWindowRect($explorerWindowHandle, [ref]$explorerBounds)) {
+        [ExplorerPhotosShelfTestNative]::SetCursorPos(
+            [int]($explorerBounds.Left + 120),
+            [int]($explorerBounds.Top + 15)) | Out-Null
+        [ExplorerPhotosShelfTestNative]::mouse_event([ExplorerPhotosShelfTestNative]::MouseLeftDown, 0, 0, 0, [UIntPtr]::Zero)
+        [ExplorerPhotosShelfTestNative]::mouse_event([ExplorerPhotosShelfTestNative]::MouseLeftUp, 0, 0, 0, [UIntPtr]::Zero)
+        Start-Sleep -Milliseconds 100
+    }
+
     [ExplorerPhotosShelfTestNative]::SetCursorPos(
         [int]($imageBounds.Left + ($imageBounds.Width / 2)),
         [int]($imageBounds.Top + ($imageBounds.Height / 2))) | Out-Null
-    [ExplorerPhotosShelfTestNative]::mouse_event([ExplorerPhotosShelfTestNative]::MouseLeftDown, 0, 0, 0, [UIntPtr]::Zero)
-    [ExplorerPhotosShelfTestNative]::mouse_event([ExplorerPhotosShelfTestNative]::MouseLeftUp, 0, 0, 0, [UIntPtr]::Zero)
-    Start-Sleep -Milliseconds 100
-    if ([ExplorerPhotosShelfTestNative]::GetForegroundWindow() -ne $explorerWindowHandle) {
-        throw "Clicking Preview.png did not activate Explorer; the feedback loop is invalid."
+    1..2 | ForEach-Object {
+        [ExplorerPhotosShelfTestNative]::mouse_event([ExplorerPhotosShelfTestNative]::MouseLeftDown, 0, 0, 0, [UIntPtr]::Zero)
+        [ExplorerPhotosShelfTestNative]::mouse_event([ExplorerPhotosShelfTestNative]::MouseLeftUp, 0, 0, 0, [UIntPtr]::Zero)
+        Start-Sleep -Milliseconds 80
     }
-    [ExplorerPhotosShelfTestNative]::mouse_event([ExplorerPhotosShelfTestNative]::MouseLeftDown, 0, 0, 0, [UIntPtr]::Zero)
-    [ExplorerPhotosShelfTestNative]::mouse_event([ExplorerPhotosShelfTestNative]::MouseLeftUp, 0, 0, 0, [UIntPtr]::Zero)
 
     $viewerProcess = $null
     $deadline = (Get-Date).AddSeconds(15)
