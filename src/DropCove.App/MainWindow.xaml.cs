@@ -722,9 +722,6 @@ public sealed partial class MainWindow : Window
     {
         switch (message)
         {
-            case 0x001C: // WM_ACTIVATEAPP: popup-owned HWND activation is not app deactivation.
-                if (wParam == 0 && _page is not null && !_page.IsItemDragInProgress) DispatcherQueue.TryEnqueue(_page.CloseBatchPopup);
-                break;
             case WindowInterop.WmNcCalcSize:
                 return WindowMessageResult.HandledZero;
 

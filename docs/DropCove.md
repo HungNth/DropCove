@@ -654,6 +654,7 @@ Multi-item batches provide detailed inspection and item management through a non
   - Opens via pointer activation or keyboard `Enter` / `Space` on the batch chevron.
   - Closes via clicking the same chevron, clicking outside the popup, or pressing `Esc`.
   - Outside dismissal runs on pointer release, not press, so the underlying Settings/button action can activate with one click.
+  - Activating another application does not close the popup; it remains anchored until an explicit dismissal or owner-lifecycle condition occurs.
   - Closes automatically when the Drop Shelf hides, when its owning batch is removed, when shelf resizing begins, or when whole-batch drag starts.
   - Long names and paths truncate visually with full text accessible via tooltips and accessibility properties.
 
