@@ -173,7 +173,7 @@
                                     Style="{StaticResource RailActionButtonStyle}" Width="24" Height="24"
                                     IsEnabled="{x:Bind ActionsEnabled, Mode=OneWay}"
                                     Tag="{x:Bind}" Click="OnManageItemsClicked" PreviewKeyDown="OnManageItemsKeyDown"
-                                    Visibility="{x:Bind Presentation.MultiItemVisibility, Mode=OneWay}"
+                                    Visibility="{x:Bind ManageItemsVisibility, Mode=OneWay}"
                                     ToolTipService.ToolTip="Manage items">
                                     <FontIcon FontSize="9" Glyph="&#xE70D;" />
                                 </Button>

@@ -663,7 +663,7 @@ Multi-item batches provide detailed inspection and item management through a non
 - **Bulk Pinning header**: A fixed `X of N pinned` summary and tri-state bulk toggle sit above the item scroller. The header consumes part of the existing `480`-pixel overall height limit. It shares the card action's lifecycle, atomic persistence, accessible names, and Mixed pin badge. In-popup success or failure keeps the popup open and the bulk control focused; a card bulk action closes it under the normal outside-click rule.
 - **Actions**: Users can Pin/Unpin individual items, Remove Item, or initiate native drag-out of an individual item directly from the popup row.
 - **Drag behavior**:
-  - Starting a drag of an individual item does not close the popup, allowing users to continue managing remaining items. Canceled drags leave references intact. Successful drag-out applies the standard Temporary/Pinned lifecycle and updates the popup (closing it if the batch becomes empty).
+  - Starting a drag of an individual item does not close the popup, allowing users to continue managing every remaining item. Canceled drags leave references intact. Successful drag-out applies the standard Temporary/Pinned lifecycle and refreshes the anchored popup while the batch remains; dragging or removing the final item removes the batch and closes its popup.
   - While an individual native drag is active, outside pointer release, app deactivation, and `Esc` do not dismiss the popup. `Esc` cancels that drag; the next ordinary `Esc` closes the popup. Drag completion clears this lifetime guard, including rejected and canceled operations.
   - Starting a drag of the entire batch from its card closes the popup immediately.
 

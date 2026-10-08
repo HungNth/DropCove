@@ -8,8 +8,10 @@ internal sealed class RailBatchSummary : INotifyPropertyChanged
 {
     private static readonly PropertyChangedEventArgs AllPropertiesChanged = new(string.Empty);
     private static readonly PropertyChangedEventArgs ActionsEnabledChanged = new(nameof(ActionsEnabled));
+    private static readonly PropertyChangedEventArgs ManageItemsVisibilityChanged = new(nameof(ManageItemsVisibility));
     private bool _isBusy;
     private bool _hasFollowingBatch;
+    private bool _isManagementOpen;
 
     public RailBatchSummary(ShelfBatch batch, bool hasFollowingBatch)
     {
@@ -24,6 +26,7 @@ internal sealed class RailBatchSummary : INotifyPropertyChanged
     public bool ActionsEnabled => !_isBusy;
     public Thickness RowMargin => new(0, 0, 0, _hasFollowingBatch ? EdgeRailSizingPolicy.Gap : 0);
     public string RemoveAutomationName => Presentation.IsSingleItem ? $"Remove {Presentation.Title}" : Presentation.RemoveBatchAutomationName;
+    public Visibility ManageItemsVisibility => Presentation.IsMultiItem || _isManagementOpen ? Visibility.Visible : Visibility.Collapsed;
 
     public void Update(ShelfBatch batch, bool hasFollowingBatch)
     {
@@ -40,5 +43,12 @@ internal sealed class RailBatchSummary : INotifyPropertyChanged
         if (_isBusy == isBusy) return;
         _isBusy = isBusy;
         PropertyChanged?.Invoke(this, ActionsEnabledChanged);
+    }
+
+    public void SetManagementOpen(bool isOpen)
+    {
+        if (_isManagementOpen == isOpen) return;
+        _isManagementOpen = isOpen;
+        PropertyChanged?.Invoke(this, ManageItemsVisibilityChanged);
     }
 }

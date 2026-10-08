@@ -39,14 +39,15 @@ public sealed partial class EdgeRailWindow
 
     private void OpenManagementFlyout(Button anchor, RailBatchSummary row, bool keyboard)
     {
-        if (!row.Presentation.IsMultiItem || !row.ActionsEnabled) return;
         if (ReferenceEquals(_managementRow, row))
         {
             CloseManagementFlyout(keyboard);
             return;
         }
+        if (!row.Presentation.IsMultiItem || !row.ActionsEnabled) return;
         CloseManagementFlyout(false);
         _managementRow = row;
+        row.SetManagementOpen(true);
         _managementAnchor = anchor;
         _managementKeyboardOpened = keyboard;
         _managementSummary = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
@@ -140,6 +141,7 @@ public sealed partial class EdgeRailWindow
     private void ReleaseManagementContent(bool restoreFocus)
     {
         var anchor = _managementAnchor;
+        var row = _managementRow;
         if (_managementList is not null)
         {
             _managementList.ElementPrepared -= OnManagementItemPrepared;
@@ -164,6 +166,7 @@ public sealed partial class EdgeRailWindow
             _openFlyout.Content = null;
         }
         _openFlyout = null;
+        row?.SetManagementOpen(false);
         _managementRow = null;
         _managementList = null;
         _managementBulkPin = null;
@@ -173,13 +176,18 @@ public sealed partial class EdgeRailWindow
         _managementKeyboardOpened = false;
         SetFlyoutOpen(false);
         if (WindowInterop.IsPointerOverWindow(_windowHandle)) OnRailPointerEntered();
-        if (restoreFocus && anchor is { IsLoaded: true, Visibility: Visibility.Visible }) anchor.Focus(FocusState.Keyboard);
+        if (restoreFocus && anchor is { IsLoaded: true })
+        {
+            if (anchor.Visibility == Visibility.Visible) anchor.Focus(FocusState.Keyboard);
+            else if (anchor.Parent is DependencyObject parent && FocusManager.FindFirstFocusableElement(parent) is Control fallback)
+                fallback.Focus(FocusState.Keyboard);
+        }
     }
 
     private void RefreshManagementItems()
     {
         if (_managementRow is not { } row) return;
-        if (row.Batch.Items.Count < 2)
+        if (row.Batch.Items.Count == 0)
         {
             CloseManagementFlyout(_managementKeyboardOpened);
             return;
@@ -356,7 +364,6 @@ public sealed partial class EdgeRailWindow
         finally
         {
             _sourceDragInProgress = false;
-            CloseManagementFlyout(false);
             StartCollapseTimer();
         }
     }
