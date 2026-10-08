@@ -1877,4 +1877,171 @@ public static class WindowInterop
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int SetWindowRgn(nint windowHandle, nint region, [MarshalAs(UnmanagedType.Bool)] bool redraw);
+
+    /// <summary>Retrieves the message time for the last message retrieved by the current thread from the message queue.</summary>
+    /// <returns>The Win32 message time in milliseconds.</returns>
+    public static int GetKeyboardMessageTime() => GetMessageTime();
+
+    /// <summary>
+    /// Reads the current-thread modifier key state for aggregate Ctrl, Alt, Shift, and Windows keys.
+    /// Uses GetKeyState to query the calling thread's message queue state without global or asynchronous polling.
+    /// </summary>
+    /// <returns>The aggregate modifier flags currently down.</returns>
+    public static HotKeyModifiers GetCurrentHotKeyModifiers()
+    {
+        var modifiers = HotKeyModifiers.None;
+
+        // High-order bit is set (0x8000 / negative short) if the key is down.
+        if ((GetKeyState(VkControl) & 0x8000) != 0 ||
+            (GetKeyState(VkLControl) & 0x8000) != 0 ||
+            (GetKeyState(VkRControl) & 0x8000) != 0)
+        {
+            modifiers |= HotKeyModifiers.Control;
+        }
+
+        if ((GetKeyState(VkMenu) & 0x8000) != 0 ||
+            (GetKeyState(VkLMenu) & 0x8000) != 0 ||
+            (GetKeyState(VkRMenu) & 0x8000) != 0)
+        {
+            modifiers |= HotKeyModifiers.Alt;
+        }
+
+        if ((GetKeyState(VkShift) & 0x8000) != 0 ||
+            (GetKeyState(VkLShift) & 0x8000) != 0 ||
+            (GetKeyState(VkRShift) & 0x8000) != 0)
+        {
+            modifiers |= HotKeyModifiers.Shift;
+        }
+
+        if ((GetKeyState(VkLWin) & 0x8000) != 0 ||
+            (GetKeyState(VkRWin) & 0x8000) != 0)
+        {
+            modifiers |= HotKeyModifiers.Windows;
+        }
+
+        return modifiers;
+    }
+
+    /// <summary>
+    /// Gets a friendly display label for an approved virtual key, using the active Windows keyboard layout
+    /// for punctuation and OEM keys.
+    /// </summary>
+    /// <param name="virtualKey">The Win32 virtual-key code.</param>
+    /// <returns>A user-facing key label, or <see langword="null"/> if the key is unsupported or unprintable.</returns>
+    public static string? GetHotKeyKeyLabel(uint virtualKey)
+    {
+        // A-Z
+        if (virtualKey >= 0x41 && virtualKey <= 0x5A)
+        {
+            return ((char)virtualKey).ToString();
+        }
+
+        // Top-row 0-9
+        if (virtualKey >= 0x30 && virtualKey <= 0x39)
+        {
+            return ((char)virtualKey).ToString();
+        }
+
+        // Function keys F1-F24
+        if (virtualKey >= 0x70 && virtualKey <= 0x87)
+        {
+            return $"F{virtualKey - 0x70 + 1}";
+        }
+
+        // Numpad digits 0-9
+        if (virtualKey >= 0x60 && virtualKey <= 0x69)
+        {
+            return $"Num {virtualKey - 0x60}";
+        }
+
+        // Specific named keys
+        switch (virtualKey)
+        {
+            case 0x20: return "Space";
+            case 0x09: return "Tab";
+            case 0x0D: return "Enter";
+            case 0x08: return "Backspace";
+            case 0x2E: return "Delete";
+            case 0x2D: return "Insert";
+            case 0x25: return "Left";
+            case 0x26: return "Up";
+            case 0x27: return "Right";
+            case 0x28: return "Down";
+            case 0x24: return "Home";
+            case 0x23: return "End";
+            case 0x21: return "Page Up";
+            case 0x22: return "Page Down";
+
+            // Numpad arithmetic
+            case 0x6A: return "Num *";
+            case 0x6B: return "Num +";
+            case 0x6C: return "Num Separator";
+            case 0x6D: return "Num -";
+            case 0x6E: return "Num .";
+            case 0x6F: return "Num /";
+        }
+
+        // Explicitly rejected non-printable, modifier, lock, navigation/system, or media keys
+        // Escape (0x1B), Lock keys (0x14 Caps, 0x90 Num, 0x91 Scroll), PrintScreen (0x2C), Pause (0x13),
+        // Modifiers (0x10-0x12, 0x5B-0x5C), Media/Volume (0xAD-0xB7), IME/Process/Packet (0x15-0x1A, 0xE5, 0xE7), etc.
+        // OEM positions approved:
+        // 0xBA (OEM_1 ;:), 0xBB (OEM_PLUS =+), 0xBC (OEM_COMMA ,<), 0xBD (OEM_MINUS -_), 0xBE (OEM_PERIOD .>),
+        // 0xBF (OEM_2 /?), 0xC0 (OEM_3 `~), 0xDB (OEM_4 [{), 0xDC (OEM_5 \|), 0xDD (OEM_6 ]}), 0xDE (OEM_7 '"'),
+        // 0xDF (OEM_8), 0xE2 (OEM_102 <>\| ISO)
+        var isApprovedOem = (virtualKey >= 0xBA && virtualKey <= 0xC0) ||
+                            (virtualKey >= 0xDB && virtualKey <= 0xDF) ||
+                            virtualKey == 0xE2;
+
+        if (!isApprovedOem)
+        {
+            return null;
+        }
+
+        return ResolveOemKeyLabel(virtualKey);
+    }
+
+    private static string? ResolveOemKeyLabel(uint virtualKey)
+    {
+        var layout = GetKeyboardLayout(0);
+        // MapVirtualKeyEx MAPVK_VK_TO_CHAR = 2
+        var charCode = MapVirtualKeyEx(virtualKey, 2, layout);
+        if (charCode == 0)
+        {
+            return null;
+        }
+
+        // The high bit marks a dead key; its low-word glyph is still a display label.
+
+        var ch = (char)(charCode & 0xFFFF);
+        if (char.IsControl(ch) || char.IsWhiteSpace(ch))
+        {
+            return null;
+        }
+
+        return ch.ToString();
+    }
+
+    private const int VkControl = 0x11;
+    private const int VkLControl = 0xA2;
+    private const int VkRControl = 0xA3;
+    private const int VkMenu = 0x12; // Alt
+    private const int VkLMenu = 0xA4;
+    private const int VkRMenu = 0xA5;
+    private const int VkShift = 0x10;
+    private const int VkLShift = 0xA0;
+    private const int VkRShift = 0xA1;
+    private const int VkLWin = 0x5B;
+    private const int VkRWin = 0x5C;
+
+    [DllImport("user32.dll")]
+    private static extern short GetKeyState(int virtualKey);
+
+    [DllImport("user32.dll")]
+    private static extern int GetMessageTime();
+
+    [DllImport("user32.dll")]
+    private static extern uint MapVirtualKeyEx(uint uCode, uint uMapType, nint dwhkl);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetKeyboardLayout(uint idThread);
 }

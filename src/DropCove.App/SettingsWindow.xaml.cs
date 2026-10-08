@@ -2,6 +2,10 @@ using DropCove.Core;
 using DropCove.Native;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
+using Microsoft.UI.Xaml.Input;
+using Windows.System;
 using Windows.Graphics;
 
 namespace DropCove;
@@ -13,7 +17,13 @@ public sealed partial class SettingsWindow : Window
     private IReadOnlyList<MonitorOption> _availableMonitorOptions;
     private readonly IReadOnlyList<RailEdgeChoice> _edgeChoices;
     private readonly IReadOnlyList<ShakeSensitivityChoice> _shakeSensitivityChoices;
-
+    private HotKeyDefinition _draftHotKey;
+    private bool _isListening;
+    private VirtualKey _activationKey;
+    private VirtualKey _completedKey;
+    private int? _captureMessageTime;
+    private const string RecorderHelp = "Click or press Enter or Space to record a shortcut.";
+    private const string InvalidShortcutHelp = "Use at least one modifier and a supported key.";
 
     /// <summary>Creates a settings window.</summary>
     /// <param name="settings">The current settings.</param>
@@ -55,15 +65,20 @@ public sealed partial class SettingsWindow : Window
         ShakeSensitivityComboBox.ItemsSource = _shakeSensitivityChoices;
         ShakeSensitivityComboBox.SelectedItem = _shakeSensitivityChoices.First(choice => choice.Sensitivity == settings.ShakeSensitivity);
 
-        ControlCheckBox.IsChecked = settings.HotKey.Control;
-        AltCheckBox.IsChecked = settings.HotKey.Alt;
-        ShiftCheckBox.IsChecked = settings.HotKey.Shift;
-        WindowsCheckBox.IsChecked = settings.HotKey.Windows;
+        _draftHotKey = settings.HotKey;
         StartWithWindowsToggle.IsOn = settings.StartWithWindows;
-
-        KeyComboBox.ItemsSource = KeyChoices;
-        KeyComboBox.SelectedItem = KeyChoices.FirstOrDefault(choice => choice.VirtualKey == settings.HotKey.VirtualKey)
-            ?? KeyChoices[0];
+        RenderHotKey();
+        Activated += (_, args) =>
+        {
+            if (args.WindowActivationState == WindowActivationState.Deactivated)
+            {
+                CancelRecording();
+            }
+            else
+            {
+                RenderHotKey();
+            }
+        };
     }
 
     internal void UpdateMonitorOptions(IReadOnlyList<MonitorOption> monitorOptions)
@@ -93,32 +108,184 @@ public sealed partial class SettingsWindow : Window
         return choices;
     }
 
+    internal bool HandleRegisteredHotKey(nint keyData)
+    {
+        if (_isListening)
+        {
+            var modifiers = (HotKeyModifiers)((long)keyData & 0xFFFF);
+            CompleteRecording(new HotKeyDefinition(
+                modifiers.HasFlag(HotKeyModifiers.Control),
+                modifiers.HasFlag(HotKeyModifiers.Alt),
+                modifiers.HasFlag(HotKeyModifiers.Shift),
+                modifiers.HasFlag(HotKeyModifiers.Windows),
+                (uint)(((long)keyData >> 16) & 0xFFFF)));
+            _captureMessageTime = null;
+            return true;
+        }
 
-    private static IReadOnlyList<HotKeyChoice> KeyChoices { get; } = CreateKeyChoices();
+        // WM_HOTKEY and WinUI key input from the same press can arrive in either order.
+        var suppress = _captureMessageTime == WindowInterop.GetKeyboardMessageTime();
+        _captureMessageTime = null;
+        return suppress;
+    }
+
+    private void OnHotKeyRecorderClicked(object sender, RoutedEventArgs e)
+    {
+        HotKeyRecorder.Focus(FocusState.Programmatic);
+        BeginRecording();
+    }
+
+    private void BeginRecording()
+    {
+        if (_isListening) return;
+        _isListening = true;
+        _completedKey = VirtualKey.None;
+        SaveButton.IsEnabled = false;
+        ErrorInfoBar.IsOpen = false;
+        RenderHotKey();
+    }
+
+    private void CancelRecording()
+    {
+        _activationKey = VirtualKey.None;
+        _completedKey = VirtualKey.None;
+        if (!_isListening) return;
+        _isListening = false;
+        SaveButton.IsEnabled = true;
+        RenderHotKey();
+    }
+
+    private void OnHotKeyLostFocus(object sender, RoutedEventArgs e) => CancelRecording();
+    private void OnHotKeyGotFocus(object sender, RoutedEventArgs e) => HotKeyEditor.StartBringIntoView();
+
+    private void OnHotKeyPreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (!_isListening)
+        {
+            if (e.Key == _completedKey || _activationKey != VirtualKey.None)
+            {
+                e.Handled = true;
+            }
+            else if (e.Key is VirtualKey.Enter or VirtualKey.Space)
+            {
+                e.Handled = true;
+                if (!e.KeyStatus.WasKeyDown) _activationKey = e.Key;
+            }
+            return;
+        }
+
+        var modifiers = WindowInterop.GetCurrentHotKeyModifiers();
+        if (e.Key == VirtualKey.Tab && modifiers == HotKeyModifiers.None) return;
+        e.Handled = true;
+        if (e.Key == VirtualKey.Escape)
+        {
+            CancelRecording();
+            return;
+        }
+
+        if (IsModifier(e.Key))
+        {
+            RenderHotKey();
+            return;
+        }
+
+        CompleteRecording(new HotKeyDefinition(
+            modifiers.HasFlag(HotKeyModifiers.Control),
+            modifiers.HasFlag(HotKeyModifiers.Alt),
+            modifiers.HasFlag(HotKeyModifiers.Shift),
+            modifiers.HasFlag(HotKeyModifiers.Windows),
+            (uint)e.Key));
+    }
+
+    private void OnHotKeyPreviewKeyUp(object sender, KeyRoutedEventArgs e)
+    {
+        if (_activationKey == e.Key)
+        {
+            _activationKey = VirtualKey.None;
+            e.Handled = true;
+            BeginRecording();
+        }
+        else if (_completedKey == e.Key)
+        {
+            _completedKey = VirtualKey.None;
+            e.Handled = true;
+        }
+        else if (_isListening)
+        {
+            e.Handled = true;
+            if (IsModifier(e.Key)) RenderHotKey();
+        }
+    }
+
+    private void CompleteRecording(HotKeyDefinition hotKey)
+    {
+        var keyLabel = hotKey.Control || hotKey.Alt || hotKey.Shift || hotKey.Windows
+            ? WindowInterop.GetHotKeyKeyLabel(hotKey.VirtualKey)
+            : null;
+        if (keyLabel is null)
+        {
+            RenderHotKey();
+            HotKeyStatusText.Text = InvalidShortcutHelp;
+            AnnounceRecorder();
+            HotKeyEditor.StartBringIntoView();
+            return;
+        }
+
+        _captureMessageTime = WindowInterop.GetKeyboardMessageTime();
+        _completedKey = (VirtualKey)hotKey.VirtualKey;
+        _draftHotKey = hotKey;
+        _isListening = false;
+        SaveButton.IsEnabled = true;
+        RenderHotKey(keyLabel);
+    }
+
+    private void RenderHotKey(string? capturedKeyLabel = null)
+    {
+        var modifiers = _isListening
+            ? WindowInterop.GetCurrentHotKeyModifiers()
+            : (_draftHotKey.Control ? HotKeyModifiers.Control : 0) |
+              (_draftHotKey.Alt ? HotKeyModifiers.Alt : 0) |
+              (_draftHotKey.Shift ? HotKeyModifiers.Shift : 0) |
+              (_draftHotKey.Windows ? HotKeyModifiers.Windows : 0);
+        var label = (_isListening ? "" : capturedKeyLabel ?? WindowInterop.GetHotKeyKeyLabel(_draftHotKey.VirtualKey)) ?? "Unsupported shortcut";
+        var prefix = (modifiers.HasFlag(HotKeyModifiers.Control) ? "Ctrl + " : "") +
+                     (modifiers.HasFlag(HotKeyModifiers.Alt) ? "Alt + " : "") +
+                     (modifiers.HasFlag(HotKeyModifiers.Shift) ? "Shift + " : "") +
+                     (modifiers.HasFlag(HotKeyModifiers.Windows) ? "Win + " : "");
+        HotKeyValueText.Text = _isListening ? prefix + "…" : prefix + label;
+        HotKeyStatusText.Text = _isListening ? "Press shortcut… Escape cancels." : RecorderHelp;
+        AutomationProperties.SetName(HotKeyRecorder, "Global hotkey, " + HotKeyValueText.Text);
+        AutomationProperties.SetItemStatus(HotKeyRecorder, _isListening ? "Listening" : "Shortcut selected");
+        AutomationProperties.SetHelpText(HotKeyRecorder, _isListening ? "Press a shortcut with at least one modifier. Escape cancels recording." : RecorderHelp);
+        if (HotKeyRecorder.FocusState != FocusState.Unfocused) HotKeyEditor.StartBringIntoView();
+        AnnounceRecorder();
+    }
+
+    private void AnnounceRecorder() => FrameworkElementAutomationPeer.FromElement(HotKeyStatusText)
+        ?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+
+    private static bool IsModifier(VirtualKey key) => key is
+        VirtualKey.Control or VirtualKey.LeftControl or VirtualKey.RightControl or
+        VirtualKey.Menu or VirtualKey.LeftMenu or VirtualKey.RightMenu or
+        VirtualKey.Shift or VirtualKey.LeftShift or VirtualKey.RightShift or
+        VirtualKey.LeftWindows or VirtualKey.RightWindows;
 
 
     private async void OnSaveClicked(object sender, RoutedEventArgs e)
     {
-        if (KeyComboBox.SelectedItem is not HotKeyChoice key ||
-            RailEdgeComboBox.SelectedItem is not RailEdgeChoice edge ||
+        if (_isListening) return;
+        if (RailEdgeComboBox.SelectedItem is not RailEdgeChoice edge ||
             RailMonitorComboBox.SelectedItem is not MonitorOption monitor ||
             ShakeSensitivityComboBox.SelectedItem is not ShakeSensitivityChoice sensitivity ||
-            !(ControlCheckBox.IsChecked == true ||
-              AltCheckBox.IsChecked == true ||
-              ShiftCheckBox.IsChecked == true ||
-              WindowsCheckBox.IsChecked == true))
+            !(_draftHotKey.Control || _draftHotKey.Alt || _draftHotKey.Shift || _draftHotKey.Windows) ||
+            WindowInterop.GetHotKeyKeyLabel(_draftHotKey.VirtualKey) is null)
         {
-            ShowError("Choose a rail edge, target monitor, shake sensitivity, key, and at least one modifier.");
+            ShowError("Choose a rail edge, target monitor, shake sensitivity, and a valid hotkey.");
             return;
         }
 
         var settings = new AppSettings(
-            new HotKeyDefinition(
-                ControlCheckBox.IsChecked == true,
-                AltCheckBox.IsChecked == true,
-                ShiftCheckBox.IsChecked == true,
-                WindowsCheckBox.IsChecked == true,
-                key.VirtualKey),
+            _draftHotKey,
             StartWithWindowsToggle.IsOn,
             edge.Edge,
             monitor.Id,
@@ -130,7 +297,7 @@ public sealed partial class SettingsWindow : Window
         {
             if (!await _applySettingsAsync(settings))
             {
-                ShowError("That hotkey is already registered by another application.");
+                ShowError("DropCove couldn’t register this hotkey. It may be unavailable or reserved by Windows. Choose another.");
                 return;
             }
 
@@ -148,25 +315,11 @@ public sealed partial class SettingsWindow : Window
     {
         ErrorInfoBar.Message = message;
         ErrorInfoBar.IsOpen = true;
+        ErrorInfoBar.UpdateLayout();
+        ErrorInfoBar.StartBringIntoView();
     }
 
-    private static IReadOnlyList<HotKeyChoice> CreateKeyChoices()
-    {
-        var choices = new List<HotKeyChoice> { new("Space", 0x20) };
-        for (var key = 'A'; key <= 'Z'; key++)
-        {
-            choices.Add(new HotKeyChoice(key.ToString(), key));
-        }
-
-        for (uint functionKey = 1; functionKey <= 12; functionKey++)
-        {
-            choices.Add(new HotKeyChoice($"F{functionKey}", 0x6F + functionKey));
-        }
-
-        return choices;
-    }
 
     private sealed record RailEdgeChoice(ShelfRailEdge Edge, string Name);
-    private sealed record HotKeyChoice(string Name, uint VirtualKey);
     private sealed record ShakeSensitivityChoice(ShakeSensitivity Sensitivity, string Name);
 }

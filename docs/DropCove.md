@@ -164,7 +164,21 @@ Default:
 Ctrl + Shift + Space
 ```
 
-The shortcut is configurable. If registration fails because another application owns the combination, DropCove remains running, reports the conflict through the tray, and asks the user to choose another shortcut.
+Configure it in **Settings → Global hotkey**:
+
+1. Click the shortcut field, or focus it with Tab and press Enter or Space. Merely focusing the field does not start recording; the Enter/Space activation press is not recorded.
+2. Hold at least one of Ctrl, Alt, Shift, or Win and press a supported primary key. The first valid primary-key press completes recording and displays the draft in `Ctrl + Alt + Shift + Win + key` order.
+3. Select **Save** to register and persist the draft. Until Save succeeds, the previously saved shortcut remains active. DropCove suppresses its own shelf toggle only while recording, including the press that completes recording.
+
+Supported primary keys are A–Z, 0–9, Space, Tab, Enter, Backspace, Delete, Insert, arrow keys, Home/End/Page Up/Page Down, F1–F24, numpad digits/arithmetic, and standard punctuation/OEM keys. While recording, modifier-plus-Tab/Enter/Space is captured before normal focus or button behavior. Bare Tab leaves the field and cancels recording. Escape cancels only the recording attempt; Backspace and Delete with a modifier are normal shortcut keys, not clear commands. Lock keys, Print Screen, Pause, media/volume, browser/launch, IME, mouse buttons, and unknown keys are not supported.
+
+During recording, Save is disabled. Incomplete or unsupported input leaves the field listening and shows inline guidance. Escape, moving focus to another control, or switching to another window restores the prior draft. There is no recording timeout. Cancel or closing Settings discards all unsaved settings.
+
+Left/right modifiers are combined; AltGr uses Windows' Ctrl+Alt representation. Punctuation labels follow the current Windows keyboard layout for display only. Settings continue storing the same numeric virtual-key value, so a layout change can change the displayed symbol without rewriting the shortcut.
+
+Win is supported when Windows delivers the combination to Settings, but Windows-reserved combinations may run an operating-system action or take focus first. DropCove installs no keyboard hook to override them. If Windows takes focus, recording is canceled and the prior draft restored.
+
+If Windows rejects registration, Settings retains the draft and reports that the hotkey may be unavailable or reserved by Windows; the previous shortcut and saved settings remain in place. A later save failure uses the existing rollback to restore the previous registration and settings. On startup, an unavailable shortcut produces a tray warning without stopping the resident process; use tray Settings to choose another shortcut. This recorder adds no clear, disable, or reset action.
 
 The hotkey is intended for quickly opening the shelf even when no drag operation is currently active.
 

@@ -40,31 +40,28 @@
                 DisplayMemberPath="Name" />
 
             <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Global hotkey" />
-            <StackPanel Orientation="Horizontal" Spacing="12">
-                <CheckBox
-                    x:Name="ControlCheckBox"
-                    AutomationProperties.Name="Control modifier"
-                    Content="Ctrl" />
-                <CheckBox
-                    x:Name="AltCheckBox"
-                    AutomationProperties.Name="Alt modifier"
-                    Content="Alt" />
-                <CheckBox
-                    x:Name="ShiftCheckBox"
-                    AutomationProperties.Name="Shift modifier"
-                    Content="Shift" />
-                <CheckBox
-                    x:Name="WindowsCheckBox"
-                    AutomationProperties.Name="Windows modifier"
-                    Content="Win" />
+            <StackPanel x:Name="HotKeyEditor" Spacing="6">
+                <Button
+                    x:Name="HotKeyRecorder"
+                    AutomationProperties.AutomationId="GlobalHotkeyRecorder"
+                    AutomationProperties.Name="Global hotkey"
+                    AutomationProperties.HelpText="Click or press Enter or Space to record a shortcut."
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Left"
+                    Click="OnHotKeyRecorderClicked"
+                    PreviewKeyDown="OnHotKeyPreviewKeyDown"
+                    PreviewKeyUp="OnHotKeyPreviewKeyUp"
+                    GotFocus="OnHotKeyGotFocus"
+                    LostFocus="OnHotKeyLostFocus">
+                    <TextBlock x:Name="HotKeyValueText" TextWrapping="Wrap" />
+                </Button>
+                <TextBlock
+                    x:Name="HotKeyStatusText"
+                    AutomationProperties.LiveSetting="Polite"
+                    Text="Click or press Enter or Space to record a shortcut."
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    TextWrapping="Wrap" />
             </StackPanel>
-
-            <ComboBox
-                x:Name="KeyComboBox"
-                AutomationProperties.Name="Global hotkey key"
-                Header="Key"
-                HorizontalAlignment="Stretch"
-                DisplayMemberPath="Name" />
 
             <ToggleSwitch
                 x:Name="StartWithWindowsToggle"
@@ -82,7 +79,7 @@
 
             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
                 <Button Click="OnCancelClicked" Content="Cancel" />
-                <Button Style="{StaticResource AccentButtonStyle}" Click="OnSaveClicked" Content="Save" />
+                <Button x:Name="SaveButton" AutomationProperties.AutomationId="SaveSettings" Style="{StaticResource AccentButtonStyle}" Click="OnSaveClicked" Content="Save" />
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

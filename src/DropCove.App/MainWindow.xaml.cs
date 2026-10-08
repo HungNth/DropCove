@@ -598,8 +598,8 @@ public sealed partial class MainWindow : Window
         if (!TryRegisterHotKey(settings.HotKey))
         {
             _trayIcon.ShowWarning(
-                "Hotkey conflict",
-                "That combination is already in use. Choose another hotkey in DropCove Settings.");
+                "Hotkey unavailable",
+                "DropCove couldn’t register this hotkey. It may be unavailable or reserved by Windows. Choose another.");
             return false;
         }
 
@@ -780,7 +780,10 @@ public sealed partial class MainWindow : Window
 
         if (_globalHotKey.Matches(message, wParam))
         {
-            DispatcherQueue.TryEnqueue(async () => await ToggleShelfAsync());
+            if (_settingsWindow?.HandleRegisteredHotKey(lParam) != true)
+            {
+                DispatcherQueue.TryEnqueue(async () => await ToggleShelfAsync());
+            }
             return WindowMessageResult.HandledZero;
         }
 
