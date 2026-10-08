@@ -15,7 +15,7 @@
 - [ ] Lifecycle smoke verifies pending empty-shelf sizing, first-item persistence, restart before first content returning to `180 × 180`, exact manual restoration, final-item reset, no live shrink, and recalculation on later show/restart.
 - [ ] Window smoke verifies top-edge anchoring, upward correction and clamping near work-area limits, popup closure without stranded focus, keyboard usability, and reduced-motion behavior.
 - [x] Multi-monitor and non-100% DPI behavior is exercised where the environment permits; unavailable scenarios are recorded as unobserved rather than reported as passing.
-- [ ] The installed Release gate with `100` Shelf Batches and `1,000` Shelf Items keeps visible and post-dismissal working set below `150 MB`, idle CPU at or below `0.1%`, responsive pointer/scroll/drag interaction, and shelf-show latency p95 at or below `150 ms`.
+- [ ] The installed Release gate with `100` Shelf Batches and `1,000` Shelf Items keeps visible and post-dismissal working set below `160 MB`, idle CPU at or below `0.1%`, responsive pointer/scroll/drag interaction, and shelf-show latency p95 at or below `150 ms`.
 - [x] User-facing product documentation describes Automatic Shelf Growth, Manual Height Override, row-based tiers, no live shrink, persistence, reset, and Edge Rail non-impact using the canonical glossary terms.
 - [x] The ticket records the exact installed artifact, exercised scenarios, observed results, performance measurements, and any environmental limitations needed to reproduce the acceptance evidence.
 

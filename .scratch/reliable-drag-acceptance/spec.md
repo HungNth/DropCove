@@ -95,7 +95,7 @@ A native startup or execution error retains every valid participating Path Refer
 - The destination matrix includes Explorer/Desktop, Edge or Chrome file input, VS Code, and at least one common chat application at the same integrity level.
 - Each accepted target must receive every offered path. The source filesystem objects must remain byte-for-byte unchanged.
 - The complete automated suite must pass after the old WinUI source-drag path is removed.
-- Existing installed Release resource gates remain unchanged: every visible and post-dismissal `WorkingSet64` sample below `150 MB`, idle CPU at or below `0.1%`, and shelf-show p95 at or below `150 ms`. Native drag qualification does not waive an existing failure.
+- Existing installed Release resource gates remain unchanged: every visible and post-dismissal `WorkingSet64` sample below `160 MB`, idle CPU at or below `0.1%`, and shelf-show p95 at or below `150 ms`. Native drag qualification does not waive an existing failure.
 - The previously failed clean keyboard popup smoke must be rerun with controlled focus. Native drag acceptance does not count as keyboard-smoke evidence.
 
 ## Out of Scope

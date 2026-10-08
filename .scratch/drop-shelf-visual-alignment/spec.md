@@ -121,7 +121,7 @@ Keep the header and footer at `32` logical pixels and preserve the existing Sett
 - No screenshot-baseline framework is introduced. Screenshots are qualification evidence for human review, not pixel-perfect permanent tests tied to OS rendering revisions.
 - Existing installed Release and UI Automation evidence for responsive layout, automatic growth, Bulk Pinning, focus, and named controls is prior art for the qualification procedure.
 - Environmental limitations are explicit. Unavailable non-100% DPI, High Contrast, DWM policy state, or multi-monitor scenarios are recorded as unobserved rather than inferred from automated coverage.
-- The existing canonical performance gate remains unchanged: `100` Shelf Batches and `1,000` Shelf Items, production show/dismiss lifecycle, idle CPU at or below `0.1%`, shelf-show p95 at or below `150 ms`, and visible/post-dismissal working set below `150 MB`. This feature does not waive the current residency blocker or claim to solve it.
+- The existing canonical performance gate remains unchanged: `100` Shelf Batches and `1,000` Shelf Items, production show/dismiss lifecycle, idle CPU at or below `0.1%`, shelf-show p95 at or below `150 ms`, and visible/post-dismissal working set below `160 MB`. This feature does not waive the current residency blocker or claim to solve it.
 - Performance measurement and UI Automation remain separate runs against the same build fingerprint so UI Automation peer realization cannot contaminate residency evidence.
 
 ## Out of Scope

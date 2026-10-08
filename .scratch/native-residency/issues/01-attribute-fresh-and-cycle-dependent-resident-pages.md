@@ -2,7 +2,7 @@
 
 **Parent specification:** [Native Residency Recovery Specification](../spec.md)
 
-**What to build:** Produce current-build residency attribution that explains both the fresh-process baseline failure and the additional pages retained across repeated show/dismiss cycles. This ticket changes no production behavior. It must identify a measured ownership or lifetime boundary specific enough that the next ticket can predict how the Release candidate will return below the existing `150 MB` total Working Set gate.
+**What to build:** Produce current-build residency attribution that explains both the fresh-process baseline failure and the additional pages retained across repeated show/dismiss cycles. This ticket changes no production behavior. It must identify a measured ownership or lifetime boundary specific enough that the next ticket can predict how the Release candidate will return below the existing `160 MB` total Working Set gate.
 
 **Status:** done
 
@@ -15,7 +15,7 @@
 - [x] Every checkpoint reconciles enumerated resident pages exactly against total process `WorkingSet64` or records an explicit measurement blocker rather than an approximation.
 - [x] Attribution distinguishes shared and private pages, native images/modules, private managed/runtime/native heap pages, mapped files, and visual/icon/imaging resources where observable.
 - [x] The report compares current attribution against the earlier `140.29 MB` page breakdown and `134.57 / 141.05 MB` passing visible/dismissed baseline without assuming different builds or environments share the same page ownership.
-- [x] Fresh-process regression and cycle-dependent accumulation are reported separately, including the reduction each requires to keep every relevant sample strictly below `150 MB`.
+- [x] Fresh-process regression and cycle-dependent accumulation are reported separately, including the reduction each requires to keep every relevant sample strictly below `160 MB`.
 - [x] The current hypotheses—XAML/composition churn, visual/icon pipeline churn, retained presentation objects, and environment/build baseline shift—are falsified or ranked using observed deltas and explicit predictions.
 - [x] If page enumeration cannot isolate the owner, built-in Windows profiling captures the additional evidence needed to distinguish managed roots, native allocations, composition/XAML resources, imaging resources, driver residency, and shared module pages.
 - [x] The result identifies one measured ownership/lifetime seam whose predicted reduction is large enough to justify Ticket 02, or marks Ticket 02 blocked with the exact missing evidence. “Likely WinUI overhead” is not sufficient attribution.

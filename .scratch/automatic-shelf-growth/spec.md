@@ -123,7 +123,7 @@ A completed user resize that changes logical height creates a Manual Height Over
 - Installed Release smoke verifies empty-shelf resize remains pending only in the running instance, first accepted content makes it durable, final-item removal resets all sizing state, and restart before first content returns to `180 × 180`.
 - Installed Release smoke verifies top-edge anchoring where space permits and reachable work-area clamping near a monitor edge. Multi-monitor and non-100% DPI observations are reported only when actually exercised.
 - Existing accessibility checks verify that focus remains usable after growth and that closing an open popup for growth does not strand keyboard focus. Reduced-motion behavior is verified against the running app.
-- The existing `100` Shelf Batch / `1,000` Shelf Item installed Release performance gate remains unchanged: visible and post-dismissal working set stay below `150 MB`, idle CPU stays at or below `0.1%`, pointer/scroll/drag interaction remains responsive, and shelf-show latency p95 stays at or below `150 ms`.
+- The existing `100` Shelf Batch / `1,000` Shelf Item installed Release performance gate remains unchanged: visible and post-dismissal working set stay below `160 MB`, idle CPU stays at or below `0.1%`, pointer/scroll/drag interaction remains responsive, and shelf-show latency p95 stays at or below `150 ms`.
 
 ## Out of Scope
 

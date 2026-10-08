@@ -508,7 +508,8 @@ public sealed partial class MainWindow : Window
             _page.AcceptStorageDropAsync,
             RefreshRailAfterMutationAsync,
             OpenShelfFromRail,
-            message => _trayIcon.ShowWarning("Edge Rail drag", message));
+            message => _trayIcon.ShowWarning("Edge Rail", message),
+            _page.VisualCoordinator);
         _railWindow.UpdateBatches(_manager.Batches);
         _railWindow.Show(_manager.RailPlacement, _settings.ShowRailOverFullscreen);
     }

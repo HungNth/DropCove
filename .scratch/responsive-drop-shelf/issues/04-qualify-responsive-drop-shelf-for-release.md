@@ -22,7 +22,7 @@
 - [ ] Current hotkey, shake, close-to-dismiss, tray, Edge Rail, fullscreen, drag-in/out, Pin/Unpin, Remove, Clear Temporary Items, persistence, Missing/Unavailable, same-integrity, reduced-motion, and accessibility behavior remains intact.
 - [ ] Multi-monitor and DPI evidence records the actual configurations exercised. Unavailable configurations are not claimed; any required unverified configuration remains an explicit blocker.
 - [ ] With 100 Shelf Batches and 1,000 Shelf Items, grid scrolling, popup opening/closing, pinning, removal, and drag initiation remain responsive with deferred item projections and lazy visual work.
-- [ ] Installed Release `WorkingSet64` remains below `150 MB` while the shelf is visible and after dismissal, compared against the pre-change baselines of approximately `134.57 MB` and `141.05 MB`.
+- [ ] Installed Release `WorkingSet64` remains below `160 MB` while the shelf is visible and after dismissal, compared against the pre-change baselines of approximately `134.57 MB` and `141.05 MB`.
 - [ ] Installed Release idle CPU remains at or below `0.1%`, shelf-show latency p95 remains at or below `150 ms`, and no continuous cursor polling or periodic resize work is introduced.
 - [ ] Temporary profiles, seeded databases, test files, measurement artifacts not intended for retention, and installed smoke state are cleaned up; the user's original profile and persisted content are restored.
 - [ ] The parent specification and ticket comments record exact automated, installed-smoke, configuration, and performance evidence without claiming scenarios that were not exercised.

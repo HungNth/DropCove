@@ -22,6 +22,51 @@
         Drop="OnRailDrop"
         PointerMoved="OnRailPointerMoved"
         PointerExited="OnRailPointerExited">
+        <Grid.Resources>
+            <Style x:Key="RailActionButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonStyle}">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+            </Style>
+            <Style x:Key="RailActionToggleButtonStyle" TargetType="ToggleButton" BasedOn="{StaticResource TitleBarToggleButtonStyle}">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+            </Style>
+            <DataTemplate x:Key="RailManagementItemTemplate" x:DataType="local:ShelfItemViewModel">
+                <Border Tag="{x:Bind}" DataContext="{x:Bind}" Padding="4" CornerRadius="4"
+                        Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                        AutomationProperties.Name="{x:Bind DragAutomationName, Mode=OneWay}"
+                        CanDrag="True" DragStarting="OnRailItemDragStarting" DropCompleted="OnRailItemDropCompleted">
+                    <Grid ColumnSpacing="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ContentControl Width="24" Height="24" VerticalAlignment="Center" IsTabStop="False" IsHitTestVisible="False"
+                                        Content="{x:Bind}" ContentTemplate="{StaticResource ShelfItemVisualTemplate}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock FontSize="10" FontWeight="SemiBold" Text="{x:Bind Name, Mode=OneWay}"
+                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTipService.ToolTip="{x:Bind Name, Mode=OneWay}" />
+                            <TextBlock FontSize="9" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       Text="{x:Bind Path, Mode=OneWay}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                                       ToolTipService.ToolTip="{x:Bind Path, Mode=OneWay}" />
+                            <TextBlock FontSize="9" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       Text="{x:Bind DetailsLabel, Mode=OneWay}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <ToggleButton Width="24" Height="24" Style="{StaticResource RailActionToggleButtonStyle}"
+                                          Tag="{x:Bind}" Click="OnManagementItemPinClicked" IsEnabled="{x:Bind ActionsEnabled, Mode=OneWay}"
+                                          IsChecked="{x:Bind IsPinned, Mode=OneWay}" AutomationProperties.Name="{x:Bind PinAutomationName, Mode=OneWay}"
+                                          ToolTipService.ToolTip="Pin / Unpin">
+                                <FontIcon FontSize="11" Glyph="&#xE718;" />
+                            </ToggleButton>
+                            <Button Width="24" Height="24" Style="{StaticResource RailActionButtonStyle}"
+                                    Tag="{x:Bind}" Click="OnManagementItemRemoveClicked" IsEnabled="{x:Bind ActionsEnabled, Mode=OneWay}"
+                                    AutomationProperties.Name="{x:Bind RemoveAutomationName, Mode=OneWay}"
+                                    ToolTipService.ToolTip="{x:Bind RemoveAutomationName, Mode=OneWay}" Content="×" FontSize="14" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </DataTemplate>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -44,7 +89,7 @@
         </Button>
 
         <ListView x:Name="BatchList" Grid.Row="1" Margin="0,4,0,4" Padding="0"
-                  Visibility="Collapsed" SelectionMode="None"
+                  Visibility="Collapsed" SelectionMode="None" ContainerContentChanging="OnBatchContainerContentChanging"
                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                   ScrollViewer.VerticalScrollBarVisibility="Hidden">
             <ListView.ItemContainerStyle>
@@ -67,10 +112,10 @@
                         <Border
                             DataContext="{x:Bind}"
                             Padding="3"
-                            Margin="{x:Bind RowMargin, Mode=OneTime}"
+                            Margin="{x:Bind RowMargin, Mode=OneWay}"
                             Height="64"
                             HorizontalAlignment="Stretch"
-                            AutomationProperties.Name="{x:Bind AutomationName, Mode=OneTime}"
+                            AutomationProperties.Name="{x:Bind Presentation.DragBatchAutomationName, Mode=OneWay}"
                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
@@ -81,90 +126,49 @@
                             ToolTipService.ToolTip="Drag all items in batch">
                             <Grid ColumnSpacing="6">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="28" />
+                                    <ColumnDefinition Width="42" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <FontIcon Grid.Column="0" FontSize="17" Glyph="{x:Bind Glyph, Mode=OneTime}" />
+                                <ContentControl Width="42" Height="42" VerticalAlignment="Center"
+                                                IsTabStop="False" IsHitTestVisible="False"
+                                                Content="{x:Bind Presentation}" ContentTemplate="{StaticResource ShelfBatchPreviewTemplate}" />
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                                    <TextBlock FontSize="10" FontWeight="SemiBold" Text="{x:Bind Title, Mode=OneTime}"
+                                    <TextBlock FontSize="10" FontWeight="SemiBold" Text="{x:Bind Presentation.Title, Mode=OneWay}"
+                                               ToolTipService.ToolTip="{x:Bind Presentation.Title, Mode=OneWay}"
                                                TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                                     <TextBlock FontSize="8" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                               Text="{x:Bind Subtitle, Mode=OneTime}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                               Text="{x:Bind Presentation.Subtitle, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Presentation.Subtitle, Mode=OneWay}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                                 </StackPanel>
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                    <TextBlock FontSize="10" HorizontalAlignment="Right" Text="{x:Bind PinnedGlyph, Mode=OneTime}" />
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal">
+                                    <ToggleButton Width="24" Height="24" Style="{StaticResource RailActionToggleButtonStyle}"
+                                                  Tag="{x:Bind}" Click="OnRailPinClicked" IsEnabled="{x:Bind ActionsEnabled, Mode=OneWay}"
+                                                  IsChecked="{x:Bind Presentation.IsPinned, Mode=OneWay}"
+                                                  Visibility="{x:Bind Presentation.SingleItemVisibility, Mode=OneWay}"
+                                                  AutomationProperties.Name="{x:Bind Presentation.SingleItemPinAutomationName, Mode=OneWay}"
+                                                  ToolTipService.ToolTip="Pin / Unpin">
+                                        <FontIcon FontSize="11" Glyph="&#xE718;" />
+                                    </ToggleButton>
+                                    <ToggleButton Width="24" Height="24" Style="{StaticResource RailActionToggleButtonStyle}"
+                                                  Tag="{x:Bind}" Click="OnRailPinClicked" IsEnabled="{x:Bind ActionsEnabled, Mode=OneWay}"
+                                                  IsThreeState="True" IsChecked="{x:Bind Presentation.BulkPinState, Mode=OneWay}"
+                                                  Visibility="{x:Bind Presentation.MultiItemVisibility, Mode=OneWay}"
+                                                  AutomationProperties.Name="{x:Bind Presentation.BulkPinAutomationName, Mode=OneWay}"
+                                                  ToolTipService.ToolTip="{x:Bind Presentation.BulkPinAutomationName, Mode=OneWay}"
+                                                  Content="{x:Bind Presentation}" ContentTemplate="{StaticResource BulkPinIconTemplate}" />
                                 <Button
-                                    AutomationProperties.Name="{x:Bind FlyoutAutomationName, Mode=OneTime}"
-                                    ClickMode="Press"
-                                    Height="22"
-                                    HorizontalAlignment="Center"
-                                    Padding="6,0"
-                                    PointerPressed="OnBatchFlyoutButtonPointerPressed"
-                                    Visibility="{x:Bind FlyoutVisibility, Mode=OneTime}"
-                                    ToolTipService.ToolTip="Show batch items">
-                                    <TextBlock FontSize="9" Text="Items" />
-                                    <Button.Flyout>
-                                        <Flyout
-                                            Closed="OnBatchFlyoutClosed"
-                                            Opened="OnBatchFlyoutOpened">
-                                            <ScrollViewer
-                                                Width="260"
-                                                MaxHeight="480"
-                                                HorizontalScrollBarVisibility="Disabled"
-                                                VerticalScrollBarVisibility="Auto">
-                                                <ItemsRepeater ItemsSource="{x:Bind Items}">
-                                                    <ItemsRepeater.Layout>
-                                                        <StackLayout Spacing="4" />
-                                                    </ItemsRepeater.Layout>
-                                                    <ItemsRepeater.ItemTemplate>
-                                                        <DataTemplate x:DataType="local:RailItemSummary">
-                                                            <Border
-                                                                DataContext="{x:Bind}"
-                                                                Padding="6"
-                                                                AutomationProperties.Name="{x:Bind DragAutomationName, Mode=OneTime}"
-                                                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                                                                CanDrag="True"
-                                                                CornerRadius="4"
-                                                                DragStarting="OnRailItemDragStarting"
-                                                                DropCompleted="OnRailItemDropCompleted">
-                                                                <Grid ColumnSpacing="6">
-                                                                    <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="24" />
-                                                                        <ColumnDefinition Width="*" />
-                                                                        <ColumnDefinition Width="Auto" />
-                                                                    </Grid.ColumnDefinitions>
-                                                                    <Grid Width="24" Height="24" VerticalAlignment="Center">
-                                                                        <FontIcon FontSize="13" Glyph="{x:Bind Glyph, Mode=OneTime}" />
-                                                                    </Grid>
-                                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                                        <TextBlock
-                                                                            FontSize="10"
-                                                                            FontWeight="SemiBold"
-                                                                            Text="{x:Bind Name, Mode=OneTime}"
-                                                                            TextTrimming="CharacterEllipsis"
-                                                                            TextWrapping="NoWrap" />
-                                                                        <TextBlock
-                                                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                                            FontSize="9"
-                                                                            Text="{x:Bind Type, Mode=OneTime}"
-                                                                            TextTrimming="CharacterEllipsis"
-                                                                            TextWrapping="NoWrap" />
-                                                                    </StackPanel>
-                                                                    <TextBlock
-                                                                        Grid.Column="2"
-                                                                        FontSize="11"
-                                                                        Text="{x:Bind PinnedGlyph, Mode=OneTime}"
-                                                                        VerticalAlignment="Center" />
-                                                                </Grid>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsRepeater.ItemTemplate>
-                                                </ItemsRepeater>
-                                            </ScrollViewer>
-                                        </Flyout>
-                                    </Button.Flyout>
+                                    AutomationProperties.Name="{x:Bind Presentation.ManageItemsAutomationName, Mode=OneWay}"
+                                    Style="{StaticResource RailActionButtonStyle}" Width="24" Height="24"
+                                    IsEnabled="{x:Bind ActionsEnabled, Mode=OneWay}"
+                                    Tag="{x:Bind}" Click="OnManageItemsClicked" PreviewKeyDown="OnManageItemsKeyDown"
+                                    Visibility="{x:Bind Presentation.MultiItemVisibility, Mode=OneWay}"
+                                    ToolTipService.ToolTip="Manage items">
+                                    <FontIcon FontSize="9" Glyph="&#xE70D;" />
                                 </Button>
+                                    <Button Width="24" Height="24" Style="{StaticResource RailActionButtonStyle}"
+                                            Tag="{x:Bind}" Click="OnRailRemoveClicked" IsEnabled="{x:Bind ActionsEnabled, Mode=OneWay}"
+                                            AutomationProperties.Name="{x:Bind RemoveAutomationName, Mode=OneWay}"
+                                            ToolTipService.ToolTip="{x:Bind RemoveAutomationName, Mode=OneWay}" Content="×" FontSize="14" />
                                 </StackPanel>
                             </Grid>
                         </Border>

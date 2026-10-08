@@ -658,6 +658,12 @@ public static class WindowInterop
     public static nint GetFirstChildWindow(nint windowHandle) =>
         FindWindowEx(windowHandle, 0, "Microsoft.UI.Content.DesktopChildSiteBridge", null);
 
+    /// <summary>Determines whether the pointer hits a window or one of its native content children.</summary>
+    /// <param name="windowHandle">The top-level window HWND.</param>
+    /// <returns><see langword="true" /> if the pointer hits the window; otherwise, <see langword="false" />.</returns>
+    public static bool IsPointerOverWindow(nint windowHandle) =>
+        GetCursorPos(out var cursor) && GetAncestor(WindowFromPoint(cursor), 2) == windowHandle;
+
     /// <summary>Requests a <c>WM_MOUSELEAVE</c> notification for an overlay window.</summary>
     /// <param name="windowHandle">The target HWND.</param>
     public static void TrackMouseLeave(nint windowHandle)
@@ -1762,6 +1768,12 @@ public static class WindowInterop
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetCursorPos(out Point point);
+
+    [DllImport("user32.dll")]
+    private static extern nint WindowFromPoint(Point point);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetAncestor(nint windowHandle, uint flags);
 
     [DllImport("user32.dll")]
     private static extern nint MonitorFromPoint(Point point, uint flags);

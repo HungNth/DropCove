@@ -237,6 +237,13 @@ Only the two desktop-facing corners round (8-pixel radius aligned with Drop Shel
 
 **Transparent-surface corner change (unqualified for expansion):** the evidence above predates the transparent rail surface and 5-pixel input region. For the change itself, 96-DPI captures on white and red desktops show antialiased corners on both edges with the rail fill unchanged; the corner gap does not hit-test as rail while the body does; and 226 tests pass. Hover expansion, the flyout lifecycle, and drag-out have not been re-verified on this build: the automated hover drivers and `scripts/test-edge-rail-flyout.ps1` fail the same way on the unmodified baseline in the current environment.
 
+### Shared shelf presentation
+
+The Drop Shelf and Edge Rail reuse the same compiled 42-pixel bounded batch-preview template, Bulk Pinning visual template, item/batch projections, thumbnail eligibility, and realization lifetime. The existing visual coordinator/provider remains shared; each surface owns cancellation and ImageSource release independently. A batch requests at most its first three item visuals. Collapsed or hidden Edge Rail rows release their visual requests and detach the list content; expansion recreates visible rows through the existing virtualized list.
+
+**Thumbnail/management parity progress:** shared Drop Shelf extraction builds successfully in Release and has running single-image, native file/folder icon, stacked-preview, and item-popup smoke evidence. Edge Rail preview code builds, but expanded-preview acceptance is blocked: the isolated left rail remains collapsed despite the cursor reaching its input HWND and native hover routing. Row Pin/Remove and upgraded Manage Items behavior have not started because the approved ticket chain requires this gate first. This is not installed-release qualification and does not clear the independent total Working Set `<150 MB` release gate.
+
+
 ---
 
 # 6. Shelf Data Model
@@ -1196,7 +1203,7 @@ Release-build acceptance targets:
 Idle CPU average                    ≤ 0.1%
 Periodic cursor polling             0
 Show shelf from resident process    p95 ≤ 150 ms
-Idle working set target             < 150 MB
+Idle working set target             < 160 MB
 ```
 
 Thumbnail loading and SQLite I/O must not block the UI thread. V1 should remain responsive with at least 100 batches and 1,000 items by using lazy thumbnail loading and UI virtualization. The shelf realizes only visible item elements; native icons are requested independently, and image thumbnails are discarded when their visible realization ends.

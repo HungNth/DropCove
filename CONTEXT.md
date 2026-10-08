@@ -56,6 +56,18 @@ _Avoid_: Permanent file, favorite
 A lifecycle action that sets every Shelf Item in one Shelf Batch to the Pinned or Temporary lifecycle state together. Any all-pinned, all-temporary, or mixed status is derived from those items; the Shelf Batch never owns a pinned state.
 _Avoid_: Pinned Batch, Pin Batch, Batch-level pin
 
+**Manage Items**:
+The action that opens item-level inspection and management for a multi-item Shelf Batch.
+_Avoid_: Expand Batch, Open Batch
+
+**Remove Item**:
+A lifecycle action that removes one Shelf Item reference from DropCove and prunes its Shelf Batch when no items remain. It never deletes the referenced filesystem object.
+_Avoid_: Delete Item, Trash Item
+
+**Remove Batch**:
+A lifecycle action that removes one Shelf Batch and all of its Shelf Item references from DropCove. It never deletes referenced filesystem objects.
+_Avoid_: Delete Batch, Clear Batch
+
 **Clear Temporary Items**:
 A confirmed shelf-wide lifecycle action that removes every Temporary Item reference while preserving every Pinned Item. It never deletes filesystem objects.
 _Avoid_: Delete all, Clear batches

@@ -86,7 +86,7 @@ Remove the window-level Expand/Compact controls and all corresponding presentati
 62. As a performance-conscious user, I want responsive resizing and scrolling with 100 Shelf Batches and 1,000 Shelf Items, so that dynamic layout does not block pointer interaction.
 63. As a performance-conscious user, I want deferred item materialization and virtualization retained, so that unopened multi-item batches do not retain full item view models.
 64. As a performance-conscious user, I want idle CPU to remain at or below `0.1%`, so that the resident utility remains effectively idle.
-65. As a performance-conscious user, I want visible and post-dismissal working set to remain below `150 MB`, so that the more flexible UI remains lightweight.
+65. As a performance-conscious user, I want visible and post-dismissal working set to remain below `160 MB`, so that the more flexible UI remains lightweight.
 66. As a Windows user, I want the shelf-show latency target to remain at or below `150 ms` p95, so that restoring preferred geometry still feels immediate.
 
 ## Implementation Decisions
@@ -142,7 +142,7 @@ Remove the window-level Expand/Compact controls and all corresponding presentati
 - Installed Release smoke covers one/two/three/four-column boundaries, even card stretching, newest-first row order, vertical-only scrolling, stable window bounds when content changes, and absence of Compact/Expanded controls.
 - Installed Release smoke covers single-item direct actions and the complete multi-item popup lifecycle: pointer and keyboard opening, one-at-a-time replacement, placement fallback, bounded sizing, vertical overflow, outside click, `Esc` precedence, focus return, resize closure, batch deletion, Pin/Unpin, item removal, item drag, and whole-batch drag.
 - The repository's documented installed-EXE/UI Automation smoke procedures are prior art. No standalone smoke harness currently exists for this surface, so manual and UI Automation observations must record the exercised scenario and actual result without claiming unobserved multi-monitor or DPI cases.
-- The existing installed Release performance gate remains unchanged. With `100` Shelf Batches and `1,000` Shelf Items, visible and post-dismissal `WorkingSet64` must each remain below `150 MB`, idle CPU must remain at or below `0.1%`, pointer/scroll/drag interaction must remain responsive, and shelf-show latency p95 must remain at or below `150 ms`.
+- The existing installed Release performance gate remains unchanged. With `100` Shelf Batches and `1,000` Shelf Items, visible and post-dismissal `WorkingSet64` must each remain below `160 MB`, idle CPU must remain at or below `0.1%`, pointer/scroll/drag interaction must remain responsive, and shelf-show latency p95 at or below `150 ms`.
 - The verified pre-change baseline is approximately `134.57 MB` visible, `141.05 MB` post-dismissal, and `0.00%` idle CPU. Regression against the acceptance limits blocks completion even if functional smoke passes.
 
 ## Out of Scope

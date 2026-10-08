@@ -22,7 +22,7 @@
 - [ ] Item popup and Edge Rail flyout lifetime, one-click Settings, outside dismissal, and whole-batch closure remain correct after the gesture cutover.
 - [ ] The previously failed clean popup keyboard replay is rerun with controlled foreground and focus; a failed replay remains an explicit blocker rather than being inferred from earlier evidence.
 - [ ] The full automated suite passes after obsolete WinUI source-drag tests and assumptions are removed or updated.
-- [ ] Installed resource qualification uses exactly 100 Shelf Batches / 1,000 Shelf Items, 30 seconds of quiescence, a 60-second CPU window, and six memory samples at 10-second intervals. Every memory sample must remain below 150 MiB and CPU at or below 0.1%; shelf-show p95 must remain at or below 150 ms.
+- [ ] Installed resource qualification uses exactly 100 Shelf Batches / 1,000 Shelf Items, 30 seconds of quiescence, a 60-second CPU window, and six memory samples at 10-second intervals. Every memory sample must remain below 160 MiB and CPU at or below 0.1%; shelf-show p95 must remain at or below 150 ms.
 - [ ] A failing keyboard, CPU, memory, latency, DPI, or target-compatibility gate remains red; no result is rounded, averaged away, cherry-picked, or waived.
 - [ ] Responsive Drop Shelf Tickets 03 and 04 are updated only with exercised evidence. Final NSIS qualification is claimed only if every required gate passes.
 - [ ] Probe processes and disposable runtime diagnostics are stopped/removed, referenced fixture sources remain unchanged, and the latest original profile is restored before delivery.

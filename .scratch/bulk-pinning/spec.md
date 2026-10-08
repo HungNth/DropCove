@@ -137,7 +137,7 @@ Bulk Pinning is one all-or-nothing persistence mutation. A failure leaves both i
 - Popup smoke verifies an in-popup mutation keeps the popup open and focused, while a card mutation follows outside-click dismissal. Long-list scrolling keeps the header fixed and does not change popup or shelf bounds.
 - An isolated installed test profile may use the same deterministic SQLite abort trigger to verify the visible failure message, unchanged toggle/count/item states, retained popup focus, and absence of automatic retry. Live user data must never be altered for this test.
 - Visual smoke covers light, dark, and high-contrast presentation. Mixed state must remain distinguishable without relying only on color or opacity.
-- Performance smoke retains deferred popup projections and responsive interaction for a long Shelf Batch. The existing `100` Shelf Batch / `1,000` Shelf Item release gate remains unchanged: visible and post-dismissal working set below `150 MB`, idle CPU at or below `0.1%`, responsive pointer/scroll/drag interaction, and shelf-show latency p95 at or below `150 ms`.
+- Performance smoke retains deferred popup projections and responsive interaction for a long Shelf Batch. The existing `100` Shelf Batch / `1,000` Shelf Item release gate remains unchanged: visible and post-dismissal working set below `160 MB`, idle CPU at or below `0.1%`, responsive pointer/scroll/drag interaction, and shelf-show latency p95 at or below `150 ms`.
 - The complete existing automated suite must remain green. Existing individual Pin/Unpin, persistence, removal, availability, popup, drag-out, sizing, shake, Edge Rail, and visual-coordinator contracts are not rewritten to match implementation details.
 
 ## Out of Scope

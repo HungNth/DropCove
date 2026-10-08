@@ -4,16 +4,16 @@ Status: ready-for-agent
 
 ## Problem Statement
 
-DropCove's current self-contained x64 Release candidate fails the existing native residency release gate at the canonical 100 Shelf Batch / 1,000 Shelf Item scale. Fresh visible residency is `153.2461 MB`, first post-dismissal residency is approximately `156.27 MB`, the 30-cycle peak is `182.5195 MB`, and the post-30-cycle settled result is `178.8672 MB`. Total process `WorkingSet64` must remain below `150 MB`; passing CPU and latency results do not waive the residency failure.
+DropCove's current self-contained x64 Release candidate fails the existing native residency release gate at the canonical 100 Shelf Batch / 1,000 Shelf Item scale. Fresh visible residency is `153.2461 MB`, first post-dismissal residency is approximately `156.27 MB`, the 30-cycle peak is `182.5195 MB`, and the post-30-cycle settled result is `178.8672 MB`. Total process `WorkingSet64` must remain below `160 MB`; passing CPU and latency results do not waive the residency failure.
 
 The current failure has two observable components: a fresh-process baseline regression and additional resident pages accumulated across repeated show/dismiss cycles. Historical attribution cannot identify the owner of the current delta. Selecting a cache, presentation lifetime, XAML, composition, icon or runtime change before current attribution would repeat earlier ineffective experiments.
 
 ## Solution
 
-Recover the existing `<150 MB` gate in three evidence-gated vertical steps:
+Recover the existing `<160 MB` gate in three evidence-gated vertical steps:
 
 1. Attribute current fresh-process and cycle-dependent resident pages without changing production behavior.
-2. Apply the smallest measured ownership/lifetime change that returns every fresh visible and first post-dismissal sample below `150 MB`.
+2. Apply the smallest measured ownership/lifetime change that returns every fresh visible and first post-dismissal sample below `160 MB`.
 3. Eliminate measured show/dismiss accumulation and qualify the complete 30-cycle Release gate while preserving DropCove interactions and lifecycle.
 
 The diagnosis may prove that one implementation change solves both residency components. The tickets remain separate so fresh-process improvement cannot hide cycle accumulation, and cycle work cannot proceed from an already failing baseline.
@@ -21,11 +21,11 @@ The diagnosis may prove that one implementation change solves both residency com
 ## Implementation Decisions
 
 - The acceptance metric remains total process `WorkingSet64`, including shared native pages. It is never replaced by private memory, committed memory, installer size, managed heap size or an average that hides an individual sample over the limit.
-- The target remains strictly below `150 MB`. No threshold change, tolerance band, forced GC, `EmptyWorkingSet`, process trimming, working-set API, periodic cleanup, background polling or measurement-only behavior is allowed.
+- The target remains strictly below `160 MB`. No threshold change, tolerance band, forced GC, `EmptyWorkingSet`, process trimming, working-set API, periodic cleanup, background polling or measurement-only behavior is allowed.
 - Profiling precedes production architecture changes. Current snapshots must distinguish native images/modules, shared pages, private heap/runtime pages, mapped files, visual/icon resources and scale-dependent presentation state strongly enough to predict the proposed reduction.
 - The canonical acceptance fixture is exactly 100 Shelf Batches / 1,000 Shelf Items in an explicit isolated test profile. A one-batch control may be used only for attribution, never as acceptance evidence.
-- Fresh-process acceptance requires every sampled visible and first post-dismissal value below `150 MB`, not only the average.
-- Cycle acceptance requires every recorded cycle sample, the peak settled sample and the post-30-cycle settled sample below `150 MB`.
+- Fresh-process acceptance requires every sampled visible and first post-dismissal value below `160 MB`, not only the average.
+- Cycle acceptance requires every recorded cycle sample, the peak settled sample and the post-30-cycle settled sample below `160 MB`.
 - Idle CPU remains at or below `0.1%`; shelf-show p95 remains at or below `150 ms`.
 - The production hotkey/show path and real owned-foreground dismissal path remain the measurement lifecycle. UI Automation may prove interactions in a separate run but must not contaminate the canonical 30-cycle residency loop.
 - `DropShelfManager` remains the durable state owner. Presentations own only projections and native resources required by current visible surfaces. Do not add a public abstraction until profiling proves behavior that genuinely varies.

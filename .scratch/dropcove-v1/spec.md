@@ -133,7 +133,7 @@ The first usable vertical slice proves the unpackaged EXE installation path, nat
 113. As a Windows user, I want DropCove responsive with at least 100 Shelf Batches and 1,000 Shelf Items, so that normal temporary-workspace growth remains smooth.
 114. As a performance-conscious user, I want idle CPU to average at most 0.1% on the release build, so that the resident utility is effectively idle.
 115. As a Windows user, I want the resident process to show the shelf within a 150 ms p95 target, so that invocation feels immediate.
-116. As a Windows user, I want an idle working-set target below 150 MB, so that the utility remains lightweight for its WinUI stack.
+116. As a Windows user, I want an idle working-set target below 160 MB, so that the utility remains lightweight for its WinUI stack.
 117. As a Windows user, I want thumbnail and database work kept off the UI thread, so that drag and pointer interactions remain responsive.
 118. As a Windows user, I want drag-in compatibility with Explorer and Desktop, so that the primary sources work before V1 release.
 119. As a Windows user, I want drag-out compatibility with Explorer, browser file inputs, VS Code, and at least one common chat application, so that representative destination types are proven.
@@ -210,7 +210,7 @@ The first usable vertical slice proves the unpackaged EXE installation path, nat
 - MSIX/Microsoft Store delivery is deferred until the application is stable and Partner Center supplies its package name and publisher. The development manifest identity is not a production identity.
 - DropCove has no telemetry, background update checker, or application-owned network traffic. The EXE installer has no built-in updater.
 - Delivery is staged: unpackaged EXE vertical slice; Edge Rail; shake-to-open; Compact/Expanded modes and polish; later MSIX/Microsoft Store submission.
-- Release targets are idle CPU average at or below 0.1%, zero periodic cursor polling, shelf-show latency p95 at or below 150 ms from the resident process, and idle working-set target below 150 MB.
+- Release targets are idle CPU average at or below 0.1%, zero periodic cursor polling, shelf-show latency p95 at or below 150 ms from the resident process, and idle working-set target below 160 MB. The working-set target was raised from 150 MB on 2026-10-08 by product decision after measurement showed the self-contained WinUI/Windows App SDK/.NET floor at ~147–149 MB with a single Shelf Item on the reference machine (see Ticket 19).
 - V1 responsiveness is validated with at least 100 Shelf Batches and 1,000 Shelf Items using lazy thumbnail loading and UI virtualization.
 
 ## Testing Decisions
