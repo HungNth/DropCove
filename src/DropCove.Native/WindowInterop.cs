@@ -265,21 +265,24 @@ public sealed class ForegroundWindowHook : IDisposable
     private const int ObjidWindow = 0;
     private const uint WineventOutOfContext = 0;
     private readonly WinEventDelegate _foregroundCallback;
-    private readonly WinEventDelegate _locationCallback;
+    private readonly WinEventDelegate? _locationCallback;
     private readonly Action _onForegroundChanged;
+    private readonly bool _monitorLocationChanges;
     private nint _foregroundHook;
     private nint _locationHook;
     private bool _disposed;
     private uint _locationThreadId;
 
-    /// <summary>Installs out-of-context hooks for foreground activation and in-place foreground resize.</summary>
+    /// <summary>Installs an out-of-context hook for foreground activation and optionally foreground resize.</summary>
     /// <param name="onForegroundChanged">The callback invoked when the foreground window changes or resizes.</param>
-    public ForegroundWindowHook(Action onForegroundChanged)
+    /// <param name="monitorLocationChanges">Whether foreground-window location changes also invoke the callback.</param>
+    public ForegroundWindowHook(Action onForegroundChanged, bool monitorLocationChanges = true)
     {
         ArgumentNullException.ThrowIfNull(onForegroundChanged);
         _onForegroundChanged = onForegroundChanged;
+        _monitorLocationChanges = monitorLocationChanges;
         _foregroundCallback = HandleForegroundChanged;
-        _locationCallback = HandleLocationChanged;
+        _locationCallback = monitorLocationChanges ? HandleLocationChanged : null;
 
         _foregroundHook = SetWinEventHook(
             EventSystemForeground,
@@ -292,6 +295,11 @@ public sealed class ForegroundWindowHook : IDisposable
         if (_foregroundHook == 0)
         {
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not monitor foreground-window changes.");
+        }
+
+        if (!_monitorLocationChanges)
+        {
+            return;
         }
 
         try
@@ -337,7 +345,12 @@ public sealed class ForegroundWindowHook : IDisposable
         uint eventThreadId,
         uint eventTime)
     {
-        if (!_disposed)
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_monitorLocationChanges)
         {
             try
             {
@@ -348,8 +361,9 @@ public sealed class ForegroundWindowHook : IDisposable
                 _locationThreadId = 0;
                 return;
             }
-            _onForegroundChanged();
         }
+
+        _onForegroundChanged();
     }
 
     private void HandleLocationChanged(
@@ -390,7 +404,7 @@ public sealed class ForegroundWindowHook : IDisposable
             EventObjectLocationChange,
             EventObjectLocationChange,
             0,
-            _locationCallback,
+            _locationCallback!,
             0,
             threadId,
             WineventOutOfContext);
@@ -1488,6 +1502,11 @@ public static class WindowInterop
         SetWindowPos(windowHandle, HwndTopmost, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpShowWindow);
         SetForegroundWindow(windowHandle);
     }
+
+    /// <summary>Reasserts the window's topmost z-order without activating or moving it.</summary>
+    /// <param name="windowHandle">The target HWND.</param>
+    public static void ReassertTopmost(nint windowHandle) =>
+        SetWindowPos(windowHandle, HwndTopmost, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoActivate);
 
     /// <summary>Hides a window without destroying it.</summary>
     /// <param name="windowHandle">The target HWND.</param>

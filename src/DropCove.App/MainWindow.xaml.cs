@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     private readonly SettingsStore _settingsStore;
     private readonly nint _windowHandle;
     private readonly WindowMessageHook _messageHook;
+    private ForegroundWindowHook? _shelfForegroundWindowHook;
     private readonly GlobalHotKey _globalHotKey;
     private readonly TrayIcon _trayIcon;
     private readonly MainPage _page;
@@ -185,6 +186,7 @@ public sealed partial class MainWindow : Window
         GrowAfterAcceptedDrop();
 
         WindowInterop.ShowAndActivate(_windowHandle);
+        TrackShelfForegroundChanges();
         _page.Focus(FocusState.Programmatic);
         _page.PlayShelfAppearance();
     }
@@ -357,6 +359,7 @@ public sealed partial class MainWindow : Window
         WindowInterop.PositionNearPoint(_windowHandle, targetX, targetY, preferred.PreferredWidth, height);
         GrowAfterAcceptedDrop();
         WindowInterop.ShowAndActivate(_windowHandle);
+        TrackShelfForegroundChanges();
         _page.Focus(FocusState.Programmatic);
         if (refresh)
         {
@@ -541,8 +544,25 @@ public sealed partial class MainWindow : Window
         HideRail();
     }
 
+    private void TrackShelfForegroundChanges() =>
+        _shelfForegroundWindowHook ??= new ForegroundWindowHook(
+            () => _dispatcherQueue.TryEnqueue(ReassertShelfTopmost),
+            monitorLocationChanges: false);
+
+    private void ReassertShelfTopmost()
+    {
+        if (!_disposed &&
+            _manager?.DisplayState == ShelfDisplayState.Visible &&
+            WindowInterop.IsVisible(_windowHandle))
+        {
+            WindowInterop.ReassertTopmost(_windowHandle);
+        }
+    }
+
     private void HideShelf()
     {
+        _shelfForegroundWindowHook?.Dispose();
+        _shelfForegroundWindowHook = null;
         ClearResizeHover();
         _page.ReleasePresentation();
         WindowInterop.Hide(_windowHandle);
@@ -1053,6 +1073,8 @@ public sealed partial class MainWindow : Window
         _trayIcon.Dispose();
         _railWindow?.Close();
         _railWindow = null;
+        _shelfForegroundWindowHook?.Dispose();
+        _shelfForegroundWindowHook = null;
         try
         {
             _shakeMouseHook?.Dispose();

@@ -550,6 +550,8 @@ Placement remains independent so display and monitor-position behavior do not be
 
 The hotkey toggles the shelf. `Esc` and the `×` button also dismiss it; losing focus does not. If an item popup is open, the first `Esc` closes the popup while keeping the shelf visible; a subsequent `Esc` dismisses the shelf.
 
+While visible, the Drop Shelf reasserts its topmost z-order when the foreground application changes without activating itself. Closing an external viewer with `Alt+F4` must not leave the shelf behind the application that regains focus.
+
 Dismissing the visible shelf preserves every Shelf Batch. With Edge Rail available, the resulting state is:
 
 ```text
