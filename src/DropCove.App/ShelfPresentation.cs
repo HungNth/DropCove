@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using DropCove.Core;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
 namespace DropCove;
@@ -44,7 +45,7 @@ internal sealed class BatchCardViewModel : INotifyPropertyChanged
     public int PinnedItemCount { get; private set; }
     public bool? BulkPinState => PinnedItemCount == 0 ? false : PinnedItemCount == Batch.Items.Count ? true : null;
     public Visibility MixedPinVisibility => BulkPinState is null ? Visibility.Visible : Visibility.Collapsed;
-    public string BulkPinSummary => $"{PinnedItemCount} of {Batch.Items.Count} pinned";
+    public string BulkPinSummary => $"{PinnedItemCount}/{Batch.Items.Count} pinned";
     public string BulkPinAutomationName => BulkPinState == true
         ? $"Unpin all {Batch.Items.Count} items"
         : $"Pin all {Batch.Items.Count} items{(BulkPinState is null ? $", {PinnedItemCount} currently pinned" : string.Empty)}";
@@ -108,8 +109,10 @@ internal sealed class ShelfItemViewModel : INotifyPropertyChanged
     private ImageSource? _icon;
     private bool _usedThumbnail;
     private bool _isBusy;
+    private Range? _compactPathTail;
     private static readonly PropertyChangedEventArgs AllPropertiesChanged = new(string.Empty);
     private static readonly PropertyChangedEventArgs ActionsEnabledChanged = new(nameof(ActionsEnabled));
+    private static readonly PropertyChangedEventArgs DisplayPathChanged = new(nameof(DisplayPath));
 
     public ShelfItemViewModel(ShelfItem item, string name, string type, string fallbackGlyph)
     {
@@ -117,6 +120,8 @@ internal sealed class ShelfItemViewModel : INotifyPropertyChanged
         Name = name;
         Type = type;
         FallbackGlyph = fallbackGlyph;
+        DisplayPath = item.Path;
+        _compactPathTail = GetCompactPathTail(item.Path);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -125,6 +130,27 @@ internal sealed class ShelfItemViewModel : INotifyPropertyChanged
     public string Name { get; }
     public string Type { get; }
     public string Path => Item.Path;
+    public string DisplayPath { get; private set; }
+
+    public void CompactDisplayPath()
+    {
+        if (DisplayPath != Path || _compactPathTail is not { } tail) return;
+        DisplayPath = string.Concat("…\\", Path.AsSpan()[tail]);
+        PropertyChanged?.Invoke(this, DisplayPathChanged);
+    }
+
+    private static Range? GetCompactPathTail(string value)
+    {
+        var path = value.AsSpan();
+        var end = path.Length;
+        while (end > 0 && path[end - 1] is '\\' or '/') end--;
+        var nameSeparator = path[..end].LastIndexOfAny('\\', '/');
+        if (nameSeparator <= 0) return null;
+        var parentStart = path[..nameSeparator].LastIndexOfAny('\\', '/') + 1;
+        var rootLength = System.IO.Path.GetPathRoot(path).Length;
+        return parentStart < rootLength || parentStart == 0 ? null : parentStart..end;
+    }
+
     public string AvailabilityText => Item.Availability switch
     {
         ItemAvailability.Available => "Available",
@@ -146,6 +172,11 @@ internal sealed class ShelfItemViewModel : INotifyPropertyChanged
     public void Update(ShelfItem item)
     {
         if (ReferenceEquals(Item, item)) return;
+        if (Item.Path != item.Path)
+        {
+            DisplayPath = item.Path;
+            _compactPathTail = GetCompactPathTail(item.Path);
+        }
         Item = item;
         PropertyChanged?.Invoke(this, AllPropertiesChanged);
     }
@@ -174,6 +205,11 @@ internal sealed class ShelfItemViewModel : INotifyPropertyChanged
 
 internal static class ShelfPresentation
 {
+    public static void OnPathTextTrimmed(TextBlock text)
+    {
+        if (text.IsTextTrimmed && text.Tag is ShelfItemViewModel item) item.CompactDisplayPath();
+    }
+
     public static BatchCardViewModel CreateBatchCard(ShelfBatch batch, BatchCardViewModel? existing = null)
     {
         var previewCount = Math.Min(3, batch.Items.Count);

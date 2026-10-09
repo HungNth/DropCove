@@ -1,0 +1,2862 @@
+{
+  "feature": "Compact Manage Items Controls",
+  "reviewBase": "d4a7929b132871ad993a2a444ca5d345c12bdaec",
+  "installedPayload": {
+    "executableSha256": "7FC50FC36EAE8AE6F4B4123D069D77263F940B60889BC75837C04F3374A93970",
+    "applicationSha256": "6558106D6D1EE1631757BAE91003398308E52AE51577383EEF19D1EE5D363461",
+    "publishMatchesInstalled": [
+      "DropCove.exe",
+      "DropCove.dll",
+      "DropCove.Core.dll",
+      "DropCove.Services.dll",
+      "DropCove.Native.dll"
+    ]
+  },
+  "verification": {
+    "releaseBuild": {
+      "warnings": 0,
+      "errors": 0
+    },
+    "focusedNativePlacement": {
+      "passed": 68,
+      "failed": 0
+    },
+    "nativeWidthRedBeforeGreen": {
+      "failedBefore": 3,
+      "dpi": [
+        96,
+        144,
+        192
+      ],
+      "expectedLogicalWidth": 280
+    },
+    "fullMSTestSuite": {
+      "passed": 221,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "surfaces": [
+    {
+      "Surface": "Shelf",
+      "Theme": "Dark",
+      "Dll": "6558106D6D1EE1631757BAE91003398308E52AE51577383EEF19D1EE5D363461",
+      "Dpi": 96,
+      "PopupHost": "958,466,280,480",
+      "Checks": [
+        {
+          "Passed": true,
+          "Name": "Short path remains complete"
+        },
+        {
+          "Passed": true,
+          "Name": "Long file preserves parent and filename"
+        },
+        {
+          "Passed": true,
+          "Name": "Long folder preserves parent and folder"
+        },
+        {
+          "Passed": true,
+          "Name": "Compact pin count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin left and Close right"
+        },
+        {
+          "Passed": true,
+          "Name": "Rendered popup width is 280 logical pixels"
+        },
+        {
+          "Passed": true,
+          "Name": "Popup height remains bounded"
+        },
+        {
+          "Passed": true,
+          "Name": "Tab reaches Close from Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "ShiftTab returns to Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Header remains fixed while virtualized rows scroll"
+        },
+        {
+          "Passed": true,
+          "Name": "Space activates Close"
+        },
+        {
+          "Passed": true,
+          "Name": "Close restores originating focus"
+        },
+        {
+          "Passed": true,
+          "Name": "Escape dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Invoke Close dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Manage toggle dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside click target is outside popup bounds"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside pointer release dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard opening initially focuses popup Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin On and N/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk unpin Off and 0/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard realizes target file after bulk refresh"
+        },
+        {
+          "Passed": true,
+          "Name": "Individual pin refreshes mixed count"
+        },
+        {
+          "Passed": true,
+          "Name": "Item removal retains popup and recomputes count"
+        },
+        {
+          "Passed": true,
+          "Name": "Close reenabled after mutation completes"
+        },
+        {
+          "Passed": true,
+          "Name": "Close works after mutation completes"
+        }
+      ],
+      "Header": {
+        "Close": "1207,473,24,24",
+        "Summary": "997,477,202,16",
+        "ToggleState": "Indeterminate",
+        "Bulk": "965,473,24,24"
+      },
+      "ForwardFocus": [
+        "Close Manage Items",
+        "Pin a.txt",
+        "Remove a.txt",
+        "Unpin file_name.png",
+        "Remove file_name.png",
+        "Pin folder_name",
+        "Remove folder_name",
+        "Pin multi3.txt",
+        "Remove multi3.txt",
+        "Pin extra4.txt",
+        "Remove extra4.txt",
+        "Pin extra5.txt",
+        "Remove extra5.txt",
+        "Pin extra6.txt",
+        "Remove extra6.txt",
+        "Pin extra7.txt",
+        "Remove extra7.txt",
+        "Pin extra8.txt",
+        "Remove extra8.txt",
+        "Pin extra9.txt",
+        "Remove extra9.txt",
+        "Pin extra10.txt",
+        "Remove extra10.txt",
+        "Pin extra11.txt",
+        "Remove extra11.txt",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "ReverseFocus": [
+        "Remove extra11.txt",
+        "Pin extra11.txt",
+        "Remove extra10.txt",
+        "Pin extra10.txt",
+        "Remove extra9.txt",
+        "Pin extra9.txt",
+        "Remove extra8.txt",
+        "Pin extra8.txt",
+        "Remove extra7.txt",
+        "Pin extra7.txt",
+        "Remove extra6.txt",
+        "Pin extra6.txt",
+        "Remove extra5.txt",
+        "Pin extra5.txt",
+        "Remove extra4.txt",
+        "Pin extra4.txt",
+        "Remove multi3.txt",
+        "Pin multi3.txt",
+        "Remove folder_name",
+        "Pin folder_name",
+        "Remove file_name.png",
+        "Unpin file_name.png",
+        "Remove a.txt",
+        "Pin a.txt",
+        "Close Manage Items",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "PendingCloseDisabledObserved": true,
+      "Limitations": [
+        "Actual drag acceptance/cancellation and safely isolated High Contrast not exercised in this smoke"
+      ],
+      "Screenshot": "artifacts/compact-Shelf-Dark.png",
+      "Cleanup": "Isolated process/fixtures removed; original AppsUseLightTheme restored",
+      "pathTextEvidence": [
+        {
+          "Bounds": "999,519,176,12",
+          "VisibleText": "C:\\a.txt",
+          "FullName": "C:\\a.txt"
+        },
+        {
+          "Bounds": "999,573,176,12",
+          "VisibleText": "…\\parent_folder\\file_name.png",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-7865b38358f9483ab1732805d6a1c62d\\fixtures\\nested_level_one\\parent_folder\\file_name.png"
+        },
+        {
+          "Bounds": "999,627,176,12",
+          "VisibleText": "…\\parent_folder\\folder_name",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-7865b38358f9483ab1732805d6a1c62d\\fixtures\\nested_level_one\\parent_folder\\folder_name"
+        },
+        {
+          "Bounds": "999,681,176,12",
+          "VisibleText": "…\\fixtures\\multi3.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-7865b38358f9483ab1732805d6a1c62d\\fixtures\\multi3.txt"
+        },
+        {
+          "Bounds": "999,735,176,12",
+          "VisibleText": "…\\fixtures\\extra4.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-7865b38358f9483ab1732805d6a1c62d\\fixtures\\extra4.txt"
+        },
+        {
+          "Bounds": "999,789,176,12",
+          "VisibleText": "…\\fixtures\\extra5.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-7865b38358f9483ab1732805d6a1c62d\\fixtures\\extra5.txt"
+        },
+        {
+          "Bounds": "999,843,176,12",
+          "VisibleText": "…\\fixtures\\extra6.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-7865b38358f9483ab1732805d6a1c62d\\fixtures\\extra6.txt"
+        },
+        {
+          "Bounds": "999,897,176,12",
+          "VisibleText": "…\\fixtures\\extra7.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-7865b38358f9483ab1732805d6a1c62d\\fixtures\\extra7.txt"
+        },
+        {
+          "Bounds": "Empty",
+          "VisibleText": "…\\fixtures\\extra8.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-7865b38358f9483ab1732805d6a1c62d\\fixtures\\extra8.txt"
+        },
+        {
+          "Bounds": "Empty",
+          "VisibleText": "…\\fixtures\\extra9.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-7865b38358f9483ab1732805d6a1c62d\\fixtures\\extra9.txt"
+        }
+      ]
+    },
+    {
+      "Surface": "RailRight",
+      "Theme": "Dark",
+      "Dll": "6558106D6D1EE1631757BAE91003398308E52AE51577383EEF19D1EE5D363461",
+      "Dpi": 96,
+      "PopupHost": "1582,208,280,474",
+      "Checks": [
+        {
+          "Passed": true,
+          "Name": "Pointer hit resolves to isolated rail"
+        },
+        {
+          "Passed": true,
+          "Name": "Short path remains complete"
+        },
+        {
+          "Passed": true,
+          "Name": "Long file preserves parent and filename"
+        },
+        {
+          "Passed": true,
+          "Name": "Long folder preserves parent and folder"
+        },
+        {
+          "Passed": true,
+          "Name": "Compact pin count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin left and Close right"
+        },
+        {
+          "Passed": true,
+          "Name": "Rendered popup width is 280 logical pixels"
+        },
+        {
+          "Passed": true,
+          "Name": "Popup height remains bounded"
+        },
+        {
+          "Passed": true,
+          "Name": "Tab reaches Close from Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "ShiftTab returns to Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Header remains fixed while virtualized rows scroll"
+        },
+        {
+          "Passed": true,
+          "Name": "Space activates Close"
+        },
+        {
+          "Passed": true,
+          "Name": "Close restores originating focus"
+        },
+        {
+          "Passed": true,
+          "Name": "Escape dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Invoke Close dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Manage toggle dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside click target is outside popup bounds"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside pointer release dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard opening initially focuses popup Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin On and N/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk unpin Off and 0/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard realizes target file after bulk refresh"
+        },
+        {
+          "Passed": true,
+          "Name": "Individual pin refreshes mixed count"
+        },
+        {
+          "Passed": true,
+          "Name": "Item removal retains popup and recomputes count"
+        },
+        {
+          "Passed": true,
+          "Name": "Close reenabled after mutation completes"
+        },
+        {
+          "Passed": true,
+          "Name": "Close works after mutation completes"
+        }
+      ],
+      "Header": {
+        "Close": "1829,215,24,24",
+        "Summary": "1619,219,202,16",
+        "ToggleState": "Indeterminate",
+        "Bulk": "1587,215,24,24"
+      },
+      "ForwardFocus": [
+        "Close Manage Items",
+        "Pin a.txt",
+        "Remove a.txt",
+        "Unpin file_name.png",
+        "Remove file_name.png",
+        "Pin folder_name",
+        "Remove folder_name",
+        "Pin multi3.txt",
+        "Remove multi3.txt",
+        "Pin extra4.txt",
+        "Remove extra4.txt",
+        "Pin extra5.txt",
+        "Remove extra5.txt",
+        "Pin extra6.txt",
+        "Remove extra6.txt",
+        "Pin extra7.txt",
+        "Remove extra7.txt",
+        "Pin extra8.txt",
+        "Remove extra8.txt",
+        "Pin extra9.txt",
+        "Remove extra9.txt",
+        "Pin extra10.txt",
+        "Remove extra10.txt",
+        "Pin extra11.txt",
+        "Remove extra11.txt",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "ReverseFocus": [
+        "Remove extra11.txt",
+        "Pin extra11.txt",
+        "Remove extra10.txt",
+        "Pin extra10.txt",
+        "Remove extra9.txt",
+        "Pin extra9.txt",
+        "Remove extra8.txt",
+        "Pin extra8.txt",
+        "Remove extra7.txt",
+        "Pin extra7.txt",
+        "Remove extra6.txt",
+        "Pin extra6.txt",
+        "Remove extra5.txt",
+        "Pin extra5.txt",
+        "Remove extra4.txt",
+        "Pin extra4.txt",
+        "Remove multi3.txt",
+        "Pin multi3.txt",
+        "Remove folder_name",
+        "Pin folder_name",
+        "Remove file_name.png",
+        "Unpin file_name.png",
+        "Remove a.txt",
+        "Pin a.txt",
+        "Close Manage Items",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "PendingCloseDisabledObserved": true,
+      "Limitations": [
+        "Rail expansion uses production WM_MOUSEMOVE with confirmed real pointer hit; physical hover timing not certified",
+        "Actual drag acceptance/cancellation and safely isolated High Contrast not exercised in this smoke"
+      ],
+      "Screenshot": "artifacts/compact-RailRight-Dark.png",
+      "Cleanup": "Isolated process/fixtures removed; original AppsUseLightTheme restored",
+      "pathTextEvidence": [
+        {
+          "Bounds": "1621,261,176,12",
+          "VisibleText": "C:\\a.txt",
+          "FullName": "C:\\a.txt"
+        },
+        {
+          "Bounds": "1621,315,176,12",
+          "VisibleText": "…\\parent_folder\\file_name.png",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-18c09705537948e7b5997027af2be425\\fixtures\\nested_level_one\\parent_folder\\file_name.png"
+        },
+        {
+          "Bounds": "1621,369,176,12",
+          "VisibleText": "…\\parent_folder\\folder_name",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-18c09705537948e7b5997027af2be425\\fixtures\\nested_level_one\\parent_folder\\folder_name"
+        },
+        {
+          "Bounds": "1621,423,176,12",
+          "VisibleText": "…\\fixtures\\multi3.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-18c09705537948e7b5997027af2be425\\fixtures\\multi3.txt"
+        },
+        {
+          "Bounds": "1621,477,176,12",
+          "VisibleText": "…\\fixtures\\extra4.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-18c09705537948e7b5997027af2be425\\fixtures\\extra4.txt"
+        },
+        {
+          "Bounds": "1621,531,176,12",
+          "VisibleText": "…\\fixtures\\extra5.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-18c09705537948e7b5997027af2be425\\fixtures\\extra5.txt"
+        },
+        {
+          "Bounds": "1621,585,176,12",
+          "VisibleText": "…\\fixtures\\extra6.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-18c09705537948e7b5997027af2be425\\fixtures\\extra6.txt"
+        },
+        {
+          "Bounds": "1621,639,176,12",
+          "VisibleText": "…\\fixtures\\extra7.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-18c09705537948e7b5997027af2be425\\fixtures\\extra7.txt"
+        },
+        {
+          "Bounds": "Empty",
+          "VisibleText": "…\\fixtures\\extra8.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-18c09705537948e7b5997027af2be425\\fixtures\\extra8.txt"
+        }
+      ],
+      "foregroundHwndUnchangedDuringExpansion": true
+    },
+    {
+      "Surface": "RailLeft",
+      "Theme": "Dark",
+      "Dll": "6558106D6D1EE1631757BAE91003398308E52AE51577383EEF19D1EE5D363461",
+      "Dpi": 96,
+      "PopupHost": "249,208,280,474",
+      "Checks": [
+        {
+          "Passed": true,
+          "Name": "Pointer hit resolves to isolated rail"
+        },
+        {
+          "Passed": true,
+          "Name": "Short path remains complete"
+        },
+        {
+          "Passed": true,
+          "Name": "Long file preserves parent and filename"
+        },
+        {
+          "Passed": true,
+          "Name": "Long folder preserves parent and folder"
+        },
+        {
+          "Passed": true,
+          "Name": "Compact pin count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin left and Close right"
+        },
+        {
+          "Passed": true,
+          "Name": "Rendered popup width is 280 logical pixels"
+        },
+        {
+          "Passed": true,
+          "Name": "Popup height remains bounded"
+        },
+        {
+          "Passed": true,
+          "Name": "Tab reaches Close from Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "ShiftTab returns to Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Header remains fixed while virtualized rows scroll"
+        },
+        {
+          "Passed": true,
+          "Name": "Space activates Close"
+        },
+        {
+          "Passed": true,
+          "Name": "Close restores originating focus"
+        },
+        {
+          "Passed": true,
+          "Name": "Escape dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Invoke Close dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Manage toggle dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside click target is outside popup bounds"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside pointer release dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard opening initially focuses popup Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin On and N/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk unpin Off and 0/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard realizes target file after bulk refresh"
+        },
+        {
+          "Passed": true,
+          "Name": "Individual pin refreshes mixed count"
+        },
+        {
+          "Passed": true,
+          "Name": "Item removal retains popup and recomputes count"
+        },
+        {
+          "Passed": true,
+          "Name": "Close reenabled after mutation completes"
+        },
+        {
+          "Passed": true,
+          "Name": "Close works after mutation completes"
+        }
+      ],
+      "Header": {
+        "Close": "500,215,24,24",
+        "Summary": "290,219,202,16",
+        "ToggleState": "Indeterminate",
+        "Bulk": "258,215,24,24"
+      },
+      "ForwardFocus": [
+        "Close Manage Items",
+        "Pin a.txt",
+        "Remove a.txt",
+        "Unpin file_name.png",
+        "Remove file_name.png",
+        "Pin folder_name",
+        "Remove folder_name",
+        "Pin multi3.txt",
+        "Remove multi3.txt",
+        "Pin extra4.txt",
+        "Remove extra4.txt",
+        "Pin extra5.txt",
+        "Remove extra5.txt",
+        "Pin extra6.txt",
+        "Remove extra6.txt",
+        "Pin extra7.txt",
+        "Remove extra7.txt",
+        "Pin extra8.txt",
+        "Remove extra8.txt",
+        "Pin extra9.txt",
+        "Remove extra9.txt",
+        "Pin extra10.txt",
+        "Remove extra10.txt",
+        "Pin extra11.txt",
+        "Remove extra11.txt",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "ReverseFocus": [
+        "Remove extra11.txt",
+        "Pin extra11.txt",
+        "Remove extra10.txt",
+        "Pin extra10.txt",
+        "Remove extra9.txt",
+        "Pin extra9.txt",
+        "Remove extra8.txt",
+        "Pin extra8.txt",
+        "Remove extra7.txt",
+        "Pin extra7.txt",
+        "Remove extra6.txt",
+        "Pin extra6.txt",
+        "Remove extra5.txt",
+        "Pin extra5.txt",
+        "Remove extra4.txt",
+        "Pin extra4.txt",
+        "Remove multi3.txt",
+        "Pin multi3.txt",
+        "Remove folder_name",
+        "Pin folder_name",
+        "Remove file_name.png",
+        "Unpin file_name.png",
+        "Remove a.txt",
+        "Pin a.txt",
+        "Close Manage Items",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "PendingCloseDisabledObserved": true,
+      "Limitations": [
+        "Rail expansion uses production WM_MOUSEMOVE with confirmed real pointer hit; physical hover timing not certified",
+        "Actual drag acceptance/cancellation and safely isolated High Contrast not exercised in this smoke"
+      ],
+      "Screenshot": "artifacts/compact-RailLeft-Dark.png",
+      "Cleanup": "Isolated process/fixtures removed; original AppsUseLightTheme restored",
+      "pathTextEvidence": [
+        {
+          "Bounds": "292,261,176,12",
+          "VisibleText": "C:\\a.txt",
+          "FullName": "C:\\a.txt"
+        },
+        {
+          "Bounds": "292,315,176,12",
+          "VisibleText": "…\\parent_folder\\file_name.png",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-83b79fa34d5e4fb3bbfaef5961e3b147\\fixtures\\nested_level_one\\parent_folder\\file_name.png"
+        },
+        {
+          "Bounds": "292,369,176,12",
+          "VisibleText": "…\\parent_folder\\folder_name",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-83b79fa34d5e4fb3bbfaef5961e3b147\\fixtures\\nested_level_one\\parent_folder\\folder_name"
+        },
+        {
+          "Bounds": "292,423,176,12",
+          "VisibleText": "…\\fixtures\\multi3.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-83b79fa34d5e4fb3bbfaef5961e3b147\\fixtures\\multi3.txt"
+        },
+        {
+          "Bounds": "292,477,176,12",
+          "VisibleText": "…\\fixtures\\extra4.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-83b79fa34d5e4fb3bbfaef5961e3b147\\fixtures\\extra4.txt"
+        },
+        {
+          "Bounds": "292,531,176,12",
+          "VisibleText": "…\\fixtures\\extra5.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-83b79fa34d5e4fb3bbfaef5961e3b147\\fixtures\\extra5.txt"
+        },
+        {
+          "Bounds": "292,585,176,12",
+          "VisibleText": "…\\fixtures\\extra6.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-83b79fa34d5e4fb3bbfaef5961e3b147\\fixtures\\extra6.txt"
+        },
+        {
+          "Bounds": "292,639,176,12",
+          "VisibleText": "…\\fixtures\\extra7.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-83b79fa34d5e4fb3bbfaef5961e3b147\\fixtures\\extra7.txt"
+        },
+        {
+          "Bounds": "Empty",
+          "VisibleText": "…\\fixtures\\extra8.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-83b79fa34d5e4fb3bbfaef5961e3b147\\fixtures\\extra8.txt"
+        }
+      ],
+      "foregroundHwndUnchangedDuringExpansion": true
+    },
+    {
+      "Surface": "Shelf",
+      "Theme": "Light",
+      "Dll": "6558106D6D1EE1631757BAE91003398308E52AE51577383EEF19D1EE5D363461",
+      "Dpi": 96,
+      "PopupHost": "958,466,280,480",
+      "Checks": [
+        {
+          "Passed": true,
+          "Name": "Short path remains complete"
+        },
+        {
+          "Passed": true,
+          "Name": "Long file preserves parent and filename"
+        },
+        {
+          "Passed": true,
+          "Name": "Long folder preserves parent and folder"
+        },
+        {
+          "Passed": true,
+          "Name": "Compact pin count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin left and Close right"
+        },
+        {
+          "Passed": true,
+          "Name": "Rendered popup width is 280 logical pixels"
+        },
+        {
+          "Passed": true,
+          "Name": "Popup height remains bounded"
+        },
+        {
+          "Passed": true,
+          "Name": "Tab reaches Close from Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "ShiftTab returns to Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Header remains fixed while virtualized rows scroll"
+        },
+        {
+          "Passed": true,
+          "Name": "Space activates Close"
+        },
+        {
+          "Passed": true,
+          "Name": "Close restores originating focus"
+        },
+        {
+          "Passed": true,
+          "Name": "Escape dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Invoke Close dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Manage toggle dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside click target is outside popup bounds"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside pointer release dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard opening initially focuses popup Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin On and N/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk unpin Off and 0/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard realizes target file after bulk refresh"
+        },
+        {
+          "Passed": true,
+          "Name": "Individual pin refreshes mixed count"
+        },
+        {
+          "Passed": true,
+          "Name": "Item removal retains popup and recomputes count"
+        },
+        {
+          "Passed": true,
+          "Name": "Close reenabled after mutation completes"
+        },
+        {
+          "Passed": true,
+          "Name": "Close works after mutation completes"
+        }
+      ],
+      "Header": {
+        "Close": "1207,473,24,24",
+        "Summary": "997,477,202,16",
+        "ToggleState": "Indeterminate",
+        "Bulk": "965,473,24,24"
+      },
+      "ForwardFocus": [
+        "Close Manage Items",
+        "Pin a.txt",
+        "Remove a.txt",
+        "Unpin file_name.png",
+        "Remove file_name.png",
+        "Pin folder_name",
+        "Remove folder_name",
+        "Pin multi3.txt",
+        "Remove multi3.txt",
+        "Pin extra4.txt",
+        "Remove extra4.txt",
+        "Pin extra5.txt",
+        "Remove extra5.txt",
+        "Pin extra6.txt",
+        "Remove extra6.txt",
+        "Pin extra7.txt",
+        "Remove extra7.txt",
+        "Pin extra8.txt",
+        "Remove extra8.txt",
+        "Pin extra9.txt",
+        "Remove extra9.txt",
+        "Pin extra10.txt",
+        "Remove extra10.txt",
+        "Pin extra11.txt",
+        "Remove extra11.txt",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "ReverseFocus": [
+        "Remove extra11.txt",
+        "Pin extra11.txt",
+        "Remove extra10.txt",
+        "Pin extra10.txt",
+        "Remove extra9.txt",
+        "Pin extra9.txt",
+        "Remove extra8.txt",
+        "Pin extra8.txt",
+        "Remove extra7.txt",
+        "Pin extra7.txt",
+        "Remove extra6.txt",
+        "Pin extra6.txt",
+        "Remove extra5.txt",
+        "Pin extra5.txt",
+        "Remove extra4.txt",
+        "Pin extra4.txt",
+        "Remove multi3.txt",
+        "Pin multi3.txt",
+        "Remove folder_name",
+        "Pin folder_name",
+        "Remove file_name.png",
+        "Unpin file_name.png",
+        "Remove a.txt",
+        "Pin a.txt",
+        "Close Manage Items",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "PendingCloseDisabledObserved": true,
+      "Limitations": [
+        "Actual drag acceptance/cancellation and safely isolated High Contrast not exercised in this smoke"
+      ],
+      "Screenshot": "artifacts/compact-Shelf-Light.png",
+      "Cleanup": "Isolated process/fixtures removed; original AppsUseLightTheme restored",
+      "pathTextEvidence": [
+        {
+          "Bounds": "999,519,176,12",
+          "VisibleText": "C:\\a.txt",
+          "FullName": "C:\\a.txt"
+        },
+        {
+          "Bounds": "999,573,176,12",
+          "VisibleText": "…\\parent_folder\\file_name.png",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-073cbb4c0f7b4fe4b4dcae45a37e4d41\\fixtures\\nested_level_one\\parent_folder\\file_name.png"
+        },
+        {
+          "Bounds": "999,627,176,12",
+          "VisibleText": "…\\parent_folder\\folder_name",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-073cbb4c0f7b4fe4b4dcae45a37e4d41\\fixtures\\nested_level_one\\parent_folder\\folder_name"
+        },
+        {
+          "Bounds": "999,681,176,12",
+          "VisibleText": "…\\fixtures\\multi3.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-073cbb4c0f7b4fe4b4dcae45a37e4d41\\fixtures\\multi3.txt"
+        },
+        {
+          "Bounds": "999,735,176,12",
+          "VisibleText": "…\\fixtures\\extra4.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-073cbb4c0f7b4fe4b4dcae45a37e4d41\\fixtures\\extra4.txt"
+        },
+        {
+          "Bounds": "999,789,176,12",
+          "VisibleText": "…\\fixtures\\extra5.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-073cbb4c0f7b4fe4b4dcae45a37e4d41\\fixtures\\extra5.txt"
+        },
+        {
+          "Bounds": "999,843,176,12",
+          "VisibleText": "…\\fixtures\\extra6.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-073cbb4c0f7b4fe4b4dcae45a37e4d41\\fixtures\\extra6.txt"
+        },
+        {
+          "Bounds": "999,897,176,12",
+          "VisibleText": "…\\fixtures\\extra7.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-073cbb4c0f7b4fe4b4dcae45a37e4d41\\fixtures\\extra7.txt"
+        },
+        {
+          "Bounds": "Empty",
+          "VisibleText": "…\\fixtures\\extra8.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-073cbb4c0f7b4fe4b4dcae45a37e4d41\\fixtures\\extra8.txt"
+        },
+        {
+          "Bounds": "Empty",
+          "VisibleText": "…\\fixtures\\extra9.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-073cbb4c0f7b4fe4b4dcae45a37e4d41\\fixtures\\extra9.txt"
+        }
+      ]
+    },
+    {
+      "Surface": "RailRight",
+      "Theme": "Light",
+      "Dll": "6558106D6D1EE1631757BAE91003398308E52AE51577383EEF19D1EE5D363461",
+      "Dpi": 96,
+      "PopupHost": "1582,208,280,474",
+      "Checks": [
+        {
+          "Passed": true,
+          "Name": "Pointer hit resolves to isolated rail"
+        },
+        {
+          "Passed": true,
+          "Name": "Short path remains complete"
+        },
+        {
+          "Passed": true,
+          "Name": "Long file preserves parent and filename"
+        },
+        {
+          "Passed": true,
+          "Name": "Long folder preserves parent and folder"
+        },
+        {
+          "Passed": true,
+          "Name": "Compact pin count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin left and Close right"
+        },
+        {
+          "Passed": true,
+          "Name": "Rendered popup width is 280 logical pixels"
+        },
+        {
+          "Passed": true,
+          "Name": "Popup height remains bounded"
+        },
+        {
+          "Passed": true,
+          "Name": "Tab reaches Close from Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "ShiftTab returns to Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Header remains fixed while virtualized rows scroll"
+        },
+        {
+          "Passed": true,
+          "Name": "Space activates Close"
+        },
+        {
+          "Passed": true,
+          "Name": "Close restores originating focus"
+        },
+        {
+          "Passed": true,
+          "Name": "Escape dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Invoke Close dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Manage toggle dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside click target is outside popup bounds"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside pointer release dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard opening initially focuses popup Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin On and N/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk unpin Off and 0/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard realizes target file after bulk refresh"
+        },
+        {
+          "Passed": true,
+          "Name": "Individual pin refreshes mixed count"
+        },
+        {
+          "Passed": true,
+          "Name": "Item removal retains popup and recomputes count"
+        },
+        {
+          "Passed": true,
+          "Name": "Close reenabled after mutation completes"
+        },
+        {
+          "Passed": true,
+          "Name": "Close works after mutation completes"
+        }
+      ],
+      "Header": {
+        "Close": "1829,215,24,24",
+        "Summary": "1619,219,202,16",
+        "ToggleState": "Indeterminate",
+        "Bulk": "1587,215,24,24"
+      },
+      "ForwardFocus": [
+        "Close Manage Items",
+        "Pin a.txt",
+        "Remove a.txt",
+        "Unpin file_name.png",
+        "Remove file_name.png",
+        "Pin folder_name",
+        "Remove folder_name",
+        "Pin multi3.txt",
+        "Remove multi3.txt",
+        "Pin extra4.txt",
+        "Remove extra4.txt",
+        "Pin extra5.txt",
+        "Remove extra5.txt",
+        "Pin extra6.txt",
+        "Remove extra6.txt",
+        "Pin extra7.txt",
+        "Remove extra7.txt",
+        "Pin extra8.txt",
+        "Remove extra8.txt",
+        "Pin extra9.txt",
+        "Remove extra9.txt",
+        "Pin extra10.txt",
+        "Remove extra10.txt",
+        "Pin extra11.txt",
+        "Remove extra11.txt",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "ReverseFocus": [
+        "Remove extra11.txt",
+        "Pin extra11.txt",
+        "Remove extra10.txt",
+        "Pin extra10.txt",
+        "Remove extra9.txt",
+        "Pin extra9.txt",
+        "Remove extra8.txt",
+        "Pin extra8.txt",
+        "Remove extra7.txt",
+        "Pin extra7.txt",
+        "Remove extra6.txt",
+        "Pin extra6.txt",
+        "Remove extra5.txt",
+        "Pin extra5.txt",
+        "Remove extra4.txt",
+        "Pin extra4.txt",
+        "Remove multi3.txt",
+        "Pin multi3.txt",
+        "Remove folder_name",
+        "Pin folder_name",
+        "Remove file_name.png",
+        "Unpin file_name.png",
+        "Remove a.txt",
+        "Pin a.txt",
+        "Close Manage Items",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "PendingCloseDisabledObserved": true,
+      "Limitations": [
+        "Rail expansion uses production WM_MOUSEMOVE with confirmed real pointer hit; physical hover timing not certified",
+        "Actual drag acceptance/cancellation and safely isolated High Contrast not exercised in this smoke"
+      ],
+      "Screenshot": "artifacts/compact-RailRight-Light.png",
+      "Cleanup": "Isolated process/fixtures removed; original AppsUseLightTheme restored",
+      "pathTextEvidence": [
+        {
+          "Bounds": "1621,261,176,12",
+          "VisibleText": "C:\\a.txt",
+          "FullName": "C:\\a.txt"
+        },
+        {
+          "Bounds": "1621,315,176,12",
+          "VisibleText": "…\\parent_folder\\file_name.png",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-784294dc6d0b4eac973fb6b1818ec058\\fixtures\\nested_level_one\\parent_folder\\file_name.png"
+        },
+        {
+          "Bounds": "1621,369,176,12",
+          "VisibleText": "…\\parent_folder\\folder_name",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-784294dc6d0b4eac973fb6b1818ec058\\fixtures\\nested_level_one\\parent_folder\\folder_name"
+        },
+        {
+          "Bounds": "1621,423,176,12",
+          "VisibleText": "…\\fixtures\\multi3.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-784294dc6d0b4eac973fb6b1818ec058\\fixtures\\multi3.txt"
+        },
+        {
+          "Bounds": "1621,477,176,12",
+          "VisibleText": "…\\fixtures\\extra4.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-784294dc6d0b4eac973fb6b1818ec058\\fixtures\\extra4.txt"
+        },
+        {
+          "Bounds": "1621,531,176,12",
+          "VisibleText": "…\\fixtures\\extra5.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-784294dc6d0b4eac973fb6b1818ec058\\fixtures\\extra5.txt"
+        },
+        {
+          "Bounds": "1621,585,176,12",
+          "VisibleText": "…\\fixtures\\extra6.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-784294dc6d0b4eac973fb6b1818ec058\\fixtures\\extra6.txt"
+        },
+        {
+          "Bounds": "1621,639,176,12",
+          "VisibleText": "…\\fixtures\\extra7.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-784294dc6d0b4eac973fb6b1818ec058\\fixtures\\extra7.txt"
+        },
+        {
+          "Bounds": "Empty",
+          "VisibleText": "…\\fixtures\\extra8.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-784294dc6d0b4eac973fb6b1818ec058\\fixtures\\extra8.txt"
+        }
+      ],
+      "foregroundHwndUnchangedDuringExpansion": true
+    },
+    {
+      "Surface": "RailLeft",
+      "Theme": "Light",
+      "Dll": "6558106D6D1EE1631757BAE91003398308E52AE51577383EEF19D1EE5D363461",
+      "Dpi": 96,
+      "PopupHost": "249,208,280,474",
+      "Checks": [
+        {
+          "Passed": true,
+          "Name": "Pointer hit resolves to isolated rail"
+        },
+        {
+          "Passed": true,
+          "Name": "Short path remains complete"
+        },
+        {
+          "Passed": true,
+          "Name": "Long file preserves parent and filename"
+        },
+        {
+          "Passed": true,
+          "Name": "Long folder preserves parent and folder"
+        },
+        {
+          "Passed": true,
+          "Name": "Compact pin count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin left and Close right"
+        },
+        {
+          "Passed": true,
+          "Name": "Rendered popup width is 280 logical pixels"
+        },
+        {
+          "Passed": true,
+          "Name": "Popup height remains bounded"
+        },
+        {
+          "Passed": true,
+          "Name": "Tab reaches Close from Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "ShiftTab returns to Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Forward traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra11.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra10.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra9.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra8.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra7.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra6.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra5.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin extra4.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin multi3.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin folder_name"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Unpin file_name.png"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Remove a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin a.txt"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Close Manage Items"
+        },
+        {
+          "Passed": true,
+          "Name": "Reverse traversal: Pin all 12 items, 1 currently pinned"
+        },
+        {
+          "Passed": true,
+          "Name": "Header remains fixed while virtualized rows scroll"
+        },
+        {
+          "Passed": true,
+          "Name": "Space activates Close"
+        },
+        {
+          "Passed": true,
+          "Name": "Close restores originating focus"
+        },
+        {
+          "Passed": true,
+          "Name": "Escape dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Invoke Close dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Manage toggle dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside click target is outside popup bounds"
+        },
+        {
+          "Passed": true,
+          "Name": "Outside pointer release dismisses popup"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard opening initially focuses popup Bulk Pin"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk pin On and N/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Bulk unpin Off and 0/N count"
+        },
+        {
+          "Passed": true,
+          "Name": "Keyboard realizes target file after bulk refresh"
+        },
+        {
+          "Passed": true,
+          "Name": "Individual pin refreshes mixed count"
+        },
+        {
+          "Passed": true,
+          "Name": "Item removal retains popup and recomputes count"
+        },
+        {
+          "Passed": true,
+          "Name": "Close reenabled after mutation completes"
+        },
+        {
+          "Passed": true,
+          "Name": "Close works after mutation completes"
+        }
+      ],
+      "Header": {
+        "Close": "500,215,24,24",
+        "Summary": "290,219,202,16",
+        "ToggleState": "Indeterminate",
+        "Bulk": "258,215,24,24"
+      },
+      "ForwardFocus": [
+        "Close Manage Items",
+        "Pin a.txt",
+        "Remove a.txt",
+        "Unpin file_name.png",
+        "Remove file_name.png",
+        "Pin folder_name",
+        "Remove folder_name",
+        "Pin multi3.txt",
+        "Remove multi3.txt",
+        "Pin extra4.txt",
+        "Remove extra4.txt",
+        "Pin extra5.txt",
+        "Remove extra5.txt",
+        "Pin extra6.txt",
+        "Remove extra6.txt",
+        "Pin extra7.txt",
+        "Remove extra7.txt",
+        "Pin extra8.txt",
+        "Remove extra8.txt",
+        "Pin extra9.txt",
+        "Remove extra9.txt",
+        "Pin extra10.txt",
+        "Remove extra10.txt",
+        "Pin extra11.txt",
+        "Remove extra11.txt",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "ReverseFocus": [
+        "Remove extra11.txt",
+        "Pin extra11.txt",
+        "Remove extra10.txt",
+        "Pin extra10.txt",
+        "Remove extra9.txt",
+        "Pin extra9.txt",
+        "Remove extra8.txt",
+        "Pin extra8.txt",
+        "Remove extra7.txt",
+        "Pin extra7.txt",
+        "Remove extra6.txt",
+        "Pin extra6.txt",
+        "Remove extra5.txt",
+        "Pin extra5.txt",
+        "Remove extra4.txt",
+        "Pin extra4.txt",
+        "Remove multi3.txt",
+        "Pin multi3.txt",
+        "Remove folder_name",
+        "Pin folder_name",
+        "Remove file_name.png",
+        "Unpin file_name.png",
+        "Remove a.txt",
+        "Pin a.txt",
+        "Close Manage Items",
+        "Pin all 12 items, 1 currently pinned"
+      ],
+      "PendingCloseDisabledObserved": true,
+      "Limitations": [
+        "Rail expansion uses production WM_MOUSEMOVE with confirmed real pointer hit; physical hover timing not certified",
+        "Actual drag acceptance/cancellation and safely isolated High Contrast not exercised in this smoke"
+      ],
+      "Screenshot": "artifacts/compact-RailLeft-Light.png",
+      "Cleanup": "Isolated process/fixtures removed; original AppsUseLightTheme restored",
+      "pathTextEvidence": [
+        {
+          "Bounds": "292,261,176,12",
+          "VisibleText": "C:\\a.txt",
+          "FullName": "C:\\a.txt"
+        },
+        {
+          "Bounds": "292,315,176,12",
+          "VisibleText": "…\\parent_folder\\file_name.png",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-6920b3236dcd4439a956a8281181668e\\fixtures\\nested_level_one\\parent_folder\\file_name.png"
+        },
+        {
+          "Bounds": "292,369,176,12",
+          "VisibleText": "…\\parent_folder\\folder_name",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-6920b3236dcd4439a956a8281181668e\\fixtures\\nested_level_one\\parent_folder\\folder_name"
+        },
+        {
+          "Bounds": "292,423,176,12",
+          "VisibleText": "…\\fixtures\\multi3.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-6920b3236dcd4439a956a8281181668e\\fixtures\\multi3.txt"
+        },
+        {
+          "Bounds": "292,477,176,12",
+          "VisibleText": "…\\fixtures\\extra4.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-6920b3236dcd4439a956a8281181668e\\fixtures\\extra4.txt"
+        },
+        {
+          "Bounds": "292,531,176,12",
+          "VisibleText": "…\\fixtures\\extra5.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-6920b3236dcd4439a956a8281181668e\\fixtures\\extra5.txt"
+        },
+        {
+          "Bounds": "292,585,176,12",
+          "VisibleText": "…\\fixtures\\extra6.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-6920b3236dcd4439a956a8281181668e\\fixtures\\extra6.txt"
+        },
+        {
+          "Bounds": "292,639,176,12",
+          "VisibleText": "…\\fixtures\\extra7.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-6920b3236dcd4439a956a8281181668e\\fixtures\\extra7.txt"
+        },
+        {
+          "Bounds": "Empty",
+          "VisibleText": "…\\fixtures\\extra8.txt",
+          "FullName": "C:\\Users\\Hung\\AppData\\Local\\Temp\\DropCove-CompactSurface-6920b3236dcd4439a956a8281181668e\\fixtures\\extra8.txt"
+        }
+      ],
+      "foregroundHwndUnchangedDuringExpansion": true
+    }
+  ],
+  "codeReview": {
+    "Standards": {
+      "outstandingFindings": 0
+    },
+    "Spec": {
+      "outstandingFindings": 0,
+      "resolved": "Pure tail-range calculation moved to presentation creation/path change; native trim selects cached tail once without allocating unused compact strings."
+    }
+  },
+  "performance": {
+    "protocol": "100 batches/1000 all-Temporary items, 10 PNG previews, 30 production show/dismiss cycles; no UI Automation, forced GC or working-set trimming",
+    "candidate": {
+      "GeneratedUtc": "2026-10-09T04:48:53.6243243Z",
+      "Executable": "C:\\Users\\Hung\\AppData\\Local\\Programs\\DropCove\\DropCove.exe",
+      "ExecutableSha256": "7FC50FC36EAE8AE6F4B4123D069D77263F940B60889BC75837C04F3374A93970",
+      "ApplicationSha256": "6558106D6D1EE1631757BAE91003398308E52AE51577383EEF19D1EE5D363461",
+      "Batches": 100,
+      "Items": 1000,
+      "Measurement": "No UI Automation; production native show/hide messages; no forced GC or working-set trimming",
+      "WindowsBuild": "10.0.26300.0",
+      "VisibleWorkingSetMb": 158.82,
+      "VisibleCpuPercent": 0.039,
+      "ShowMessageToVisibleP95Ms": 30.56,
+      "LatencyLimit": "Native hotkey-message-to-visible only, not physical keyboard or first rendered frame",
+      "PostDismissalWorkingSetMb": 173.15,
+      "HiddenCpuPercent": 0.0,
+      "Cycles": 30,
+      "CycleWorkingSetMb": [
+        162.71,
+        165.51,
+        166.38,
+        167.2,
+        168.04,
+        169.61,
+        169.85,
+        170.1,
+        170.35,
+        170.86,
+        171.42,
+        173.55,
+        173.68,
+        173.77,
+        174.16,
+        171.04,
+        171.43,
+        171.65,
+        171.69,
+        171.81,
+        172.01,
+        172.02,
+        172.16,
+        172.17,
+        172.35,
+        172.35,
+        172.33,
+        172.38,
+        172.44,
+        172.82
+      ],
+      "UnresponsiveObserved": false,
+      "WorkingSetBelow150Mb": false,
+      "WorkingSetBelow160Mb": false,
+      "HiddenCpuAtMostPointOnePercent": true,
+      "ShowLatencyAtMost150Ms": true,
+      "Cleanup": "Only isolated process/profile/fixtures removed; no live user data changed"
+    },
+    "preChangeBaseline": {
+      "GeneratedUtc": "2026-10-09T04:49:41.8734341Z",
+      "Executable": "F:\\CSharp\\dropcove\\artifacts\\publish-release\\DropCove.exe",
+      "ExecutableSha256": "7FC50FC36EAE8AE6F4B4123D069D77263F940B60889BC75837C04F3374A93970",
+      "ApplicationSha256": "9A547296882EE06B90092A2D8A9DEC53EBEF29D5D99511190E5FE47BDB731B39",
+      "Batches": 100,
+      "Items": 1000,
+      "Measurement": "No UI Automation; production native show/hide messages; no forced GC or working-set trimming",
+      "WindowsBuild": "10.0.26300.0",
+      "VisibleWorkingSetMb": 158.41,
+      "VisibleCpuPercent": 0.0,
+      "ShowMessageToVisibleP95Ms": 16.41,
+      "LatencyLimit": "Native hotkey-message-to-visible only, not physical keyboard or first rendered frame",
+      "PostDismissalWorkingSetMb": 173.86,
+      "HiddenCpuPercent": 0.0,
+      "Cycles": 30,
+      "CycleWorkingSetMb": [
+        163.34,
+        164.74,
+        165.78,
+        166.72,
+        167.64,
+        169.77,
+        170.31,
+        170.66,
+        170.82,
+        171.52,
+        172.23,
+        174.59,
+        174.71,
+        174.74,
+        174.95,
+        171.03,
+        171.32,
+        171.47,
+        171.54,
+        171.91,
+        172.28,
+        172.42,
+        172.37,
+        172.38,
+        172.53,
+        172.55,
+        172.56,
+        172.83,
+        172.89,
+        173.75
+      ],
+      "UnresponsiveObserved": false,
+      "WorkingSetBelow150Mb": false,
+      "WorkingSetBelow160Mb": false,
+      "HiddenCpuAtMostPointOnePercent": true,
+      "ShowLatencyAtMost150Ms": true,
+      "Cleanup": "Only isolated process/profile/fixtures removed; no live user data changed"
+    },
+    "status": "Inherited residency gate remains unmet for both payloads. No release-ready claim; observed candidate post-dismissal working set is not higher than same-protocol baseline.",
+    "additionalMixedPinnedRun": {
+      "GeneratedUtc": "2026-10-09T04:39:28.6519931Z",
+      "Executable": "C:\\Users\\Hung\\AppData\\Local\\Programs\\DropCove\\DropCove.exe",
+      "ExecutableSha256": "7FC50FC36EAE8AE6F4B4123D069D77263F940B60889BC75837C04F3374A93970",
+      "ApplicationSha256": "6558106D6D1EE1631757BAE91003398308E52AE51577383EEF19D1EE5D363461",
+      "Batches": 100,
+      "Items": 1000,
+      "Measurement": "No UI Automation; production native show/hide messages; no forced GC or working-set trimming",
+      "WindowsBuild": "10.0.26300.0",
+      "VisibleWorkingSetMb": 158.49,
+      "VisibleCpuPercent": 0.0,
+      "ShowMessageToVisibleP95Ms": 30.39,
+      "LatencyLimit": "Native hotkey-message-to-visible only, not physical keyboard or first rendered frame",
+      "PostDismissalWorkingSetMb": 174.31,
+      "HiddenCpuPercent": 0.0,
+      "Cycles": 30,
+      "CycleWorkingSetMb": [
+        163.31,
+        165.21,
+        166.35,
+        167.16,
+        168.12,
+        170.22,
+        170.66,
+        171.09,
+        171.36,
+        171.72,
+        172.13,
+        171.54,
+        172.06,
+        172.05,
+        172.5,
+        172.66,
+        172.69,
+        172.69,
+        172.7,
+        172.73,
+        172.75,
+        173.0,
+        173.01,
+        173.23,
+        173.29,
+        173.33,
+        173.58,
+        173.79,
+        173.75,
+        174.2
+      ],
+      "UnresponsiveObserved": false,
+      "WorkingSetBelow150Mb": false,
+      "WorkingSetBelow160Mb": false,
+      "HiddenCpuAtMostPointOnePercent": true,
+      "ShowLatencyAtMost150Ms": true,
+      "Cleanup": "Only isolated process/profile/fixtures removed; no live user data changed",
+      "FixtureNote": "100 batches / 1000 items with one pinned item per batch; additional mixed-pinning workload, not the canonical all-Temporary seed."
+    }
+  },
+  "remainingObservations": [
+    "Physical-keyboard/first-render-frame latency is not measured by native message-to-visible timing.",
+    "Mixed-DPI/multi-monitor work-area scenarios are covered by existing geometry regression, not certified by this 96-DPI UI run.",
+    "High Contrast and non-default text scaling remain uncertified: the isolated Sandbox guest harness failed before contrast activation; its owned session was stopped without host theme changes.",
+    "Actual item drag acceptance/cancellation was not re-certified by this UI smoke; existing lifecycle tests remain regression coverage."
+  ],
+  "cleanup": "Temporary test profiles and fixture files removed. AppsUseLightTheme restored after each host surface run. No source filesystem objects or normal user profile were changed.",
+  "releaseReady": false,
+  "qualificationDisposition": "User explicitly approved committing the UI feature while Ticket 02 remains blocked by the inherited residency gate; no threshold waived. Remaining release checks are explicitly left open in Ticket 02.",
+  "finalInstalledLaunch": {
+    "processId": 30996,
+    "title": "DropCove",
+    "hwnd": 3542082,
+    "responding": true,
+    "leftRunningForUser": true
+  }
+}

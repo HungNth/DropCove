@@ -41,6 +41,7 @@ public sealed partial class MainPage : Page
     private UIElement? _openPopupAnchor;
     private IReadOnlyList<ShelfItemViewModel>? _popupItemViewModels;
     private bool _focusPopupHeaderOnOpen;
+    private int _pendingPopupMutations;
     internal bool IsItemDragInProgress { get; private set; }
     public MainPage()
     {
@@ -108,7 +109,7 @@ public sealed partial class MainPage : Page
 
     private async void OnPageKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key == Windows.System.VirtualKey.Escape && IsItemDragInProgress) return;
+        if (e.Key == Windows.System.VirtualKey.Escape && (IsItemDragInProgress || _pendingPopupMutations > 0)) return;
         if (e.Key == Windows.System.VirtualKey.Tab && BatchPopup.IsOpen)
         {
             var shift = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift);
@@ -138,7 +139,7 @@ public sealed partial class MainPage : Page
     private void MovePopupFocus(bool backward)
     {
         if (_popupItemViewModels is not { Count: > 0 } items) return;
-        var actionCount = 1 + items.Count * 2;
+        var actionCount = 2 + items.Count * 2;
 
         var focused = FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
         var row = focused;
@@ -149,17 +150,28 @@ public sealed partial class MainPage : Page
 
         var rowIndex = row is UIElement element ? BatchPopupItemList.GetElementIndex(element) : -1;
         var currentIndex = ReferenceEquals(focused, BatchPopupBulkPin) ? 0 :
-            rowIndex >= 0 ? 1 + rowIndex * 2 + (focused is ToggleButton ? 0 : 1) :
+            ReferenceEquals(focused, BatchPopupClose) ? 1 :
+            rowIndex >= 0 ? 2 + rowIndex * 2 + (focused is ToggleButton ? 0 : 1) :
             backward ? 0 : actionCount - 1;
         var actionIndex = (currentIndex + (backward ? -1 : 1) + actionCount) % actionCount;
+        if (actionIndex == 1 && !BatchPopupClose.IsEnabled)
+        {
+            actionIndex = (actionIndex + (backward ? -1 : 1) + actionCount) % actionCount;
+        }
+
         if (actionIndex == 0)
         {
             BatchPopupBulkPin.Focus(FocusState.Keyboard);
             return;
         }
 
+        if (actionIndex == 1)
+        {
+            BatchPopupClose.Focus(FocusState.Keyboard);
+            return;
+        }
         // Realize only the next row; virtualized offscreen actions must remain keyboard reachable.
-        var rowActionIndex = actionIndex - 1;
+        var rowActionIndex = actionIndex - 2;
         var targetRow = BatchPopupItemList.GetOrCreateElement(rowActionIndex / 2);
         targetRow.UpdateLayout();
         var target = rowActionIndex % 2 == 0 ? FocusManager.FindFirstFocusableElement(targetRow) :
@@ -366,16 +378,35 @@ public sealed partial class MainPage : Page
 
     private async void OnPinClicked(object sender, RoutedEventArgs e)
     {
-        if (sender is ToggleButton toggle && _manager is not null)
-        {
-            var itemVm = toggle.Tag as ShelfItemViewModel ?? toggle.DataContext as ShelfItemViewModel;
-            var singleVm = (toggle.Tag as BatchCardViewModel)?.SingleItem
-                ?? (toggle.DataContext as BatchCardViewModel)?.SingleItem;
+        if (sender is not ToggleButton toggle || _manager is null) return;
 
-            var itemId = itemVm?.Item.Id ?? singleVm?.Id;
-            if (itemId.HasValue && await _manager.SetPinnedAsync(itemId.Value, toggle.IsChecked == true))
+        var itemVm = toggle.Tag as ShelfItemViewModel ?? toggle.DataContext as ShelfItemViewModel;
+        var singleVm = (toggle.Tag as BatchCardViewModel)?.SingleItem
+            ?? (toggle.DataContext as BatchCardViewModel)?.SingleItem;
+
+        var itemId = itemVm?.Item.Id ?? singleVm?.Id;
+        if (!itemId.HasValue) return;
+
+        var fromPopup = BatchPopup.IsOpen && itemVm is not null;
+        if (fromPopup)
+        {
+            _pendingPopupMutations++;
+            BatchPopupClose.IsEnabled = false;
+        }
+
+        try
+        {
+            if (await _manager.SetPinnedAsync(itemId.Value, toggle.IsChecked == true))
             {
                 await RefreshAfterMutationAsync();
+            }
+        }
+        finally
+        {
+            if (fromPopup)
+            {
+                _pendingPopupMutations--;
+                BatchPopupClose.IsEnabled = _pendingPopupMutations == 0;
             }
         }
     }
@@ -388,24 +419,41 @@ public sealed partial class MainPage : Page
         toggle.IsChecked = card.BulkPinState;
         var fromPopup = ReferenceEquals(toggle, BatchPopupBulkPin);
         if (!fromPopup) CloseBatchPopup();
-        bool exists;
-        try
+        else
         {
-            exists = await _manager.SetAllItemsPinnedAsync(card.Batch.Id, target);
-        }
-        catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or IOException or InvalidDataException)
-        {
-            if (!ReferenceEquals(toggle.Tag, card)) return;
-            ShowDropMessage("Couldn’t update pinning. Nothing changed.", InfoBarSeverity.Error);
-            toggle.IsChecked = card.BulkPinState;
-            if (fromPopup && BatchPopup.IsOpen) toggle.Focus(FocusState.Programmatic);
-            return;
+            _pendingPopupMutations++;
+            BatchPopupClose.IsEnabled = false;
         }
 
-        if (exists) await RefreshAfterMutationAsync();
-        if (!ReferenceEquals(toggle.Tag, card)) return;
-        toggle.IsChecked = card.BulkPinState;
-        if (fromPopup && BatchPopup.IsOpen) toggle.Focus(FocusState.Programmatic);
+        try
+        {
+            bool exists;
+            try
+            {
+                exists = await _manager.SetAllItemsPinnedAsync(card.Batch.Id, target);
+            }
+            catch (Exception exception) when (exception is Microsoft.Data.Sqlite.SqliteException or IOException or InvalidDataException)
+            {
+                if (!ReferenceEquals(toggle.Tag, card)) return;
+                ShowDropMessage("Couldn’t update pinning. Nothing changed.", InfoBarSeverity.Error);
+                toggle.IsChecked = card.BulkPinState;
+                if (fromPopup && BatchPopup.IsOpen) toggle.Focus(FocusState.Programmatic);
+                return;
+            }
+
+            if (exists) await RefreshAfterMutationAsync();
+            if (!ReferenceEquals(toggle.Tag, card)) return;
+            toggle.IsChecked = card.BulkPinState;
+            if (fromPopup && BatchPopup.IsOpen) toggle.Focus(FocusState.Programmatic);
+        }
+        finally
+        {
+            if (fromPopup)
+            {
+                _pendingPopupMutations--;
+                BatchPopupClose.IsEnabled = _pendingPopupMutations == 0;
+            }
+        }
     }
 
     private async void OnRemoveItemClicked(object sender, RoutedEventArgs e)
@@ -421,23 +469,41 @@ public sealed partial class MainPage : Page
             return;
         }
 
-        var animationTarget = FindAnimationTarget(sender);
-        if (await _manager.RemoveItemAsync(item.Item.Id))
+        var fromPopup = BatchPopup.IsOpen;
+        if (fromPopup)
         {
-            try
+            _pendingPopupMutations++;
+            BatchPopupClose.IsEnabled = false;
+        }
+
+        try
+        {
+            var animationTarget = FindAnimationTarget(sender);
+            if (await _manager.RemoveItemAsync(item.Item.Id))
             {
-                if (animationTarget is not null)
+                try
                 {
-                    await ShelfMotion.PlayExitAsync(animationTarget);
+                    if (animationTarget is not null)
+                    {
+                        await ShelfMotion.PlayExitAsync(animationTarget);
+                    }
+                }
+                finally
+                {
+                    await RefreshAfterMutationAsync();
+                    if (animationTarget is not null)
+                    {
+                        ShelfMotion.Reset(animationTarget);
+                    }
                 }
             }
-            finally
+        }
+        finally
+        {
+            if (fromPopup)
             {
-                await RefreshAfterMutationAsync();
-                if (animationTarget is not null)
-                {
-                    ShelfMotion.Reset(animationTarget);
-                }
+                _pendingPopupMutations--;
+                BatchPopupClose.IsEnabled = _pendingPopupMutations == 0;
             }
         }
     }
@@ -505,7 +571,7 @@ public sealed partial class MainPage : Page
     }
     private void OnPagePointerReleased(object sender, PointerRoutedEventArgs e)
     {
-        if (!BatchPopup.IsOpen || IsItemDragInProgress) return;
+        if (!BatchPopup.IsOpen || IsItemDragInProgress || _pendingPopupMutations > 0) return;
         var element = e.OriginalSource as DependencyObject;
         while (element is not null)
         {
@@ -515,6 +581,17 @@ public sealed partial class MainPage : Page
 
         CloseBatchPopup();
     }
+    private void OnBatchPopupCloseClicked(object sender, RoutedEventArgs e)
+    {
+        if (!BatchPopup.IsOpen || IsItemDragInProgress || _pendingPopupMutations > 0) return;
+        CloseBatchPopup();
+    }
+
+    private void OnPopupItemPathTrimmed(TextBlock sender, IsTextTrimmedChangedEventArgs args)
+    {
+        ShelfPresentation.OnPathTextTrimmed(sender);
+    }
+
 
     private void OnManageItemsClicked(object sender, RoutedEventArgs e)
     {
@@ -576,6 +653,7 @@ public sealed partial class MainPage : Page
     {
         if (BatchPopup.IsOpen && _openPopupBatchId == batchVm.Batch.Id)
         {
+            if (_pendingPopupMutations > 0 || IsItemDragInProgress) return;
             CloseBatchPopup();
             return;
         }
@@ -595,8 +673,8 @@ public sealed partial class MainPage : Page
         _openPopupBatchId = batchVm.Batch.Id;
         _openPopupAnchor = anchor;
         _focusPopupHeaderOnOpen = fromKeyboard;
+        BatchPopupClose.IsEnabled = _pendingPopupMutations == 0;
         UpdatePopupHeader(batchVm);
-
         var fullItems = new ShelfItemViewModel[batchVm.Batch.Items.Count];
         for (var i = 0; i < fullItems.Length; i++)
         {
@@ -605,12 +683,11 @@ public sealed partial class MainPage : Page
         _popupItemViewModels = fullItems;
         BatchPopupItemList.ItemsSource = _popupItemViewModels;
 
-        UpdatePopupPlacement(anchor, new Windows.Foundation.Size(320, 480));
+        UpdatePopupPlacement(anchor, new Windows.Foundation.Size(EdgeRailSizingPolicy.ExpandedWidth, 480));
         BatchPopup.IsOpen = true;
-        BatchPopupBorder.Width = double.NaN;
+        BatchPopupBorder.Width = EdgeRailSizingPolicy.ExpandedWidth;
         BatchPopupBorder.Height = double.NaN;
-        BatchPopupBorder.MaxWidth = 480;
-
+        BatchPopupBorder.MaxWidth = EdgeRailSizingPolicy.ExpandedWidth;
         DispatcherQueue.TryEnqueue(() =>
         {
             if (!BatchPopup.IsOpen || _openPopupBatchId != batchVm.Batch.Id) return;
@@ -680,7 +757,7 @@ public sealed partial class MainPage : Page
             cardPhysicalTop + cardPhysicalHeight);
 
         var desired = contentSize ?? BatchPopupBorder.DesiredSize;
-        var reqLogicalWidth = Math.Clamp((int)Math.Ceiling(desired.Width), 320, 480);
+        var reqLogicalWidth = EdgeRailSizingPolicy.ExpandedWidth;
         var reqLogicalHeight = Math.Clamp((int)Math.Ceiling(desired.Height), 1, 480);
 
         var popupPhysicalBounds = WindowInterop.PlaceAnchoredPopup(
@@ -838,7 +915,7 @@ public sealed partial class MainPage : Page
 
         if (_openPopupAnchor is FrameworkElement anchor && anchor.XamlRoot is not null)
         {
-            BatchPopupBorder.Width = double.NaN;
+            BatchPopupBorder.Width = EdgeRailSizingPolicy.ExpandedWidth;
             BatchPopupBorder.Height = double.NaN;
             DispatcherQueue.TryEnqueue(() =>
             {

@@ -30,8 +30,6 @@
                 <Setter Property="AllowFocusOnInteraction" Value="False" />
             </Style>
             <Style x:Key="RailManagementPresenterStyle" TargetType="FlyoutPresenter">
-                <Setter Property="MinWidth" Value="320" />
-                <Setter Property="MaxWidth" Value="480" />
                 <Setter Property="MaxHeight" Value="480" />
                 <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
@@ -57,7 +55,9 @@
                             <TextBlock FontSize="10" FontWeight="SemiBold" Text="{x:Bind Name, Mode=OneWay}"
                                        TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTipService.ToolTip="{x:Bind Name, Mode=OneWay}" />
                             <TextBlock FontSize="9" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Text="{x:Bind Path, Mode=OneWay}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                                       Tag="{x:Bind}" AutomationProperties.Name="{x:Bind Path, Mode=OneWay}"
+                                       Text="{x:Bind DisplayPath, Mode=OneWay}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                                       IsTextTrimmedChanged="OnManagementItemPathTrimmed"
                                        ToolTipService.ToolTip="{x:Bind Path, Mode=OneWay}" />
                             <TextBlock FontSize="9" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        Text="{x:Bind DetailsLabel, Mode=OneWay}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"

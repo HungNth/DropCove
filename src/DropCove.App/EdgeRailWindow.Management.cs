@@ -19,9 +19,14 @@ public sealed partial class EdgeRailWindow
     private Grid? _managementContent;
     private ItemsRepeater? _managementList;
     private ToggleButton? _managementBulkPin;
+    private Button? _managementClose;
     private TextBlock? _managementSummary;
     private bool _managementKeyboardOpened;
 
+    private void OnManagementItemPathTrimmed(TextBlock sender, IsTextTrimmedChangedEventArgs args)
+    {
+        ShelfPresentation.OnPathTextTrimmed(sender);
+    }
     private void OnManageItemsClicked(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: RailBatchSummary row } button) OpenManagementFlyout(button, row, keyboard: false);
@@ -50,7 +55,6 @@ public sealed partial class EdgeRailWindow
         row.SetManagementOpen(true);
         _managementAnchor = anchor;
         _managementKeyboardOpened = keyboard;
-        _managementSummary = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         _managementBulkPin = new ToggleButton
         {
             Width = 24,
@@ -62,12 +66,26 @@ public sealed partial class EdgeRailWindow
             ContentTemplate = (DataTemplate)Application.Current.Resources["BulkPinIconTemplate"],
         };
         _managementBulkPin.Click += OnRailPinClicked;
+        _managementSummary = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        _managementClose = new Button
+        {
+            Width = 24,
+            Height = 24,
+            Style = (Style)RailSurface.Resources["RailActionButtonStyle"],
+            Content = new FontIcon { FontSize = 10, Glyph = "\uE8BB" },
+        };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_managementClose, "Close Manage Items");
+        ToolTipService.SetToolTip(_managementClose, "Close Manage Items");
+        _managementClose.Click += OnManagementCloseClicked;
         var header = new Grid { ColumnSpacing = 8 };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.Children.Add(_managementSummary);
-        Grid.SetColumn(_managementBulkPin, 1);
         header.Children.Add(_managementBulkPin);
+        Grid.SetColumn(_managementSummary, 1);
+        header.Children.Add(_managementSummary);
+        Grid.SetColumn(_managementClose, 2);
+        header.Children.Add(_managementClose);
         _managementList = new ItemsRepeater
         {
             Layout = new StackLayout { Spacing = 4 },
@@ -87,7 +105,8 @@ public sealed partial class EdgeRailWindow
             MaxHeight = 432,
             IsTabStop = false,
         };
-        _managementContent = new Grid { RowSpacing = 4, MinWidth = 304, MaxWidth = 464, MaxHeight = 464 };
+        // Constrain measurement as well as the presenter; its template scroller otherwise measures content horizontally unbounded.
+        _managementContent = new Grid { RowSpacing = 4, Width = ExpandedWidth - 14, MaxHeight = 464 };
         _managementContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _managementContent.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         _managementContent.Children.Add(header);
@@ -157,6 +176,10 @@ public sealed partial class EdgeRailWindow
             _managementBulkPin.Tag = null;
             _managementBulkPin.Content = null;
         }
+        if (_managementClose is not null)
+        {
+            _managementClose.Click -= OnManagementCloseClicked;
+        }
         if (_managementContent is not null) _managementContent.KeyDown -= OnManagementKeyDown;
         if (_openFlyout is not null)
         {
@@ -170,6 +193,7 @@ public sealed partial class EdgeRailWindow
         _managementRow = null;
         _managementList = null;
         _managementBulkPin = null;
+        _managementClose = null;
         _managementSummary = null;
         _managementContent = null;
         _managementAnchor = null;
@@ -182,6 +206,13 @@ public sealed partial class EdgeRailWindow
             else if (anchor.Parent is DependencyObject parent && FocusManager.FindFirstFocusableElement(parent) is Control fallback)
                 fallback.Focus(FocusState.Keyboard);
         }
+    }
+
+
+    private void OnManagementCloseClicked(object sender, RoutedEventArgs e)
+    {
+        if (_managementRow is { } row && !_pendingMutations.Contains(row.Batch.Id) && !_sourceDragInProgress)
+            CloseManagementFlyout(restoreFocus: true);
     }
 
     private void RefreshManagementItems()
@@ -204,6 +235,7 @@ public sealed partial class EdgeRailWindow
     {
         if (!ReferenceEquals(row, _managementRow)) return;
         if (_managementBulkPin is not null) _managementBulkPin.IsEnabled = !busy;
+        if (_managementClose is not null) _managementClose.IsEnabled = !busy;
         foreach (var item in _managementItems.MaterializedItems) item.SetBusy(busy);
     }
 
@@ -301,23 +333,33 @@ public sealed partial class EdgeRailWindow
 
     private void MoveManagementFocus(bool backward)
     {
-        if (_managementContent is null || _managementList is null || _managementBulkPin is null || _managementItems.Count == 0) return;
+        if (_managementContent is null || _managementList is null || _managementBulkPin is null || _managementClose is null || _managementItems.Count == 0) return;
         var focused = FocusManager.GetFocusedElement(_managementContent.XamlRoot) as DependencyObject;
         var element = focused;
         while (element is not null && !ReferenceEquals(VisualTreeHelper.GetParent(element), _managementList))
             element = VisualTreeHelper.GetParent(element);
         var rowIndex = element is UIElement rowElement ? _managementList.GetElementIndex(rowElement) : -1;
-        var actionCount = 1 + _managementItems.Count * 2;
+        var actionCount = 2 + _managementItems.Count * 2;
         var current = ReferenceEquals(focused, _managementBulkPin) ? 0 :
-            rowIndex >= 0 ? 1 + rowIndex * 2 + (focused is ToggleButton ? 0 : 1) :
+            ReferenceEquals(focused, _managementClose) ? 1 :
+            rowIndex >= 0 ? 2 + rowIndex * 2 + (focused is ToggleButton ? 0 : 1) :
             backward ? 0 : actionCount - 1;
         var next = (current + (backward ? -1 : 1) + actionCount) % actionCount;
+        if (next == 0 && !_managementBulkPin.IsEnabled)
+            next = (next + (backward ? -1 : 1) + actionCount) % actionCount;
+        if (next == 1 && !_managementClose.IsEnabled)
+            next = (next + (backward ? -1 : 1) + actionCount) % actionCount;
         if (next == 0)
         {
             _managementBulkPin.Focus(FocusState.Keyboard);
             return;
         }
-        var rowAction = next - 1;
+        if (next == 1)
+        {
+            _managementClose.Focus(FocusState.Keyboard);
+            return;
+        }
+        var rowAction = next - 2;
         var targetRow = _managementList.GetOrCreateElement(rowAction / 2);
         targetRow.UpdateLayout();
         var target = rowAction % 2 == 0 ? FocusManager.FindFirstFocusableElement(targetRow) : FocusManager.FindLastFocusableElement(targetRow);

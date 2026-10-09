@@ -255,7 +255,7 @@ Only the two desktop-facing corners round (8-pixel radius aligned with Drop Shel
 
 The Drop Shelf and Edge Rail reuse the same compiled 42-pixel bounded batch-preview template, Bulk Pinning visual template, item/batch projections, thumbnail eligibility, and realization lifetime. The existing visual coordinator/provider remains shared; each surface owns cancellation and ImageSource release independently. A batch requests at most its first three item visuals. Collapsed or hidden Edge Rail rows release their visual requests and detach the list content; expansion recreates visible rows through the existing virtualized list.
 
-Manage Items on the Edge Rail now follows the Drop Shelf popup's visual language: a solid theme-aware surface, subtle one-pixel boundary, eight-pixel corners, six-pixel padding, flat shadow-free presentation, and matching header and item-row spacing, typography, and actions. The Drop Shelf remains unchanged. The Edge Rail retains its native Flyout, desktop-facing placement, 320–480 logical-pixel width, 480-pixel height limit, fixed header, vertical-only scrolling, no-activate interaction, keyboard focus rules, motion, and item lifecycle.
+Manage Items on the Drop Shelf and Edge Rail shares a solid theme-aware surface, subtle one-pixel boundary, eight-pixel corners, six-pixel padding, and matching header and item-row spacing, typography, and actions. Both surfaces are fixed at `280` logical pixels wide, matching the expanded Edge Rail. The header reads `[pin] X/N pinned` on the left with an explicit Close button on the right. The Edge Rail retains its native Flyout, flat shadow-free presentation, desktop-facing placement, 480-pixel height limit, fixed header, vertical-only scrolling, no-activate interaction, motion, and item lifecycle.
 
 **Thumbnail/management parity progress:** shared Drop Shelf extraction and Edge Rail Manage Items presentation alignment are implemented and build in Release. Visual parity with Drop Shelf popup styling (solid background, 1px card stroke boundary, 8px corner radius, 6px padding, shadow suppression, and aligned item typography/actions) has been verified. Formal qualification for the independent total Working Set `<150 MB` release gate remains separate.
 
@@ -665,19 +665,19 @@ Multi-item batches provide detailed inspection and item management through a non
 - **Anchoring**: The popup is anchored to its originating batch card. It is non-modal and allowed to extend outside the Drop Shelf window boundaries, but remains clamped inside the monitor work area (with at least `16` logical pixels of margin where work area permits).
 - **Placement preference**: Right of the card, then left, then below, then above, followed by work-area clamping.
 - **Single instance**: Exactly one batch popup can be open at a time across the entire shelf. Activating another batch's chevron replaces the current popup.
-- **Dimensions**: Width sizes to content between `320` and `480` logical pixels. Height sizes to content up to `480` logical pixels, with vertical scrolling enabled for additional items (horizontal scrolling disabled).
+- **Dimensions**: Width is fixed at `280` logical pixels on both Drop Shelf and Edge Rail, independent of item path length. Height sizes to content up to `480` logical pixels, with vertical scrolling enabled for additional items (horizontal scrolling disabled). Monitor work-area clamping retains reachability where a full-size surface cannot fit.
 - **Opening and dismissal**:
   - Opens via pointer activation or keyboard `Enter` / `Space` on the batch chevron.
-  - Closes via clicking the same chevron, clicking outside the popup, or pressing `Esc`.
+  - Closes via the header's Close button (`Close Manage Items`), clicking the same chevron, clicking outside the popup, or pressing `Esc`. Explicit dismissal respects pending-mutation and active-drag guards.
   - Outside dismissal runs on pointer release, not press, so the underlying Settings/button action can activate with one click.
   - Activating another application does not close the popup; it remains anchored until an explicit dismissal or owner-lifecycle condition occurs.
   - Closes automatically when the Drop Shelf hides, when its owning batch is removed, when shelf resizing begins, or when whole-batch drag starts.
-  - Long names and paths truncate visually with full text accessible via tooltips and accessibility properties.
+  - Short paths remain complete when they fit. Long paths display a tail such as `…\parent_folder\file_name.png`; long folder references retain the parent and folder name. Full original paths remain available through tooltips and accessibility properties. Exceptionally long names still trim without widening the surface.
 
 ## Item management and drag interactions
 
 - **Content**: Each popup row displays the item's icon/thumbnail, name, path reference, availability classification, and pinned indicator.
-- **Bulk Pinning header**: A fixed `X of N pinned` summary and tri-state bulk toggle sit above the item scroller. The header consumes part of the existing `480`-pixel overall height limit. It shares the card action's lifecycle, atomic persistence, accessible names, and Mixed pin badge. In-popup success or failure keeps the popup open and the bulk control focused; a card bulk action closes it under the normal outside-click rule.
+- **Bulk Pinning header**: A fixed left-aligned tri-state bulk toggle followed by `X/N pinned` sits above the item scroller; the Close button stays at the upper right. The header consumes part of the existing `480`-pixel overall height limit. It shares the card action's lifecycle, atomic persistence, accessible names, and Mixed pin badge. In-popup success or failure keeps the popup open and the bulk control focused; a card bulk action closes it under the normal outside-click rule.
 - **Actions**: Users can Pin/Unpin individual items, Remove Item, or initiate native drag-out of an individual item directly from the popup row.
 - **Drag behavior**:
   - Starting a drag of an individual item does not close the popup, allowing users to continue managing every remaining item. Canceled drags leave references intact. Successful drag-out applies the standard Temporary/Pinned lifecycle and refreshes the anchored popup while the batch remains; dragging or removing the final item removes the batch and closes its popup.
@@ -686,9 +686,9 @@ Multi-item batches provide detailed inspection and item management through a non
 
 ## Keyboard accessibility
 
-When opened via keyboard (`Enter` or `Space` on the chevron), focus moves to the fixed header's bulk pin control. Pointer opening does not force focus into the popup. `Enter` and `Space` activate the focused bulk control. Pressing `Esc` closes the popup and restores keyboard focus to the originating chevron. A second `Esc` dismisses the Drop Shelf.
+When opened via keyboard (`Enter` or `Space` on the chevron), focus moves to the fixed header's bulk pin control. Pointer opening does not force focus into the popup. `Enter` and `Space` activate the focused control, including Close. Explicit closure restores focus to the originating Manage Items control when it still exists. Pressing `Esc` closes the popup before a subsequent `Esc` can dismiss the Drop Shelf.
 
-Popup `Tab`/`Shift+Tab` traversal visits the fixed header first, then each item's Pin/Unpin and Remove actions, wraps in both directions, and realizes only the next offscreen row on demand. It does not depend on global next-focus lookup across the popup's native visual root and never resizes the Drop Shelf.
+Popup `Tab`/`Shift+Tab` traversal visits Bulk Pinning, Close, then each item's Pin/Unpin and Remove actions, wraps in both directions, skips disabled controls, and realizes only the next offscreen row on demand. It does not depend on global next-focus lookup across the popup's native visual root and never resizes the Drop Shelf.
 
 ## Deferred projections & performance
 

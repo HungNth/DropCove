@@ -1360,8 +1360,6 @@ public static class WindowInterop
         var workAreaWidth = Math.Max(0, workArea.Width);
         var workAreaHeight = Math.Max(0, workArea.Height);
 
-        const int minLogicalWidth = 320;
-        const int maxLogicalWidth = 480;
         const int minLogicalHeight = 1;
         const int maxLogicalHeight = 480;
 
@@ -1371,9 +1369,7 @@ public static class WindowInterop
         var availableWidth = workAreaWidth - 2 * marginX;
         var availableHeight = workAreaHeight - 2 * marginY;
 
-        var minPhysicalWidth = Math.Min(Scale(minLogicalWidth, effectiveDpi), availableWidth);
-        var maxPhysicalWidth = Math.Min(Scale(maxLogicalWidth, effectiveDpi), availableWidth);
-        var targetPhysicalWidth = Math.Clamp(Scale(requestedLogicalWidth, effectiveDpi), minPhysicalWidth, maxPhysicalWidth);
+        var targetPhysicalWidth = Math.Clamp(Scale(requestedLogicalWidth, effectiveDpi), Math.Min(1, availableWidth), availableWidth);
 
         var minPhysicalHeight = Math.Min(Scale(minLogicalHeight, effectiveDpi), availableHeight);
         var maxPhysicalHeight = Math.Min(Scale(maxLogicalHeight, effectiveDpi), availableHeight);

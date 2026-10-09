@@ -442,40 +442,13 @@ public sealed class WindowInteropTests
         Assert.AreEqual(350, popup.Height);
     }
 
-    [TestMethod]
-    [DataRow(100, 0, 320, 1)]      // Below minimums: clamps to 320x1
-    [DataRow(320, 1, 320, 1)]      // Exact minimums
-    [DataRow(400, 300, 400, 300)]  // Within range
-    [DataRow(480, 480, 480, 480)]  // Exact maximums
-    [DataRow(600, 700, 480, 480)]  // Above maximums: clamps to 480x480
-    public void PlaceAnchoredPopup_LogicalSizeLimits_ClampsWidthAndHeight(
-        int requestedW,
-        int requestedH,
-        int expectedW,
-        int expectedH)
-    {
-        var workArea = new WindowBounds(0, 0, 1920, 1080);
-        var anchor = new WindowBounds(100, 100, 200, 200);
-
-        var popup = WindowInterop.PlaceAnchoredPopup(
-            anchor,
-            workArea,
-            requestedLogicalWidth: requestedW,
-            requestedLogicalHeight: requestedH,
-            dpi: 96u);
-
-        Assert.AreEqual(expectedW, popup.Width);
-        Assert.AreEqual(expectedH, popup.Height);
-    }
 
     [TestMethod]
-    [DataRow(96u, 320, 480, 16, 400, 300)]     // 100% scale
-    [DataRow(144u, 480, 720, 24, 600, 450)]    // 150% scale
-    [DataRow(192u, 640, 960, 32, 800, 600)]    // 200% scale
+    [DataRow(96u, 16, 280, 300)]
+    [DataRow(144u, 24, 420, 450)]
+    [DataRow(192u, 32, 560, 600)]
     public void PlaceAnchoredPopup_SupportsDifferentDpis(
         uint dpi,
-        int expectedMinWidth,
-        int expectedMaxWidth,
         int expectedMargin,
         int expectedScaledW,
         int expectedScaledH)
@@ -483,11 +456,11 @@ public sealed class WindowInteropTests
         var workArea = new WindowBounds(0, 0, 3840, 2160);
         var anchor = new WindowBounds(200, 200, 400, 400);
 
-        // Request 400x300 logical
+        // Request the compact Manage Items width at each effective monitor DPI.
         var popup = WindowInterop.PlaceAnchoredPopup(
             anchor,
             workArea,
-            requestedLogicalWidth: 400,
+            requestedLogicalWidth: 280,
             requestedLogicalHeight: 300,
             dpi: dpi);
 
@@ -525,7 +498,7 @@ public sealed class WindowInteropTests
     [TestMethod]
     public void PlaceAnchoredPopup_TinyWorkArea_OverridesMinimumsAndPreservesAvailableMargin()
     {
-        // WorkArea is smaller than the minimum popup width (320) and height
+        // WorkArea is smaller than the requested popup width and height.
         var tinyWorkArea = new WindowBounds(100, 100, 300, 250); // Width = 200, Height = 150
         var anchor = new WindowBounds(150, 120, 250, 180);
 

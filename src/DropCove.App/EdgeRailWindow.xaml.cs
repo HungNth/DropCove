@@ -81,6 +81,10 @@ public sealed partial class EdgeRailWindow : Window
         ArgumentNullException.ThrowIfNull(visualCoordinator);
 
         InitializeComponent();
+        var managementStyle = (Style)RailSurface.Resources["RailManagementPresenterStyle"];
+        managementStyle.Setters.Add(new Setter(FrameworkElement.WidthProperty, (double)ExpandedWidth));
+        managementStyle.Setters.Add(new Setter(FrameworkElement.MinWidthProperty, 0d));
+        managementStyle.Setters.Add(new Setter(FrameworkElement.MaxWidthProperty, (double)ExpandedWidth));
         _windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
         WindowInterop.MakeBorderless(_windowHandle);
         var initialDpi = WindowInterop.GetWindowDpi(_windowHandle);

@@ -46,9 +46,12 @@
                         <TextBlock
                             FontSize="9"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="{x:Bind Path, Mode=OneWay}"
+                            Tag="{x:Bind}"
+                            AutomationProperties.Name="{x:Bind Path, Mode=OneWay}"
+                            Text="{x:Bind DisplayPath, Mode=OneWay}"
                             TextTrimming="CharacterEllipsis"
                             TextWrapping="NoWrap"
+                            IsTextTrimmedChanged="OnPopupItemPathTrimmed"
                             ToolTipService.ToolTip="{x:Bind Path, Mode=OneWay}" />
                         <TextBlock
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -399,22 +402,35 @@
                     </Grid.RowDefinitions>
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock
-                            x:Name="BatchPopupPinCount"
-                            FontSize="12"
-                            VerticalAlignment="Center" />
                         <ToggleButton
                             x:Name="BatchPopupBulkPin"
-                            Grid.Column="1"
                             Style="{StaticResource TitleBarToggleButtonStyle}"
                             Width="24"
                             Height="24"
                             IsThreeState="True"
                             Click="OnBulkPinClicked"
                             ContentTemplate="{StaticResource BulkPinIconTemplate}" />
+                        <TextBlock
+                            x:Name="BatchPopupPinCount"
+                            Grid.Column="1"
+                            FontSize="12"
+                            VerticalAlignment="Center"
+                            TextTrimming="CharacterEllipsis" />
+                        <Button
+                            x:Name="BatchPopupClose"
+                            Grid.Column="2"
+                            Style="{StaticResource TitleBarButtonStyle}"
+                            Width="24"
+                            Height="24"
+                            AutomationProperties.Name="Close Manage Items"
+                            Click="OnBatchPopupCloseClicked"
+                            ToolTipService.ToolTip="Close Manage Items">
+                            <FontIcon FontSize="10" Glyph="&#xE8BB;" />
+                        </Button>
                     </Grid>
                     <ScrollViewer
                         x:Name="BatchPopupScroller"
