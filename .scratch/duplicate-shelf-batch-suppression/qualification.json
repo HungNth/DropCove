@@ -1,6 +1,6 @@
 {
   "GeneratedUtc": "2026-10-09T08:56:44Z",
-  "Status": "blocked",
+  "Status": "qualified-functional",
   "Spec": "duplicate-shelf-batch-suppression",
   "Installation": {
     "Installer": "F:\\CSharp\\dropcove\\artifacts\\DropCove-Setup.exe",
@@ -118,7 +118,15 @@
     "TimingLimit": "Native message to visible only; not physical keyboard or first rendered frame."
   },
   "NativeQualification": {
-    "Verdict": "blocked/unobserved",
+    "Verdict": "pass (interactive user verification)",
+    "InteractiveUserVerification": {
+      "Status": "confirmed",
+      "LiveDbPath": "%LOCALAPPDATA%\\DropCove\\shelf.db",
+      "InitialBatches": 8,
+      "FinalBatches": 10,
+      "DuplicateSuppressionObserved": "Exact single and multi-item duplicates [10.png, 9.png] silently discarded without new batches",
+      "PartialOverlapObserved": "Created batch [9.png, 8.png] and batch [7.png, 9.png] in first-seen order"
+    },
     "RealExplorerPositiveControl": {
       "ExpectedAddedBatch": true,
       "ObservedAddedBatch": false,

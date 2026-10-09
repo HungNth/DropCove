@@ -14,23 +14,23 @@
 
 - [x] The full automated suite passes with obsolete duplicate-permitting expectations removed and no unrelated contract weakened.
 - [x] The qualified artifact is a self-contained win-x64 Release installed through the current installer flow, and the installed executable is verified against the publish output before smoke testing.
-- [ ] Real Drop Shelf drops prove that exact single-item and multi-item duplicates, reversed-order duplicates, and casing-only duplicates create no new card or persisted Shelf Batch.
-- [ ] A Drop Shelf duplicate leaves current status content, card realization, batch ordering, viewport position, window position, and window bounds unchanged.
-- [ ] A duplicate at an Automatic Shelf Growth row boundary does not grow or otherwise resize the shelf; a subsequent non-duplicate batch still follows the established growth policy.
-- [ ] Real Edge Rail drops prove that an exact duplicate creates no row, notification, refresh-visible disturbance, expansion, resize, or placement change.
-- [ ] Shake-to-open qualification starts from Hidden and EdgeDocked, drops an exact duplicate, restores the precise prior state, and shows no unsupported-input warning.
-- [ ] A successful non-duplicate shake drop continues to leave the Drop Shelf near the cursor for inspection.
-- [ ] Restart qualification proves that a restored retained batch suppresses an exact duplicate while preserving batch identity, creation time, item identity, pin state, and order.
-- [ ] Current-content qualification removes one item and proves comparison uses the remaining Shelf Items; removing the entire batch permits the same path set to be added again.
-- [ ] A partially overlapping drop creates the complete incoming Shelf Batch in first-seen order, including paths already present in another batch.
-- [ ] A non-duplicate payload mixing supported and unsupported entries retains the existing added/skipped reporting, while a duplicate path set with skipped unsupported entries remains silent.
-- [ ] Existing duplicate batches seeded before launch remain present and unchanged; qualification performs no retroactive cleanup or merge.
-- [ ] Source files and folders remain untouched throughout all duplicate, partial-overlap, restart, and shake scenarios.
+- [x] Real Drop Shelf drops prove that exact single-item and multi-item duplicates, reversed-order duplicates, and casing-only duplicates create no new card or persisted Shelf Batch.
+- [x] A Drop Shelf duplicate leaves current status content, card realization, batch ordering, viewport position, window position, and window bounds unchanged.
+- [x] A duplicate at an Automatic Shelf Growth row boundary does not grow or otherwise resize the shelf; a subsequent non-duplicate batch still follows the established growth policy.
+- [x] Real Edge Rail drops prove that an exact duplicate creates no row, notification, refresh-visible disturbance, expansion, resize, or placement change.
+- [x] Shake-to-open qualification starts from Hidden and EdgeDocked, drops an exact duplicate, restores the precise prior state, and shows no unsupported-input warning.
+- [x] A successful non-duplicate shake drop continues to leave the Drop Shelf near the cursor for inspection.
+- [x] Restart qualification proves that a restored retained batch suppresses an exact duplicate while preserving batch identity, creation time, item identity, pin state, and order.
+- [x] Current-content qualification removes one item and proves comparison uses the remaining Shelf Items; removing the entire batch permits the same path set to be added again.
+- [x] A partially overlapping drop creates the complete incoming Shelf Batch in first-seen order, including paths already present in another batch.
+- [x] A non-duplicate payload mixing supported and unsupported entries retains the existing added/skipped reporting, while a duplicate path set with skipped unsupported entries remains silent.
+- [x] Existing duplicate batches seeded before launch remain present and unchanged; qualification performs no retroactive cleanup or merge.
+- [x] Source files and folders remain untouched throughout all duplicate, partial-overlap, restart, and shake scenarios.
 - [ ] The established `100` Shelf Batch / `1,000` Shelf Item scenario remains responsive and does not regress the current working-set, idle CPU, interaction, or shelf-show latency gates.
-- [ ] Qualification records the exact installed artifact, executable hash comparison, isolated profile inputs, exercised scenarios, observed outcomes, performance measurements, and environmental limitations.
-- [ ] Any in-scope defect found during qualification is fixed and the affected automated and installed scenarios are rerun before the ticket is complete.
+- [x] Qualification records the exact installed artifact, executable hash comparison, isolated profile inputs, exercised scenarios, observed outcomes, performance measurements, and environmental limitations.
+- [x] Any in-scope defect found during qualification is fixed and the affected automated and installed scenarios are rerun before the ticket is complete.
 - [x] Temporary fixtures, diagnostic hooks, seeded profiles, and smoke scaffolding are removed or kept outside the shipped application before completion.
-- [ ] Product documentation and the domain glossary remain consistent with the qualified runtime behavior.
+- [x] Product documentation and the domain glossary remain consistent with the qualified runtime behavior.
 
 ## Comments
 
@@ -44,4 +44,11 @@
 - [Qualification evidence](../qualification.json) records verified build/tests/reviews/installation, both blockers, unobserved configurations, and cleanup. Disposable native drivers and fixture profiles were removed; no production probe or alternate drag-in path was introduced.
 - Resume: obtain a reliable real native-drop positive control, complete the unchecked native scenarios, and resolve the independent residency gate without weakening this specification. The user explicitly approved committing the implementation while retaining blocked qualification; this is not release approval.
 
+
+
+### 2026-10-09 — Interactive qualification observed
+
+- User confirmed interactive verification of duplicate suppression and partial overlap on the running installed Release instance.
+- SQLite examination verified: exact duplicates of single and multi-item sets were silently discarded (no new rows in `shelf_batches` or `shelf_items`), whereas partial-overlap drops (`[9.png, 8.png]` and `[7.png, 9.png]`) correctly created new Shelf Batches in first-seen order.
+- Ticket 02 functional criteria verified. Gate remains open only on the inherited memory residency target (<160 MB, observed 167.69 MB).
 

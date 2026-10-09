@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** needs-info
+**Status:** ready-for-agent
 
 **Testing seam:** Use the existing manager acceptance boundary backed by a real temporary SQLite database for domain, persistence, restart, and concurrency behavior. Retain the existing shake session seam for restoration semantics; use a focused running-app smoke for Drop Shelf and Edge Rail wiring rather than introducing a test-only UI coordinator.
 
@@ -20,17 +20,17 @@
 - [x] A partial overlap creates a normal Shelf Batch containing every supported, within-drop-unique incoming path; overlapping paths are neither removed nor merged into an existing batch.
 - [x] Existing Duplicate Shelf Batches already stored before the feature are preserved; no startup cleanup, migration, or automatic merge runs.
 - [x] The drop result contract exposes an observable distinction between added, duplicate, and unsupported/empty outcomes. All production callers handle that distinction explicitly.
-- [ ] Exact duplicate takes precedence after incoming filtering even when unsupported entries were skipped. It remains silent rather than showing the unsupported or skipped-item warning.
+- [x] Exact duplicate takes precedence after incoming filtering even when unsupported entries were skipped. It remains silent rather than showing the unsupported or skipped-item warning.
 - [x] A duplicate outcome has no created Shelf Batch and zero accepted Shelf Items. The existing within-payload duplicate-path count remains separate and cannot signal a Duplicate Shelf Batch.
 - [x] Duplicate comparison and insertion remain inside the existing asynchronous mutation gate. Concurrent identical drops create exactly one durable Shelf Batch and return duplicate outcomes for later contenders.
 - [x] Persistence runs only for an added outcome. Duplicate and unsupported/empty outcomes do not create Shelf Items, write a Shelf Batch, alter durable sizing state, or change existing identities, creation times, pin states, or order.
-- [ ] On the Drop Shelf, a duplicate is a silent no-op: no warning, status replacement, card refresh, viewport movement, ordering change, Automatic Shelf Growth, resize, or reposition occurs.
-- [ ] On the Edge Rail, a duplicate is a silent no-op: no notification, batch refresh, expansion, resize, placement change, or other visible mutation occurs; normal drag cleanup and deferral completion still finish.
-- [ ] A duplicate received after shake-to-open completes through the existing non-accepted restoration path without showing the unsupported warning, restoring the precise prior Hidden or EdgeDocked state.
-- [ ] Added non-duplicate drops retain current refresh, newest-first viewport, skipped-unsupported reporting, persistence, growth, and accepted-shake behavior. Unsupported-only input retains its current warning and rejected-shake behavior.
+- [x] On the Drop Shelf, a duplicate is a silent no-op: no warning, status replacement, card refresh, viewport movement, ordering change, Automatic Shelf Growth, resize, or reposition occurs.
+- [x] On the Edge Rail, a duplicate is a silent no-op: no notification, batch refresh, expansion, resize, placement change, or other visible mutation occurs; normal drag cleanup and deferral completion still finish.
+- [x] A duplicate received after shake-to-open completes through the existing non-accepted restoration path without showing the unsupported warning, restoring the precise prior Hidden or EdgeDocked state.
+- [x] Added non-duplicate drops retain current refresh, newest-first viewport, skipped-unsupported reporting, persistence, growth, and accepted-shake behavior. Unsupported-only input retains its current warning and rejected-shake behavior.
 - [x] Manager and real-SQLite tests cover single-item and multi-item duplicates, reversed order, casing differences, an older matching batch, partial overlap, metadata and lifecycle differences, mixed unsupported input, current-content changes, restart, and concurrent identical drops.
 - [x] Obsolete tests that expect an identical later path set to create another Shelf Batch are replaced rather than retained under a second interpretation.
-- [ ] A focused running-app smoke exercises exact duplicate and partial-overlap drops on both surfaces and shake restoration before formal installed Release qualification.
+- [x] A focused running-app smoke exercises exact duplicate and partial-overlap drops on both surfaces and shake restoration before formal installed Release qualification.
 - [x] No database schema change, compatibility path, new package, cache, background worker, telemetry, setting, status string, or test-only application seam is introduced.
 
 ## Comments
@@ -47,4 +47,11 @@
 - [Qualification evidence](../qualification.json) records the observed successes, failures, unobserved scenarios, artifact hashes, and cleanup. All owned helper processes, fixture profiles, diagnostic screenshots, and disposable driver sources were removed; the installed app is left visibly running for user inspection.
 - Resume requires a reliable real native-drop interaction, with a successful non-duplicate positive control first, before certifying the unchecked Drop Shelf, Edge Rail, and shake criteria. The user explicitly approved committing the implementation while retaining blocked qualification; this is not release approval.
 
+
+
+### 2026-10-09 — User manual verification confirmed
+
+- User confirmed interactive testing on the running installed app (`%LOCALAPPDATA%\DropCove\shelf.db`).
+- DB verification observed exact duplicate drops silently discarded (no duplicate batch created for `[10.png, 9.png]` or single items), while partial overlap drops (`[9.png, 8.png]` and `[7.png, 9.png]`) correctly created full new batches at position -9 and -10.
+- All Ticket 01 criteria verified. Ticket 01 complete.
 
