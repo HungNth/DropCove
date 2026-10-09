@@ -99,6 +99,167 @@ public sealed class DropShelfPersistenceTests
     }
 
     [TestMethod]
+    [DataRow(ItemAvailability.Available)]
+    [DataRow(ItemAvailability.Missing)]
+    [DataRow(ItemAvailability.Unavailable)]
+    public async Task DuplicateDrop_AfterRestartPreservesOlderBatchAndSizing(ItemAvailability availability)
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var older = (await manager.AcceptDropAsync([
+            new(@"C:\Work\A.png", "A.png", false),
+            new(@"C:\Work\Folder", "Folder", true),
+        ])).Batch!;
+        await manager.SetPinnedAsync(older.Items[1].Id, true);
+        await manager.AcceptDropAsync([new(@"C:\Work\Latest.txt", "Latest.txt", false)]);
+        await manager.SetSizingStateAsync(new ShelfSizingState(350, 420));
+        manager = await DropShelfManager.OpenAsync(databasePath, _ => availability);
+        var before = manager.Batches.ToArray();
+
+        var duplicate = await manager.AcceptDropAsync([
+            new(@"c:\work\folder", "Different metadata", false),
+            new(@"c:\work\a.png", "Renamed display", true),
+            new(@"C:\Work\A.PNG", "Repeated path", false),
+            new(string.Empty, "Unsupported", false),
+        ], skippedUnsupportedCount: 1);
+
+        Assert.AreEqual(DropDisposition.Duplicate, duplicate.Disposition);
+        Assert.AreEqual(2, duplicate.SkippedUnsupportedCount);
+        Assert.AreEqual(1, duplicate.DuplicatePathCount);
+        Assert.IsNull(duplicate.Batch);
+        Assert.AreEqual(0, duplicate.AcceptedCount);
+        CollectionAssert.AreEqual(before, manager.Batches.ToArray());
+        var restored = await DropShelfManager.OpenAsync(databasePath, _ => availability);
+        Assert.AreEqual(new ShelfSizingState(350, 420), restored.SizingState);
+        Assert.HasCount(2, restored.Batches);
+        for (var i = 0; i < before.Length; i++)
+        {
+            Assert.AreEqual(before[i].Id, restored.Batches[i].Id);
+            Assert.AreEqual(before[i].CreatedAt, restored.Batches[i].CreatedAt);
+            CollectionAssert.AreEqual(before[i].Items.ToArray(), restored.Batches[i].Items.ToArray());
+        }
+    }
+
+    [TestMethod]
+    public async Task DuplicateDrop_UsesRemainingItemsAndForgetsRemovedBatches()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        IncomingShelfItem[] original = [
+            new(@"C:\Work\A.txt", "A.txt", false),
+            new(@"C:\Work\B.txt", "B.txt", false),
+        ];
+        var batch = (await manager.AcceptDropAsync(original)).Batch!;
+        await manager.RemoveItemAsync(batch.Items[1].Id);
+
+        var duplicate = await manager.AcceptDropAsync([original[0]]);
+        Assert.AreEqual(DropDisposition.Duplicate, duplicate.Disposition);
+        var readded = await manager.AcceptDropAsync(original);
+        Assert.AreEqual(DropDisposition.Added, readded.Disposition);
+        CollectionAssert.AreEqual(new[] { @"C:\Work\A.txt", @"C:\Work\B.txt" },
+            readded.Batch!.Items.Select(item => item.Path).ToArray());
+
+        await manager.RemoveBatchAsync(readded.Batch.Id);
+        await manager.RemoveBatchAsync(batch.Id);
+        var fresh = await manager.AcceptDropAsync(original);
+        Assert.AreEqual(DropDisposition.Added, fresh.Disposition);
+        Assert.AreNotEqual(batch.Id, fresh.Batch!.Id);
+        var restored = await OpenAsync(databasePath);
+        Assert.AreEqual(fresh.Batch.Id, restored.Batches.Single().Id);
+    }
+
+    [TestMethod]
+    public async Task ConcurrentIdenticalDrops_CreateOneDurableBatch()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var drops = Enumerable.Range(0, 8).Select(_ => Task.Run(async () =>
+        {
+            await start.Task;
+            return await manager.AcceptDropAsync([
+                new(@"C:\Work\Concurrent.txt", "Concurrent.txt", false),
+            ]);
+        })).ToArray();
+        start.SetResult();
+
+        var outcomes = await Task.WhenAll(drops);
+
+        Assert.AreEqual(1, outcomes.Count(outcome => outcome.Disposition == DropDisposition.Added));
+        Assert.AreEqual(7, outcomes.Count(outcome => outcome.Disposition == DropDisposition.Duplicate));
+        var added = outcomes.Single(outcome => outcome.Disposition == DropDisposition.Added).Batch!;
+        var restored = await OpenAsync(databasePath);
+        Assert.AreEqual(added.Id, restored.Batches.Single().Id);
+        CollectionAssert.AreEqual(added.Items.ToArray(), restored.Batches.Single().Items.ToArray());
+    }
+
+    [TestMethod]
+    public async Task DuplicateDrop_DoesNotWriteWhenBatchInsertionIsUnavailable()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var original = (await manager.AcceptDropAsync([
+            new(@"C:\Work\Existing.txt", "Existing.txt", false),
+        ])).Batch!;
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath};Pooling=False"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TRIGGER reject_batch_insert BEFORE INSERT ON shelf_batches BEGIN SELECT RAISE(ABORT, 'insert unavailable'); END";
+            command.ExecuteNonQuery();
+        }
+
+        var duplicate = await manager.AcceptDropAsync([new(@"C:\Work\Existing.txt", "Existing.txt", false)]);
+
+        Assert.AreEqual(DropDisposition.Duplicate, duplicate.Disposition);
+        Assert.AreSame(original, manager.Batches.Single());
+        await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(() => manager.AcceptDropAsync([
+            new(@"C:\Work\New.txt", "New.txt", false),
+        ]));
+        var restored = await OpenAsync(databasePath);
+        Assert.AreEqual(original.Id, restored.Batches.Single().Id);
+        CollectionAssert.AreEqual(original.Items.ToArray(), restored.Batches.Single().Items.ToArray());
+    }
+
+    [TestMethod]
+    public async Task DuplicateDrop_PreservesPreexistingDuplicatesAcrossRestart()
+    {
+        var databasePath = CreateDatabasePath();
+        var manager = await OpenAsync(databasePath);
+        var original = (await manager.AcceptDropAsync([
+            new(@"C:\Work\Existing.txt", "Existing.txt", false),
+        ])).Batch!;
+        var legacyBatchId = Guid.NewGuid();
+        var legacyItemId = Guid.NewGuid();
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath};Pooling=False"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO shelf_batches (id, created_at, position)
+                SELECT $batchId, created_at, position - 1 FROM shelf_batches WHERE id = $original;
+                INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+                SELECT $itemId, $batchId, position, path, name, is_folder, is_pinned
+                FROM shelf_items WHERE batch_id = $original;
+                """;
+            command.Parameters.AddWithValue("$batchId", legacyBatchId.ToString("D"));
+            command.Parameters.AddWithValue("$itemId", legacyItemId.ToString("D"));
+            command.Parameters.AddWithValue("$original", original.Id.ToString("D"));
+            command.ExecuteNonQuery();
+        }
+        manager = await OpenAsync(databasePath);
+
+        var duplicate = await manager.AcceptDropAsync([new(@"C:\Work\Existing.txt", "Existing.txt", false)]);
+
+        Assert.AreEqual(DropDisposition.Duplicate, duplicate.Disposition);
+        var restored = await OpenAsync(databasePath);
+        CollectionAssert.AreEqual(new[] { legacyBatchId, original.Id },
+            restored.Batches.Select(batch => batch.Id).ToArray());
+        CollectionAssert.AreEqual(new[] { legacyItemId, original.Items[0].Id },
+            restored.Batches.SelectMany(batch => batch.Items).Select(item => item.Id).ToArray());
+    }
+
+    [TestMethod]
     public async Task CompletedMutations_AreCommittedImmediately()
     {
         var databasePath = CreateDatabasePath();

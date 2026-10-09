@@ -266,9 +266,11 @@ Manage Items on the Drop Shelf and Edge Rail shares a solid theme-aware surface,
 
 DropCove stores items by **drop operation**, not as one flat list.
 
-Each drop creates a `ShelfBatch`.
+Each accepted non-duplicate drop creates a `ShelfBatch`.
 
-Paths are deduplicated within that drop operation. The same path dropped again later creates a new `ShelfItem` in a new batch, preserving the context of each operation.
+Paths are deduplicated within that drop operation. After unsupported entries and repeated paths in the payload are removed, an incoming batch is duplicate when its set of path strings exactly matches the current items of any retained batch using ordinal case-insensitive comparison, regardless of item order. DropCove does not rewrite separators or perform filesystem canonicalization for this comparison. It silently discards that incoming batch without persistence, refresh, scrolling, sizing, status, or shake-to-open state changes. Partial overlap remains a distinct batch and may repeat individual paths.
+
+**Duplicate-batch delivery status:** Manager/SQLite behavior and both application outcome handlers are implemented; the full automated suite passes 232 tests. Installed Release launches successfully, but native Drop Shelf/Edge Rail/shake qualification remains blocked because the automated drag source did not deliver its positive control and the supplemental OLE harness timed out. The inherited residency gate also remains open. See the [qualification evidence](../.scratch/duplicate-shelf-batch-suppression/qualification.json); these limits are not a release-ready claim.
 
 Example:
 
@@ -309,7 +311,7 @@ public sealed class ShelfBatch
 }
 ```
 
-A new batch is created every time a user drops one or more files/folders into DropCove.
+A new batch is created every time a user drops one or more supported files or folders into DropCove, unless the resulting path set duplicates a retained batch.
 
 Example:
 
@@ -603,7 +605,7 @@ Key sizing and geometry rules:
 - **Shared preferences**: Width and explicit height are shared across monitors. A width-only resize preserves the optional height override and never changes height during reflow; a height-changing top/bottom or corner resize establishes a Manual Height Override that suppresses Automatic Shelf Growth.
 - **Preference lifecycle & persistence**: User sizing intent persists in SQLite while at least one Shelf Item exists. Empty-shelf choices remain in memory until first acceptance, which persists width and nullable manual height atomically with content. Restart before acceptance discards pending choices. Existing retained-content size records are preserved as manual sizes on cutover.
 - **Final-item reset**: When the final Shelf Item is removed (via manual removal, Clear Temporary Items, drag-out, or Missing cleanup) from either the visible Drop Shelf or Edge Rail, the shelf transitions to `Hidden`, closes any open popup, and deletes the persisted preferred-size record, resetting the next opening to `180 × 180`.
-- **Automatic Shelf Growth**: With no Manual Height Override, an accepted drop or opening derives height from responsive rows at the current actual width: zero/one row uses `180`, two use `236`, three use `292`, and four or more use `348` logical pixels. Existing-row capacity does not grow the shelf; overflow scrolls vertically. Automatic growth preserves width and the top edge unless work-area reachability requires an upward correction, and closes an open batch popup before changing bounds.
+- **Automatic Shelf Growth**: With no Manual Height Override, a newly created Shelf Batch or opening derives height from responsive rows at the current actual width: zero/one row uses `180`, two use `236`, three use `292`, and four or more use `348` logical pixels. Existing-row capacity does not grow the shelf; duplicate-only drops do not trigger growth; overflow scrolls vertically. Automatic growth preserves width and the top edge unless work-area reachability requires an upward correction, and closes an open batch popup before changing bounds.
 - **No live shrink**: Removing content retains visible height while Shelf Items remain. A later show or restart recalculates the tier and can reclaim unused height. Hidden or EdgeDocked additions defer full-shelf geometry until opening; Edge Rail sizing and hover behavior are unchanged. Automatic height is never saved as user sizing intent.
 
 ## Responsive layout
@@ -1009,7 +1011,7 @@ cancel
 Hidden
 ```
 
-The shake workflow does not permanently alter the shelf state unless a supported drop is accepted. Cancellation, an unsupported payload, or a false-positive shake restores the previous state. After an accepted drop, the shelf remains near the cursor so the user can inspect the new batch; dismissing it follows the normal Hidden/EdgeDocked rules.
+The shake workflow does not permanently alter the shelf state unless an accepted non-duplicate drop creates a new Shelf Batch. Cancellation, an unsupported payload, a duplicate-only drop, or a false-positive shake restores the previous state; a duplicate-only drop remains silent. After a new batch is created, the shelf remains near the cursor so the user can inspect it; dismissing the shelf follows the normal Hidden/EdgeDocked rules.
 ---
 
 # 28. Storage Behavior
@@ -1064,7 +1066,7 @@ If the database cannot be opened or is corrupt, DropCove preserves it as a times
 
 V1 accepts files and folders that provide filesystem paths. Virtual items that exist only as streams are not materialized into DropCove storage.
 
-One accepted drop creates one `ShelfBatch`. Paths are deduplicated within that operation while retaining source order. If a payload mixes supported paths and unsupported items, DropCove accepts the supported paths and reports how many items were skipped; a payload with no supported paths is rejected.
+One accepted non-duplicate drop creates one `ShelfBatch`. Paths are deduplicated within that operation while retaining source order, then compared with retained batches by unordered, ordinal case-insensitive path-string equality without path canonicalization. An exact match is a silent no-op. Otherwise, if a payload mixes supported paths and unsupported items, DropCove accepts every supported path and reports how many items were skipped; a payload with no supported paths is rejected.
 
 Incoming data should be converted immediately into the application domain model.
 

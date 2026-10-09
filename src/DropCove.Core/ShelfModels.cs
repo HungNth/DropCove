@@ -114,13 +114,26 @@ public enum DragOutOutcome
     AcceptedCopy,
 }
 
+/// <summary>Distinguishes new content, a duplicate batch, and unsupported incoming data.</summary>
+public enum DropDisposition
+{
+    /// <summary>A new Shelf Batch was created.</summary>
+    Added,
+    /// <summary>The incoming path set already exists in a retained Shelf Batch.</summary>
+    Duplicate,
+    /// <summary>No supported path remained after incoming filtering.</summary>
+    Unsupported,
+}
+
 /// <summary>Reports the outcome of one incoming drop.</summary>
-/// <param name="Batch">The created batch, or <see langword="null"/> when no item was accepted.</param>
-/// <param name="AcceptedCount">The number of accepted unique paths.</param>
+/// <param name="Disposition">Whether the drop created a batch, was duplicate, or was unsupported.</param>
+/// <param name="Batch">The created batch, or <see langword="null"/> when no batch was added.</param>
+/// <param name="AcceptedCount">The number of unique paths added to DropCove.</param>
 /// <param name="SkippedUnsupportedCount">The number of unsupported entries.</param>
-/// <param name="DuplicateCount">The number of duplicate paths removed within this drop.</param>
+/// <param name="DuplicatePathCount">The number of repeated paths removed within this drop.</param>
 public sealed record DropAcceptance(
+    DropDisposition Disposition,
     ShelfBatch? Batch,
     int AcceptedCount,
     int SkippedUnsupportedCount,
-    int DuplicateCount);
+    int DuplicatePathCount);

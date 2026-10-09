@@ -490,10 +490,17 @@ public sealed partial class EdgeRailWindow : Window
         try
         {
             var outcome = await _acceptStorageDrop(e.DataView);
-            if (outcome.Batch is null)
+            switch (outcome.Disposition)
             {
-                _notify("No supported filesystem paths were found.");
-                return;
+                case DropDisposition.Duplicate:
+                    return;
+                case DropDisposition.Unsupported:
+                    _notify("No supported filesystem paths were found.");
+                    return;
+                case DropDisposition.Added:
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unknown drop disposition: {outcome.Disposition}");
             }
 
             await _refreshAfterMutation();

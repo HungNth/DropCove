@@ -17,8 +17,12 @@ The narrow visible resting form of the Edge Rail that expands on pointer hover o
 _Avoid_: Hidden hot zone, collapsed shelf
 
 **Shelf Batch**:
-The ordered group of unique paths accepted from one drop operation. The same path may appear independently in batches created by different drop operations.
+The ordered group of unique paths accepted from one drop operation. The same path may appear in different Shelf Batches when their complete path sets differ.
 _Avoid_: Folder, collection
+
+**Duplicate Shelf Batch**:
+An incoming Shelf Batch whose set of path strings exactly matches the current Shelf Items of any retained Shelf Batch using ordinal case-insensitive comparison, regardless of item order. Paths are not canonicalized, and partial path overlap does not make a Shelf Batch duplicate.
+_Avoid_: Repeated item
 
 **Shelf Item**:
 One occurrence of a referenced file or folder inside a Shelf Batch.

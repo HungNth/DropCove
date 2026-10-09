@@ -85,9 +85,16 @@ public sealed partial class MainPage : Page
     internal async Task<DropAcceptance> AcceptStorageDropAsync(DataPackageView dataView)
     {
         var outcome = await (_storageDropService ?? throw new InvalidOperationException("MainPage is not initialized.")).AcceptAsync(dataView);
-        if (outcome.Batch is not null)
+        switch (outcome.Disposition)
         {
-            ShelfBatchAccepted?.Invoke();
+            case DropDisposition.Added:
+                ShelfBatchAccepted?.Invoke();
+                break;
+            case DropDisposition.Duplicate:
+            case DropDisposition.Unsupported:
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown drop disposition: {outcome.Disposition}");
         }
         return outcome;
     }
@@ -224,12 +231,21 @@ public sealed partial class MainPage : Page
             }
 
             var outcome = await AcceptStorageDropAsync(e.DataView);
-            if (outcome.Batch is null)
+            switch (outcome.Disposition)
             {
-                shakeOutcomeReported = true;
-                await (_shakeDropCompleted?.Invoke(false) ?? Task.CompletedTask);
-                ShowDropMessage("No supported filesystem paths were found.", InfoBarSeverity.Warning);
-                return;
+                case DropDisposition.Duplicate:
+                    shakeOutcomeReported = true;
+                    await (_shakeDropCompleted?.Invoke(false) ?? Task.CompletedTask);
+                    return;
+                case DropDisposition.Unsupported:
+                    shakeOutcomeReported = true;
+                    await (_shakeDropCompleted?.Invoke(false) ?? Task.CompletedTask);
+                    ShowDropMessage("No supported filesystem paths were found.", InfoBarSeverity.Warning);
+                    return;
+                case DropDisposition.Added:
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unknown drop disposition: {outcome.Disposition}");
             }
 
             shakeOutcomeReported = true;

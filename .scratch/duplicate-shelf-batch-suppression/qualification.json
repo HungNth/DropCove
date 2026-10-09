@@ -1,0 +1,168 @@
+{
+  "GeneratedUtc": "2026-10-09T08:56:44Z",
+  "Status": "blocked",
+  "Spec": "duplicate-shelf-batch-suppression",
+  "Installation": {
+    "Installer": "F:\\CSharp\\dropcove\\artifacts\\DropCove-Setup.exe",
+    "InstalledDirectory": "C:\\Users\\Hung\\AppData\\Local\\Programs\\DropCove",
+    "InstallerExitCode": 0,
+    "PayloadHashes": [
+      {
+        "File": "DropCove.exe",
+        "PublishedSha256": "6A204072E272DB8F66EA85FC41D629D15CBC095216370C84168561E73F2B6BDA",
+        "InstalledSha256": "6A204072E272DB8F66EA85FC41D629D15CBC095216370C84168561E73F2B6BDA",
+        "Matches": true
+      },
+      {
+        "File": "DropCove.dll",
+        "PublishedSha256": "05C8570A2C0356CE61C1379241FB4DE8B29DB1D9B633C649036776E64EFAAC15",
+        "InstalledSha256": "05C8570A2C0356CE61C1379241FB4DE8B29DB1D9B633C649036776E64EFAAC15",
+        "Matches": true
+      },
+      {
+        "File": "DropCove.Core.dll",
+        "PublishedSha256": "6AC1819B49EE4CDADB7082E92FC22747FC2700A2340551EBC016C63A88F768AC",
+        "InstalledSha256": "6AC1819B49EE4CDADB7082E92FC22747FC2700A2340551EBC016C63A88F768AC",
+        "Matches": true
+      },
+      {
+        "File": "DropCove.Services.dll",
+        "PublishedSha256": "703293E109235F6D7DB7FA1376B5562E7B83CA7EE95851DB1EC070D32B2F9EAD",
+        "InstalledSha256": "703293E109235F6D7DB7FA1376B5562E7B83CA7EE95851DB1EC070D32B2F9EAD",
+        "Matches": true
+      },
+      {
+        "File": "DropCove.Native.dll",
+        "PublishedSha256": "79D96BA13CBA6314DA307DFA4F5721C59C101BF85ECBAA4F8E5E7B13A7D77572",
+        "InstalledSha256": "79D96BA13CBA6314DA307DFA4F5721C59C101BF85ECBAA4F8E5E7B13A7D77572",
+        "Matches": true
+      }
+    ],
+    "SmokeLaunch": {
+      "ProcessId": 35344,
+      "ObservedWindows": [
+        {
+          "hwnd": 1314388,
+          "pid": 35344,
+          "title": "DropCove — Test profile",
+          "visible": true
+        },
+        {
+          "hwnd": 4000300,
+          "pid": 35344,
+          "title": "MSCTFIME UI",
+          "visible": false
+        },
+        {
+          "hwnd": 919902,
+          "pid": 35344,
+          "title": "Default IME",
+          "visible": false
+        }
+      ],
+      "Passed": true
+    }
+  },
+  "AutomatedVerification": {
+    "RedCommand": "dotnet test tests/DropCove.Tests/DropCove.Tests.csproj --filter FullyQualifiedName~DuplicateDrop_AfterRestartPreservesOlderBatchAndSizing",
+    "RedObserved": "Assert.IsNull failed for duplicate.Batch before implementation",
+    "GreenObserved": "Regression passed after implementation",
+    "ManagerSuite": {
+      "Passed": 39,
+      "Failed": 0
+    },
+    "PersistenceSuite": {
+      "Passed": 47,
+      "Failed": 0
+    },
+    "FullSuite": {
+      "Passed": 232,
+      "Failed": 0
+    },
+    "Build": {
+      "Configuration": "Release win-x64 self-contained",
+      "Warnings": 0,
+      "Errors": 0
+    }
+  },
+  "Review": {
+    "Baseline": "afe6797fac4d79ba97ea5b935814002775a3c5c8",
+    "Standards": {
+      "HardViolations": 0,
+      "ActionableFindings": 0,
+      "DismissedJudgementCalls": [
+        "Cross-batch matching belongs to the manager, not a per-batch abstraction.",
+        "Explicit disposition handling is required; defensive defaults do not add speculative behavior.",
+        "Existing diagnostic counters belong to the DropAcceptance result record."
+      ]
+    },
+    "Spec": {
+      "Findings": 0
+    },
+    "NativeAcceptanceNotCertifiedBySourceReview": true
+  },
+  "Scale": {
+    "Evidence": "../../../artifacts/duplicate-batches-scale.json",
+    "Batches": 100,
+    "Items": 1000,
+    "PngPreviews": 10,
+    "Cycles": 30,
+    "VisibleWorkingSetMb": 153.9,
+    "PostDismissalWorkingSetMb": 167.69,
+    "VisibleCpuPercent": 0.0,
+    "HiddenCpuPercent": 0.0,
+    "NativeMessageToVisibleP95Ms": 44.24,
+    "WorkingSetBelow160Mb": false,
+    "NoUiAutomation": true,
+    "NoForcedGcOrTrimming": true,
+    "TimingLimit": "Native message to visible only; not physical keyboard or first rendered frame."
+  },
+  "NativeQualification": {
+    "Verdict": "blocked/unobserved",
+    "RealExplorerPositiveControl": {
+      "ExpectedAddedBatch": true,
+      "ObservedAddedBatch": false,
+      "BeforeBatchCount": 3,
+      "AfterBatchCount": 3
+    },
+    "ManualExplorerProbe": {
+      "AddedBatches": 0,
+      "DropTargetFeedbackObserved": false,
+      "Attempts": 2
+    },
+    "SupplementalOleSource": {
+      "Outcome": "Driver timed out after 240 seconds during multi-item drops",
+      "LastLoggedTarget": [
+        960,
+        516
+      ],
+      "LastLoggedWindowProcessId": 12172,
+      "MouseUpLogged": true,
+      "AcceptedResultLogged": false
+    },
+    "NoDuplicatePassClaimed": true,
+    "Unobserved": [
+      "Drop Shelf duplicate status/scroll/bounds/realization",
+      "Edge Rail duplicate notification/bounds/rows",
+      "Partial-overlap native acceptance",
+      "Hidden and EdgeDocked duplicate shake restoration",
+      "Mixed supported/unsupported native presentation",
+      "Native growth-boundary behavior"
+    ],
+    "Limits": [
+      "Unchanged database counts are not proof of a duplicate without delivered input.",
+      "The failed native harness does not diagnose an application defect.",
+      "No custom production instrumentation or alternate drop pipeline was added."
+    ]
+  },
+  "Cleanup": {
+    "TimedOutOwnedProfileRemoved": true,
+    "OwnedManualProbeProfileAndExplorerWindowRemoved": true,
+    "ProductionInstrumentationAdded": false,
+    "DisposableDriversRemoved": true
+  },
+  "InstalledAppLeftRunning": true,
+  "GitCommitCreatedAtQualification": false,
+  "ImplementationCommitApproved": true,
+  "CommitApprovalScope": "Implementation, tests, documentation, specification and tickets; native qualification and residency remain blocked."
+}

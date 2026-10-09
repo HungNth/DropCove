@@ -6,7 +6,7 @@ namespace DropCove.Tests;
 public sealed class DropShelfManagerTests
 {
     [TestMethod]
-    public void AcceptDrop_PreservesOrderAndDeduplicatesOnlyWithinTheDrop()
+    public void AcceptDrop_DeduplicatesIncomingPathsWhilePreservingPartialOverlap()
     {
         var manager = new DropShelfManager();
         var first = manager.AcceptDrop(
@@ -17,8 +17,10 @@ public sealed class DropShelfManagerTests
         ]);
         var second = manager.AcceptDrop([new(@"C:\Work\A.png", "A.png", false)]);
 
+        Assert.AreEqual(DropDisposition.Added, first.Disposition);
+        Assert.AreEqual(DropDisposition.Added, second.Disposition);
         Assert.AreEqual(2, first.AcceptedCount);
-        Assert.AreEqual(1, first.DuplicateCount);
+        Assert.AreEqual(1, first.DuplicatePathCount);
         CollectionAssert.AreEqual(
             new[] { @"C:\Work\A.png", @"C:\Work\B.png" },
             first.Batch!.Items.Select(item => item.Path).ToArray());
@@ -38,6 +40,7 @@ public sealed class DropShelfManagerTests
             new(@"\\server\share\Folder", "Folder", true),
         ], skippedUnsupportedCount: 1);
 
+        Assert.AreEqual(DropDisposition.Added, result.Disposition);
         Assert.AreEqual(2, result.AcceptedCount);
         Assert.AreEqual(2, result.SkippedUnsupportedCount);
         Assert.HasCount(1, manager.Batches);
@@ -50,9 +53,40 @@ public sealed class DropShelfManagerTests
 
         var result = manager.AcceptDrop([new(string.Empty, "Virtual item", false)]);
 
+        Assert.AreEqual(DropDisposition.Unsupported, result.Disposition);
         Assert.IsNull(result.Batch);
         Assert.AreEqual(1, result.SkippedUnsupportedCount);
         Assert.IsEmpty(manager.Batches);
+    }
+
+    [TestMethod]
+    public void AcceptDrop_SingleItemDuplicateRetainsTheExistingOccurrence()
+    {
+        var manager = new DropShelfManager();
+        var first = manager.AcceptDrop([new(@"C:\Work\A.txt", "A.txt", false)]).Batch!;
+
+        var duplicate = manager.AcceptDrop([new(@"c:\work\a.txt", "Different name", true)]);
+
+        Assert.AreEqual(DropDisposition.Duplicate, duplicate.Disposition);
+        Assert.IsNull(duplicate.Batch);
+        Assert.AreEqual(0, duplicate.AcceptedCount);
+        Assert.AreSame(first, manager.Batches.Single());
+    }
+
+    [TestMethod]
+    [DataRow(@"C:\Work\Folder\")]
+    [DataRow(@"C:/Work/Folder")]
+    [DataRow(@"C:\Work\Other\..\Folder")]
+    public void AcceptDrop_DoesNotCanonicalizePathStrings(string alternatePath)
+    {
+        var manager = new DropShelfManager();
+        manager.AcceptDrop([new(@"C:\Work\Folder", "Folder", true)]);
+
+        var result = manager.AcceptDrop([new(alternatePath, "Folder", true)]);
+
+        Assert.AreEqual(DropDisposition.Added, result.Disposition);
+        Assert.AreEqual(alternatePath, result.Batch!.Items.Single().Path);
+        Assert.HasCount(2, manager.Batches);
     }
     [TestMethod]
     public void SetPinned_UpdatesTheVisibleLifecycleState()

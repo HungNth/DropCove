@@ -157,15 +157,15 @@ public sealed class DropShelfManager
     {
         using var mutation = await LockMutationsAsync(cancellationToken);
         var outcome = AcceptDrop(items, skippedUnsupportedCount);
-        if (outcome.Batch is not null && _database is not null)
+        if (outcome.Disposition == DropDisposition.Added && _database is not null)
         {
             try
             {
-                await _database.AddBatchAsync(outcome.Batch, _batches.Count == 1 ? _sizingState : null, cancellationToken);
+                await _database.AddBatchAsync(outcome.Batch!, _batches.Count == 1 ? _sizingState : null, cancellationToken);
             }
             catch
             {
-                _batches.Remove(outcome.Batch);
+                _batches.Remove(outcome.Batch!);
                 throw;
             }
         }
@@ -393,7 +393,7 @@ public sealed class DropShelfManager
         ArgumentNullException.ThrowIfNull(items);
         ArgumentOutOfRangeException.ThrowIfNegative(skippedUnsupportedCount);
 
-        var accepted = new List<ShelfItem>();
+        var incoming = new List<IncomingShelfItem>();
         var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var duplicates = 0;
         var skipped = skippedUnsupportedCount;
@@ -412,21 +412,51 @@ public sealed class DropShelfManager
                 continue;
             }
 
-            accepted.Add(new ShelfItem(
+            incoming.Add(item);
+        }
+
+        if (incoming.Count == 0)
+        {
+            return new DropAcceptance(DropDisposition.Unsupported, null, 0, skipped, duplicates);
+        }
+
+        foreach (var existing in _batches)
+        {
+            if (existing.Items.Count != incoming.Count)
+            {
+                continue;
+            }
+
+            var matches = true;
+            for (var i = 0; i < existing.Items.Count; i++)
+            {
+                if (!seenPaths.Contains(existing.Items[i].Path))
+                {
+                    matches = false;
+                    break;
+                }
+            }
+
+            if (matches)
+            {
+                return new DropAcceptance(DropDisposition.Duplicate, null, 0, skipped, duplicates);
+            }
+        }
+
+        var accepted = new ShelfItem[incoming.Count];
+        for (var i = 0; i < incoming.Count; i++)
+        {
+            var item = incoming[i];
+            accepted[i] = new ShelfItem(
                 Guid.NewGuid(),
                 item.Path,
                 string.IsNullOrWhiteSpace(item.Name) ? GetFallbackName(item.Path) : item.Name,
-                item.IsFolder));
-        }
-
-        if (accepted.Count == 0)
-        {
-            return new DropAcceptance(null, 0, skipped, duplicates);
+                item.IsFolder);
         }
 
         var batch = new ShelfBatch(Guid.NewGuid(), DateTimeOffset.UtcNow, accepted);
         _batches.Insert(0, batch);
-        return new DropAcceptance(batch, accepted.Count, skipped, duplicates);
+        return new DropAcceptance(DropDisposition.Added, batch, accepted.Length, skipped, duplicates);
     }
 
     /// <summary>Updates one Shelf Item's pinned lifecycle state.</summary>
