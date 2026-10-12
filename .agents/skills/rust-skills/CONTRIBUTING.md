@@ -1,0 +1,118 @@
+# Contributing
+
+Thanks for helping improve rust-skills! This repo is a set of focused Rust
+best-practice rules consumed by AI coding agents. Contributions usually mean
+adding a rule, improving an existing one, or fixing an example.
+
+## Adding or editing a rule
+
+1. **Create `rules/<prefix>-<name>.md`** with a `kebab-case` id that starts with
+   an existing category prefix (`own-`, `err-`, `mem-`, `unsafe-`, `api-`,
+   `async-`, `conc-`, `opt-`, `num-`, `type-`, `trait-`, `conv-`, `const-`,
+   `serde-`, `pat-`, `macro-`, `closure-`, `coll-`, `name-`, `test-`, `doc-`,
+   `obs-`, `perf-`, `proj-`, `ffi-`, `lint-`, `anti-`). To propose a
+   brand-new category, add it to `CATEGORIES` in `checks/gen_index.py`.
+
+2. **Follow the format** of existing rules exactly:
+
+   ````markdown
+   # prefix-rule-name
+
+   > One-line imperative summary.
+
+   ## Why It Matters
+
+   Two to four sentences.
+
+   ## Bad
+
+   ```rust
+   // the anti-pattern
+   ```
+
+   ## Good
+
+   ```rust
+   // the recommended pattern
+   ```
+
+   ## See Also
+
+   - [other-rule](other-rule.md) - why it's related
+   ````
+
+   The first line must be `# <id>` (matching the filename), followed by a `>`
+   summary line. `## Why It Matters` and `## See Also` are required; `See Also`
+   links must point to real rule files.
+
+   **Name every other section for what it contains.** `Why It Matters`, `Bad`,
+   `Good`, and `See Also` are the fixed frame each rule shares. Everything
+   between them is free-form, and the heading should tell a reader what is in
+   it — `## Numeric Invariants`, `## Boundary Conversion Before Effects`,
+   `## Builder Typestate`, `## Supported Cases And Precedence`. Most rules have
+   two to five such sections; they are where the rule does its teaching, and
+   their headings double as the rule's table of contents.
+
+   `## Contract`, `## Key Points`, `## Failure Tests`, and `## Notes` are
+   **rejected by the validator**. They are the labels that accumulate when a
+   section is written without deciding what it is about: a reader scanning
+   three rules sees three identical headings, and someone searching for "nonce
+   reuse" or "rollback attack" matches nothing. Say what the section covers
+   instead — a checklist of obligations at an API boundary might be
+   `## Request Handling Contract`, a list of cases a test suite should pin
+   might be `## Cases To Pin In Tests`. The rename is not cosmetic: these
+   headings are the main retrieval surface for both humans and the agents this
+   library is written for.
+
+3. **Make examples compile on current stable Rust** (2024 edition). Prefer
+   self-contained `## Good` examples (define the types you reference) so the
+   compile harness can verify them. Keep error/log message strings lowercase
+   with no trailing punctuation.
+
+4. **Regenerate the index** so `SKILL.md` and the README counts stay in sync —
+   never hand-edit the generated table or Quick Reference:
+
+   ```bash
+   python3 checks/gen_index.py
+   ```
+
+5. **Add a `CHANGELOG.md` entry** under the next version.
+
+## Before opening a PR
+
+Run the same checks CI runs:
+
+```bash
+# Pins and validates source evidence, checks structure/index parity, runs both
+# focused behavior suites, and compile-checks extracted examples on Rust 1.97.1.
+bash checks/check.sh
+```
+
+If the compile gate reports a real bug, fix the example. If you intentionally
+added a new fragment-style snippet, refresh the baseline (see
+`checks/README.md`).
+
+## The `anti-` category is deliberately redundant
+
+Rules under `anti-` restate a positive rule as the failure mode it prevents:
+`anti-clone-excessive` pairs with `own-borrow-over-clone`, `anti-panic-expected`
+with `err-result-over-panic`, `anti-vec-for-slice` with `own-slice-over-vec`.
+That overlap is the point — the category is a REFERENCE index for code review,
+where the reviewer starts from the smell rather than from the principle.
+
+Do not "de-duplicate" an `anti-` rule into its positive counterpart. A rule
+audit will keep reporting these pairs as duplicates, because by any test of
+overlapping obligations they are; the answer is that the redundancy is
+intentional. When the two drift apart in substance, fix the drift rather than
+merging them.
+
+Genuine duplication is two rules in *different* categories teaching the same
+contract with no such intent — for example a `# Errors` documentation rule
+living in both Error Handling and Documentation. Those should be merged.
+
+## Style
+
+- Be concrete and example-driven, not preachy.
+- Cite sources by name (the Rust Reference, the API Guidelines, a crate) rather
+  than fragile deep links.
+- Keep rules small and single-purpose; cross-link related rules in `See Also`.

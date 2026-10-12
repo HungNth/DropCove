@@ -1,0 +1,393 @@
+{
+  "schema_version": 1,
+  "description": "Typed provenance for rules that no source-coverage ledger references. Each entry names the kind of source the rule's contract comes from and what in that source it derives from. Justifications name documents, APIs, lints, and crates; validate.py rejects any that carries a URL, page, section, or version locator, because those cannot be checked from the text and are the shape a fabricated citation takes.",
+  "reviewer": "Jason Lee <jason931225@gmail.com>",
+  "reviewed_on": "2026-08-20",
+  "entries": [
+    {
+      "rule_id": "anti-expect-lazy",
+      "source_class": "synthesized-practice",
+      "justification": "The contract \u2014 reserve panicking accessors for bugs and invariants while recoverable I/O, parsing, and lookup failures return `Result` \u2014 is community practice built on the documented fact that `expect` panics; no single upstream document states this split."
+    },
+    {
+      "rule_id": "anti-format-hot-path",
+      "source_class": "rust-performance-book",
+      "justification": "Replacing repeated `format!` with `write!` into a reused `String` buffer to avoid per-iteration heap allocations is exactly the kind of allocation-reduction guidance The Rust Performance Book gathers, and the rule frames it as a measured hot-path decision."
+    },
+    {
+      "rule_id": "anti-string-for-str",
+      "source_class": "clippy-docs",
+      "justification": "The rule states and configures Clippy's `ptr_arg` lint, which is precisely the policy that a `&String` parameter should be `&str`; the deref-coercion explanation is supporting mechanism rather than the source of the contract."
+    },
+    {
+      "rule_id": "anti-vec-for-slice",
+      "source_class": "clippy-docs",
+      "justification": "Same origin as the `&String` rule: Clippy's `ptr_arg` lint, named in the rule, is what makes `&Vec<T>` parameters a reportable defect where `&[T]` works."
+    },
+    {
+      "rule_id": "api-builder-must-use",
+      "source_class": "rust-api-guidelines",
+      "justification": "This applies the API Guidelines' builder-pattern guidance together with its convention of flagging returned values that are useless when discarded, so a chained `-> Self` builder method cannot be silently dropped; Clippy's `return_self_not_must_use` and `must_use_candidate` are listed only as enforcement."
+    },
+    {
+      "rule_id": "api-operator-overload",
+      "source_class": "rust-api-guidelines",
+      "justification": "The rule text itself invokes the Rust API Guidelines' position on operator overloading (C-OVERLOAD): implement `std::ops` traits only where the meaning is unsurprising, plus the guidelines' related advice to implement arithmetic for reference operands."
+    },
+    {
+      "rule_id": "async-broadcast-pubsub",
+      "source_class": "crate-docs",
+      "justification": "The whole contract is tokio::sync::broadcast's documented behaviour \u2014 every subscriber created by Sender::subscribe receives every message, messages must be Clone, and a slow receiver observes RecvError::Lagged rather than backpressure."
+    },
+    {
+      "rule_id": "async-oneshot-response",
+      "source_class": "crate-docs",
+      "justification": "States tokio::sync::oneshot's contract: a single-use channel consumed by await, RecvError when the sender drops, send returning the value back when the receiver is gone, and is_closed/closed for detecting an abandoned receiver."
+    },
+    {
+      "rule_id": "async-try-join",
+      "source_class": "crate-docs",
+      "justification": "Turns on tokio's try_join! contract \u2014 concurrent polling of a fixed tuple in one task, return on the first observed error, and dropping unfinished branch futures without any rollback \u2014 plus futures' try_join_all/buffered for the dynamic case."
+    },
+    {
+      "rule_id": "async-watch-latest",
+      "source_class": "crate-docs",
+      "justification": "Describes tokio::sync::watch's contract: receivers see only the most recent value, changed() plus borrow()/borrow_and_update(), send_if_modified for change-gated notification, and the Ref guard that must not be held across an await."
+    },
+    {
+      "rule_id": "closure-disjoint-capture",
+      "source_class": "edition-guide",
+      "justification": "The rule is built on the 2021 edition's disjoint closure capture change (RFC 2229), where closures capture individual fields rather than whole variables \u2014 a behaviour change the Edition Guide documents as an edition migration."
+    },
+    {
+      "rule_id": "coll-binaryheap",
+      "source_class": "std-docs",
+      "justification": "The contract is the documented behaviour of `std::collections::BinaryHeap`: it is a max-heap whose `pop` removes the greatest element and `peek` returns it without removing, with `std::cmp::Reverse` inverting the ordering to obtain a min-heap, and no arbitrary removal or priority-update operation offered \u2014 stated without attributing the rule's O(log n) figures to std."
+    },
+    {
+      "rule_id": "coll-seq-choice",
+      "source_class": "std-docs",
+      "justification": "`Vec` as the default sequence, `VecDeque`'s amortized O(1) push/pop at both ends, the O(n) cost of `Vec::remove(0)`, and the standard library's own discouragement of `LinkedList` all come from the `std::collections` documentation."
+    },
+    {
+      "rule_id": "coll-set-membership",
+      "source_class": "std-docs",
+      "justification": "The O(n) cost of `Vec::contains` against expected O(1) `HashSet` membership, `BTreeSet`'s sorted iteration, and `Vec::dedup` requiring adjacent equal elements are documented standard-library complexity contracts."
+    },
+    {
+      "rule_id": "conv-asmut-mutable",
+      "source_class": "std-docs",
+      "justification": "The rule rests on std::convert::AsMut's documented contract as the mutable counterpart of AsRef and on which std types lend `&mut [u8]` (Vec, arrays, slices), making one generic parameter accept all of them; the API-shape framing parallels the API Guidelines' generic-parameter advice."
+    },
+    {
+      "rule_id": "doc-cargo-metadata",
+      "source_class": "cargo-book",
+      "justification": "The rule is entirely about `Cargo.toml` package manifest fields \u2014 `description`, `license`, `repository`, `keywords`, `categories`, `readme`, `rust-version`, `include`/`exclude` \u2014 and the `cargo package`/`cargo publish --dry-run` verification flow, which are Cargo manifest and publishing behaviour."
+    },
+    {
+      "rule_id": "doc-crate-readme",
+      "source_class": "synthesized-practice",
+      "justification": "No single upstream document prescribes unifying README and crate root docs; the rule combines the `#[doc = ...]` attribute with `include_str!` and the Cargo `readme` field into a single-source-of-truth practice, with the doctest-tagging advice being ordinary rustdoc hygiene."
+    },
+    {
+      "rule_id": "doc-errors-section",
+      "source_class": "rust-api-guidelines",
+      "justification": "The `# Errors` documentation section for fallible functions is the API Guidelines documentation convention for `Result`-returning APIs (the failure/documentation checklist items), with Clippy's `missing_errors_doc` cited only as enforcement."
+    },
+    {
+      "rule_id": "doc-hidden-setup",
+      "source_class": "rust-api-guidelines",
+      "justification": "The policy of showing only the meaningful lines of an example rests on the API Guidelines' documentation expectations for examples, while the '# ' hidden-line mechanism itself is a rustdoc feature; because the class list has no rustdoc entry the attribution is a judgement call."
+    },
+    {
+      "rule_id": "doc-panics-section",
+      "source_class": "rust-api-guidelines",
+      "justification": "Documenting panic conditions in a '# Panics' section is the Rust API Guidelines documentation item requiring error, panic, and safety considerations on function docs."
+    },
+    {
+      "rule_id": "doc-question-mark",
+      "source_class": "rust-api-guidelines",
+      "justification": "Using `?` rather than unwrap in rustdoc examples is a named Rust API Guidelines documentation item about how examples should handle errors."
+    },
+    {
+      "rule_id": "doc-safety-section",
+      "source_class": "rustonomicon",
+      "justification": "The obligations the rule requires a '# Safety' section to enumerate \u2014 validity invariants, alignment, initialization, provenance, aliasing, ownership transfer, and unwinding across FFI \u2014 are the soundness obligations the Rustonomicon defines; the section convention itself also appears in the API Guidelines and is checked by clippy::missing_safety_doc, so the class is a judgement between them."
+    },
+    {
+      "rule_id": "lint-clippy-nursery-selected",
+      "source_class": "clippy-docs",
+      "justification": "The rule exists because the `clippy::nursery` lint group exists and names individual nursery lints (`significant_drop_tightening`, `redundant_clone`, `use_self`, `redundant_else`, `or_fun_call`) whose behaviour and unstable status come from Clippy's own lint documentation."
+    },
+    {
+      "rule_id": "lint-missing-docs",
+      "source_class": "clippy-docs",
+      "justification": "The rule exists because the `missing_docs` lint exists and simply states a policy for it (warn then deny, `pub`-only scope, `#[allow]` overrides, `[lints.rust]`/workspace configuration); note this is a rustc lint rather than a Clippy one, so the lint-policy class is an approximate fit."
+    },
+    {
+      "rule_id": "lint-pedantic-selective",
+      "source_class": "clippy-docs",
+      "justification": "The whole rule is policy over the `clippy::pedantic` lint group and named members of it such as `doc_markdown`, `semicolon_if_nothing_returned`, `wildcard_imports`, `module_name_repetitions`, and `must_use_candidate`."
+    },
+    {
+      "rule_id": "lint-unsafe-doc",
+      "source_class": "clippy-docs",
+      "justification": "The rule is built on the Clippy lints `undocumented_unsafe_blocks`, `multiple_unsafe_ops_per_block`, and `missing_safety_doc`, and states the enforcement level and override policy for them, even though the proofs it demands are soundness reasoning."
+    },
+    {
+      "rule_id": "macro-export-crate-path",
+      "source_class": "rust-reference",
+      "justification": "The contract is the language's macro-export semantics \u2014 `#[macro_export]` placing a macro at the crate root and path-based macro import replacing `#[macro_use] extern crate` \u2014 documented in the Rust Reference's macros-by-example and macro-scoping material; the 2018-edition framing means edition-guide is a plausible alternative."
+    },
+    {
+      "rule_id": "macro-proc-error-spans",
+      "source_class": "crate-docs",
+      "justification": "The contract belongs to the `syn` crate's error API \u2014 `syn::Error::new`, `Error::new_spanned`, `Error::combine`, and `to_compile_error` \u2014 together with `quote` and `proc-macro2` for emitting the resulting token stream."
+    },
+    {
+      "rule_id": "mem-avoid-format",
+      "source_class": "rust-performance-book",
+      "justification": "This is the allocation-avoidance advice the Performance Book collects under heap allocations and string handling \u2014 do not build an owned `String` for constant text, and prefer borrowed or `Cow` returns on hot paths."
+    },
+    {
+      "rule_id": "mem-box-large-variant",
+      "source_class": "rust-reference",
+      "justification": "The underlying fact is the language's enum layout semantics \u2014 an enum value must be able to hold its largest variant, so boxing that variant's payload shrinks every instance \u2014 and Clippy's `large_enum_variant` merely reports the condition rather than creating the contract."
+    },
+    {
+      "rule_id": "mem-clone-from",
+      "source_class": "std-docs",
+      "justification": "It derives from `Clone::clone_from`'s documented contract \u2014 the default implementation is `*self = source.clone()`, and concrete impls such as `String`/`Vec`/`PathBuf` may instead reuse existing capacity."
+    },
+    {
+      "rule_id": "mem-compact-string",
+      "source_class": "crate-docs",
+      "justification": "The contract belongs to the `compact_str`, `smartstring`, and `ecow` crates, whose inline and shared string representations (and their version-specific inline capacities) the rule is entirely about."
+    },
+    {
+      "rule_id": "mem-smaller-integers",
+      "source_class": "rust-performance-book",
+      "justification": "This is type-size and layout advice of the kind that book collects \u2014 shrinking struct footprint by choosing narrower integer and float fields, padding and field-ordering effects under `repr(C)`, bitflag packing, and `NonZero` niche use for `Option`."
+    },
+    {
+      "rule_id": "mem-smallvec",
+      "source_class": "crate-docs",
+      "justification": "The rule is the `smallvec` crate's contract (`SmallVec<[T; N]>` stores up to N elements inline and spills to the heap beyond that), with `tinyvec` and `arrayvec` named as the alternatives."
+    },
+    {
+      "rule_id": "mem-take-replace",
+      "source_class": "std-docs",
+      "justification": "The contract is the documented behaviour of `std::mem::take` (replaces with `T::default()` and returns the original, requiring `T: Default`), `std::mem::replace`, and the related `Option::take`."
+    },
+    {
+      "rule_id": "mem-thinvec",
+      "source_class": "crate-docs",
+      "justification": "The contract belongs to the `thin-vec` crate: `ThinVec<T>` keeps length and capacity behind the pointer so the handle is one word, trading indirection for a smaller inline field."
+    },
+    {
+      "rule_id": "mem-write-over-format",
+      "source_class": "std-docs",
+      "justification": "The contract is that `format!` constructs an owned `String` while `write!`/`writeln!` render into an existing target through `std::fmt::Write` or `std::io::Write`, returning a `Result` those traits define."
+    },
+    {
+      "rule_id": "name-acronym-word",
+      "source_class": "rust-api-guidelines",
+      "justification": "The casing convention that acronyms are treated as one word (HttpServer, not HTTPServer) is the Rust API Guidelines' naming/casing item, itself codifying RFC 430, and the rule's evidence is std names like TcpStream and UdpSocket."
+    },
+    {
+      "rule_id": "name-consts-screaming",
+      "source_class": "rust-api-guidelines",
+      "justification": "SCREAMING_SNAKE_CASE for consts and statics is the casing convention in the Rust API Guidelines naming chapter (RFC 430), separately enforced by rustc's non_upper_case_globals lint that the rule mentions as compiler warnings."
+    },
+    {
+      "rule_id": "name-crate-no-rs",
+      "source_class": "synthesized-practice",
+      "justification": "The advice against `-rs`/`-rust` crate-name suffixes is a crates.io community naming habit the rule illustrates with real crate names (serde, tokio, reqwest, clap), not a contract stated in the API Guidelines checklist or any other single upstream document."
+    },
+    {
+      "rule_id": "name-funcs-snake",
+      "source_class": "rust-api-guidelines",
+      "justification": "snake_case for functions, methods, variables, and modules is the value-level casing convention in the Rust API Guidelines naming chapter (RFC 430), backed by rustc's non_snake_case lint the rule quotes."
+    },
+    {
+      "rule_id": "name-into-ownership",
+      "source_class": "rust-api-guidelines",
+      "justification": "The into_ prefix for self-consuming conversions comes from the Rust API Guidelines conversion-naming item, illustrated here with String::into_bytes, Vec::into_boxed_slice, and IntoIterator::into_iter."
+    },
+    {
+      "rule_id": "name-is-has-bool",
+      "source_class": "synthesized-practice",
+      "justification": "The is_/has_/can_/should_ prefix table is general naming practice generalized from std predicates (Option::is_some, str::is_ascii, Path::is_file) rather than from a specific API Guidelines checklist item I can name, so I mark it low-confidence as an attribution."
+    },
+    {
+      "rule_id": "name-lifetime-short",
+      "source_class": "synthesized-practice",
+      "justification": "Short lifetime names ('a, 'b, 'src, 'ctx) are community convention with no single upstream document I can cite; the one concrete borrowing is serde's 'de from its Deserialize trait, so confidence in any stronger attribution is low."
+    },
+    {
+      "rule_id": "name-to-expensive",
+      "source_class": "rust-api-guidelines",
+      "justification": "The to_ prefix marking a conversion that allocates or computes is the Rust API Guidelines conversion-naming item, shown here with to_string, to_vec, to_lowercase, and the ToOwned trait."
+    },
+    {
+      "rule_id": "name-type-param-single",
+      "source_class": "rust-api-guidelines",
+      "justification": "It restates the API Guidelines naming convention that generic parameters are concise single uppercase letters with conventional meanings (`T`, `E`, `K`, `V`), matching the std signatures the guidelines point to."
+    },
+    {
+      "rule_id": "name-types-camel",
+      "source_class": "rust-api-guidelines",
+      "justification": "The casing convention for types, traits, and type aliases (`UpperCamelCase`, acronyms treated as words) is the API Guidelines naming checklist item, which rustc's `non_camel_case_types` lint enforces."
+    },
+    {
+      "rule_id": "name-variants-camel",
+      "source_class": "rust-api-guidelines",
+      "justification": "Enum variants fall under the same API Guidelines casing convention as types (`UpperCamelCase`), again backed by the `non_camel_case_types` warning quoted in the rule."
+    },
+    {
+      "rule_id": "num-float-compare",
+      "source_class": "std-docs",
+      "justification": "The contract comes from documented `f32`/`f64` behaviour \u2014 `PartialOrd::partial_cmp` returning `None` for NaN, `total_cmp`'s IEEE totalOrder-compatible ordering, `is_nan`/`is_finite`, and `to_bits` \u2014 rather than from Clippy's `float_cmp` lint, which the rule never mentions."
+    },
+    {
+      "rule_id": "num-saturating-clamp",
+      "source_class": "std-docs",
+      "justification": "Every claim is a documented standard-library contract: `Ord::clamp` panicking when `min > max`, `f32`/`f64::clamp` propagating `NaN` from the value and panicking on a `NaN` bound, and the `saturating_*` integer methods stopping at the type's limits."
+    },
+    {
+      "rule_id": "opt-bounds-check",
+      "source_class": "rust-performance-book",
+      "justification": "This is bounds-check-elimination advice of the kind that book collects \u2014 prefer iterator, `windows`, `chunks_exact`, and `split_at` traversal over indexing in hot loops, and verify generated code before reaching for unchecked access; the guaranteed-panic-on-out-of-bounds premise itself is language semantics, so the source is mixed."
+    },
+    {
+      "rule_id": "opt-cold-unlikely",
+      "source_class": "rust-reference",
+      "justification": "The contract is the `#[cold]` codegen attribute as the language documents it \u2014 a hint that a function is unlikely to be called, carrying no guarantee of section placement, branch weighting, or inlining behaviour."
+    },
+    {
+      "rule_id": "opt-inline-always-rare",
+      "source_class": "rust-reference",
+      "justification": "It derives from the documented semantics of the `#[inline(always)]` attribute as a stronger code-generation hint that the compiler may still decline, not a language guarantee."
+    },
+    {
+      "rule_id": "opt-inline-never-cold",
+      "source_class": "rust-reference",
+      "justification": "The rule combines the documented `#[inline(never)]` and `#[cold]` attributes, both defined as code-generation hints rather than promises about machine-code placement."
+    },
+    {
+      "rule_id": "opt-inline-small",
+      "source_class": "rust-reference",
+      "justification": "The contract is the `#[inline]` attribute family's documented status as codegen hints, together with the language's cross-crate inlining model in which a non-generic body may be unavailable downstream without the attribute or LTO."
+    },
+    {
+      "rule_id": "opt-pgo-profile",
+      "source_class": "synthesized-practice",
+      "justification": "The contract \u2014 representative and versioned training workloads, pinned `llvm-profdata` matching the toolchain, holdout validation, and promoting only the measured artifact \u2014 is a build-pipeline discipline assembled by the author around rustc's `-Cprofile-generate`/`-Cprofile-use` flags rather than a policy any one of the listed documents states."
+    },
+    {
+      "rule_id": "opt-simd-portable",
+      "source_class": "std-docs",
+      "justification": "The rule is organized around standard-library SIMD surfaces \u2014 nightly `std::simd` with `slice::as_simd`, `std::arch` intrinsics, `is_x86_feature_detected!`, and the `#[target_feature]` safety obligation \u2014 with the `wide` crate shown only as a stable alternative."
+    },
+    {
+      "rule_id": "own-clone-explicit",
+      "source_class": "std-docs",
+      "justification": "It derives from the documented split between `std::clone::Clone` (explicit `.clone()`, may be expensive, has a `clone_from` hook that can reuse storage) and `Copy`'s implicit duplication."
+    },
+    {
+      "rule_id": "own-copy-small",
+      "source_class": "std-docs",
+      "justification": "The rule restates the documented requirements and semantics of `std::marker::Copy` \u2014 every field `Copy`, no `Drop`, implicit duplication on move \u2014 plus the list of standard `Copy` types including `&T` but not `&mut T`."
+    },
+    {
+      "rule_id": "own-move-large",
+      "source_class": "synthesized-practice",
+      "justification": "General engineering advice \u2014 borrow by default, box only for recursion, address stability, stack limits, or a measured copy \u2014 with no single upstream document behind it, though the recursive-type case is a language requirement."
+    },
+    {
+      "rule_id": "own-rwlock-readers",
+      "source_class": "std-docs",
+      "justification": "The rule rests on `std::sync::RwLock`'s documented semantics: many readers or one writer, poisoning, and an explicitly unspecified/platform-dependent fairness policy that makes writer starvation possible."
+    },
+    {
+      "rule_id": "pat-at-bindings",
+      "source_class": "rust-reference",
+      "justification": "The `name @ pattern` binding syntax and the positions in which patterns may appear are language grammar and semantics from the Rust Reference's Patterns chapter."
+    },
+    {
+      "rule_id": "pat-if-let-chains",
+      "source_class": "edition-guide",
+      "justification": "The rule's prerequisite is the 2024 edition, since let chains are gated on it, which is what the Edition Guide covers; the Reference documents the syntax itself, so rust-reference is a defensible alternative."
+    },
+    {
+      "rule_id": "pat-let-else",
+      "source_class": "rust-reference",
+      "justification": "`let ... else` and its requirement that the else block diverge are language semantics specified in the Rust Reference's statement and pattern material, not an edition-gated or lint-driven contract."
+    },
+    {
+      "rule_id": "perf-chain-avoid",
+      "source_class": "synthesized-practice",
+      "justification": "The rule's core claim \u2014 that `Iterator::chain` costs a branch per item under `next()`-driven consumption and should be restructured in hot loops \u2014 is measurement-driven iteration advice rather than a documented std guarantee; std documents that `Chain` exists and overrides some internal-iteration methods, but not the per-item branch cost the rule reasons from."
+    },
+    {
+      "rule_id": "perf-collect-into",
+      "source_class": "rust-performance-book",
+      "justification": "The contract is the book's collection-reuse advice \u2014 clear and refill a buffer via `Extend`/`extend` so the existing capacity is reused instead of allocating a fresh collection per loop iteration \u2014 with `Iterator::collect_into` noted as the still-unstable spelling."
+    },
+    {
+      "rule_id": "perf-drain-reuse",
+      "source_class": "std-docs",
+      "justification": "The contract is the documented capacity behaviour of `Vec::drain`, `Vec::clear`, `HashMap::drain`, and `mem::take` \u2014 removal without releasing the allocation, versus `take` resetting capacity to zero."
+    },
+    {
+      "rule_id": "perf-extend-batch",
+      "source_class": "std-docs",
+      "justification": "It derives from the documented behaviour of the `Extend` trait and `Vec::extend`/`extend_from_slice`/`append`, specifically that reservation depends on the iterator's `size_hint` and is therefore not a guaranteed single allocation."
+    },
+    {
+      "rule_id": "perf-io-buffering",
+      "source_class": "std-docs",
+      "justification": "It rests on documented `std::io` contracts: `BufReader`/`BufWriter` batch operations on the inner handle, `BufRead` supplies `lines`/`read_line`/`read_until`, buffer capacity is an unspecified implementation detail, and dropping a `BufWriter` discards errors from the final write so `flush` must be called explicitly."
+    },
+    {
+      "rule_id": "proj-bin-dir",
+      "source_class": "cargo-book",
+      "justification": "The contract is Cargo's target auto-discovery convention documented in the Cargo Book \u2014 files under src/bin/ (and src/bin/<name>/main.rs) become binary targets without [[bin]] sections, plus the manifest keys the rule shows (path, required-features, default-run) and the --bin/--bins selection flags."
+    },
+    {
+      "rule_id": "proj-pub-super-parent",
+      "source_class": "rust-reference",
+      "justification": "The rule derives from the language's visibility and privacy semantics as specified in the Rust Reference: pub(super) makes an item visible in the parent module and everything nested within it, sitting between private, pub(in path), pub(crate), and pub."
+    },
+    {
+      "rule_id": "serde-skip-empty",
+      "source_class": "crate-docs",
+      "justification": "Built on serde's `skip_serializing_if`, `skip`, `skip_serializing`, and `skip_deserializing` attributes and their documented predicate signature and `Default` requirement, with the wire-contract judgment layered on top as the crate's own guidance does not make that call."
+    },
+    {
+      "rule_id": "test-mockall-mocking",
+      "source_class": "crate-docs",
+      "justification": "Everything the rule prescribes is mockall's API contract: #[automock]/MockX::new, expect_* builders with with/withf and mockall::predicate matchers, times counts, Sequence ordering, returning closures, and expectation verification on drop."
+    },
+    {
+      "rule_id": "trait-blanket-impl",
+      "source_class": "rust-reference",
+      "justification": "The load-bearing content is language-level coherence: a blanket impl is permitted because the trait is local, and it cannot overlap a specific impl because specialization is unstable (error E0119); the semver caveat is a secondary Cargo-book concern and the ToString-for-Display example is std."
+    },
+    {
+      "rule_id": "type-never-diverge",
+      "source_class": "rust-reference",
+      "justification": "The contract is language semantics for the never type `!` \u2014 divergent function return types, coercion of `!` to any type, and which uses are stable versus still feature-gated \u2014 with std::process::exit and std::convert::Infallible as illustrations."
+    },
+    {
+      "rule_id": "type-numeric-fmt",
+      "source_class": "rust-api-guidelines",
+      "justification": "The rule is the API Guidelines checklist item C-NUM-FMT, that numeric types should support the LowerHex, UpperHex, Octal, and Binary formatting traits wherever the underlying primitive does; the file names that item."
+    },
+    {
+      "rule_id": "type-unicode-length",
+      "source_class": "std-docs",
+      "justification": "The factual basis is the documented behaviour of standard-library string APIs \u2014 str::len returns the length in UTF-8 bytes while chars() yields Unicode scalar values, and std offers no grapheme-cluster segmentation \u2014 though the surrounding policy of naming and enforcing one unit at every boundary is the rule's own engineering advice, so the attribution is only partial."
+    }
+  ]
+}

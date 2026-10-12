@@ -1,0 +1,79 @@
+# unsafe-safety-comment
+
+> Write a `// SAFETY:` comment above every `unsafe` block and a `# Safety` section in every `unsafe fn`.
+
+## Why It Matters
+
+Unsafe code is unauditable when its obligations and local proof are implicit.
+The `clippy::undocumented_unsafe_blocks` lint can require a comment for each
+block, while public unsafe functions also need a caller-facing contract. These
+two forms answer different questions and neither replaces the other. Omitting
+either prevents a reviewer from verifying soundness.
+
+## Two Levels Of Documentation
+
+Use two distinct levels of documentation:
+
+1. **`# Safety` in a doc comment on an `unsafe fn`** — describes the *caller's* obligations (preconditions that must hold for the call to be sound).
+2. **`// SAFETY:` inline comment above each `unsafe {}` block** — explains why *this specific operation* upholds the required invariants at the call site.
+
+## Bad
+
+```rust
+// unsafe fn with no # Safety section — caller has no idea what's required
+pub unsafe fn read_at(ptr: *const u8, offset: usize) -> u8 {
+    // no SAFETY comment — why is this dereference sound?
+    unsafe { *ptr.add(offset) }
+}
+
+// standalone block with no justification
+fn process(slice: &[u8]) -> u8 {
+    unsafe { *slice.as_ptr().add(10) }
+}
+```
+
+## Good
+
+```rust
+/// Returns the byte at `ptr + offset`.
+///
+/// # Safety
+///
+/// `ptr` must be non-null and derived from one allocation containing at least
+/// `offset + 1` initialized bytes. `offset` must be at most `isize::MAX`, the
+/// computed address must remain in that allocation, and no mutation that
+/// conflicts with this read may occur during the call.
+pub unsafe fn read_at(ptr: *const u8, offset: usize) -> u8 {
+    // SAFETY: the caller contract establishes provenance, in-bounds offset,
+    // initialization, and aliasing for this one-byte read.
+    unsafe { *ptr.add(offset) }
+}
+
+fn process(slice: &[u8]) -> Option<u8> {
+    if slice.len() > 10 {
+        // SAFETY: slice.as_ptr() identifies slice.len() initialized bytes in
+        // one allocation; the branch proves offset 10 is in bounds, and the
+        // shared slice prevents conflicting safe mutation for the call.
+        Some(unsafe { read_at(slice.as_ptr(), 10) })
+    } else {
+        None
+    }
+}
+```
+
+## Lints And Comment Scope
+
+- A `# Safety` doc section and a `// SAFETY:` inline comment serve different audiences: the doc section targets *callers*, the inline comment targets *auditors* of the implementation.
+- Enable the lint explicitly to catch omissions:
+  ```rust
+  #![warn(clippy::undocumented_unsafe_blocks)]
+  ```
+- When an unsafe block spans multiple operations, write one `// SAFETY:` comment that addresses each distinct invariant, or split into multiple smaller blocks (see `unsafe-minimize-scope`).
+- In an `unsafe fn`, the body still requires `// SAFETY:` comments for each inner `unsafe {}` block under the 2024 edition's `unsafe_op_in_unsafe_fn` lint.
+
+## See Also
+
+- [unsafe-minimize-scope](unsafe-minimize-scope.md) - keep unsafe blocks as small as possible
+- [lint-unsafe-doc](lint-unsafe-doc.md) - enable `clippy::undocumented_unsafe_blocks`
+- [doc-safety-section](doc-safety-section.md) - include `# Safety` sections in public unsafe fns
+- [unsafe-means-ub](unsafe-means-ub.md) - unsafe means UB risk, not "this is dangerous"

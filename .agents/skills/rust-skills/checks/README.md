@@ -1,0 +1,306 @@
+# checks — verify rule structure, behavior, and examples
+
+A dev tool that type-checks the ` ```rust ` code blocks in `../rules/*.md` so the
+"Good" examples we tell agents to write actually compile. Focused Rust tests
+also execute language and library behavior that compilation alone cannot prove.
+Not part of the published skill.
+
+## Run
+
+```bash
+# full local/CI gate (retrieves and verifies the pinned Microsoft source)
+bash checks/check.sh
+
+# individual focused behavior suites
+cd checks
+cargo test --test source_guidance
+cargo test --test language_guidance
+cargo test --test pdf_corpus_guidance
+
+# individual example compile-check
+python3 gen.py                                              # extract blocks -> examples/
+cargo check --examples --keep-going --message-format=json > check.json
+python3 analyze.py check.json                               # classify results
+python3 analyze.py check.json --check-baseline baseline.txt # CI gate: exact reviewed parity
+```
+
+The full gate runs in CI (`.github/workflows/ci.yml`) on Rust 1.97.1. It
+validates structure and source inventories, runs the source-guidance and
+language-guidance suites, then compile-checks generated examples against the
+reviewed baseline.
+
+`validate.py` checks the 89-item Microsoft Pragmatic Rust Guidelines v2026.6
+manifest against an exact source checkout: source IDs and hashes, mappings,
+context pages, nested links, and known upstream defects must match. Focused
+Rust tests execute selected runtime invariants; they are examples, not proof
+that prose mappings are semantically complete. Static API guidance is checked
+through manifest review, link/index parity, and extracted-example compilation.
+
+The validator also checks the 431-unit *Zero To Production In Rust* disposition
+ledger. It was written against a PDF with SHA-256 `5de8b3ef…20f75e`, which is
+not the binary issue #1 names authoritative. `rebind_zero2production.py`
+re-anchored it to the authoritative `f122f6e8…c168cf47b` on content identity
+rather than position: all 431 rows — including the two that carry no page
+number — matched exactly one page whose layout-mode extracted text is
+byte-identical to the page the disposition was written against, with a single
+uniform offset of +1 and no ambiguous or unmatched row. Because the bytes are
+the same, the dispositions carry across; no row was transferred by title, page,
+or ordinal, which issue #1 forbids.
+
+**What that proves and what it does not.** The rows name 256 of the 433
+physical pages, and those are proven identical. The other 177 carry no stored
+digest: the superseded binary is gone, so no evidence about them survives. A
+disposition summarizes a section, so an edit inside a reviewed section that
+left its heading page untouched would not be detected. The ledger says so —
+`audit_status.semantic_status` is `source-rebound-partial-proof`, and the
+`rebinding` block records `pages_proven_identical` alongside a `proof_scope`
+statement. Closing that gap needs a reread, not a digest comparison.
+
+The validator enforces the evidence rather than trusting it: the rebinding
+block must account for every row with zero ambiguous and zero unmatched, must
+state its proof scope and page count, and must carry a `binding_digest` that
+validate.py recomputes from `<section>:<page>:<page digest>` over every row and
+compares against a pinned constant — so a digest swapped for another
+well-formed hex value fails in CI, where the PDF cannot be opened. The tool
+itself refuses to run under any pypdf other than 6.6.0, the extractor that
+produced the stored digests, and refuses to rebind a ledger that names neither
+the authoritative nor the superseded binary.
+
+`microsoft_training_coverage.json` inventories all 2,124 semantic units of the
+Microsoft *RustTraining* books at commit
+`9d19c482d66ef3995dca794bda74c7852134e0b7`: type-driven correctness 240, Rust
+patterns 295, async 142, engineering 181, C/C++ 468, C# 477, and Python 321.
+A unit is one ATX heading outside fenced code blocks in a `SUMMARY.md`-linked
+chapter of `<book>/src`. Chapters are ordered by first reference in
+`SUMMARY.md`, and each unit records its source path, per-file ordinal, heading
+path, line range, and the SHA-256 of its source lines. Only heading text is
+retained; unit bodies are kept as digests, so the ledger is not a copy of the
+upstream books.
+
+Three digests pin that inventory. A book's `unit_inventory_sha256` is the
+SHA-256 of its `<chapter-relative-path>:<ordinal>:<heading level>:<heading
+text>` lines joined by LF; `chapter_inventory_sha256` is the same construction
+over `<chapter-relative-path>:<file sha256>`; and
+`aggregate_inventory_sha256` (`df9e3cd5b41145ebae2c4440adc1024eda17f915522f19c2f292c9d77e6514ec`)
+is the SHA-256 of `<book>:<unit_inventory_sha256>` lines in declared book
+order. `validate.py` recomputes all three from the ledger rows themselves, so
+reordering, editing, dropping, or inventing a row fails the gate.
+
+Every unit is `unreviewed`. That is a backlog state, not a coverage claim: no
+unit has been read against the rule library, and a shared heading or topic is
+not traceability. An unreviewed row must carry no mapped rule, an `unassessed`
+typed `exact_difference`, the `pending-semantic-review` rationale class, the
+`inventory-parity-only` executable applicability, and no reviewer — the
+validator rejects any row that claims more. Moving a unit off `unreviewed`
+requires a stated rule relationship, a typed difference with detail, a named
+reviewer, an assessed `audit_disposition`, and a review bound to the source
+file digest; mapped rules must resolve to real files in `rules/`.
+
+The typed difference must agree with the disposition, so no row can take
+coverage credit for a unit it also says diverges: `covered` allows only
+`no-difference`, `documented-deviation` allows `extends-rule` or
+`contradicts-rule`, `project-specific` allows only `out-of-scope`, and `reject`
+allows `contradicts-rule` or `out-of-scope`. A reviewed row states its
+relationship to the rule library exactly one way: it names the rules it was
+judged against, or it records `out-of-scope` — the one difference kind that
+asserts no rule edge exists, and which must then map no rules. Any other
+reviewed row with an empty `mapped_rule_ids` fails the gate.
+
+Validation requires both exact source checkouts. Point the validator at them to
+recompute the RustTraining inventory — chapter set, per-file digests, unit
+ordering, line ranges, and unit digests — and to verify the Microsoft guidance
+manifest instead of trusting hashes repeated inside either ledger:
+
+```bash
+git clone https://github.com/microsoft/rust-guidelines /path/to/microsoft-rust-guidelines
+git -C /path/to/microsoft-rust-guidelines checkout --detach bbf7b03f3a51548f187888fb8c516e8118ebb1c2
+git clone https://github.com/microsoft/RustTraining /path/to/rusttraining
+git -C /path/to/rusttraining checkout --detach 9d19c482d66ef3995dca794bda74c7852134e0b7
+MICROSOFT_RUST_GUIDELINES_ROOT=/path/to/microsoft-rust-guidelines \
+MICROSOFT_RUSTTRAINING_ROOT=/path/to/rusttraining \
+  python3 checks/validate.py
+```
+
+Without either checkout validation fails closed. Ledger-only digests can detect
+accidental row drift, but they cannot independently prove that repeated source
+and unit hashes still identify the pinned bytes.
+
+## Authenticated PDF corpus
+
+`pdf_corpus_coverage.json` inventories 1,325 units across the eight purchased
+PDF sources, each pinned by byte length and SHA-256: *Black Hat Rust*,
+*Command-Line Rust*, *Fullstack Rust*, the *Lets Get Rusty* cheat sheet, the
+*Rust container* cheat sheet, *Rust for Rustaceans*, *Rust in Action*, and
+*Zero to Production in Rust* (binary `f122f6e8…c168cf47b`, which is a different
+identity from the one the legacy `zero2production_coverage.json` was built
+against — no row transfers between them).
+
+The enumeration rule is mechanical: a PDF with an outline contributes one unit
+per outline entry, in document order, carrying its title, depth, and
+destination page; a PDF with no outline contributes one unit per page, because
+no finer structure is recoverable from the binary. That yields 219, 177, 91,
+11, 1, 59, 336, and 431 units respectively. The two cheat sheets are therefore
+enumerated at page granularity, which is coarser than the 91 and 24 units
+recorded in issue #1 by an earlier process whose enumeration rule was not
+preserved.
+
+`build_pdf_ledger.py` regenerates the ledger from the binaries — it refuses to
+run unless every file matches its pinned length and digest — and applies
+dispositions from `pdf_corpus_review.json`, refusing any review entry whose
+unit title or page-text digest has moved. The generated ledger is never
+hand-edited; review state lives in the review file:
+
+```bash
+RUST_PDF_CORPUS_ROOT=/path/to/pdfs python3 checks/build_pdf_ledger.py
+```
+
+`validate.py` always enforces structural parity from the rows themselves: the
+declared source order and contiguous ordinals, unit IDs derived from source and
+ordinal, claims derived from title/depth/file/page, per-source and aggregate
+inventory digests, mapped rules that resolve to real files, assertion IDs that
+resolve to real symbols, the disposition summary, and exact agreement between
+the ledger and the review file. When `RUST_PDF_CORPUS_ROOT` is set it
+additionally re-authenticates each binary against its pinned digest.
+
+CI cannot perform that second pass: these are purchased, non-redistributable
+binaries, so no CI run can prove source identity for this corpus. Structural
+parity detects drift within the ledger; it is not a substitute for holding the
+files. The rules derived from this corpus do not depend on that distinction —
+each states its own contract and, where runtime behavior exists, is backed by
+an assertion in `tests/pdf_corpus_guidance.rs`.
+
+Twenty-three units are reviewed: 22 `covered` and one `project-specific`. The
+other 1,302 are explicitly `unreviewed` — a backlog state carrying no mapped
+rule, an `unassessed` difference, the `pending-semantic-review` rationale
+class, and no reviewer. Moving a unit off `unreviewed` requires the same
+evidence the RustTraining ledger demands, with one extra difference kind:
+`rule-extends-source`, for a rule that states more than its source unit does.
+Reviewed rows must take a difference kind their disposition allows — `covered`
+accepts `no-difference` or `rule-extends-source`, `documented-deviation`
+accepts `extends-rule` or `contradicts-rule`, `project-specific` accepts
+`out-of-scope`, and `reject` accepts `contradicts-rule` or `out-of-scope` — and
+must either name mapped rules or record `out-of-scope`, which maps none.
+
+No substantial text from any purchased source is stored here. The ledger holds
+digests, titles, page numbers, and dispositions; the rules are original prose.
+
+## RustTraining chapter dispositions
+
+The 2,124 RustTraining units are headings, and a heading is too small a unit to
+judge on its own. They were dispositioned at **chapter granularity**: ten agents
+read all 160 unreviewed chapters and assigned one of four classes, then three
+more challenged every decision that would remove a chapter from the backlog.
+
+| Class | Chapters | Applied to the ledger |
+|---|---:|---|
+| `language-equivalence` | 35 | `project-specific` / `out-of-scope` |
+| `tutorial-scaffolding` | 30 | `reject` / `out-of-scope` |
+| `covered-by-rules` | 65 | nothing — still `unreviewed` |
+| `needs-review` | 30 | nothing — still `unreviewed` |
+
+Only the two disposal classes were applied, and neither maps a rule: they are
+recorded as material this library does not govern, with a per-chapter reason
+naming what the chapter actually contains. Each row says so in
+`remaining_uncertainty` — the reason describes the chapter, not the heading in
+isolation.
+
+The 66 `covered-by-rules` chapters were deliberately **not** marked covered. A
+chapter-level "the library already states this" applied to a dozen headings is
+exactly the unearned coverage credit the rest of these gates exist to prevent;
+mapping those units needs heading-level review.
+
+The verification pass overturned four disposals, and the pattern is worth
+keeping in mind for the next one: two 1,000-line "walkthrough" chapters that
+state contracts of their own, a C++ case-study chapter whose *Lessons Learned*
+section carries durable Rust guidance, and a coverage claim whose cited rules
+did not say what was claimed. A chapter is not scaffolding because of its
+title, and it is not onboarding because of the book it sits in.
+
+## Rule provenance
+
+`rule_provenance.json` answers, for every rule in `rules/`, where its contract
+came from. A rule is either **ledger-mapped** — one of the source-coverage
+ledgers names it, so its origin is already evidence-bound — or it carries a
+**typed justification**: a source class and one sentence saying what in that
+source it derives from.
+
+```bash
+python3 checks/build_rule_provenance.py
+```
+
+The generator recomputes the ledger mapping from the coverage files on every
+run and merges the reviewed justifications in `rule_provenance_review.json`.
+It refuses a justification for a rule the ledgers already cover, and refuses to
+write at all if any rule has neither.
+
+`validate.py` re-derives the same mapping rather than trusting the file, and
+requires every rule to appear exactly once. It also rejects any justification
+containing a **URL, page, section, or version locator**. Naming a document, an
+API, a lint, or a crate is checkable by a reader; a locator is not, and it is
+the shape a fabricated citation takes — the classification pass that produced
+this ledger did assert one stabilization version and one section number that
+had to be removed.
+
+Current split: 235 ledger-mapped, 145 justified — `std-docs` 33, `crate-docs`
+27, `rust-reference` 26, `rust-api-guidelines` 21, `synthesized-practice` 14,
+`rust-performance-book` 9, `clippy-docs` 6, `cargo-book` 4, `rustonomicon` 3,
+`edition-guide` 2. `synthesized-practice` is the honest answer for a rule with
+no single upstream document; it is also where uncertainty hides, so it is worth
+re-reading when it grows.
+
+## Updating the baseline
+
+`baseline.txt` lists the currently accepted suspects (fragments/pseudocode the
+heuristics cannot auto-classify). The CI gate requires exact parity: a new
+signature fails, and a stale signature fails so it cannot mask a later
+regression after an example is repaired. After intentionally adding/changing
+examples, regenerate it on the pinned toolchain and review every changed line:
+
+```bash
+rustup run 1.97.1 cargo check --examples --keep-going --message-format=json > check.json
+python3 analyze.py check.json --emit-baseline > baseline.txt
+```
+
+When bumping the pinned toolchain in `ci.yml`, regenerate `baseline.txt` on the
+same version in the same commit.
+
+## How it works
+
+`gen.py` extracts each candidate block into `examples/<name>.rs`, wrapping
+fragments in an `async fn -> Result<...>` so `?` and `.await` type-check. It
+skips blocks that can't compile standalone by design: `## Bad` anti-patterns,
+nightly `#![feature]` gates, procedural-macro code, placeholder crate names
+(`my_crate`, …), and bare `...` pseudocode.
+
+`rust_release_coverage.json` inventories all 162 release-note entries from
+Rust 1.95.0 through 1.97.1. Each entry records its source identity, claim,
+disposition, mapped rules, exact difference, rationale class, evidence,
+executable check, and remaining uncertainty. The validator parses the release
+notes shipped by the pinned `rust-docs` component and requires exact inventory
+parity; stabilization alone is recorded as reference material rather than
+automatically becoming a recommendation.
+
+`tests/language_guidance.rs` executes the language and standard-library
+semantics referenced by the 1.95–1.97 refresh: if-let guard binding, atomic
+update outcomes, single-branch cfg selection, total ordering in `BTreeMap`,
+fallible integer-to-bool conversion, `NonZero` range iteration, and integer
+bit-helper zero cases. It also checks that mutable sequence insertion returns
+the inserted value for immediate initialization.
+
+`analyze.py` buckets each failing example by compiler error code:
+
+- **fragment** — every error is name resolution (undefined symbol/crate). These
+  reference helpers defined elsewhere in the rule; expected, ignored.
+- **artifact** — caused by extraction (a `&self` method body wrapped as a free
+  fn, pseudocode `...`/`???` tokens, dangling doc comments). Not real bugs.
+- **low** — only "type annotations needed"; compiles in the rule's real context.
+- **SUSPECT** — anything else (type mismatch, no-method, bad syntax, wrong
+  arity, missing trait impl). These are the ones to review and fix.
+
+## Notes
+
+- Run on Rust ≥ 1.97: the harness is pinned to 1.97.1 and `baseline.txt` is
+  generated there. Older toolchains produce spurious failures (e.g. the
+  `MaybeUninit` array `From` conversions, stable since 1.95).
+- Generated files (`examples/`, `*.json`, `manifest.json`, `target/`) are
+  gitignored; only the harness source and focused tests are tracked.

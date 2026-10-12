@@ -1,0 +1,3273 @@
+{
+  "schema_version": 1,
+  "generator": "checks/build_rule_provenance.py",
+  "rule_count": 434,
+  "ledger_mapped": 357,
+  "typed_justification": 77,
+  "summary": {
+    "cargo-book": 2,
+    "clippy-docs": 6,
+    "crate-docs": 10,
+    "edition-guide": 2,
+    "ledger-mapped": 357,
+    "rust-api-guidelines": 15,
+    "rust-performance-book": 5,
+    "rust-reference": 11,
+    "rustonomicon": 1,
+    "std-docs": 17,
+    "synthesized-practice": 8
+  },
+  "entries": [
+    {
+      "rule_id": "anti-clone-excessive",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-collect-intermediate",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-empty-catch",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-expect-lazy",
+      "provenance": "typed-justification",
+      "source_class": "synthesized-practice",
+      "justification": "The contract \u2014 reserve panicking accessors for bugs and invariants while recoverable I/O, parsing, and lookup failures return `Result` \u2014 is community practice built on the documented fact that `expect` panics; no single upstream document states this split.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "anti-format-hot-path",
+      "provenance": "typed-justification",
+      "source_class": "rust-performance-book",
+      "justification": "Replacing repeated `format!` with `write!` into a reused `String` buffer to avoid per-iteration heap allocations is exactly the kind of allocation-reduction guidance The Rust Performance Book gathers, and the rule frames it as a measured hot-path decision.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "anti-index-over-iter",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-lock-across-await",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-over-abstraction",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-panic-expected",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-premature-optimize",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-string-for-str",
+      "provenance": "typed-justification",
+      "source_class": "clippy-docs",
+      "justification": "The rule states and configures Clippy's `ptr_arg` lint, which is precisely the policy that a `&String` parameter should be `&str`; the deref-coercion explanation is supporting mechanism rather than the source of the contract.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "anti-stringly-typed",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-transliterated-port",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-type-erasure",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-unwrap-abuse",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "anti-vec-for-slice",
+      "provenance": "typed-justification",
+      "source_class": "clippy-docs",
+      "justification": "Same origin as the `&String` rule: Clippy's `ptr_arg` lint, named in the rule, is what makes `&Vec<T>` parameters a reportable defect where `&[T]` works.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "api-authz-fail-closed",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-auto-trait-contract",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-browser-security",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-buffer-disclosure",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-builder-must-use",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "This applies the API Guidelines' builder-pattern guidance together with its convention of flagging returned values that are useless when discarded, so a chained `-> Self` builder method cannot be silently dropped; Clippy's `return_self_not_must_use` and `must_use_candidate` are listed only as enforcement.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "api-builder-pattern",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-clap-parser-contract",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-common-traits",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-credential-scope",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-crypto-primitives",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-datagram-trust",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-default-impl",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-dir-enumeration",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-error-schema",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-extension-trait",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-extract-or-reject",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-fallible-self-return",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-free-functions",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-from-not-into",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-health-probes",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-http-connection-lifecycle",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-idempotency-key",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-impl-asref",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-impl-fromiterator",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-impl-into",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-impl-io",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-impl-rangebounds",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-inherent-core",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-init-cascaded",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-must-use",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-newtype-safety",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-no-wrapper-params",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-non-exhaustive",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-operator-overload",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "The rule text itself invokes the Rust API Guidelines' position on operator overloading (C-OVERLOAD): implement `std::ops` traits only where the meaning is unsurprising, plus the guidelines' related advice to implement arithmetic for reference operands.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "api-outbound-target",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-param-order",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-parse-dont-validate",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-password-auth",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-password-reset",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-path-containment",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-record-checksum",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-request-scoped-state",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-resource-limits",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-scoped-closure-access",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-sealed-trait",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-serde-optional",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-service-clone",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-session-security",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-sql-parameters",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-std-types-boundary",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-subprocess-args",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-tls-required",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-typed-command-dispatch",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-typed-response",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-typestate",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-update-signature",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "api-upload-serving",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-assert-send",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-async-fn-bounds",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-bounded-channel",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-bounded-dependency",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-broadcast-pubsub",
+      "provenance": "typed-justification",
+      "source_class": "crate-docs",
+      "justification": "The whole contract is tokio::sync::broadcast's documented behaviour \u2014 every subscriber created by Sender::subscribe receives every message, messages must be Clone, and a slow receiver observes RecvError::Lagged rather than backpressure.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "async-cancel-safety",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-cancellation-token",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-clone-before-await",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-completion-owned-buffer",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-durable-worker",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-explicit-close",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-fn-in-trait",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-fn-over-future",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-future-size",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-http-client-reuse",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-join-parallel",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-joinset-structured",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-mpsc-queue",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-no-lock-await",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-oneshot-response",
+      "provenance": "typed-justification",
+      "source_class": "crate-docs",
+      "justification": "States tokio::sync::oneshot's contract: a single-use channel consumed by await, RecvError when the sender drops, send returning the value back when the receiver is gone, and is_closed/closed for detecting an abandoned receiver.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "async-poll-contract",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-runtime-agnostic-lib",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-select-racing",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-spawn-blocking",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-sync-core",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-tokio-fs",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-tokio-runtime",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "async-try-join",
+      "provenance": "typed-justification",
+      "source_class": "crate-docs",
+      "justification": "Turns on tokio's try_join! contract \u2014 concurrent polling of a fixed tuple in one task, return on the first observed error, and dropping unfinished branch futures without any rollback \u2014 plus futures' try_join_all/buffered for the dynamic case.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "async-watch-latest",
+      "provenance": "typed-justification",
+      "source_class": "crate-docs",
+      "justification": "Describes tokio::sync::watch's contract: receivers see only the most recent value, changed() plus borrow()/borrow_and_update(), send_if_modified for change-gated notification, and the Ref guard that must not be held across an await.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "async-yield-cpu",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "closure-disjoint-capture",
+      "provenance": "typed-justification",
+      "source_class": "edition-guide",
+      "justification": "The rule is built on the 2021 edition's disjoint closure capture change (RFC 2229), where closures capture individual fields rather than whole variables \u2014 a behaviour change the Edition Guide documents as an edition migration.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "closure-fn-trait-bounds",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "closure-impl-fn-return",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "closure-move-capture",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "closure-static-vs-dyn",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "coll-binaryheap",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "The contract is the documented behaviour of `std::collections::BinaryHeap`: it is a max-heap whose `pop` removes the greatest element and `peek` returns it without removing, with `std::cmp::Reverse` inverting the ordering to obtain a min-heap, and no arbitrary removal or priority-update operation offered \u2014 stated without attributing the rule's O(log n) figures to std.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "coll-map-choice",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "coll-seq-choice",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "`Vec` as the default sequence, `VecDeque`'s amortized O(1) push/pop at both ends, the O(n) cost of `Vec::remove(0)`, and the standard library's own discouragement of `LinkedList` all come from the `std::collections` documentation.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "coll-set-membership",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "The O(n) cost of `Vec::contains` against expected O(1) `HashSet` membership, `BTreeSet`'s sorted iteration, and `Vec::dedup` requiring adjacent equal elements are documented standard-library complexity contracts.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "conc-atomic-ordering",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conc-atomic-update",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conc-condvar-predicate-loop",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conc-db-transaction-boundary",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conc-lock-reentry",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conc-pattern-choice",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conc-rayon-par-iter",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conc-scoped-threads",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conc-signal-handler-safety",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conc-thread-budget",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conc-thread-channel",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conc-thread-local",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "const-block",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "const-fn",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "const-generics",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "const-named-magic",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "const-vs-static",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conv-asmut-mutable",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "The rule rests on std::convert::AsMut's documented contract as the mutable counterpart of AsRef and on which std types lend `&mut [u8]` (Vec, arrays, slices), making one generic parameter accept all of them; the API-shape framing parallels the API Guidelines' generic-parameter advice.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "conv-fromstr-parsing",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "conv-tryfrom-fallible",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "rust_release_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "doc-all-public",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "doc-canonical-sections",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "doc-cargo-metadata",
+      "provenance": "typed-justification",
+      "source_class": "cargo-book",
+      "justification": "The rule is entirely about `Cargo.toml` package manifest fields \u2014 `description`, `license`, `repository`, `keywords`, `categories`, `readme`, `rust-version`, `include`/`exclude` \u2014 and the `cargo package`/`cargo publish --dry-run` verification flow, which are Cargo manifest and publishing behaviour.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "doc-crate-readme",
+      "provenance": "typed-justification",
+      "source_class": "synthesized-practice",
+      "justification": "No single upstream document prescribes unifying README and crate root docs; the rule combines the `#[doc = ...]` attribute with `include_str!` and the Cargo `readme` field into a single-source-of-truth practice, with the doctest-tagging advice being ordinary rustdoc hygiene.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "doc-errors-section",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "The `# Errors` documentation section for fallible functions is the API Guidelines documentation convention for `Result`-returning APIs (the failure/documentation checklist items), with Clippy's `missing_errors_doc` cited only as enforcement.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "doc-examples-section",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "doc-first-sentence",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "doc-hidden-setup",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "The policy of showing only the meaningful lines of an example rests on the API Guidelines' documentation expectations for examples, while the '# ' hidden-line mechanism itself is a rustdoc feature; because the class list has no rustdoc entry the attribution is a judgement call.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "doc-inline-reexport",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "doc-intra-links",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "doc-module-inner",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "doc-no-meta-design",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "doc-panics-section",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "Documenting panic conditions in a '# Panics' section is the Rust API Guidelines documentation item requiring error, panic, and safety considerations on function docs.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "doc-question-mark",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "Using `?` rather than unwrap in rustdoc examples is a named Rust API Guidelines documentation item about how examples should handle errors.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "doc-safety-section",
+      "provenance": "typed-justification",
+      "source_class": "rustonomicon",
+      "justification": "The obligations the rule requires a '# Safety' section to enumerate \u2014 validity invariants, alignment, initialization, provenance, aliasing, ownership transfer, and unwinding across FFI \u2014 are the soundness obligations the Rustonomicon defines; the section convention itself also appears in the API Guidelines and is checked by clippy::missing_safety_doc, so the class is a judgement between them.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "err-anyhow-app",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-canonical-struct",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-catch-unwind-boundary",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-context-chain",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-custom-type",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-debug-assert-scope",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-edge-mapping",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-expect-bugs-only",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-from-impl",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-lowercase-msg",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-no-unwrap-prod",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-panic-handler-policy",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-panic-message",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-question-mark",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-result-over-panic",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-send-sync-static",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-short-read",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-source-chain",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "err-thiserror-lib",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "ffi-c-bitflag-enum",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "ffi-dll-portable-state",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "ffi-foreign-resource-binding",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "ffi-logic-in-core",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "ffi-native-escape-hatch",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "ffi-opaque-handle-lifecycle",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "ffi-status-to-result",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "ffi-sys-crate-builds",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "ffi-sys-vs-ffi-name",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "ffi-wasm-memory-view",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "ffi-wasm-wire-abi",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-cargo-metadata",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-cfg-check",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-clippy-nursery-selected",
+      "provenance": "typed-justification",
+      "source_class": "clippy-docs",
+      "justification": "The rule exists because the `clippy::nursery` lint group exists and names individual nursery lints (`significant_drop_tightening`, `redundant_clone`, `use_self`, `redundant_else`, `or_fun_call`) whose behaviour and unstable status come from Clippy's own lint documentation.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "lint-deny-correctness",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "rust_release_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-expect-override",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-missing-docs",
+      "provenance": "typed-justification",
+      "source_class": "clippy-docs",
+      "justification": "The rule exists because the `missing_docs` lint exists and simply states a policy for it (warn then deny, `pub`-only scope, `#[allow]` overrides, `[lints.rust]`/workspace configuration); note this is a rustc lint rather than a Clippy one, so the lint-policy class is an approximate fit.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "lint-pedantic-selective",
+      "provenance": "typed-justification",
+      "source_class": "clippy-docs",
+      "justification": "The whole rule is policy over the `clippy::pedantic` lint group and named members of it such as `doc_markdown`, `semicolon_if_nothing_returned`, `wildcard_imports`, `module_name_repetitions`, and `must_use_candidate`.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "lint-rustfmt-check",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-static-verification",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-unsafe-doc",
+      "provenance": "typed-justification",
+      "source_class": "clippy-docs",
+      "justification": "The rule is built on the Clippy lints `undocumented_unsafe_blocks`, `multiple_unsafe_ops_per_block`, and `missing_safety_doc`, and states the enforcement level and override policy for them, even though the proofs it demands are soundness reasoning.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "lint-warn-complexity",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-warn-perf",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-warn-style",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-warn-suspicious",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-warnings-deny-config",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "lint-workspace-lints",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "macro-absolute-std-paths",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "macro-declarative-before-proc",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "macro-export-crate-path",
+      "provenance": "typed-justification",
+      "source_class": "rust-reference",
+      "justification": "The contract is the language's macro-export semantics \u2014 `#[macro_export]` placing a macro at the crate root and path-based macro import replacing `#[macro_use] extern crate` \u2014 documented in the Rust Reference's macros-by-example and macro-scoping material; the 2018-edition framing means edition-guide is a plausible alternative.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "macro-fragment-specifiers",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "macro-no-implied-items",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "macro-no-rewrite-item",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "macro-prefer-functions",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "macro-private-helpers",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "macro-proc-error-spans",
+      "provenance": "typed-justification",
+      "source_class": "crate-docs",
+      "justification": "The contract belongs to the `syn` crate's error API \u2014 `syn::Error::new`, `Error::new_spanned`, `Error::combine`, and `to_compile_error` \u2014 together with `quote` and `proc-macro2` for emitting the resulting token stream.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "macro-proc-helper-attributes",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "macro-proc-syn-quote",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "macro-proc-two-crate",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "macro-rules-hygiene",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "mem-arena-allocator",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "mem-arrayvec",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "mem-assert-type-size",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "mem-avoid-format",
+      "provenance": "typed-justification",
+      "source_class": "rust-performance-book",
+      "justification": "This is the allocation-avoidance advice the Performance Book collects under heap allocations and string handling \u2014 do not build an owned `String` for constant text, and prefer borrowed or `Cow` returns on hot paths.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "mem-box-large-variant",
+      "provenance": "typed-justification",
+      "source_class": "rust-reference",
+      "justification": "The underlying fact is the language's enum layout semantics \u2014 an enum value must be able to hold its largest variant, so boxing that variant's payload shrinks every instance \u2014 and Clippy's `large_enum_variant` merely reports the condition rather than creating the contract.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "mem-boxed-slice",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "mem-clone-from",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "It derives from `Clone::clone_from`'s documented contract \u2014 the default implementation is `*self = source.clone()`, and concrete impls such as `String`/`Vec`/`PathBuf` may instead reuse existing capacity.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "mem-compact-string",
+      "provenance": "typed-justification",
+      "source_class": "crate-docs",
+      "justification": "The contract belongs to the `compact_str`, `smartstring`, and `ecow` crates, whose inline and shared string representations (and their version-specific inline capacities) the rule is entirely about.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "mem-drop-order",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "mem-page-commit",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "mem-reuse-collections",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "mem-shrink-to-fit",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "mem-smaller-integers",
+      "provenance": "typed-justification",
+      "source_class": "rust-performance-book",
+      "justification": "This is type-size and layout advice of the kind that book collects \u2014 shrinking struct footprint by choosing narrower integer and float fields, padding and field-ordering effects under `repr(C)`, bitflag packing, and `NonZero` niche use for `Option`.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "mem-smallvec",
+      "provenance": "typed-justification",
+      "source_class": "crate-docs",
+      "justification": "The rule is the `smallvec` crate's contract (`SmallVec<[T; N]>` stores up to N elements inline and spills to the heap beyond that), with `tinyvec` and `arrayvec` named as the alternatives.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "mem-take-replace",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "The contract is the documented behaviour of `std::mem::take` (replaces with `T::default()` and returns the original, requiring `T: Default`), `std::mem::replace`, and the related `Option::take`.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "mem-thinvec",
+      "provenance": "typed-justification",
+      "source_class": "crate-docs",
+      "justification": "The contract belongs to the `thin-vec` crate: `ThinVec<T>` keeps length and capacity behind the pointer so the handle is one word, trading indirection for a smaller inline field.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "mem-with-capacity",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "mem-write-over-format",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "The contract is that `format!` constructs an owned `String` while `write!`/`writeln!` render into an existing target through `std::fmt::Write` or `std::io::Write`, returning a `Result` those traits define.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "mem-zero-copy",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "name-acronym-word",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "The casing convention that acronyms are treated as one word (HttpServer, not HTTPServer) is the Rust API Guidelines' naming/casing item, itself codifying RFC 430, and the rule's evidence is std names like TcpStream and UdpSocket.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "name-as-free",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "name-consts-screaming",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "SCREAMING_SNAKE_CASE for consts and statics is the casing convention in the Rust API Guidelines naming chapter (RFC 430), separately enforced by rustc's non_upper_case_globals lint that the rule mentions as compiler warnings.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "name-crate-no-rs",
+      "provenance": "typed-justification",
+      "source_class": "synthesized-practice",
+      "justification": "The advice against `-rs`/`-rust` crate-name suffixes is a crates.io community naming habit the rule illustrates with real crate names (serde, tokio, reqwest, clap), not a contract stated in the API Guidelines checklist or any other single upstream document.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "name-funcs-snake",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "snake_case for functions, methods, variables, and modules is the value-level casing convention in the Rust API Guidelines naming chapter (RFC 430), backed by rustc's non_snake_case lint the rule quotes.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "name-into-ownership",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "The into_ prefix for self-consuming conversions comes from the Rust API Guidelines conversion-naming item, illustrated here with String::into_bytes, Vec::into_boxed_slice, and IntoIterator::into_iter.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "name-is-has-bool",
+      "provenance": "typed-justification",
+      "source_class": "synthesized-practice",
+      "justification": "The is_/has_/can_/should_ prefix table is general naming practice generalized from std predicates (Option::is_some, str::is_ascii, Path::is_file) rather than from a specific API Guidelines checklist item I can name, so I mark it low-confidence as an attribution.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "name-iter-convention",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "name-iter-type-match",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "name-lifetime-short",
+      "provenance": "typed-justification",
+      "source_class": "synthesized-practice",
+      "justification": "Short lifetime names ('a, 'b, 'src, 'ctx) are community convention with no single upstream document I can cite; the one concrete borrowing is serde's 'de from its Deserialize trait, so confidence in any stronger attribution is low.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "name-no-get-prefix",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "name-no-weasel",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "name-short-items",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "name-to-expensive",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "The to_ prefix marking a conversion that allocates or computes is the Rust API Guidelines conversion-naming item, shown here with to_string, to_vec, to_lowercase, and the ToOwned trait.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "name-type-param-single",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "It restates the API Guidelines naming convention that generic parameters are concise single uppercase letters with conventional meanings (`T`, `E`, `K`, `V`), matching the std signatures the guidelines point to.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "name-types-camel",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "The casing convention for types, traits, and type aliases (`UpperCamelCase`, acronyms treated as words) is the API Guidelines naming checklist item, which rustc's `non_camel_case_types` lint enforces.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "name-variants-camel",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "Enum variants fall under the same API Guidelines casing convention as types (`UpperCamelCase`), again backed by the `non_camel_case_types` warning quoted in the rule.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "num-bit-width",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "num-cast-try-from",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "num-float-compare",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "The contract comes from documented `f32`/`f64` behaviour \u2014 `PartialOrd::partial_cmp` returning `None` for NaN, `total_cmp`'s IEEE totalOrder-compatible ordering, `is_nan`/`is_finite`, and `to_bits` \u2014 rather than from Clippy's `float_cmp` lint, which the rule never mentions.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "num-nonzero",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "num-overflow-explicit",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "num-saturating-clamp",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "Every claim is a documented standard-library contract: `Ord::clamp` panicking when `min > max`, `f32`/`f64::clamp` propagating `NaN` from the value and panicking on a `NaN` bound, and the `saturating_*` integer methods stopping at the type's limits.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "obs-error-chain",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "obs-instrument-spans",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "obs-levels-filter",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "obs-library-facade",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "obs-named-events",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "obs-no-sensitive-data",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "obs-operational-signals",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "obs-request-correlation",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "obs-structured-fields",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "obs-tracing-over-log",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "opt-bounds-check",
+      "provenance": "typed-justification",
+      "source_class": "rust-performance-book",
+      "justification": "This is bounds-check-elimination advice of the kind that book collects \u2014 prefer iterator, `windows`, `chunks_exact`, and `split_at` traversal over indexing in hot loops, and verify generated code before reaching for unchecked access; the guaranteed-panic-on-out-of-bounds premise itself is language semantics, so the source is mixed.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "opt-cache-friendly",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "opt-codegen-units",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "opt-cold-unlikely",
+      "provenance": "typed-justification",
+      "source_class": "rust-reference",
+      "justification": "The contract is the `#[cold]` codegen attribute as the language documents it \u2014 a hint that a function is unlikely to be called, carrying no guarantee of section placement, branch weighting, or inlining behaviour.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "opt-inline-always-rare",
+      "provenance": "typed-justification",
+      "source_class": "rust-reference",
+      "justification": "It derives from the documented semantics of the `#[inline(always)]` attribute as a stronger code-generation hint that the compiler may still decline, not a language guarantee.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "opt-inline-never-cold",
+      "provenance": "typed-justification",
+      "source_class": "rust-reference",
+      "justification": "The rule combines the documented `#[inline(never)]` and `#[cold]` attributes, both defined as code-generation hints rather than promises about machine-code placement.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "opt-inline-small",
+      "provenance": "typed-justification",
+      "source_class": "rust-reference",
+      "justification": "The contract is the `#[inline]` attribute family's documented status as codegen hints, together with the language's cross-crate inlining model in which a non-generic body may be unavailable downstream without the attribute or LTO.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "opt-likely-hint",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "opt-lto-release",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "opt-monomorph-outline",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "opt-pgo-profile",
+      "provenance": "typed-justification",
+      "source_class": "synthesized-practice",
+      "justification": "The contract \u2014 representative and versioned training workloads, pinned `llvm-profdata` matching the toolchain, holdout validation, and promoting only the measured artifact \u2014 is a build-pipeline discipline assembled by the author around rustc's `-Cprofile-generate`/`-Cprofile-use` flags rather than a policy any one of the listed documents states.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "opt-simd-portable",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "The rule is organized around standard-library SIMD surfaces \u2014 nightly `std::simd` with `slice::as_simd`, `std::arch` intrinsics, `is_x86_feature_detected!`, and the `#[target_feature]` safety obligation \u2014 with the `wide` crate shown only as a stable alternative.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "opt-target-cpu",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "own-arc-shared",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "own-borrow-over-clone",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "own-clone-explicit",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "It derives from the documented split between `std::clone::Clone` (explicit `.clone()`, may be expensive, has a `clone_from` hook that can reuse storage) and `Copy`'s implicit duplication.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "own-copy-small",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "The rule restates the documented requirements and semantics of `std::marker::Copy` \u2014 every field `Copy`, no `Drop`, implicit duplication on move \u2014 plus the list of standard `Copy` types including `&T` but not `&mut T`.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "own-cow-conditional",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "own-lifetime-elision",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "own-move-large",
+      "provenance": "typed-justification",
+      "source_class": "synthesized-practice",
+      "justification": "General engineering advice \u2014 borrow by default, box only for recursion, address stability, stack limits, or a measured copy \u2014 with no single upstream document behind it, though the recursive-type case is a language requirement.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "own-mutation-scope",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "own-mutex-interior",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "own-rc-single-thread",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "own-refcell-interior",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "own-rwlock-readers",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "The rule rests on `std::sync::RwLock`'s documented semantics: many readers or one writer, poisoning, and an explicitly unspecified/platform-dependent fairness policy that makes writer starvation possible.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "own-slice-over-vec",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "own-split-borrow-fields",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "pat-at-bindings",
+      "provenance": "typed-justification",
+      "source_class": "rust-reference",
+      "justification": "The `name @ pattern` binding syntax and the positions in which patterns may appear are language grammar and semantics from the Rust Reference's Patterns chapter.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "pat-combinator-over-branch",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "pat-exhaustive-enum",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "pat-if-let-chains",
+      "provenance": "typed-justification",
+      "source_class": "edition-guide",
+      "justification": "The rule's prerequisite is the 2024 edition, since let chains are gated on it, which is what the Edition Guide covers; the Reference documents the syntax itself, so rust-reference is a defensible alternative.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "pat-if-let-guards",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "pat-let-else",
+      "provenance": "typed-justification",
+      "source_class": "rust-reference",
+      "justification": "`let ... else` and its requirement that the else block diverge are language semantics specified in the Rust Reference's statement and pattern material, not an edition-gated or lint-driven contract.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "pat-matches-macro",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "perf-ahash",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "perf-batch-throughput",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "perf-black-box-bench",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "perf-chain-avoid",
+      "provenance": "typed-justification",
+      "source_class": "synthesized-practice",
+      "justification": "The rule's core claim \u2014 that `Iterator::chain` costs a branch per item under `next()`-driven consumption and should be restructured in hot loops \u2014 is measurement-driven iteration advice rather than a documented std guarantee; std documents that `Chain` exists and overrides some internal-iteration methods, but not the per-item branch cost the rule reasons from.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "perf-collect-into",
+      "provenance": "typed-justification",
+      "source_class": "rust-performance-book",
+      "justification": "The contract is the book's collection-reuse advice \u2014 clear and refill a buffer via `Extend`/`extend` so the existing capacity is reused instead of allocating a fresh collection per loop iteration \u2014 with `Iterator::collect_into` noted as the still-unstable spelling.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "perf-drain-reuse",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "The contract is the documented capacity behaviour of `Vec::drain`, `Vec::clear`, `HashMap::drain`, and `mem::take` \u2014 removal without releasing the allocation, versus `take` resetting capacity to zero.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "perf-entry-api",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "perf-extend-batch",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "It derives from the documented behaviour of the `Extend` trait and `Vec::extend`/`extend_from_slice`/`append`, specifically that reservation depends on the iterator's `size_hint` and is therefore not a guaranteed single allocation.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "perf-global-allocator",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "perf-hoist-loop-invariant",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "perf-io-buffering",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "It rests on documented `std::io` contracts: `BufReader`/`BufWriter` batch operations on the inner handle, `BufRead` supplies `lines`/`read_line`/`read_until`, buffer capacity is an unspecified implementation detail, and dropping a `BufWriter` discards errors from the final write so `flush` must be called explicitly.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "perf-iter-lazy",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "perf-iter-over-index",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "perf-profile-first",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "perf-release-profile",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-append-log-recovery",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-atomic-file-replace",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-avoid-statics",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-bin-dir",
+      "provenance": "typed-justification",
+      "source_class": "cargo-book",
+      "justification": "The contract is Cargo's target auto-discovery convention documented in the Cargo Book \u2014 files under src/bin/ (and src/bin/<name>/main.rs) become binary targets without [[bin]] sections, plus the manifest keys the rule shows (path, required-features, default-run) and the --bin/--bins selection flags.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "proj-build-rs-minimal",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-build-script-scope",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-build-target-cfg",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-cfg-select",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-cli-contract",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-continuous-delivery",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-dependency-policy",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-feature-additive",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-flat-small",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-latest-edition",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-lib-main-split",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-libc-floor",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-mod-by-feature",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-mod-rs-dir",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-msrv-declare",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-no-glob-reexport",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-prelude-module",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-pub-crate-internal",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-pub-super-parent",
+      "provenance": "typed-justification",
+      "source_class": "rust-reference",
+      "justification": "The rule derives from the language's visibility and privacy semantics as specified in the Rust Reference: pub(super) makes an item visible in the parent module and everything nested within it, sitting between private, pub(in path), pub(crate), and pub.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "proj-pub-use-reexport",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-reproducible-runtime",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-schema-migrations",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-secret-file-mode",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-semver-contract",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-split-crates",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-stable-toolchain",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "rust_release_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-stateless-process",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-thin-vertical-slice",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-typed-config",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-works-out-of-box",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-workspace-deps",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "proj-workspace-large",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "serde-byte-order",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "serde-custom-with",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "serde-default-compat",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "serde-deny-unknown-fields",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "serde-enum-representation",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "serde-flatten",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "serde-format-choice",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "serde-format-version",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "serde-rename-all",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "serde-skip-empty",
+      "provenance": "typed-justification",
+      "source_class": "crate-docs",
+      "justification": "Built on serde's `skip_serializing_if`, `skip`, `skip_serializing`, and `skip_deserializing` attributes and their documented predicate signature and `Default` requirement, with the wire-contract judgment layered on top as the crate's own guidance does not make that call.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "serde-try-from-validate",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-arrange-act-assert",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-cfg-test-module",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-cli-blackbox",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-compile-fail-guarantees",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-criterion-bench",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-cross-target-execution",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-descriptive-names",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-doctest-examples",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-drop-release-paths",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-env-independent",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-fixture-raii",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-fuzz-target",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-http-blackbox",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-integration-dir",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-loom-concurrency",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-mock-traits",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-mockall-mocking",
+      "provenance": "typed-justification",
+      "source_class": "crate-docs",
+      "justification": "Everything the rule prescribes is mockall's API contract: #[automock]/MockX::new, expect_* builders with with/withf and mockall::predicate matchers, times counts, Sequence ordering, returning closures, and expectation verification on drop.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "test-no-tautology",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-observable-coverage",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-proptest-properties",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-sanitizers",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-should-panic",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-snapshot-testing",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-tokio-async",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-use-super",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "test-util-feature",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "trait-associated-type-vs-generic",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "trait-blanket-impl",
+      "provenance": "typed-justification",
+      "source_class": "rust-reference",
+      "justification": "The load-bearing content is language-level coherence: a blanket impl is permitted because the trait is local, and it cannot overlap a specific impl because specialization is unstable (error E0119); the semver caveat is a secondary Cargo-book concern and the ToString-for-Display example is std.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "trait-capability-mixin",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "trait-coherence-newtype",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "trait-config-family",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "trait-default-methods",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "trait-dyn-vs-generic",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "trait-object-safety",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "trait-ord-consistent",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-affine-quantity",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-capability-token",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-case-insensitive-match",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-deref-coercion",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-display-vs-debug",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-enum-states",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-exclusive-occupancy-guard",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-generational-handle",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-generic-bounds",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-lifetime-branding",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-line-terminator-fidelity",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-never-diverge",
+      "provenance": "typed-justification",
+      "source_class": "rust-reference",
+      "justification": "The contract is language semantics for the never type `!` \u2014 divergent function return types, coercion of `!` to any type, and which uses are stable versus still feature-gated \u2014 with std::process::exit and std::convert::Infallible as illustrations.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "type-newtype-ids",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-newtype-validated",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-no-stringly",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-numeric-fmt",
+      "provenance": "typed-justification",
+      "source_class": "rust-api-guidelines",
+      "justification": "The rule is the API Guidelines checklist item C-NUM-FMT, that numeric types should support the LowerHex, UpperHex, Octal, and Binary formatting traits wherever the underlying primitive does; the file names that item.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "type-option-nullable",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-path-not-string",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-phantom-marker",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-repr-transparent",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-result-fallible",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-secret-material",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-single-use-token",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-text-decode-policy",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-time-domain",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-time-sample-once",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-unicode-identity",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "type-unicode-length",
+      "provenance": "typed-justification",
+      "source_class": "std-docs",
+      "justification": "The factual basis is the documented behaviour of standard-library string APIs \u2014 str::len returns the length in UTF-8 bytes while chars() yields Unicode scalar values, and std offers no grapheme-cluster segmentation \u2014 though the surrounding policy of naming and enforcing one unit at every boundary is the rule's own engineering advice, so the attribution is only partial.",
+      "reviewer": "Jason Lee <jason931225@gmail.com>"
+    },
+    {
+      "rule_id": "type-variance",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-byte-slice-cast",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-extern-block",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-inline-asm",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-justify-use",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-maybeuninit",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json",
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-means-ub",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-minimize-scope",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-miri-ci",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json",
+        "zero2production_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-no-mangle-unsafe",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "rust_release_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-pin-address-stable",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-pin-projection",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-pointer-provenance",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-safety-comment",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-send-sync-manual",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-sound-abstractions",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_guidelines_coverage.json",
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    },
+    {
+      "rule_id": "unsafe-volatile-mmio",
+      "provenance": "ledger-mapped",
+      "ledgers": [
+        "microsoft_training_coverage.json",
+        "pdf_corpus_coverage.json"
+      ]
+    }
+  ]
+}

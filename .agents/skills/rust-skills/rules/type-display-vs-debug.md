@@ -1,0 +1,108 @@
+# type-display-vs-debug
+
+> Use `Display` for user-facing output and `Debug` for diagnostics; never swap them
+
+## Why It Matters
+
+`Debug` (`{:?}`) is for developers, so derive it for ordinary public types and
+write a redacting implementation for sensitive ones. `Display` (`{}`) is for
+end users, including CLI output, human-facing errors, and string-like wrappers.
+`std::error::Error` requires `Display` so error chains read naturally. Routing
+`Debug` to users can leak implementation details, while routing only `Display`
+to telemetry loses structural information.
+
+## Bad
+
+```rust
+#[derive(Debug)]
+struct ParseError {
+    input: String,
+    line: u32,
+}
+
+// Mistake 1: using Debug output in a user-facing message
+fn report_error(e: &ParseError) {
+    eprintln!("failed: {:?}", e); // leaks internal field names
+}
+
+// Mistake 2: implementing Display by calling debug
+use std::fmt;
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self) // wrong — duplicates Debug
+    }
+}
+```
+
+## Good
+
+```rust
+use std::fmt;
+
+#[derive(Debug)]
+struct ParseError {
+    input_len: usize,
+    line: u32,
+}
+
+// Hand-write Display for a clean, human-readable message
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "parse error on line {} ({} input bytes)",
+            self.line,
+            self.input_len,
+        )
+    }
+}
+
+impl std::error::Error for ParseError {}
+
+struct Label(String);
+
+impl fmt::Debug for Label {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Label").field(&"[redacted]").finish()
+    }
+}
+
+impl fmt::Display for Label {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // This domain has reviewed Label as intentionally user-visible.
+        f.write_str(&self.0)
+    }
+}
+
+fn main() {
+    let e = ParseError { input_len: 7, line: 42 };
+
+    // User-facing: clean sentence
+    eprintln!("error: {e}");
+
+    // Developer/log: structured dump
+    eprintln!("debug: {e:?}");
+}
+```
+
+## Guidelines
+
+| Trait | Format | Audience | How to implement |
+|-------|--------|----------|-----------------|
+| `Debug` | `{:?}` / `{:#?}` | Developers, diagnostics | Derive only when every field is safe; otherwise redact |
+| `Display` | `{}` | End users, error messages | Hand-write to describe the condition clearly |
+
+- Never derive `Display` — it must be intentionally written.
+- Provide useful `Debug` for ordinary public types, but never derive it across
+  secrets, credentials, tokens, unrestricted PII, or payloads.
+- Implement `Display` for a string-like wrapper only when its contents are
+  intentionally user-visible; do not create a convenient secret-leak path.
+- Follow the wrapped value's rendering conventions, including newlines and escape sequences; do not route `Display` through `{:?}`.
+- If your error type implements `std::error::Error`, its `Display` output becomes the human-readable error message that propagates through `anyhow::Context` and similar.
+- The `{:#?}` pretty-print form is still `Debug`; use it in tests for readable assertion output, not in user-facing code.
+
+## See Also
+
+- [api-common-traits](api-common-traits.md) - implement `Debug`, `Clone`, `PartialEq` eagerly
+- [err-thiserror-lib](err-thiserror-lib.md) - `thiserror` generates correct `Display` from `#[error("...")]`
+- [type-numeric-fmt](type-numeric-fmt.md) - hex/octal/binary formatting for numeric newtypes

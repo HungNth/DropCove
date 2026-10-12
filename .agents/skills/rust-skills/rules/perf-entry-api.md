@@ -1,0 +1,162 @@
+# perf-entry-api
+
+> Use entry API for map insert-or-update
+
+## Why It Matters
+
+The entry API represents occupied and vacant cases from one map search and
+lets insertion reuse that result. A `contains_key`/`get_mut`/`insert` sequence
+can repeat hashing or tree traversal and may clone a key. Entry is usually the
+clearest insert-or-update contract; benchmark before claiming a material speed
+difference in a specific workload.
+
+## Bad
+
+```rust
+use std::collections::HashMap;
+
+// Double lookup: contains_key + insert
+fn increment(map: &mut HashMap<String, u32>, key: String) {
+    if map.contains_key(&key) {
+        *map.get_mut(&key).unwrap() += 1;
+    } else {
+        map.insert(key, 1);
+    }
+}
+
+// Double lookup with get + insert
+fn get_or_insert(map: &mut HashMap<String, Vec<i32>>, key: String) -> &mut Vec<i32> {
+    if !map.contains_key(&key) {
+        map.insert(key.clone(), Vec::new());
+    }
+    map.get_mut(&key).unwrap()
+}
+
+// Triple lookup pattern
+fn update_or_default(map: &mut HashMap<String, Config>, key: &str, value: i32) {
+    match map.get(key) {
+        Some(config) => {
+            let mut new_config = config.clone();
+            new_config.value = value;
+            map.insert(key.to_string(), new_config);
+        }
+        None => {
+            map.insert(key.to_string(), Config::default());
+        }
+    }
+}
+```
+
+## Good
+
+```rust
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+
+// Single lookup with entry
+fn increment(map: &mut HashMap<String, u32>, key: String) {
+    *map.entry(key).or_insert(0) += 1;
+}
+
+// Single lookup, returns mutable reference
+fn get_or_insert(map: &mut HashMap<String, Vec<i32>>, key: String) -> &mut Vec<i32> {
+    map.entry(key).or_insert_with(Vec::new)
+}
+
+// Single lookup with and_modify
+fn update_or_default(map: &mut HashMap<String, Config>, key: String, value: i32) {
+    map.entry(key)
+        .and_modify(|config| config.value = value)
+        .or_insert_with(Config::default);
+}
+```
+
+## Entry API Methods
+
+| Method | Behavior |
+|--------|----------|
+| `.or_insert(val)` | Insert `val` if empty |
+| `.or_insert_with(f)` | Insert `f()` if empty (lazy) |
+| `.or_default()` | Insert `Default::default()` if empty |
+| `.and_modify(f)` | Apply `f` if occupied |
+| `.or_insert_with_key(f)` | Insert `f(&key)` if empty |
+
+## Pattern: Count Occurrences
+
+```rust
+fn word_count(text: &str) -> HashMap<&str, usize> {
+    let mut counts = HashMap::new();
+    for word in text.split_whitespace() {
+        *counts.entry(word).or_insert(0) += 1;
+    }
+    counts
+}
+```
+
+## Pattern: Group By
+
+```rust
+fn group_by_category(items: Vec<Item>) -> HashMap<Category, Vec<Item>> {
+    let mut groups: HashMap<Category, Vec<Item>> = HashMap::new();
+    for item in items {
+        groups.entry(item.category.clone())
+            .or_default()
+            .push(item);
+    }
+    groups
+}
+```
+
+## Pattern: Complex Entry Logic
+
+```rust
+match map.entry(key) {
+    Entry::Occupied(mut entry) => {
+        let value = entry.get_mut();
+        if should_update(value) {
+            *value = new_value;
+        }
+    }
+    Entry::Vacant(entry) => {
+        entry.insert(default_value);
+    }
+}
+```
+
+## Mutate Newly Inserted Sequence Values
+
+Rust 1.95 added mutable-returning insertion methods across sequential
+collections: `Vec::{push_mut, insert_mut}`,
+`VecDeque::{push_back_mut, push_front_mut, insert_mut}`, and
+`LinkedList::{push_back_mut, push_front_mut}`. Use them when insertion is
+immediately followed by mutation; they return the inserted element directly,
+without a second index or end lookup:
+
+```rust
+#[derive(Default)]
+struct Request {
+    headers: Vec<(String, String)>,
+}
+
+let mut queue = Vec::new();
+let request = queue.push_mut(Request::default());
+request.headers.push(("accept".to_owned(), "application/json".to_owned()));
+```
+
+Use ordinary `push` when no mutable reference is needed. The new methods
+clarify the ownership flow; they do not make insertion itself free.
+
+## Performance
+
+| Pattern | Lookups | Hash Computations |
+|---------|---------|-------------------|
+| `contains_key` + `insert` | 2 | 2 |
+| `get` + `insert` | 2 | 2 |
+| `entry().or_insert()` | 1 | 1 |
+
+## See Also
+
+- [perf-extend-batch](./perf-extend-batch.md) - Batch insertions
+- [mem-with-capacity](./mem-with-capacity.md) - Pre-allocate maps
+- [perf-drain-reuse](./perf-drain-reuse.md) - Reuse map allocations
+- [coll-map-choice](./coll-map-choice.md) - Pick the right map type

@@ -1,0 +1,244 @@
+# async-select-racing
+
+> Use `select!` to race futures and handle the first to complete
+
+## Why It Matters
+
+Sometimes you need the first result from multiple futures—timeout vs operation, cancellation vs work, or competing alternatives. `tokio::select!` lets you race futures and handle whichever completes first, while properly cancelling the others.
+
+## Bad
+
+```rust
+// Can't express "whichever finishes first"
+async fn fetch_with_fallback() -> Data {
+    match fetch_primary().await {
+        Ok(data) => data,
+        Err(_) => fetch_fallback().await.unwrap(),  // Sequential, not racing
+    }
+}
+
+// Manual timeout is error-prone
+async fn fetch_with_timeout() -> Option<Data> {
+    let start = Instant::now();
+    loop {
+        if start.elapsed() > Duration::from_secs(5) {
+            return None;
+        }
+        // How do we check timeout while awaiting?
+    }
+}
+```
+
+## Good
+
+```rust
+use tokio::select;
+
+async fn fetch_with_timeout() -> Result<Data, Error> {
+    select! {
+        result = fetch_data() => result,
+        _ = tokio::time::sleep(Duration::from_secs(5)) => {
+            Err(Error::Timeout)
+        }
+    }
+}
+
+async fn fetch_with_fallback() -> Result<Data, Error> {
+    select! {
+        result = fetch_primary() => {
+            match result {
+                Ok(data) => Ok(data),
+                Err(primary_error) => fetch_fallback()
+                    .await
+                    .map_err(|fallback_error| {
+                        Error::BothBackends {
+                            primary: primary_error,
+                            fallback: fallback_error,
+                        }
+                    }),
+            }
+        }
+        _ = tokio::time::sleep(Duration::from_secs(1)) => {
+            // Primary too slow, use fallback
+            fetch_fallback().await
+        }
+    }
+}
+```
+
+## select! Syntax
+
+```rust
+select! {
+    // Pattern = future => handler
+    result = async_operation() => {
+        // Handle result
+        println!("Got: {:?}", result);
+    }
+    
+    // Can bind with pattern matching
+    Ok(data) = fallible_operation() => {
+        process(data);
+    }
+    
+    // Conditional branches with if guards
+    msg = channel.recv(), if should_receive => {
+        handle_message(msg);
+    }
+    
+    // else branch for when all futures are disabled
+    else => {
+        println!("All branches disabled");
+    }
+}
+```
+
+## Cancellation Behavior
+
+```rust
+async fn select_example() {
+    select! {
+        _ = operation_a() => {
+            println!("A completed first");
+            // operation_b() is dropped/cancelled
+        }
+        _ = operation_b() => {
+            println!("B completed first");
+            // operation_a() is dropped/cancelled
+        }
+    }
+}
+
+// Losing futures are dropped where they are currently suspended, never polled
+// again; state held across that point is lost unless the future is cancel-safe
+```
+
+## Biased Selection
+
+```rust
+// By default, select! randomly picks when multiple are ready
+// Use biased mode for deterministic priority
+select! {
+    biased;  // Check branches in order
+    
+    msg = high_priority.recv() => handle_high(msg),
+    msg = low_priority.recv() => handle_low(msg),
+}
+
+// Without biased, both channels have equal chance
+// when both have messages ready
+```
+
+The random default is not an arbitrary choice — it is the fairness mechanism,
+and `biased` trades it away. When an earlier branch is ready on nearly every
+poll, the later branches get whatever is left. Two producers continuously
+refilling their channels, drained through the same loop 2000 times:
+
+```text
+biased   : first=1920  second=80
+unbiased : first=991   second=1009
+```
+
+The second branch under `biased` is not deadlocked — it still progresses in the
+gaps where the first producer has not yet refilled — but it received four
+percent of the turns. Remove even those gaps, by pre-filling both channels so
+the first is ready on *every* poll, and the second branch gets nothing at all:
+starvation here is a spectrum whose far end is total. If
+that branch is a shutdown signal or a health check, four percent may be fine;
+if it is the other half of the work, the loop has a throughput bug that no test
+of either branch alone will show.
+
+Note which direction that cuts. `biased` is the standard advice for fixing
+starvation, and it does fix it — but only when the branch at risk is listed
+*first*. Written the other way round, with the hot branch first, `biased` is
+what produces the 1920/80 split above. It is a priority declaration in whatever
+order you wrote, so decide which branch is being deprioritised and say so,
+rather than reaching for `biased` because starvation was the symptom. Where every branch must make
+progress, keep the default ordering, or drain the hot branch in bounded batches
+so the loop returns to `select!` at a rate you chose:
+
+```rust
+// Take at most N from the hot source before yielding back to the other arms.
+const BATCH: usize = 32;
+```
+
+## Loop with select!
+
+```rust
+async fn event_loop(
+    mut commands: mpsc::Receiver<Command>,
+    shutdown: CancellationToken,
+) {
+    loop {
+        select! {
+            _ = shutdown.cancelled() => {
+                println!("Shutting down");
+                break;
+            }
+            // Bind the whole `Option` rather than pattern-matching `Some` in
+            // the arm. A `Some(..)` pattern that fails to match *disables* the
+            // branch instead of running it, and an `else` arm would not catch
+            // that here: tokio takes `else` only when every branch is
+            // disabled, and `shutdown.cancelled()` never is.
+            maybe_cmd = commands.recv() => {
+                match maybe_cmd {
+                    Some(cmd) => process_command(cmd).await,
+                    None => break, // commands channel closed
+                }
+            }
+        }
+    }
+}
+```
+
+## Racing Multiple of Same Type
+
+```rust
+// Race multiple servers for fastest response
+async fn fastest_response(servers: &[String]) -> Result<Response> {
+    // `select_all` requires `Unpin` futures, and an `async fn` future is not
+    // `Unpin` — box each one, or the call does not compile.
+    let futures = servers.iter()
+        .map(|s| Box::pin(fetch_from(s)))
+        .collect::<Vec<_>>();
+
+    // select! requires static branches, use select_all for dynamic
+    let (result, _index, _remaining) =
+        futures::future::select_all(futures).await;
+
+    result
+}
+```
+
+## Common Patterns
+
+```rust
+// Timeout
+select! {
+    result = operation() => result,
+    _ = sleep(Duration::from_secs(5)) => Err(Timeout),
+}
+
+// Cancellation
+select! {
+    result = operation() => result,
+    _ = cancel_token.cancelled() => Err(Cancelled),
+}
+
+// Interval with cancellation
+let mut interval = tokio::time::interval(Duration::from_secs(1));
+loop {
+    select! {
+        _ = shutdown.cancelled() => break,
+        _ = interval.tick() => {
+            do_periodic_work().await;
+        }
+    }
+}
+```
+
+## See Also
+
+- [async-cancellation-token](./async-cancellation-token.md) - Cancellation patterns
+- [async-join-parallel](./async-join-parallel.md) - All futures, not racing
+- [async-bounded-channel](./async-bounded-channel.md) - Channel operations in select
