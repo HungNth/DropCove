@@ -86,7 +86,7 @@ Completed checks for ticket 01:
 
 ## 0.0.3 — Shelf lifecycle and management
 
-**Status:** In progress — tickets 01–05 resolved. Release ticket 06 remains unimplemented.
+**Status:** Completed — tickets 01–06 resolved; packaged and installed 0.0.3 verified. Later versions remain unstarted.
 
 Plan: [Specification](../.scratch/shelf-lifecycle-management/spec.md) · [Delivery map and tickets](../.scratch/shelf-lifecycle-management/map.md).
 
@@ -141,13 +141,13 @@ Ticket 05 exercised evidence:
 - Programmatic/interactive full-window bounds stayed inside the observed work area without durable clamp feedback. Available smoke DPI was scale 1; live mixed-DPI/multi-monitor transitions were not separately exercised. Popup closure before movement passed on West and East; an initially obstructed East probe was explained via native hit-window inspection and rechecked unobstructed.
 - Both owned smoke/probe profiles, fixtures, WebView handles and app processes were cleaned up. No new commit or installer-release acceptance; ticket 06 is the remaining release gate.
 
-Before completion:
+Ticket 06 release evidence:
 
-- Exercise temporary, pinned, and mixed batches through item drag, batch drag, bulk pinning, explicit removal, and Clear Temporary Items.
-- Restart after each durable mutation and observe the same lifecycle state.
-- Exercise pointer and keyboard Manage Items flows, including focus restoration and active-drag dismissal guards.
-- Resize horizontally and vertically and observe automatic-height versus manual-height persistence rules.
-- Build and launch `DropCove-Setup-0.0.3.exe` on Windows 11 x64.
+- Version 0.0.3 synchronized across canonical/package/crate/lock/Tauri metadata, installed PE/runtime and current-user uninstall registration. Installer: [DropCove-Setup-0.0.3.exe](../build/DropCove-Setup-0.0.3.exe), 2.80 MiB, built as Windows x64 currentUser NSIS using cargo-xwin.
+- Packaging frontend checks passed; newly compiled 0.0.3 native test executable passed **34/34** checks. Installed process ran at Medium integrity with embedded frontend and an owned test profile.
+- Installed-app smoke proved native ordered file/folder intake and duplicate no-op; item/all-Pinned/mixed batch OLE Copy and cancellation/rejection/failure retention; Pin/Unpin, tri-state bulk and confirmation Clear; keyboard traversal/exact-origin focus; width-only/manual resize, restart restore and final reset/source safety.
+- Owned test installation was uninstalled cleanly; its executable/registration, profile, fixtures, WebView/copy data and temporary script were removed. Ambient Shelf profiles/recovery data were not used. Implementation tickets 03–05 committed as requested in `e2fefcc`; release metadata/docs remain uncommitted.
+- SHA-256: `2d385ca2ac09d60f7d069868131fa1fe8ea3569433aac416bb11b343380508c5`. Installer is unsigned; live mixed-DPI/multi-monitor smoke was not exercised (available scale 1). These limits are not represented as verified coverage.
 
 ### Deferred
 

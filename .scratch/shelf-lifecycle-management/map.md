@@ -12,7 +12,7 @@ Progress source: [Roadmap](../../docs/ROADMAP.md), version 0.0.3
 - [03: Bulk Pinning and keyboard management](issues/03-bulk-pinning-and-keyboard-management.md) — `resolved`; native/core evidence in ticket Comments.
 - [04: Confirmed Clear Temporary Items](issues/04-confirmed-clear-temporary.md) — `resolved`; native/core evidence in ticket Comments.
 - [05: Native sizing intent](issues/05-native-sizing-intent.md) — `resolved`; native/core evidence in ticket Comments.
-- [06: Release 0.0.3](issues/06-release-0.0.3.md) — `ready-for-agent`; dependencies 03, 04 and 05 resolved, now unblocked.
+- [06: Release 0.0.3](issues/06-release-0.0.3.md) — `resolved`; packaged/installed artifact evidence in ticket Comments.
 
 ## Decisions-so-far
 
@@ -26,12 +26,13 @@ Progress source: [Roadmap](../../docs/ROADMAP.md), version 0.0.3
 - Scope stays within the roadmap's 0.0.3 capabilities. Resident dismissal/hidden states, Edge Rail, Shake-to-open, visual hardening, and recovery remain later versions.
 - Ticket 01 resolved with 14 passing native core tests, a successful frontend build, and embedded-app native Copy/rollback/restore proof. Its owned smoke data and throwaway script were removed.
 - Ticket 02 resolved with 20 passing native tests, final frontend/embedded-release builds, and actual management row Copy, rollback, bounded placement, and lifecycle smoke. Owned resources and diagnostic scaffolds were removed.
-- Baseline committed in `0cee503` before ticket 03, per user request. Ticket 03 resolved with 23 passing native checks and exercised bulk/keyboard/OLE/focus smoke; its changes remain uncommitted.
+- Baseline committed in `0cee503`; tickets 03–05 subsequently committed as explicitly requested in `e2fefcc` before the release gate.
 - Ticket 04 resolved with 27 passing native checks and actual confirmation/rollback/source-safety/restore smoke. Owned fixture/profile data was removed.
-- Ticket 05 resolved with 34 passing native checks and actual eight-direction resize, intent/restore/clamp/reset/popup-start proof. Owned sizing/probe resources were removed; release ticket 06 is the next staged slice.
+- Ticket 05 resolved with 34 passing native checks and actual eight-direction resize, intent/restore/clamp/reset/popup-start proof. Owned sizing/probe resources were removed.
+- Ticket 06 resolved: 0.0.3 installer built, installed and smoked with version/Medium-integrity proof; all 34 newly compiled native checks passed. Owned installation/resources were removed. Release metadata/completion docs remain uncommitted; stop for user review, do not start 0.0.4.
 
 ## Fog
 
-- No new product discovery question is open. The user approved the published 0.0.3 spec/tickets; staged delivery starts with ticket 01.
+- No open product discovery question. Version 0.0.3 completed; later roadmap versions remain unstarted. Unsigned installer and unexercised live mixed-DPI/multi-monitor hardware coverage are explicit release limits.
 - Pointer versus keyboard activation and native user-resize intent require actual Windows surface evidence; core tests cannot substitute for it.
 - Cleanup is restricted to explicitly owned test data/processes. Ambient per-user profile and recovery files must remain untouched.
