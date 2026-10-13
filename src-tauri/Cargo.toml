@@ -1,6 +1,6 @@
 [package]
 name = "dropcove"
-version = "0.0.3"
+version = "0.0.4"
 description = "DropCove Resident Workspace"
 authors = ["DropCove Contributors"]
 edition = "2021"
@@ -19,16 +19,22 @@ thiserror = "2.0"
 rusqlite = { version = "0.40", features = ["bundled"] }
 
 [target.'cfg(windows)'.dependencies]
+tauri-plugin-notification = "2"
 windows = { version = "0.62.2", features = [
     "Win32_Foundation",
     "Win32_Globalization",
     "Win32_Graphics_Gdi",
     "Win32_UI_HiDpi",
+    "Win32_UI_Accessibility",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_Storage_FileSystem",
     "Win32_System_Com",
+    "Win32_System_DataExchange",
+    "Win32_System_Registry",
     "Win32_System_Ole",
     "Win32_System_SystemServices",
+    "Win32_System_Threading",
+    "Win32_Security",
     "Win32_UI_Shell",
     "Win32_UI_Shell_Common",
     "Win32_UI_WindowsAndMessaging",

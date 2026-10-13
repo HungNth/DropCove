@@ -3,13 +3,22 @@ use std::fmt::Display;
 use tauri::{Manager, State};
 
 mod manage_items;
+mod resident;
+mod resident_tray;
+mod settings;
+mod settings_store;
+mod settings_transaction;
 mod shelf;
 mod shelf_resize;
 #[cfg(windows)]
 mod windows_drag;
 #[cfg(windows)]
 mod windows_drop;
+mod windows_foreground;
+mod windows_hotkey;
+mod windows_instance;
 mod windows_paths;
+mod windows_startup;
 
 use shelf::{ShelfSnapshot, ShelfState};
 
@@ -347,44 +356,125 @@ fn fatal_startup_error(error: impl Display) -> ! {
     std::process::exit(1)
 }
 
+#[tauri::command]
+fn get_settings(app: tauri::AppHandle) -> Result<settings::SettingsSnapshot, String> {
+    settings::get_snapshot(&app)
+}
+
+#[tauri::command]
+fn start_settings_recording(app: tauri::AppHandle) -> Result<settings::SettingsSnapshot, String> {
+    settings::start_recording(&app)
+}
+
+#[tauri::command]
+fn cancel_settings_recording(app: tauri::AppHandle) -> Result<settings::SettingsSnapshot, String> {
+    settings::cancel_recording(&app)
+}
+
+#[tauri::command]
+fn set_start_with_windows(
+    app: tauri::AppHandle,
+    enabled: bool,
+) -> Result<settings::SettingsSnapshot, String> {
+    settings::set_start_with_windows(&app, enabled)
+}
+
+#[tauri::command]
+fn record_settings_key(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    key: settings_store::HotKey,
+) -> Result<settings::SettingsSnapshot, String> {
+    if window.label() != settings::SETTINGS_WINDOW_LABEL {
+        return Err("shortcut recording is only available in Settings".into());
+    }
+    settings::record_key(&app, key)?;
+    settings::get_snapshot(&app)
+}
+
+#[tauri::command]
+async fn save_settings(app: tauri::AppHandle) -> Result<(), String> {
+    // Win32 hotkey registration/retirement must execute on the main HWND's owner thread.
+    run_blocking(move || {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let save_app = app.clone();
+        app.run_on_main_thread(move || {
+            let _ = sender.send(settings::save(&save_app));
+        })
+        .map_err(|error| error.to_string())?;
+        receiver.recv().map_err(|error| error.to_string())?
+    })
+    .await
+}
+
+#[tauri::command]
+fn cancel_settings(app: tauri::AppHandle) -> Result<(), String> {
+    settings::cancel(&app)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+// Acquire before Tauri creates windows or opens profile persistence: secondaries only activate.
 pub fn run() {
+    let launch =
+        windows_instance::resolve_launch().unwrap_or_else(|error| fatal_startup_error(error));
+    let profile = launch.profile;
+    let mut lease = match windows_instance::acquire(&profile, launch.autostart) {
+        Ok(windows_instance::Launch::Primary(lease)) => lease,
+        Ok(windows_instance::Launch::Secondary) => return,
+        Err(error) => fatal_startup_error(error),
+    };
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
-            let mut arguments = std::env::args_os().skip(1);
-            let profile = if arguments.next().as_deref() == Some(std::ffi::OsStr::new("--profile"))
-            {
-                arguments
-                    .next()
-                    .map(std::path::PathBuf::from)
-                    .ok_or_else(|| {
-                        std::io::Error::new(
-                            std::io::ErrorKind::InvalidInput,
-                            "--profile requires a directory",
-                        )
-                    })?
-            } else {
-                app.path().local_data_dir()?.join("DropCove")
-            };
+        .plugin(tauri_plugin_notification::init())
+        .setup(move |app| {
             app.manage(ShelfState::open(profile.join("shelf.db"))?);
             app.manage(windows_drag::DragSession::default());
             app.manage(manage_items::ManageItemsState::default());
             app.manage(shelf_resize::ResizeState::default());
+            app.manage(resident::ResidentState::default());
             let window = app.get_webview_window("main").ok_or_else(|| {
                 std::io::Error::new(std::io::ErrorKind::NotFound, "Drop Shelf window is missing")
             })?;
             windows_drop::register(&window)?;
             manage_items::register_owner(&window).map_err(std::io::Error::other)?;
             shelf_resize::register_owner(&window).map_err(std::io::Error::other)?;
+            settings::initialize(app.handle(), &profile, &window).map_err(std::io::Error::other)?;
+            resident_tray::register(app.handle()).map_err(std::io::Error::other)?;
+            windows_foreground::register(&window).map_err(std::io::Error::other)?;
+            settings::publish_startup_warning_if_any(app.handle());
+            if !launch.autostart {
+                resident::show_shelf(app.handle()).map_err(std::io::Error::other)?;
+            }
+            lease.register(&window).map_err(std::io::Error::other)?;
+            app.manage(lease);
             Ok(())
         })
         .on_window_event(|window, event| {
             manage_items::on_window_event(window, event);
-            if window.label() == "main"
-                && matches!(event, tauri::WindowEvent::CloseRequested { .. })
-            {
-                windows_drop::unregister(window);
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    if let Err(error) = resident::hide_shelf(window.app_handle()) {
+                        use tauri::Emitter;
+                        let _ = window.emit("shelf-error", error);
+                    }
+                } else if matches!(event, tauri::WindowEvent::Destroyed) {
+                    windows_drop::unregister(window.app_handle());
+                }
+                if matches!(event, tauri::WindowEvent::ScaleFactorChanged { .. }) {
+                    use tauri::Emitter;
+                    if let Err(error) = window.emit("shelf-changed", ()) {
+                        if let Err(warning) = resident::publish_warning(window.app_handle(), &error.to_string()) {
+                            eprintln!("display reflow failed: {error}; warning delivery failed: {warning}");
+                        }
+                    }
+                }
+            } else if window.label() == settings::SETTINGS_WINDOW_LABEL {
+                if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                    settings::on_settings_window_close_requested(window.app_handle());
+                } else if let tauri::WindowEvent::Focused(focused) = event {
+                    settings::on_settings_window_focus_changed(window.app_handle(), *focused);
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -405,9 +495,17 @@ pub fn run() {
             start_item_drag,
             prepare_batch_drag,
             cancel_batch_drag,
-            start_batch_drag
+            start_batch_drag,
+            set_start_with_windows,
+            get_settings,
+            start_settings_recording,
+            cancel_settings_recording,
+            record_settings_key,
+            save_settings,
+            cancel_settings
         ])
         .run(tauri::generate_context!());
+
     if let Err(error) = result {
         fatal_startup_error(error);
     }

@@ -107,6 +107,8 @@ pub(crate) enum ShelfError {
     DatabaseCorrupt(String),
     #[error("shelf state lock is poisoned")]
     StatePoisoned,
+    #[error("shelf persistence is closed")]
+    StateClosed,
     #[error("shelf item not found: {0}")]
     ItemNotFound(String),
     #[error("shelf batch not found: {0}")]
@@ -121,13 +123,36 @@ pub(crate) enum ShelfError {
 
 #[derive(Clone)]
 pub(crate) struct ShelfState {
-    store: Arc<Mutex<ShelfStore>>,
+    store: Arc<Mutex<Option<ShelfStore>>>,
+}
+
+// A checked guard keeps all existing Shelf operations behind the same lifetime boundary.
+// Its private Option cannot be cleared while this guard holds the store mutex.
+struct ShelfStoreGuard<'a>(MutexGuard<'a, Option<ShelfStore>>);
+
+impl std::ops::Deref for ShelfStoreGuard<'_> {
+    type Target = ShelfStore;
+    fn deref(&self) -> &ShelfStore {
+        match self.0.as_ref() {
+            Some(store) => store,
+            None => unreachable!("ShelfStoreGuard is constructed only for an open store"),
+        }
+    }
+}
+
+impl std::ops::DerefMut for ShelfStoreGuard<'_> {
+    fn deref_mut(&mut self) -> &mut ShelfStore {
+        match self.0.as_mut() {
+            Some(store) => store,
+            None => unreachable!("ShelfStoreGuard is constructed only for an open store"),
+        }
+    }
 }
 
 impl ShelfState {
     pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self, ShelfError> {
         Ok(Self {
-            store: Arc::new(Mutex::new(ShelfStore::open(path.as_ref())?)),
+            store: Arc::new(Mutex::new(Some(ShelfStore::open(path.as_ref())?))),
         })
     }
 
@@ -315,8 +340,24 @@ impl ShelfState {
         result
     }
 
-    fn store(&self) -> Result<MutexGuard<'_, ShelfStore>, ShelfError> {
-        self.store.lock().map_err(|_| ShelfError::StatePoisoned)
+    fn store(&self) -> Result<ShelfStoreGuard<'_>, ShelfError> {
+        let guard = self.store.lock().map_err(|_| ShelfError::StatePoisoned)?;
+        if guard.is_none() {
+            return Err(ShelfError::StateClosed);
+        }
+        Ok(ShelfStoreGuard(guard))
+    }
+
+    pub(crate) fn has_pending_operations(&self) -> bool {
+        Arc::strong_count(&self.store) > 1
+    }
+
+    pub(crate) fn close(&self) -> Result<(), ShelfError> {
+        let mut guard = self.store.lock().map_err(|_| ShelfError::StatePoisoned)?;
+        // Wait for any current transaction, then close the real connection even when
+        // background callers still retain ShelfState clones. Later operations are rejected.
+        drop(guard.take());
+        Ok(())
     }
 
     #[cfg(test)]
@@ -993,6 +1034,33 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn close_releases_database_and_rejects_retained_state_clones() {
+        let directory = TestDirectory::new("resident-close");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        state
+            .accept_drop(vec![Some(
+                directory.source_file().to_string_lossy().into_owned(),
+            )])
+            .unwrap();
+        state.save_size(300.0, Some(220.0)).unwrap();
+        let retained = serde_json::to_value(state.snapshot().unwrap()).unwrap();
+        let clone = state.clone();
+        state.close().unwrap();
+        assert!(matches!(
+            clone.snapshot(),
+            Err(super::ShelfError::StateClosed)
+        ));
+        let reopened = ShelfState::open(&database).unwrap();
+        assert_eq!(
+            serde_json::to_value(reopened.snapshot().unwrap()).unwrap(),
+            retained
+        );
+        reopened.close().unwrap();
+        assert!(!database.with_extension("db-wal").exists());
     }
 
     #[test]

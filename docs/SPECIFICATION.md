@@ -192,6 +192,8 @@ Transitions:
 - Removing the final Shelf Item from either visible surface produces `Hidden`.
 - Losing focus does not dismiss the Drop Shelf.
 
+Version staging: until the Edge Rail ships in `0.0.5`, `0.0.4` temporarily maps dismissal of a non-empty `Visible` Shelf to `Hidden`. All references remain durable and resident access remains available. `0.0.5` replaces that staging transition with the canonical `Visible` → `EdgeDocked` behavior above.
+
 ## 7. Ways to open DropCove
 
 | Method                    | Result                                          | Placement                 |
@@ -588,24 +590,26 @@ Availability is refreshed at restore and drag boundaries. DropCove does not cont
 
 ### 16.1 Available settings and defaults
 
-| Setting                           | Default                | Values / behavior                                                   |
-| --------------------------------- | ---------------------- | ------------------------------------------------------------------- |
-| Global hotkey                     | `Ctrl + Shift + Space` | At least one modifier plus a supported primary key                  |
-| Start with Windows                | On                     | Adds/removes current-user sign-in registration                      |
-| Docking edge                      | Right                  | Left or Right                                                       |
-| Target monitor                    | Use remembered monitor | A display identifier or remembered placement; unavailable saved displays remain selectable |
-| Show over fullscreen applications | Off                    | Controls Edge Rail fullscreen hiding                                |
-| Enable shake gesture              | On                     | Installs/removes global pointer hook                                |
-| Shake sensitivity                 | Normal                 | Low, Normal, High                                                   |
+| Setting                           | Default                | Values / behavior                                                   | Introduced |
+| --------------------------------- | ---------------------- | ------------------------------------------------------------------- | ---------- |
+| Global hotkey                     | `Ctrl + Shift + Space` | At least one modifier plus a supported primary key                  | `0.0.4`    |
+| Start with Windows                | On                     | Adds/removes current-user sign-in registration                      | `0.0.4`    |
+| Docking edge                      | Right                  | Left or Right                                                       | `0.0.5`    |
+| Target monitor                    | Use remembered monitor | A display identifier or remembered placement; unavailable saved displays remain selectable | `0.0.5`    |
+| Show over fullscreen applications | Off                    | Controls Edge Rail fullscreen hiding                                | `0.0.5`    |
+| Enable shake gesture              | On                     | Installs/removes global pointer hook                                | Shake version |
+| Shake sensitivity                 | Normal                 | Low, Normal, High                                                   | Shake version |
 
 There is no setting to disable the Edge Rail while retaining its standard non-empty dismissal behavior.
+
+Settings only expose controls whose owning runtime capability has shipped. `0.0.4` exposes Global hotkey and Start with Windows; later versions extend the persisted contract through a clean cutover when Edge Rail and Shake-to-open become active.
 
 ### 16.2 Save and cancel behavior
 
 - Settings changes remain drafts until **Save** succeeds.
 - **Cancel** or closing Settings discards unsaved changes.
-- Hotkey registration is attempted before committing the new settings.
-- Shake hook, startup registration, JSON persistence, and current rail placement are then applied.
+- The current registered hotkey is retained while a new hotkey is tested; startup registration and atomic JSON persistence are then applied.
+- Only integrations owned by the active version participate. Edge Rail and Shake integration are added with their owning versions.
 - A failure attempts to restore the previous configuration.
 - If complete rollback is impossible, DropCove reports the retained safe state through a warning.
 
@@ -617,7 +621,7 @@ Default path:
 %LOCALAPPDATA%\DropCove\settings.json
 ```
 
-Default serialized content:
+Serialized content in `0.0.4`:
 
 ```json
 {
@@ -628,20 +632,17 @@ Default serialized content:
         "Windows": false,
         "VirtualKey": 32
     },
-    "StartWithWindows": true,
-    "RailEdge": "Right",
-    "RailMonitorId": "",
-    "ShowRailOverFullscreen": false,
-    "ShakeEnabled": true,
-    "ShakeSensitivity": "Normal"
+    "StartWithWindows": true
 }
 ```
+
+Later owning versions extend this object with their settings; `0.0.4` does not persist inactive Rail or Shake fields.
 
 `RailEdge` and `RailMonitorId` are user preferences. An empty `RailMonitorId` selects the remembered dismissal monitor stored in shelf state; a non-empty value takes precedence whenever that display is connected.
 
 The numeric virtual-key value is stable across keyboard layouts. Its displayed punctuation label follows the current Windows keyboard layout.
 
-Missing, malformed, or unreadable settings load defaults. Settings saves replace the file atomically through a temporary file.
+Missing settings load defaults without warning. Malformed or unreadable settings remain untouched, load defaults in memory, and produce a warning notification. A successful explicit Save replaces the file atomically through a temporary file.
 
 ## 17. Persistence and recovery
 

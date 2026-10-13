@@ -2,11 +2,15 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import DropShelf from "./components/shelf/DropShelf.vue";
 import ManageItems from "./components/shelf/ManageItems.vue";
+import SettingsView from "./components/settings/SettingsView.vue";
 
-const managementSurface = getCurrentWindow().label === "manage-items";
+const currentLabel = getCurrentWindow().label;
+const settingsSurface = currentLabel === "settings";
+const managementSurface = currentLabel === "manage-items";
 </script>
 
 <template>
-  <ManageItems v-if="managementSurface" />
+  <SettingsView v-if="settingsSurface" />
+  <ManageItems v-else-if="managementSurface" />
   <DropShelf v-else />
 </template>

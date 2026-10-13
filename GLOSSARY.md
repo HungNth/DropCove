@@ -3,6 +3,18 @@
 DropCove is a resident Windows utility providing a temporary drag-and-drop workspace for file and folder path references.
 
 ## Core Language
+**Resident Instance**:
+The single DropCove process that owns one DropCove profile, its global integrations, and its presentation surfaces.
+_Avoid_: Background copy, tray process
+
+**Activation Request**:
+A request that the Resident Instance show and activate the Shelf without creating another state owner.
+_Avoid_: Relaunch, second instance
+
+**Hidden Start**:
+A sign-in launch that restores durable state and global integrations while leaving all Shelf surfaces hidden.
+_Avoid_: Background mode, minimized launch
+
 
 **Shelf**:
 The persistent workspace holding referenced files and folders organized into batches.

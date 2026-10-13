@@ -155,7 +155,9 @@ Ticket 06 release evidence:
 
 ## 0.0.4 — Resident access and settings
 
-**Status:** Planned.
+**Status:** Completed — tickets 01–05 resolved; Windows x64 current-user NSIS 0.0.4 built and verified from an isolated installed executable. 0.0.5+ remains unstarted.
+
+Plan: [Specification](../.scratch/resident-access-settings/spec.md) · [Delivery map and tickets](../.scratch/resident-access-settings/map.md) · [Windows integration research](../.scratch/resident-access-settings/research/windows-resident-integration.md).
 
 ### Scope
 
@@ -167,17 +169,23 @@ Ticket 06 release evidence:
 
 ### Implemented
 
-- Not started.
+- Ticket 01 resolved: profile-scoped lease before presentation/SQLite startup, acknowledged secondary activation, resident close/hide, transient coordinator visibility, cursor-monitor placement with complete native-frame work-area clamping. User approved warning/Exit in ticket 02 and Settings in ticket 03.
+- Ticket 02 resolved: notification-area access through Tauri tray/menu, coordinator-owned warnings/Exit, event-driven visible-only topmost repair without activation, display reflow events and explicit SQLite/native integration teardown.
+- Ticket 03 resolved: global hotkey and Settings, focused chord capture, atomic Save/new-hotkey activation, old-hotkey retirement, actual conflict rejection and Cancel retention. User physical Step 5 retest passed; native Enter/Space initiation and Save-disabled/Escape checks passed on the installed build.
+- Ticket 04 resolved: Start with Windows On/Off, quoted profile-specific HKCU Run command, hidden startup, full settings schema and rollback-safe joint Save with actual-state reporting and retry.
 
 ### Verification
 
-Before completion:
+- Ticket 01 integrated suite: 44 passed, 0 failed. Actual Windows executable smoke passed same-profile startup/activation, independent profiles, close/hide and exact snapshot restart retention, 96-DPI native work-area bounds, and bounded unready-primary rejection without creating a database. Ticket 05 subsequently verified the installed 0.0.4 release on both available 96-DPI monitors; mixed-DPI hardware remains unverified.
+- Ticket 02 integrated suite: 47 passed, 0 failed. Real native Shell icon/menu/Exit and owned foreground focus/z-order smoke passed; clean exit removed WAL/SHM and restart restored the exact durable item. An owned current-user installed 0.0.3 smoke artifact proved secondary activation, hidden display-event handling, Exit and actual Windows warning toast history delivery. No transient warning banner is claimed. Owned installation/registry/shortcut/profile/WebView cleanup passed; final 0.0.4 packaging and installed proof were completed in ticket 05.
+- Recorder fix: fresh final-source integrated suite **55 passed, 0 failed**. Actual Windows input into the installed Settings captured Ctrl+Alt+K, Save persisted VK 75 and closed, and the new shortcut toggled Shelf; installed native Exit returned 0. Owned test profiles were removed; user profile data was untouched. Full coverage limits and exact artifact hashes are in [ticket 03](../.scratch/resident-access-settings/issues/03-global-hotkey-settings.md#evidence-and-manual-retest).
+- User confirmed the repaired installed recorder test passed. Additional owned installed-app native Enter/Space checks started listening, disabled Save and allowed Escape cancellation; the owned process exited 0 and its test data was removed. Ticket 03 resolved and unblocked ticket 04, which is now also resolved.
+- Ticket 04 final-source cargo-xwin Windows release build succeeded; freshly compiled native suite **66 passed, 0 failed**. Actual Windows smoke proved Run-only On/Off, exact quoted hidden launch, tray/hotkey/secondary access, nonempty Shelf/sizing restore, draft/Cancel retention, real JSON-lock rollback, startup failure warning/retry and malformed/unreadable file safety. Exact owned Run and unrelated entries were restored; owned processes/tabs/temp fixtures were cleaned. See [ticket 04 evidence and coverage limits](../.scratch/resident-access-settings/issues/04-start-with-windows-hidden-start.md#answer). Ticket 05 subsequently completed packaged release proof; actual sign-out/sign-in remains unobserved and vendor CRT PDB warnings remain nonfatal.
+- Ticket 05 release: [DropCove-Setup-0.0.4.exe](../build/DropCove-Setup-0.0.4.exe), 3,141,424 bytes, SHA-256 `23ca00c1a3871a422703e8093fdbc350f16342cb98a4037d9eda97c2642d9408`. Version/package/crate/lock/Tauri, built/installed PE and owned uninstall metadata reported 0.0.4. Freshly compiled 0.0.4 suite passed **66/66**; cargo-xwin NSIS packaging included vue-tsc/Vite.
+- Installed native proof: secondary activation, retained nonempty Shelf, held-key no-repeat, both 96-DPI monitor bounds, native tray Settings/Exit, foreground topmost repair without focus theft, recorder/Save/Cancel, occupied shortcut, new-key activation/old-key retirement, startup On/Off/hidden launch/retry and real post-effect JSON/Run/hotkey rollback. Missing/malformed/share-denied settings preserved source data; delivered malformed/access warnings observed in Windows toast history. See [ticket 05 evidence](../.scratch/resident-access-settings/issues/05-release-0.0.4.md#release-evidence).
+- Owned installation uninstalled, processes/profile/WebView removed, Run and original 0.0.3 user uninstall/shortcuts restored with unchanged ambient executable hash. User installation intentionally stays 0.0.3; 0.0.4 installer is available separately. No commit created. Limits: no mixed-DPI hardware or actual sign-out/sign-in; warning history rather than transient banner; native menu command dispatch used after observing popup because overflow pointer automation was unreliable.
 
-- Launch a second process and observe activation of the existing resident process without duplicate shelf state.
-- Exercise tray, hotkey, normal launch, settings Save/Cancel, rejected hotkeys, and sign-in hidden start.
-- Restart with valid, missing, malformed, and unreadable settings and observe the documented defaults and safe retained configuration.
-- Move between monitors with different DPI and observe correct placement, bounds, and topmost behavior.
-- Build and launch `DropCove-Setup-0.0.4.exe` on Windows 11 x64.
+Release gates completed on available hardware. Mixed-DPI and physical sign-in remain unobserved limits, not inferred coverage; later-version work requires user direction.
 
 ### Deferred
 

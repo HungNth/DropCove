@@ -278,11 +278,11 @@ pub(crate) fn register(window: &WebviewWindow) -> tauri::Result<()> {
     })
 }
 
-pub(crate) fn unregister(window: &tauri::Window) {
-    if let Some(registration) = window.try_state::<RegisteredDropWindows>() {
+pub(crate) fn unregister(app: &tauri::AppHandle) {
+    if let Some(registration) = app.try_state::<RegisteredDropWindows>() {
         if let Ok(mut handles) = registration.0.lock() {
             for handle in handles.drain(..) {
-                // SAFETY: CloseRequested runs on the owning thread before child destruction.
+                // SAFETY: Explicit resident exit runs on the owning UI thread before child destruction.
                 if let Err(error) = unsafe { RevokeDragDrop(HWND(handle as *mut _)) } {
                     if error.code() != DRAGDROP_E_NOTREGISTERED {
                         eprintln!("storage drop target cleanup failed: {error}");
