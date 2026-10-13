@@ -86,7 +86,7 @@ Completed checks for ticket 01:
 
 ## 0.0.3 — Shelf lifecycle and management
 
-**Status:** In progress — tickets 01 and 02 resolved. Tickets 03–06 remain unimplemented.
+**Status:** In progress — tickets 01–05 resolved. Release ticket 06 remains unimplemented.
 
 Plan: [Specification](../.scratch/shelf-lifecycle-management/spec.md) · [Delivery map and tickets](../.scratch/shelf-lifecycle-management/map.md).
 
@@ -104,6 +104,9 @@ Plan: [Specification](../.scratch/shelf-lifecycle-management/spec.md) · [Delive
 - Pin state survives restart; native accepted Copy retains Pinned references and consumes Temporary references after Unpin. Failed persistence leaves prior state intact.
 - Reused the existing `is_pinned` schema and Temporary-consumption predicate from 0.0.2; user-visible pin behavior and pinned Copy retention were not shipped or verified in 0.0.2.
 - Native Manage Items: independent 280-pixel owned popup, bounded item scroller, work-area placement, pointer no-activation, real availability/path presentation, per-item Pin/Unpin/Remove/native Copy, shared-core synchronization, and owner/batch/explicit-close lifetime cleanup.
+- Derived tri-state Bulk Pinning on cards and management header, atomic all-item lifecycle updates, X/N pinned summary, Enter/Space focus, canonical Tab/Shift+Tab cycling, exact-origin focus restoration, and guarded native Escape cancellation before popup dismissal.
+- Confirmed Clear Temporary Items footer/native dialog: atomic cross-batch cleanup preserves Pinned references and source objects, synchronizes management, prunes empty batches, and resets final-empty sizing without partial state on failure.
+- Native eight-edge/corner resizing with hover/cursor feedback, provenance-aware manual logical height, transient empty sizing intent, atomic first-batch retention, final-item reset, actual work-area clamping without preferred-intent overwrite, and management closure before user resize changes geometry.
 
 ### Verification
 
@@ -119,6 +122,24 @@ Ticket 02 exercised evidence:
 - Final frontend build and Windows x64 embedded release build passed; direct native execution passed all 20 core/placement checks.
 - Native smoke proved Pinned/Temporary row Copy, cancel/reject/path-error retention, one-item survivor popup, failure rollback, occurrence-specific removal, 280 × 480 bounded management with real availability labels, single-window replacement, explicit/batch/owner-hide closure, and native outer-frame work-area clamping.
 - Corrected hidden undecorated native frame initialization before no-activation show; final non-instrumented app smoke completed both row Copies. Removed owned smoke resources, temporary script, and all diagnostic instrumentation. Installer/full-version acceptance remains ticket 06.
+
+Ticket 03 exercised evidence:
+
+- Final frontend and embedded Windows x64 release builds passed; direct native suite execution passed all 23 checks, including bulk rollback/availability invariance/prepared-drag pin transitions.
+- Native app proved tri-state synchronization, complete forward/reverse keyboard traversal, explicit/replacement origin focus, real failed-update rollback, physical OLE Escape cancellation followed by separate dismissal, whole-batch Copy closure/retention, and owner/batch cleanup. Owned fixtures/profile/processes and temporary script were removed.
+- Baseline tickets 01–02 and earlier changes were committed as requested in `0cee503`; ticket 03 implementation remains uncommitted. Installer acceptance is still ticket 06.
+
+Ticket 04 exercised evidence:
+
+- Frontend/embedded Windows x64 release builds passed; direct native execution passed all 27 checks, including partial-delete rollback and final sizing reset.
+- Actual app proved Cancel/Escape no-op, safe default focus, failed-clear rollback on both surfaces, cross-batch mixed cleanup including Missing/Unavailable references, overlapping-path identity/source safety, surviving/disappearing management views, footer visibility, and 180 × 180 final reset. Restart restored the Pinned survivor and empty sizing state.
+- Owned test profile/fixtures/WebView handles were cleaned up; no ambient profile used and no new commit created. Full installer acceptance remains ticket 06.
+
+Ticket 05 exercised evidence:
+
+- Frontend/embedded Windows x64 builds passed; direct native suite execution passed all 34 checks. Actual app exercised all eight native directions, width-only versus vertical/corner intent, pending/first accepted batch behavior, failed persistence rollback, manual restart, automatic live growth/reopen recalculation, and final reset.
+- Programmatic/interactive full-window bounds stayed inside the observed work area without durable clamp feedback. Available smoke DPI was scale 1; live mixed-DPI/multi-monitor transitions were not separately exercised. Popup closure before movement passed on West and East; an initially obstructed East probe was explained via native hit-window inspection and rechecked unobstructed.
+- Both owned smoke/probe profiles, fixtures, WebView handles and app processes were cleaned up. No new commit or installer-release acceptance; ticket 06 is the remaining release gate.
 
 Before completion:
 

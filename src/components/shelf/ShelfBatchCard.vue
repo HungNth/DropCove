@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, useTemplateRef } from "vue";
 import type { ShelfAnchor, ShelfBatch } from "../../composables/useShelf";
+import BulkPinning from "./BulkPinning.vue";
 
 const props = defineProps<{ batch: ShelfBatch; busy: boolean }>();
 const emit = defineEmits<{
@@ -8,7 +9,8 @@ const emit = defineEmits<{
   dragItem: [itemId: string];
   dragBatch: [batchId: string];
   pinItem: [itemId: string, pinned: boolean];
-  manage: [batchId: string, anchor: ShelfAnchor];
+  pinBatch: [batchId: string, pinned: boolean];
+  manage: [batchId: string, anchor: ShelfAnchor, keyboard: boolean];
 }>();
 let pointerStart: { id: number; x: number; y: number } | undefined;
 const title = computed(() => props.batch.items.length === 1 ? props.batch.items[0].name : `${props.batch.items.length} items`);
@@ -16,9 +18,16 @@ const previews = computed(() => props.batch.items.slice(0, 3));
 const singleItem = computed(() => props.batch.items.length === 1 ? props.batch.items[0] : undefined);
 const card = useTemplateRef<HTMLElement>("card");
 
-function openManagement() {
+function openManagement(keyboard: boolean) {
   const bounds = card.value?.getBoundingClientRect();
-  if (bounds) emit("manage", props.batch.id, { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
+  if (bounds) emit("manage", props.batch.id, { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }, keyboard);
+}
+
+function onManageKeydown(event: KeyboardEvent) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    openManagement(true);
+  }
 }
 
 function pointerDown(event: PointerEvent) {
@@ -42,7 +51,7 @@ function pointerMove(event: PointerEvent) {
 </script>
 
 <template>
-  <article ref="card" class="card" :class="{ 'single-item': singleItem, 'multi-item': !singleItem }">
+  <article ref="card" class="card" :data-batch-id="batch.id" :class="{ 'single-item': singleItem, 'multi-item': !singleItem }">
     <div
       class="card-drag"
       :title="batch.items.length === 1 ? batch.items[0].path : title"
@@ -71,14 +80,21 @@ function pointerMove(event: PointerEvent) {
       :title="singleItem.isPinned ? 'Make temporary; consumed after successful Copy' : 'Keep this reference after successful Copy'"
       @click="emit('pinItem', singleItem.id, !singleItem.isPinned)"
     >{{ singleItem.isPinned ? "Unpin" : "Pin" }}</button>
-    <button
-      v-else
-      class="manage"
-      type="button"
-      :disabled="busy"
-      :aria-label="`Manage ${title}`"
-      @click="openManagement"
-    >Manage Items</button>
+    <div v-else class="card-multi-actions">
+      <BulkPinning
+        :batch="batch"
+        :busy="busy"
+        @pin="(id, pinned) => emit('pinBatch', id, pinned)"
+      />
+      <button
+        class="manage"
+        type="button"
+        :disabled="busy"
+        :aria-label="`Manage ${title}`"
+        @click="openManagement(false)"
+        @keydown="onManageKeydown"
+      >Manage Items</button>
+    </div>
     <button
       class="remove"
       type="button"
@@ -103,7 +119,8 @@ function pointerMove(event: PointerEvent) {
 .pin { position: absolute; bottom: 4px; right: 4px; border: 1px solid #46536a; border-radius: 4px; padding: 2px 4px; color: #cbd5e1; background: #202a3b; font: inherit; font-size: 10px; cursor: pointer; }
 .pin[aria-pressed="true"] { border-color: #a5b4fc; color: #a5b4fc; }
 .multi-item .card-drag { padding-bottom: 26px; }
-.manage { position: absolute; bottom: 4px; right: 4px; border: 1px solid #46536a; border-radius: 4px; padding: 2px 4px; color: #cbd5e1; background: #202a3b; font: inherit; font-size: 10px; cursor: pointer; }
+.card-multi-actions { position: absolute; bottom: 4px; right: 4px; display: flex; align-items: center; gap: 4px; }
+.manage { border: 1px solid #46536a; border-radius: 4px; padding: 2px 4px; color: #cbd5e1; background: #202a3b; font: inherit; font-size: 10px; cursor: pointer; }
 .remove:focus-visible, .pin:focus-visible, .manage:focus-visible { outline: 2px solid #a5b4fc; border-radius: 4px; }
 .remove:disabled, .pin:disabled, .manage:disabled { opacity: .45; cursor: default; }
 </style>

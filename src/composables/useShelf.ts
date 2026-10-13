@@ -1,6 +1,6 @@
-import { onMounted, onUnmounted, shallowRef } from "vue";
+import { computed, onMounted, onUnmounted, shallowRef, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { currentMonitor, getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { currentMonitor, getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 
 export interface ShelfItem {
@@ -53,30 +53,69 @@ interface PendingDragConfirmation {
   unavailable: number;
 }
 
+export type ResizeEdge = "North" | "NorthEast" | "East" | "SouthEast" | "South" | "SouthWest" | "West" | "NorthWest";
+
 export function useShelf() {
   const batches = shallowRef<ShelfBatch[]>([]);
   const status = shallowRef("");
   const busy = shallowRef(false);
   const draggingOver = shallowRef(false);
+  const resizing = shallowRef(false);
+  const resizeHover = shallowRef(false);
   const pendingConfirmation = shallowRef<PendingDragConfirmation | null>(null);
+  const confirmingClearTemporary = shallowRef(false);
   let readyConfirmation: PendingDragConfirmation | null = null;
   const window = getCurrentWindow();
   const unlisteners: UnlistenFn[] = [];
   let disposed = false;
-  let appliedWidth = 180;
   let refreshRequest = 0;
 
+  const hasTemporaryItems = computed(() =>
+    batches.value.some((batch) => batch.items.some((item) => !item.isPinned))
+  );
+
+  watch(hasTemporaryItems, (hasTemp) => {
+    if (!hasTemp && confirmingClearTemporary.value) {
+      confirmingClearTemporary.value = false;
+    }
+  });
   async function apply(snapshot: ShelfSnapshot, request: number) {
     if (disposed) return;
-    const [monitor, scale, current] = await Promise.all([currentMonitor(), window.scaleFactor(), window.innerSize()]);
+    const [monitor, scale, current, outer, position] = await Promise.all([
+      currentMonitor(), window.scaleFactor(), window.innerSize(), window.outerSize(), window.outerPosition(),
+    ]);
     if (disposed || request !== refreshRequest) return;
     batches.value = snapshot.batches;
-    const width = Math.min(snapshot.preferredWidth, monitor ? monitor.workArea.size.width / scale : snapshot.preferredWidth);
-    const height = Math.min(snapshot.height, monitor ? monitor.workArea.size.height / scale : snapshot.height);
-    appliedWidth = width;
+    if (resizing.value || await invoke<boolean>("get_shelf_resizing")) return;
+    if (disposed || request !== refreshRequest) return;
+    const borderWidth = outer.width - current.width;
+    const borderHeight = outer.height - current.height;
+    const width = Math.min(snapshot.preferredWidth, monitor ? (monitor.workArea.size.width - borderWidth) / scale : snapshot.preferredWidth);
+    const height = Math.min(snapshot.height, monitor ? (monitor.workArea.size.height - borderHeight) / scale : snapshot.height);
     if (Math.abs(current.width / scale - width) > .5 || Math.abs(current.height / scale - height) > .5) {
       await window.setSize(new LogicalSize(width, height));
     }
+    if (monitor && !disposed && request === refreshRequest) {
+      const area = monitor.workArea;
+      const x = Math.max(area.position.x, Math.min(position.x, area.position.x + area.size.width - width * scale - borderWidth));
+      const y = Math.max(area.position.y, Math.min(position.y, area.position.y + area.size.height - height * scale - borderHeight));
+      if (Math.abs(x - position.x) > .5 || Math.abs(y - position.y) > .5) await window.setPosition(new PhysicalPosition(x, y));
+    }
+  }
+
+  function cancelClearTemporary() {
+    confirmingClearTemporary.value = false;
+  }
+
+  function requestClearTemporary() {
+    if (busy.value || pendingConfirmation.value || !hasTemporaryItems.value) return;
+    confirmingClearTemporary.value = true;
+  }
+
+  async function confirmClearTemporary() {
+    if (!confirmingClearTemporary.value) return;
+    confirmingClearTemporary.value = false;
+    await perform("clear_temporary");
   }
 
   async function refresh() {
@@ -155,6 +194,17 @@ export function useShelf() {
 
   onMounted(async () => {
     try {
+      await retainListener(window.listen<boolean>("shelf-resize-state", async ({ payload }) => {
+        if (disposed) return;
+        resizing.value = payload;
+        if (!payload) {
+          try { await refresh(); }
+          catch (error) { if (!disposed) status.value = String(error); }
+        }
+      }));
+      await retainListener(window.listen<boolean>("shelf-resize-hover", ({ payload }) => {
+        if (!disposed) resizeHover.value = payload;
+      }));
       await retainListener(window.listen("shelf-changed", async () => {
         try { await refresh(); }
         catch (error) { if (!disposed) status.value = String(error); }
@@ -173,15 +223,11 @@ export function useShelf() {
       await retainListener(window.listen<string>("shelf-error", ({ payload }) => {
         if (!disposed) status.value = payload;
       }));
-      await retainListener(window.onResized(async ({ payload }) => {
+      await retainListener(window.listen<string>("manage-items-closed", ({ payload: batchId }) => {
         if (disposed) return;
-        try {
-          const width = payload.width / await window.scaleFactor();
-          if (Math.abs(width - appliedWidth) <= .5 || width < 180) return;
-          appliedWidth = width;
-          await invoke<ShelfSnapshot>("save_width", { width });
-          await refresh();
-        } catch (error) { if (!disposed) status.value = String(error); }
+        const selector = `[data-batch-id="${CSS.escape(batchId)}"] .manage`;
+        const manageButton = document.querySelector<HTMLElement>(selector);
+        manageButton?.focus();
       }));
       await refresh();
     } catch (error) {
@@ -199,7 +245,19 @@ export function useShelf() {
     status,
     busy,
     draggingOver,
+    resizing,
+    resizeHover,
+    startResize: async (edge: ResizeEdge) => {
+      if (busy.value || resizing.value) return;
+      try { await invoke("start_shelf_resize", { edge }); }
+      catch (error) { if (!disposed) status.value = String(error); }
+    },
     pendingConfirmation,
+    hasTemporaryItems,
+    confirmingClearTemporary,
+    requestClearTemporary,
+    cancelClearTemporary,
+    confirmClearTemporary,
     confirmBatchDrag: () => {
       const pending = pendingConfirmation.value;
       if (!pending) return;
@@ -214,9 +272,10 @@ export function useShelf() {
     cancelBatchDrag: () => void cancelPreparedBatch(),
     removeBatch: (batchId: string) => perform("remove_batch", { batchId }),
     setItemPinned: (itemId: string, pinned: boolean) => perform("set_item_pinned", { itemId, pinned }),
-    openManageItems: async (batchId: string, anchor: ShelfAnchor) => {
+    setBatchPinned: (batchId: string, pinned: boolean) => perform("set_batch_pinned", { batchId, pinned }),
+    openManageItems: async (batchId: string, anchor: ShelfAnchor, keyboard = false) => {
       if (busy.value) return;
-      try { await invoke("open_manage_items", { batchId, anchor }); }
+      try { await invoke("open_manage_items", { batchId, anchor, keyboard }); }
       catch (error) { if (!disposed) status.value = String(error); }
     },
     startItemDrag: (itemId: string) => perform("start_item_drag", { itemId }),

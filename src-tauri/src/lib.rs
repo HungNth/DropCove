@@ -4,6 +4,7 @@ use tauri::{Manager, State};
 
 mod manage_items;
 mod shelf;
+mod shelf_resize;
 #[cfg(windows)]
 mod windows_drag;
 #[cfg(windows)]
@@ -30,9 +31,23 @@ fn publish_shelf(app: &tauri::AppHandle, snapshot: ShelfSnapshot) -> Result<Shel
 }
 
 #[tauri::command]
+async fn start_shelf_resize(
+    app: tauri::AppHandle,
+    edge: shelf_resize::ResizeEdge,
+) -> Result<(), String> {
+    run_blocking(move || shelf_resize::start(&app, edge)).await
+}
+
+#[tauri::command]
+fn get_shelf_resizing(app: tauri::AppHandle) -> Result<bool, String> {
+    shelf_resize::is_resizing(&app)
+}
+
+#[tauri::command]
 async fn open_manage_items(
     batch_id: String,
     anchor: manage_items::AnchorRect,
+    keyboard: bool,
     app: tauri::AppHandle,
     state: State<'_, ShelfState>,
 ) -> Result<(), String> {
@@ -44,7 +59,7 @@ async fn open_manage_items(
         if batch.items.len() < 2 {
             return Err("Manage Items requires a multi-item batch".to_owned());
         }
-        manage_items::open(&app, &batch, anchor)?;
+        manage_items::open(&app, &batch, anchor, keyboard)?;
         manage_items::synchronize(&app)
     })
     .await
@@ -70,8 +85,13 @@ async fn get_manage_items(
 }
 
 #[tauri::command]
+async fn get_manage_items_keyboard(app: tauri::AppHandle) -> Result<bool, String> {
+    run_blocking(move || manage_items::is_keyboard_activated(&app)).await
+}
+
+#[tauri::command]
 async fn close_manage_items(app: tauri::AppHandle) -> Result<(), String> {
-    run_blocking(move || manage_items::close(&app)).await
+    run_blocking(move || manage_items::close_explicit(&app)).await
 }
 
 #[tauri::command]
@@ -85,6 +105,19 @@ async fn remove_item(
         let snapshot = state
             .remove_item(&item_id)
             .map_err(|error| error.to_string())?;
+        publish_shelf(&app, snapshot)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn clear_temporary(
+    app: tauri::AppHandle,
+    state: State<'_, ShelfState>,
+) -> Result<ShelfSnapshot, String> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let snapshot = state.clear_temporary().map_err(|error| error.to_string())?;
         publish_shelf(&app, snapshot)
     })
     .await
@@ -116,14 +149,17 @@ async fn accept_drop(
 }
 
 #[tauri::command]
-async fn save_width(
+async fn save_size(
     width: f64,
+    manual_height: Option<f64>,
     app: tauri::AppHandle,
     state: State<'_, ShelfState>,
 ) -> Result<ShelfSnapshot, String> {
     let state = state.inner().clone();
     run_blocking(move || {
-        let snapshot = state.save_width(width).map_err(|error| error.to_string())?;
+        let snapshot = state
+            .save_size(width, manual_height)
+            .map_err(|error| error.to_string())?;
         publish_shelf(&app, snapshot)
     })
     .await
@@ -156,6 +192,22 @@ async fn set_item_pinned(
     run_blocking(move || {
         let snapshot = state
             .set_item_pinned(&item_id, pinned)
+            .map_err(|error| error.to_string())?;
+        publish_shelf(&app, snapshot)
+    })
+    .await
+}
+#[tauri::command]
+async fn set_batch_pinned(
+    batch_id: String,
+    pinned: bool,
+    app: tauri::AppHandle,
+    state: State<'_, ShelfState>,
+) -> Result<ShelfSnapshot, String> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let snapshot = state
+            .set_batch_pinned(&batch_id, pinned)
             .map_err(|error| error.to_string())?;
         publish_shelf(&app, snapshot)
     })
@@ -267,6 +319,11 @@ async fn start_item_drag(
         let outcome = storage_drag_on_window_thread(app.clone(), move |session| {
             windows_drag::perform_storage_drag(session, std::iter::once(path.as_str()))
         })?;
+        if outcome == shelf::DragOutcome::Canceled {
+            use tauri::Emitter;
+            app.emit_to("manage-items", "item-drag-canceled", ())
+                .map_err(|error| error.to_string())?;
+        }
         let snapshot = state
             .complete_item_drag(&item_id, outcome)
             .map_err(|error| error.to_string())?;
@@ -313,11 +370,13 @@ pub fn run() {
             app.manage(ShelfState::open(profile.join("shelf.db"))?);
             app.manage(windows_drag::DragSession::default());
             app.manage(manage_items::ManageItemsState::default());
+            app.manage(shelf_resize::ResizeState::default());
             let window = app.get_webview_window("main").ok_or_else(|| {
                 std::io::Error::new(std::io::ErrorKind::NotFound, "Drop Shelf window is missing")
             })?;
             windows_drop::register(&window)?;
             manage_items::register_owner(&window).map_err(std::io::Error::other)?;
+            shelf_resize::register_owner(&window).map_err(std::io::Error::other)?;
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -331,12 +390,17 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_shelf,
             accept_drop,
-            save_width,
+            save_size,
+            start_shelf_resize,
+            get_shelf_resizing,
             remove_batch,
             set_item_pinned,
+            set_batch_pinned,
             remove_item,
+            clear_temporary,
             open_manage_items,
             get_manage_items,
+            get_manage_items_keyboard,
             close_manage_items,
             start_item_drag,
             prepare_batch_drag,

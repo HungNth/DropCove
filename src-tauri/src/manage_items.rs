@@ -40,9 +40,9 @@ pub(crate) struct AnchorRect {
 #[derive(Default)]
 struct PopupState {
     batch_id: Option<String>,
+    keyboard: bool,
     pending_close: bool,
 }
-
 #[derive(Default)]
 pub(crate) struct ManageItemsState(Mutex<PopupState>);
 
@@ -135,7 +135,16 @@ pub(crate) fn active_batch(app: &AppHandle) -> Result<Option<String>, String> {
     Ok(app.state::<ManageItemsState>().lock()?.batch_id.clone())
 }
 
-pub(crate) fn open(app: &AppHandle, batch: &ShelfBatch, anchor: AnchorRect) -> Result<(), String> {
+pub(crate) fn is_keyboard_activated(app: &AppHandle) -> Result<bool, String> {
+    Ok(app.state::<ManageItemsState>().lock()?.keyboard)
+}
+
+pub(crate) fn open(
+    app: &AppHandle,
+    batch: &ShelfBatch,
+    anchor: AnchorRect,
+    keyboard: bool,
+) -> Result<(), String> {
     if ![anchor.x, anchor.y, anchor.width, anchor.height]
         .into_iter()
         .all(f64::is_finite)
@@ -226,6 +235,7 @@ pub(crate) fn open(app: &AppHandle, batch: &ShelfBatch, anchor: AnchorRect) -> R
         let state = app.state::<ManageItemsState>();
         let mut state = state.lock()?;
         state.batch_id = Some(batch.id.clone());
+        state.keyboard = keyboard;
         state.pending_close = false;
     }
     let hwnd = popup.hwnd().map_err(|error| error.to_string())?;
@@ -275,13 +285,37 @@ pub(crate) fn open(app: &AppHandle, batch: &ShelfBatch, anchor: AnchorRect) -> R
             (y * scale).round() as i32,
             0,
             0,
-            SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+            if keyboard {
+                SWP_NOSIZE | SWP_SHOWWINDOW
+            } else {
+                SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW
+            },
         )
     }
     .map_err(|error| error.to_string())?;
+    if keyboard {
+        popup.set_focus().map_err(|error| error.to_string())?;
+    }
     popup
-        .emit("manage-items-opened", ())
+        .emit("manage-items-opened", keyboard)
         .map_err(|error| error.to_string())
+}
+
+pub(crate) fn close_explicit(app: &AppHandle) -> Result<(), String> {
+    if app.state::<DragSession>().is_active() {
+        return Ok(());
+    }
+    let Some(batch_id) = app.state::<ManageItemsState>().lock()?.batch_id.clone() else {
+        return Ok(());
+    };
+    close(app)?;
+    if let Some(owner) = app.get_webview_window("main") {
+        owner.set_focus().map_err(|error| error.to_string())?;
+        owner
+            .emit("manage-items-closed", batch_id)
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 pub(crate) fn close(app: &AppHandle) -> Result<(), String> {
@@ -297,6 +331,7 @@ pub(crate) fn close(app: &AppHandle) -> Result<(), String> {
         let state = app.state::<ManageItemsState>();
         let mut state = state.lock()?;
         state.batch_id = None;
+        state.keyboard = false;
         state.pending_close = false;
     }
     app.emit("shelf-changed", ())
@@ -336,11 +371,13 @@ pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) {
         match event {
             WindowEvent::CloseRequested { api, .. } if app.state::<DragSession>().is_active() => {
                 api.prevent_close();
-                close(app)
+                Ok(())
             }
+            WindowEvent::CloseRequested { .. } => close_explicit(app),
             WindowEvent::Destroyed => match app.state::<ManageItemsState>().lock() {
                 Ok(mut state) => {
                     state.batch_id = None;
+                    state.keyboard = false;
                     state.pending_close = false;
                     Ok(())
                 }

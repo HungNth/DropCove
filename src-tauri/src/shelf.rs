@@ -101,6 +101,8 @@ pub(crate) enum ShelfError {
     InvalidPath,
     #[error("shelf width must be a finite value of at least 180 logical pixels")]
     InvalidWidth,
+    #[error("shelf height must be a finite value of at least 180 logical pixels")]
+    InvalidHeight,
     #[error("database integrity check failed: {0}")]
     DatabaseCorrupt(String),
     #[error("shelf state lock is poisoned")]
@@ -194,13 +196,21 @@ impl ShelfState {
         })
     }
 
-    pub(crate) fn save_width(&self, width: f64) -> Result<ShelfSnapshot, ShelfError> {
+    pub(crate) fn save_size(
+        &self,
+        width: f64,
+        manual_height: Option<f64>,
+    ) -> Result<ShelfSnapshot, ShelfError> {
         if !width.is_finite() || width < 180.0 {
             return Err(ShelfError::InvalidWidth);
         }
-        self.store()?.save_width(width)
+        if let Some(height) = manual_height {
+            if !height.is_finite() || height < 180.0 {
+                return Err(ShelfError::InvalidHeight);
+            }
+        }
+        self.store()?.save_size(width, manual_height)
     }
-
     pub(crate) fn complete_item_drag(
         &self,
         item_id: &str,
@@ -219,6 +229,9 @@ impl ShelfState {
     }
     pub(crate) fn remove_item(&self, item_id: &str) -> Result<ShelfSnapshot, ShelfError> {
         self.store()?.remove_item(item_id)
+    }
+    pub(crate) fn clear_temporary(&self) -> Result<ShelfSnapshot, ShelfError> {
+        self.store()?.clear_temporary()
     }
 
     pub(crate) fn management_batch(&self, batch_id: &str) -> Result<ShelfBatch, ShelfError> {
@@ -239,6 +252,13 @@ impl ShelfState {
         pinned: bool,
     ) -> Result<ShelfSnapshot, ShelfError> {
         self.store()?.set_item_pinned(item_id, pinned)
+    }
+    pub(crate) fn set_batch_pinned(
+        &self,
+        batch_id: &str,
+        pinned: bool,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        self.store()?.set_batch_pinned(batch_id, pinned)
     }
 
     pub(crate) fn item_path(&self, item_id: &str) -> Result<String, ShelfError> {
@@ -310,12 +330,36 @@ impl ShelfState {
         )?;
         Ok(())
     }
+    #[cfg(test)]
+    fn install_test_settings_failure(&self) -> Result<(), ShelfError> {
+        self.store()?.connection.execute_batch(
+            "CREATE TEMP TRIGGER fail_settings_update
+             BEFORE UPDATE ON shelf_settings
+             BEGIN
+                 SELECT RAISE(FAIL, 'forced settings update failure');
+             END;",
+        )?;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn install_test_insert_failure(&self) -> Result<(), ShelfError> {
+        self.store()?.connection.execute_batch(
+            "CREATE TEMP TRIGGER fail_item_insert
+             BEFORE INSERT ON shelf_items
+             BEGIN
+                 SELECT RAISE(FAIL, 'forced insert failure');
+             END;",
+        )?;
+        Ok(())
+    }
 }
 
 struct ShelfStore {
     connection: Connection,
     width: f64,
     height: f64,
+    pending_manual_height: Option<f64>,
     availability: HashMap<String, Availability>,
     restored_availability: bool,
     prepared: Option<PreparedDrag>,
@@ -380,6 +424,7 @@ impl ShelfStore {
             connection,
             width,
             height: 180.0,
+            pending_manual_height: None,
             availability: HashMap::new(),
             restored_availability: false,
             prepared: None,
@@ -502,8 +547,8 @@ impl ShelfStore {
         transaction.execute("UPDATE shelf_batches SET position = position + 1", [])?;
         let batch_id = random_id(&transaction)?;
         transaction.execute(
-            "INSERT OR IGNORE INTO shelf_settings (id, preferred_width, manual_height) VALUES (1, ?1, NULL)",
-            [self.width],
+            "INSERT OR IGNORE INTO shelf_settings (id, preferred_width, manual_height) VALUES (1, ?1, ?2)",
+            params![self.width, self.pending_manual_height],
         )?;
         transaction.execute(
             "INSERT INTO shelf_batches (id, created_at, position) VALUES (?1, ?2, 0)",
@@ -543,6 +588,7 @@ impl ShelfStore {
         }
         transaction.commit()?;
         self.height = snapshot.height;
+        self.pending_manual_height = None;
         self.record_snapshot(&snapshot);
         Ok(snapshot)
     }
@@ -598,8 +644,14 @@ impl ShelfStore {
             None
         };
         transaction.commit()?;
-        self.width = snapshot.preferred_width;
-        self.height = snapshot.height;
+        if empty {
+            self.width = 180.0;
+            self.height = 180.0;
+            self.pending_manual_height = None;
+        } else {
+            self.width = snapshot.preferred_width;
+            self.height = snapshot.height;
+        }
         self.record_snapshot(&snapshot);
         self.prepared = token.as_ref().map(|token| PreparedDrag {
             token: token.clone(),
@@ -637,8 +689,14 @@ impl ShelfStore {
             &self.availability,
         )?;
         transaction.commit()?;
-        self.width = snapshot.preferred_width;
-        self.height = snapshot.height;
+        if empty {
+            self.width = 180.0;
+            self.height = 180.0;
+            self.pending_manual_height = None;
+        } else {
+            self.width = snapshot.preferred_width;
+            self.height = snapshot.height;
+        }
         self.record_snapshot(&snapshot);
         Ok(snapshot)
     }
@@ -658,8 +716,14 @@ impl ShelfStore {
             &self.availability,
         )?;
         transaction.commit()?;
-        self.width = snapshot.preferred_width;
-        self.height = snapshot.height;
+        if empty {
+            self.width = 180.0;
+            self.height = 180.0;
+            self.pending_manual_height = None;
+        } else {
+            self.width = snapshot.preferred_width;
+            self.height = snapshot.height;
+        }
         self.record_snapshot(&snapshot);
         Ok(snapshot)
     }
@@ -686,8 +750,44 @@ impl ShelfStore {
             &self.availability,
         )?;
         transaction.commit()?;
-        self.width = snapshot.preferred_width;
-        self.height = snapshot.height;
+        if empty {
+            self.width = 180.0;
+            self.height = 180.0;
+            self.pending_manual_height = None;
+        } else {
+            self.width = snapshot.preferred_width;
+            self.height = snapshot.height;
+        }
+        self.record_snapshot(&snapshot);
+        Ok(snapshot)
+    }
+    fn clear_temporary(&mut self) -> Result<ShelfSnapshot, ShelfError> {
+        let transaction = self.connection.transaction()?;
+        transaction.execute("DELETE FROM shelf_items WHERE is_pinned = 0", [])?;
+        transaction.execute(
+            "DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)",
+            [],
+        )?;
+        clear_sizing_when_empty(&transaction)?;
+        let empty =
+            !transaction.query_row("SELECT EXISTS (SELECT 1 FROM shelf_items)", [], |row| {
+                row.get::<_, bool>(0)
+            })?;
+        let snapshot = Self::read_snapshot(
+            &transaction,
+            if empty { 180.0 } else { self.width },
+            if empty { 180.0 } else { self.height },
+            &self.availability,
+        )?;
+        transaction.commit()?;
+        if empty {
+            self.width = 180.0;
+            self.height = 180.0;
+            self.pending_manual_height = None;
+        } else {
+            self.width = snapshot.preferred_width;
+            self.height = snapshot.height;
+        }
         self.record_snapshot(&snapshot);
         Ok(snapshot)
     }
@@ -767,20 +867,61 @@ impl ShelfStore {
         transaction.commit()?;
         Ok(snapshot)
     }
-
-    fn save_width(&mut self, width: f64) -> Result<ShelfSnapshot, ShelfError> {
-        if width == self.width {
-            return self.snapshot();
-        }
+    fn set_batch_pinned(
+        &mut self,
+        batch_id: &str,
+        pinned: bool,
+    ) -> Result<ShelfSnapshot, ShelfError> {
         let transaction = self.connection.transaction()?;
-        transaction.execute(
-            "UPDATE shelf_settings SET preferred_width = ?1 WHERE id = 1",
-            [width],
+        let updated = transaction.execute(
+            "UPDATE shelf_items SET is_pinned = ?1 WHERE batch_id = ?2",
+            params![pinned, batch_id],
         )?;
+        if updated == 0 {
+            return Err(ShelfError::BatchNotFound(batch_id.to_owned()));
+        }
+        let snapshot =
+            Self::read_snapshot(&transaction, self.width, self.height, &self.availability)?;
+        transaction.commit()?;
+        Ok(snapshot)
+    }
+
+    fn save_size(
+        &mut self,
+        width: f64,
+        manual_height: Option<f64>,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        let has_content: bool =
+            self.connection
+                .query_row("SELECT EXISTS (SELECT 1 FROM shelf_items)", [], |row| {
+                    row.get(0)
+                })?;
+
+        if !has_content {
+            self.width = width;
+            if let Some(height) = manual_height {
+                self.height = height;
+                self.pending_manual_height = Some(height);
+            }
+            return Ok(ShelfSnapshot {
+                batches: Vec::new(),
+                preferred_width: self.width,
+                height: self.height,
+            });
+        }
+
+        let transaction = self.connection.transaction()?;
+        if transaction.execute(
+            "UPDATE shelf_settings SET preferred_width = ?1, manual_height = COALESCE(?2, manual_height) WHERE id = 1",
+            params![width, manual_height],
+        )? != 1 {
+            return Err(ShelfError::DatabaseCorrupt("retained items have no sizing settings".to_owned()));
+        }
         let snapshot = Self::read_snapshot(&transaction, width, self.height, &self.availability)?;
         transaction.commit()?;
-        self.width = width;
+        self.width = snapshot.preferred_width;
         self.height = snapshot.height;
+        self.pending_manual_height = None;
         Ok(snapshot)
     }
 
@@ -1090,7 +1231,7 @@ mod tests {
             state.remove_batch(&batch.id).unwrap();
         }
         assert_eq!(state.snapshot().unwrap().height, 348.0);
-        state.save_width(348.0).unwrap();
+        state.save_size(348.0, None).unwrap();
         drop(state);
         let restored = ShelfState::open(database).unwrap();
         let snapshot = restored.snapshot().unwrap();
@@ -1327,7 +1468,7 @@ mod tests {
     fn remove_item_unknown_is_rejected_and_final_pruning_clears_sizing() {
         let directory = TestDirectory::new("remove-prune");
         let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
-        state.save_width(300.0).unwrap();
+        state.save_size(300.0, None).unwrap();
         let initial = state
             .accept_drop(vec![Some(
                 directory.source_file().to_string_lossy().into_owned(),
@@ -1474,5 +1615,713 @@ mod tests {
         // Removing item1 explicitly via remove_item prunes the now-empty batch
         let final_snap = state.remove_item(item1_id).unwrap();
         assert!(final_snap.batches.is_empty());
+    }
+    #[test]
+    fn set_batch_pinned_transitions_and_preserves_availability_classifications() {
+        use super::Availability;
+        let directory = TestDirectory::new("batch-pin-transitions");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        let avail_file = directory.0.join("available.txt");
+        fs::write(&avail_file, b"avail").unwrap();
+        let missing_file = directory.0.join("missing.txt");
+        fs::write(&missing_file, b"will_delete").unwrap();
+        let unavail_path = PathBuf::from("Z:\\unavailable_volume\\file.txt");
+
+        let initial = state
+            .accept_drop(vec![
+                Some(avail_file.to_string_lossy().into_owned()),
+                Some(missing_file.to_string_lossy().into_owned()),
+                Some(unavail_path.to_string_lossy().into_owned()),
+            ])
+            .unwrap()
+            .snapshot
+            .unwrap();
+        let batch_id = initial.batches[0].id.clone();
+        let item_avail_id = initial.batches[0].items[0].id.clone();
+        let item_missing_id = initial.batches[0].items[1].id.clone();
+        let item_unavail_id = initial.batches[0].items[2].id.clone();
+
+        // Delete missing file so it classifies as Missing
+        fs::remove_file(&missing_file).unwrap();
+
+        // Update availability in store cache via management_batch_with
+        state
+            .management_batch_with(&batch_id, |p| {
+                if p == avail_file.to_string_lossy() {
+                    Availability::Available
+                } else if p == missing_file.to_string_lossy() {
+                    Availability::Missing
+                } else {
+                    Availability::Unavailable
+                }
+            })
+            .unwrap();
+
+        let snap_before = state.snapshot().unwrap();
+        assert_eq!(
+            snap_before.batches[0].items[0].availability,
+            Availability::Available
+        );
+        assert_eq!(
+            snap_before.batches[0].items[1].availability,
+            Availability::Missing
+        );
+        assert_eq!(
+            snap_before.batches[0].items[2].availability,
+            Availability::Unavailable
+        );
+        // Initial bulk state: Off (all items is_pinned == false)
+        assert!(snap_before.batches[0].items.iter().all(|i| !i.is_pinned));
+
+        // 1. Off -> On
+        let snap_on = state.set_batch_pinned(&batch_id, true).unwrap();
+        assert!(snap_on.batches[0].items.iter().all(|i| i.is_pinned));
+        // Retains all 3 items with their classifications intact
+        assert_eq!(snap_on.batches[0].items.len(), 3);
+        assert_eq!(snap_on.batches[0].items[0].id, item_avail_id);
+        assert_eq!(
+            snap_on.batches[0].items[0].availability,
+            Availability::Available
+        );
+        assert_eq!(snap_on.batches[0].items[1].id, item_missing_id);
+        assert_eq!(
+            snap_on.batches[0].items[1].availability,
+            Availability::Missing
+        );
+        assert_eq!(snap_on.batches[0].items[2].id, item_unavail_id);
+        assert_eq!(
+            snap_on.batches[0].items[2].availability,
+            Availability::Unavailable
+        );
+
+        // 2. On -> mixed by unpinning one item
+        let snap_mixed = state.set_item_pinned(&item_missing_id, false).unwrap();
+        assert!(snap_mixed.batches[0].items[0].is_pinned);
+        assert!(!snap_mixed.batches[0].items[1].is_pinned);
+        assert!(snap_mixed.batches[0].items[2].is_pinned);
+
+        // 3. mixed -> On
+        let snap_on_again = state.set_batch_pinned(&batch_id, true).unwrap();
+        assert!(snap_on_again.batches[0].items.iter().all(|i| i.is_pinned));
+        assert_eq!(
+            snap_on_again.batches[0].items[0].availability,
+            Availability::Available
+        );
+        assert_eq!(
+            snap_on_again.batches[0].items[1].availability,
+            Availability::Missing
+        );
+        assert_eq!(
+            snap_on_again.batches[0].items[2].availability,
+            Availability::Unavailable
+        );
+
+        // 4. On -> Off
+        let snap_off = state.set_batch_pinned(&batch_id, false).unwrap();
+        assert!(snap_off.batches[0].items.iter().all(|i| !i.is_pinned));
+        assert_eq!(snap_off.batches[0].items.len(), 3);
+        assert_eq!(
+            snap_off.batches[0].items[0].availability,
+            Availability::Available
+        );
+        assert_eq!(
+            snap_off.batches[0].items[1].availability,
+            Availability::Missing
+        );
+        assert_eq!(
+            snap_off.batches[0].items[2].availability,
+            Availability::Unavailable
+        );
+
+        // Unknown batch rejected with BatchNotFound
+        assert!(matches!(
+            state.set_batch_pinned("nonexistent", true),
+            Err(super::ShelfError::BatchNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn set_batch_pinned_rollback_preserves_visible_and_durable_state() {
+        let directory = TestDirectory::new("batch-pin-rollback");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        let file_a = directory.0.join("a.txt");
+        let file_b = directory.0.join("b.txt");
+        fs::write(&file_a, b"a").unwrap();
+        fs::write(&file_b, b"b").unwrap();
+
+        let initial = state
+            .accept_drop(vec![
+                Some(file_a.to_string_lossy().into_owned()),
+                Some(file_b.to_string_lossy().into_owned()),
+            ])
+            .unwrap()
+            .snapshot
+            .unwrap();
+        let batch_id = initial.batches[0].id.clone();
+        let item_b_id = initial.batches[0].items[1].id.clone();
+
+        // Set mixed state: item 0 unpinned, item 1 pinned
+        state.set_item_pinned(&item_b_id, true).unwrap();
+        let before = state.snapshot().unwrap();
+        assert!(!before.batches[0].items[0].is_pinned);
+        assert!(before.batches[0].items[1].is_pinned);
+
+        // Install a failing trigger on update of is_pinned for item 1 specifically,
+        // simulating failure halfway through the bulk update
+        state
+            .store()
+            .unwrap()
+            .connection
+            .execute_batch(&format!(
+                "CREATE TEMP TRIGGER fail_halfway BEFORE UPDATE OF is_pinned ON shelf_items
+                 WHEN NEW.id = '{item_b_id}'
+                 BEGIN SELECT RAISE(ABORT, 'forced bulk pin halfway failure'); END;"
+            ))
+            .unwrap();
+
+        // Attempting to set all pinned to true (which would update item 0, then fail on item 1)
+        // or false should fail and rollback completely
+        assert!(state.set_batch_pinned(&batch_id, false).is_err());
+
+        // Visible snapshot is preserved unchanged
+        assert_eq!(
+            serde_json::to_value(state.snapshot().unwrap()).unwrap(),
+            serde_json::to_value(&before).unwrap()
+        );
+
+        // Reopening database verifies durable state was not partially mutated
+        drop(state);
+        let reopened = ShelfState::open(&database).unwrap();
+        assert_eq!(
+            serde_json::to_value(reopened.snapshot().unwrap()).unwrap(),
+            serde_json::to_value(&before).unwrap()
+        );
+    }
+
+    #[test]
+    fn pin_changes_between_prepared_batch_drag_and_completion_current_pin_state_wins() {
+        let directory = TestDirectory::new("batch-pin-race");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        let file_a = directory.0.join("a.txt");
+        let file_b = directory.0.join("b.txt");
+        fs::write(&file_a, b"a").unwrap();
+        fs::write(&file_b, b"b").unwrap();
+
+        let initial = state
+            .accept_drop(vec![
+                Some(file_a.to_string_lossy().into_owned()),
+                Some(file_b.to_string_lossy().into_owned()),
+            ])
+            .unwrap()
+            .snapshot
+            .unwrap();
+        let batch_id = initial.batches[0].id.clone();
+        let item_a_id = initial.batches[0].items[0].id.clone();
+
+        // Prepare batch drag while items are temporary (is_pinned = false)
+        let prep = state.prepare_batch_drag(&batch_id).unwrap();
+        let token = prep.token.expect("batch drag token should exist");
+        assert_eq!(prep.available, 2);
+
+        // While drag is active/prepared, user pins item_a via set_item_pinned
+        // (or pins all via set_batch_pinned)
+        state.set_item_pinned(&item_a_id, true).unwrap();
+
+        // Complete batch drag with Copy outcome
+        // consume_items executes "DELETE FROM shelf_items WHERE id = ?1 AND is_pinned = 0"
+        // Since item_a is now pinned, it MUST be retained; item_b is temporary, so it is consumed
+        let snap = state
+            .complete_batch_drag(&token, DragOutcome::Copy)
+            .unwrap();
+
+        assert_eq!(snap.batches.len(), 1);
+        assert_eq!(snap.batches[0].id, batch_id);
+        assert_eq!(snap.batches[0].items.len(), 1);
+        assert_eq!(snap.batches[0].items[0].id, item_a_id);
+        assert!(snap.batches[0].items[0].is_pinned);
+
+        // Clean up retained item explicitly to verify batch prunes
+        let empty_snap = state.remove_item(&item_a_id).unwrap();
+        assert!(empty_snap.batches.is_empty());
+    }
+
+    #[test]
+    fn clear_temporary_mixed_batches_prunes_empty_and_preserves_identities_and_sources() {
+        let directory = TestDirectory::new("clear-temp-mixed");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        state.save_size(320.0, None).unwrap();
+
+        // Setup 3 files: a, b, c. Overlap a in multiple drops
+        let file_a = directory.0.join("a.txt");
+        let file_b = directory.0.join("b.txt");
+        let file_c = directory.0.join("c.txt");
+        let missing_path = directory.0.join("deleted_later.txt");
+
+        fs::write(&file_a, b"content-a").unwrap();
+        fs::write(&file_b, b"content-b").unwrap();
+        fs::write(&file_c, b"content-c").unwrap();
+        fs::write(&missing_path, b"content-missing").unwrap();
+
+        // Batch 1 (older, pos 1): file_a and missing_path (both temporary initially)
+        let snap1 = state
+            .accept_drop(vec![
+                Some(file_a.to_string_lossy().into_owned()),
+                Some(missing_path.to_string_lossy().into_owned()),
+            ])
+            .unwrap()
+            .snapshot
+            .unwrap();
+        let batch1_id = snap1.batches[0].id.clone();
+        let item_a1_id = snap1.batches[0].items[0].id.clone();
+        let _item_missing_id = snap1.batches[0].items[1].id.clone();
+
+        // Delete missing_path from disk so its availability becomes Missing/Unavailable
+        fs::remove_file(&missing_path).unwrap();
+
+        // Batch 2 (newer, pos 0): file_b (will be pinned) and file_c (temporary), plus overlapping file_a (temporary)
+        let snap2 = state
+            .accept_drop(vec![
+                Some(file_b.to_string_lossy().into_owned()),
+                Some(file_c.to_string_lossy().into_owned()),
+                Some(file_a.to_string_lossy().into_owned()),
+            ])
+            .unwrap()
+            .snapshot
+            .unwrap();
+        let batch2_id = snap2.batches[0].id.clone();
+        let item_b2_id = snap2.batches[0].items[0].id.clone();
+        let _item_c2_id = snap2.batches[0].items[1].id.clone();
+        let _item_a2_id = snap2.batches[0].items[2].id.clone();
+
+        // Pin item_a in Batch 1; Pin item_b in Batch 2
+        state.set_item_pinned(&item_a1_id, true).unwrap();
+        state.set_item_pinned(&item_b2_id, true).unwrap();
+
+        // Clear temporary items across shelf
+        let cleared = state.clear_temporary().unwrap();
+
+        // Both batches survive because each has 1 pinned item
+        assert_eq!(cleared.batches.len(), 2);
+        // Order preserved: Batch 2 is position 0, Batch 1 is position 1
+        assert_eq!(cleared.batches[0].id, batch2_id);
+        assert_eq!(cleared.batches[1].id, batch1_id);
+
+        // Surviving items retain identities and pin flag
+        assert_eq!(cleared.batches[0].items.len(), 1);
+        assert_eq!(cleared.batches[0].items[0].id, item_b2_id);
+        assert!(cleared.batches[0].items[0].is_pinned);
+        assert_eq!(cleared.batches[0].items[0].path, file_b.to_string_lossy());
+
+        assert_eq!(cleared.batches[1].items.len(), 1);
+        assert_eq!(cleared.batches[1].items[0].id, item_a1_id);
+        assert!(cleared.batches[1].items[0].is_pinned);
+        assert_eq!(cleared.batches[1].items[0].path, file_a.to_string_lossy());
+
+        // Preferred width is preserved while any items remain
+        assert_eq!(cleared.preferred_width, 320.0);
+
+        // Source filesystem files are untouched
+        assert_eq!(fs::read(&file_a).unwrap(), b"content-a");
+        assert_eq!(fs::read(&file_b).unwrap(), b"content-b");
+        assert_eq!(fs::read(&file_c).unwrap(), b"content-c");
+
+        // Now unpin item_b2 and clear_temporary again: Batch 2 becomes empty and must be pruned
+        state.set_item_pinned(&item_b2_id, false).unwrap();
+        let pruned = state.clear_temporary().unwrap();
+        assert_eq!(pruned.batches.len(), 1);
+        assert_eq!(pruned.batches[0].id, batch1_id);
+        assert_eq!(pruned.batches[0].items.len(), 1);
+        assert_eq!(pruned.batches[0].items[0].id, item_a1_id);
+        assert_eq!(pruned.preferred_width, 320.0);
+    }
+
+    #[test]
+    fn clear_temporary_all_pinned_is_noop() {
+        let directory = TestDirectory::new("clear-temp-noop");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        let file_a = directory.0.join("a.txt");
+        fs::write(&file_a, b"a").unwrap();
+
+        let snap = state
+            .accept_drop(vec![Some(file_a.to_string_lossy().into_owned())])
+            .unwrap()
+            .snapshot
+            .unwrap();
+        let item_id = snap.batches[0].items[0].id.clone();
+        let pinned_snap = state.set_item_pinned(&item_id, true).unwrap();
+
+        let cleared = state.clear_temporary().unwrap();
+        assert_eq!(
+            serde_json::to_value(&cleared).unwrap(),
+            serde_json::to_value(&pinned_snap).unwrap()
+        );
+    }
+
+    #[test]
+    fn clear_temporary_all_temporary_clears_sizing_and_resets() {
+        let directory = TestDirectory::new("clear-temp-final-reset");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        state.save_size(360.0, None).unwrap();
+
+        let file_a = directory.0.join("a.txt");
+        let file_b = directory.0.join("b.txt");
+        fs::write(&file_a, b"a").unwrap();
+        fs::write(&file_b, b"b").unwrap();
+
+        state
+            .accept_drop(vec![
+                Some(file_a.to_string_lossy().into_owned()),
+                Some(file_b.to_string_lossy().into_owned()),
+            ])
+            .unwrap();
+
+        let cleared = state.clear_temporary().unwrap();
+        assert!(cleared.batches.is_empty());
+        assert_eq!(cleared.preferred_width, 180.0);
+        assert_eq!(cleared.height, 180.0);
+
+        // Sources are still on disk
+        assert_eq!(fs::read(&file_a).unwrap(), b"a");
+        assert_eq!(fs::read(&file_b).unwrap(), b"b");
+    }
+
+    #[test]
+    fn clear_temporary_rollback_preserves_visible_and_durable_state() {
+        let directory = TestDirectory::new("clear-temp-rollback");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        state.save_size(340.0, None).unwrap();
+
+        let file_a = directory.0.join("a.txt");
+        let file_b = directory.0.join("b.txt");
+        fs::write(&file_a, b"a").unwrap();
+        fs::write(&file_b, b"b").unwrap();
+
+        let initial = state
+            .accept_drop(vec![
+                Some(file_a.to_string_lossy().into_owned()),
+                Some(file_b.to_string_lossy().into_owned()),
+            ])
+            .unwrap()
+            .snapshot
+            .unwrap();
+        let before = initial;
+        state.store().unwrap().connection.execute_batch(
+            "CREATE TEMP TRIGGER fail_partial_clear BEFORE DELETE ON shelf_items
+             WHEN NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = OLD.batch_id AND position = 0)
+             BEGIN SELECT RAISE(FAIL, 'forced failure after first deletion'); END;",
+        ).expect("partial-clear failure trigger should install");
+
+        // clear_temporary must fail
+        assert!(state.clear_temporary().is_err());
+
+        // Visible snapshot is preserved unchanged
+        assert_eq!(
+            serde_json::to_value(state.snapshot().unwrap()).unwrap(),
+            serde_json::to_value(&before).unwrap()
+        );
+
+        // Durable state on reopen is preserved unchanged
+        drop(state);
+        let reopened = ShelfState::open(&database).unwrap();
+        assert_eq!(
+            serde_json::to_value(reopened.snapshot().unwrap()).unwrap(),
+            serde_json::to_value(&before).unwrap()
+        );
+    }
+    #[test]
+    fn save_size_validation_rejects_sub_180_and_non_finite() {
+        let directory = TestDirectory::new("size-validation");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+
+        assert!(matches!(
+            state.save_size(179.9, None),
+            Err(super::ShelfError::InvalidWidth)
+        ));
+        assert!(matches!(
+            state.save_size(f64::NAN, None),
+            Err(super::ShelfError::InvalidWidth)
+        ));
+        assert!(matches!(
+            state.save_size(f64::INFINITY, None),
+            Err(super::ShelfError::InvalidWidth)
+        ));
+        assert!(matches!(
+            state.save_size(200.0, Some(179.9)),
+            Err(super::ShelfError::InvalidHeight)
+        ));
+        assert!(matches!(
+            state.save_size(200.0, Some(f64::NAN)),
+            Err(super::ShelfError::InvalidHeight)
+        ));
+        assert!(matches!(
+            state.save_size(200.0, Some(f64::NEG_INFINITY)),
+            Err(super::ShelfError::InvalidHeight)
+        ));
+    }
+
+    #[test]
+    fn width_only_eligibility_and_existing_override_preservation() {
+        let directory = TestDirectory::new("width-eligibility");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        // Intake 1 batch
+        state
+            .accept_drop(vec![Some("C:\\file1.txt".into())])
+            .unwrap();
+        assert_eq!(state.snapshot().unwrap().height, 180.0);
+
+        // Width-only resize: height is None, auto-growth eligibility preserved
+        let snap = state.save_size(250.0, None).unwrap();
+        assert_eq!(snap.preferred_width, 250.0);
+        assert_eq!(snap.height, 180.0);
+
+        // Add more batches: auto-growth kicks in because no manual override exists
+        for i in 2..=4 {
+            state
+                .accept_drop(vec![Some(format!("C:\\file{i}.txt"))])
+                .unwrap();
+        }
+        let grown = state.snapshot().unwrap();
+        assert_eq!(grown.height, 348.0);
+
+        // Now set manual override
+        let manual_snap = state.save_size(250.0, Some(220.0)).unwrap();
+        assert_eq!(manual_snap.height, 220.0);
+
+        // Another width-only resize with None must PRESERVE the existing manual override
+        let width_only = state.save_size(300.0, None).unwrap();
+        assert_eq!(width_only.preferred_width, 300.0);
+        assert_eq!(width_only.height, 220.0);
+    }
+
+    #[test]
+    fn empty_pending_intent_and_first_valid_intake_atomicity() {
+        let directory = TestDirectory::new("empty-pending");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        // Empty shelf: resize width + manual height
+        let empty_snap = state.save_size(320.0, Some(260.0)).unwrap();
+        assert_eq!(empty_snap.preferred_width, 320.0);
+        assert_eq!(empty_snap.height, 260.0);
+        assert!(empty_snap.batches.is_empty());
+
+        // Check reading empty snapshot preserves pending intent
+        let read_snap = state.snapshot().unwrap();
+        assert_eq!(read_snap.preferred_width, 320.0);
+        assert_eq!(read_snap.height, 260.0);
+
+        // No settings row in SQLite while empty
+        {
+            let conn = rusqlite::Connection::open(&database).unwrap();
+            let count: i64 = conn
+                .query_row("SELECT COUNT(*) FROM shelf_settings", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(count, 0);
+        }
+
+        // Unsupported/empty drop must be no-op: does not create settings row or alter intent
+        let drop_empty = state.accept_drop(vec![None, Some("".into())]).unwrap();
+        assert!(drop_empty.snapshot.is_none());
+        {
+            let conn = rusqlite::Connection::open(&database).unwrap();
+            let count: i64 = conn
+                .query_row("SELECT COUNT(*) FROM shelf_settings", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(count, 0);
+        }
+        let check_snap = state.snapshot().unwrap();
+        assert_eq!(check_snap.preferred_width, 320.0);
+        assert_eq!(check_snap.height, 260.0);
+
+        // First valid accepted batch commits pending intent into shelf_settings atomically
+        let accepted = state
+            .accept_drop(vec![Some("C:\\first.txt".into())])
+            .unwrap();
+        let snap = accepted.snapshot.unwrap();
+        assert_eq!(snap.preferred_width, 320.0);
+        assert_eq!(snap.height, 260.0);
+
+        // Verify settings row exists with persisted manual height
+        {
+            let conn = rusqlite::Connection::open(&database).unwrap();
+            let (pw, mh): (f64, Option<f64>) = conn
+                .query_row(
+                    "SELECT preferred_width, manual_height FROM shelf_settings WHERE id = 1",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .unwrap();
+            assert_eq!(pw, 320.0);
+            assert_eq!(mh, Some(260.0));
+        }
+
+        // Duplicate drop is a no-op and does not alter persistence
+        let dup = state
+            .accept_drop(vec![Some("C:\\first.txt".into())])
+            .unwrap();
+        assert!(dup.snapshot.is_none());
+    }
+
+    #[test]
+    fn restart_manual_versus_automatic_behavior() {
+        let directory = TestDirectory::new("restart-manual-vs-auto");
+        let database = directory.path().join("shelf.db");
+
+        // Case 1: Manual override persists across restart
+        {
+            let state = ShelfState::open(&database).unwrap();
+            state
+                .accept_drop(vec![Some("C:\\item.txt".into())])
+                .unwrap();
+            state.save_size(280.0, Some(250.0)).unwrap();
+        }
+        {
+            let restored = ShelfState::open(&database).unwrap();
+            let snap = restored.snapshot().unwrap();
+            assert_eq!(snap.preferred_width, 280.0);
+            assert_eq!(snap.height, 250.0);
+        }
+
+        // Clear shelf
+        {
+            let state = ShelfState::open(&database).unwrap();
+            state.clear_temporary().unwrap();
+        }
+
+        // Case 2: Automatic growth does NOT persist manual intent; recalculates on restart
+        {
+            let state = ShelfState::open(&database).unwrap();
+            for i in 0..4 {
+                state
+                    .accept_drop(vec![Some(format!("C:\\file{i}.txt"))])
+                    .unwrap();
+            }
+            assert_eq!(state.snapshot().unwrap().height, 348.0);
+            // Set preferred width only (None for manual height)
+            state.save_size(300.0, None).unwrap();
+            // Remove 3 batches: live height does NOT shrink
+            let snap = state.snapshot().unwrap();
+            for batch in &snap.batches[..3] {
+                state.remove_batch(&batch.id).unwrap();
+            }
+            assert_eq!(state.snapshot().unwrap().height, 348.0);
+        }
+        {
+            // On restart, automatic height recalculates to 180.0 for 1 batch
+            let restored = ShelfState::open(&database).unwrap();
+            let snap = restored.snapshot().unwrap();
+            assert_eq!(snap.preferred_width, 300.0);
+            assert_eq!(snap.height, 180.0);
+        }
+    }
+
+    #[test]
+    fn final_item_removal_resets_manual_and_staged_sizing_to_180() {
+        let directory = TestDirectory::new("final-item-reset");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        // 1. Remove final item via remove_batch
+        state
+            .accept_drop(vec![Some("C:\\batch1.txt".into())])
+            .unwrap();
+        state.save_size(240.0, Some(220.0)).unwrap();
+        let snap = state.snapshot().unwrap();
+        let empty = state.remove_batch(&snap.batches[0].id).unwrap();
+        assert_eq!((empty.preferred_width, empty.height), (180.0, 180.0));
+
+        // Next intake after final removal defaults to 180x180
+        let reintake = state
+            .accept_drop(vec![Some("C:\\batch2.txt".into())])
+            .unwrap();
+        assert_eq!(
+            (
+                reintake.snapshot.as_ref().unwrap().preferred_width,
+                reintake.snapshot.as_ref().unwrap().height
+            ),
+            (180.0, 180.0)
+        );
+
+        // 2. Remove final item via consume_items (Copy outcome)
+        state.save_size(270.0, Some(230.0)).unwrap();
+        let snap = state.snapshot().unwrap();
+        let empty = state
+            .complete_item_drag(&snap.batches[0].items[0].id, DragOutcome::Copy)
+            .unwrap();
+        assert_eq!((empty.preferred_width, empty.height), (180.0, 180.0));
+
+        // 3. Remove final item via preparation pruning (missing path)
+        state
+            .accept_drop(vec![Some("C:\\missing_item.txt".into())])
+            .unwrap();
+        state.save_size(290.0, Some(240.0)).unwrap();
+        let snap = state.snapshot().unwrap();
+        let prep = state
+            .prepare_batch_drag_with(&snap.batches[0].id, |_| super::Availability::Missing)
+            .unwrap();
+        assert_eq!(
+            (prep.snapshot.preferred_width, prep.snapshot.height),
+            (180.0, 180.0)
+        );
+    }
+
+    #[test]
+    fn failed_sizing_transaction_and_staged_commit_rollback() {
+        let directory = TestDirectory::new("sizing-rollback");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        // Case 1: Failed save_size on populated shelf preserves previous retained intent
+        state
+            .accept_drop(vec![Some("C:\\item.txt".into())])
+            .unwrap();
+        state.save_size(250.0, Some(210.0)).unwrap();
+
+        // Install trigger that fails updates on shelf_settings
+        state.install_test_settings_failure().unwrap();
+
+        let fail_res = state.save_size(300.0, Some(250.0));
+        assert!(fail_res.is_err());
+
+        // Previous cached intent retained
+        let cached = state.snapshot().unwrap();
+        assert_eq!(cached.preferred_width, 250.0);
+        assert_eq!(cached.height, 210.0);
+
+        // Drop and reopen to verify SQLite state was also rolled back
+        drop(cached);
+        drop(state);
+        let reopened = ShelfState::open(&database).unwrap();
+        let reopened_snap = reopened.snapshot().unwrap();
+        assert_eq!(reopened_snap.preferred_width, 250.0);
+        assert_eq!(reopened_snap.height, 210.0);
+
+        // Case 2: Failed batch insert rolls back staged commit and keeps staged intent pending
+        reopened.clear_temporary().unwrap();
+        reopened.save_size(320.0, Some(240.0)).unwrap();
+
+        // Install trigger that fails item inserts
+        reopened.install_test_insert_failure().unwrap();
+
+        let insert_res = reopened.accept_drop(vec![Some("C:\\fail.txt".into())]);
+        assert!(insert_res.is_err());
+
+        // Cached state is still pending staged intent
+        let pending_snap = reopened.snapshot().unwrap();
+        assert_eq!(pending_snap.preferred_width, 320.0);
+        assert_eq!(pending_snap.height, 240.0);
     }
 }
