@@ -1,8 +1,8 @@
 # DropCove Architecture
 
-> Canonical current-state architecture for DropCove.
+> Canonical target architecture for DropCove.
 
-This document describes the architecture required to reproduce the current DropCove application on Windows. It is Windows-specific but implementation-language-neutral. Product behavior, installation, settings, and user workflows are defined in [SPECIFICATION.md](SPECIFICATION.md).
+This document defines the architecture required to implement the target DropCove application on Windows. It is Windows-specific but implementation-language-neutral. Product behavior, installation, settings, and user workflows are defined in [SPECIFICATION.md](SPECIFICATION.md).
 
 [`DropCove.md`](DropCove.md) is retained as implementation history and design evidence. If it conflicts with this document or `SPECIFICATION.md`, the two canonical documents take precedence.
 
@@ -87,7 +87,7 @@ Owns:
 - Temporary and Pinned Item lifecycle;
 - availability classification supplied at event boundaries;
 - display state;
-- remembered rail placement;
+- remembered rail monitor;
 - preferred width and optional Manual Height Override;
 - preparation and completion of item or batch drag-out;
 - serialized mutations.
@@ -100,7 +100,7 @@ Stores durable shelf state in a per-user SQLite database using write-ahead loggi
 
 ### 2.5 Settings and Startup Adapters
 
-- The Settings Adapter atomically reads and replaces a JSON settings file.
+- The Settings Adapter atomically reads and replaces a JSON settings file and owns the configured rail edge and target-monitor preference.
 - The Startup Adapter owns the current-user Windows sign-in registration and launches DropCove with the hidden-start option.
 
 ### 2.6 Windows Integration Adapters
@@ -152,7 +152,7 @@ The instance identity is profile-specific. A normal profile and an explicit test
 | **Shelf Batch** | Identifier, creation time, position | Represents one accepted drop; ordered newest-first. |
 | **Shelf Item** | Identifier, batch identifier, position, path, display name, folder flag, pinned flag | Represents one path occurrence inside one batch. |
 | **Display State** | Not persisted as a standalone value | `Hidden`, `Visible`, or `EdgeDocked`. |
-| **Rail Placement** | Monitor identifier, `Left` or `Right` edge | Remembered independently from display state. |
+| **Rail Placement** | Settings: target monitor identifier and `Left` or `Right` edge; shelf state: remembered monitor identifier | A configured target monitor takes precedence over remembered placement; temporary fallback does not rewrite the configured preference. |
 | **Sizing State** | Preferred logical width, nullable manual logical height | Automatic height applies when manual height is absent. |
 | **Availability** | Not persisted | Recomputed as `Available`, `Missing`, or `Unavailable` at restore and drag boundaries. |
 
@@ -231,7 +231,7 @@ The Core Shelf State Module exposes behavior equivalent to these operations:
 | Clear Temporary Items | Removes only Temporary Items across all batches; Pinned Items remain. |
 | Prepare batch drag | Reclassifies paths, durably removes Missing Items, retains Unavailable Items, and records participating Available Items. |
 | Complete item or batch drag | Consumes participating Temporary Items only after accepted `Copy`; Pinned Items remain. |
-| Dismiss shelf | Chooses `Hidden` when empty or persists rail placement and chooses `EdgeDocked` when non-empty. |
+| Dismiss shelf | Chooses `Hidden` when empty or records the actual dismissal monitor and chooses `EdgeDocked` when non-empty; rail edge and target-monitor preference remain settings-owned. |
 | Save sizing intent | Persists while content exists; pending empty-shelf intent is persisted with the first accepted batch. |
 
 Mutations are serialized. A persistence failure must not leave a user-observable partial mutation. An accepted-drop implementation may optimistically stage memory state, but it must remove that state if the durable insert fails.
@@ -337,7 +337,7 @@ The database uses foreign keys, write-ahead logging, serialized access, and an i
 |---|---|---|
 | `shelf_batches` | `id`, `created_at`, `position` | Newest-first batch order. |
 | `shelf_items` | `id`, `batch_id`, `position`, `path`, `name`, `is_folder`, `is_pinned` | Ordered item references and lifecycle state. |
-| `shelf_ui_state` | singleton `id`, `rail_monitor`, `rail_edge` | Remembered Edge Rail placement. |
+| `shelf_ui_state` | singleton `id`, nullable `rail_monitor` | Monitor actually used for the latest non-empty shelf dismissal. |
 | `shelf_settings` | singleton `id`, `preferred_width`, nullable `manual_height` | Retained user sizing intent. |
 
 The database does not store availability, source bytes, icons, or thumbnail bytes.
@@ -353,6 +353,8 @@ Default path:
 ```
 
 Settings are written to a temporary file, flushed, and atomically moved over the active file. Missing, unreadable, or malformed settings load the defaults.
+
+`RailEdge` and `RailMonitorId` are settings-owned. A non-empty `RailMonitorId` is an explicit target-monitor preference; an empty value requests the remembered `shelf_ui_state.rail_monitor`.
 
 ### 10.3 Sign-in startup registration
 
@@ -378,8 +380,11 @@ This favors continued application availability while preserving evidence for man
 - Shelf and rail bounds are clamped to the selected monitor's work area.
 - Hotkey, notification-area activation, and ordinary launch use the monitor containing the cursor.
 - Shake-to-open places the shelf near the current cursor.
-- Edge Rail uses a remembered monitor and left/right edge.
-- If the remembered monitor is unavailable, placement resolves to a connected monitor without rewriting the user's remembered choice solely because of temporary disconnection.
+- Edge Rail uses `RailEdge` from settings for its left/right side.
+- A connected non-empty `RailMonitorId` is the target monitor. If it is unavailable, the rail temporarily uses the Windows primary display without rewriting that setting.
+- An empty `RailMonitorId` uses the remembered `shelf_ui_state.rail_monitor` when connected. An unavailable remembered monitor temporarily falls back to the Windows primary display.
+- If no remembered monitor exists during non-empty shelf dismissal, the monitor containing the Drop Shelf is used.
+- Every non-empty shelf dismissal stores the actual selected monitor. A display-change fallback while already docked does not by itself rewrite remembered placement.
 - Display and DPI changes trigger reflow through window/display events.
 
 The Drop Shelf is borderless but retains native resize behavior on all edges and corners. The Edge Rail is a separate no-activate window so hover, drop-in, drag-out, and management do not steal foreground focus.

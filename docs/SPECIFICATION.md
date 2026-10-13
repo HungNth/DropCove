@@ -1,6 +1,6 @@
 # DropCove Product Specification
 
-> Canonical specification of current DropCove behavior.
+> Canonical specification of target DropCove behavior.
 
 DropCove is a resident Windows utility that provides a temporary drag-and-drop workspace for files and folders. It holds path references between workflows, preserves which items arrived together, and lets users drag them into another application later.
 
@@ -388,9 +388,10 @@ The Edge Rail appears when a non-empty Drop Shelf is dismissed.
 
 ### 11.1 Placement
 
-- Dock edge: `Left` or `Right`.
-- Default edge: `Right`.
-- Target monitor: configured monitor or remembered dismissal monitor.
+- Dock edge comes from `RailEdge` in settings; the default is `Right`.
+- A non-empty `RailMonitorId` is the explicit target monitor. When connected, it takes precedence over remembered placement. When unavailable, DropCove temporarily uses the Windows primary display without changing the setting.
+- An empty `RailMonitorId` requests the remembered dismissal monitor from shelf state. If that monitor is unavailable, DropCove temporarily uses the Windows primary display. If no remembered monitor exists, dismissal uses the monitor containing the Drop Shelf.
+- Every non-empty Drop Shelf dismissal stores the actual selected monitor. A display-change fallback while the rail is already docked does not by itself replace the remembered monitor.
 - The rail remains centered vertically in the selected monitor work area.
 - The rail is an overlay and does not reserve desktop work area.
 - Screen-edge corners remain square; desktop-facing corners are rounded.
@@ -592,7 +593,7 @@ Availability is refreshed at restore and drag boundaries. DropCove does not cont
 | Global hotkey                     | `Ctrl + Shift + Space` | At least one modifier plus a supported primary key                  |
 | Start with Windows                | On                     | Adds/removes current-user sign-in registration                      |
 | Docking edge                      | Right                  | Left or Right                                                       |
-| Target monitor                    | Use remembered monitor | Any connected display; unavailable saved display remains selectable |
+| Target monitor                    | Use remembered monitor | A display identifier or remembered placement; unavailable saved displays remain selectable |
 | Show over fullscreen applications | Off                    | Controls Edge Rail fullscreen hiding                                |
 | Enable shake gesture              | On                     | Installs/removes global pointer hook                                |
 | Shake sensitivity                 | Normal                 | Low, Normal, High                                                   |
@@ -636,6 +637,8 @@ Default serialized content:
 }
 ```
 
+`RailEdge` and `RailMonitorId` are user preferences. An empty `RailMonitorId` selects the remembered dismissal monitor stored in shelf state; a non-empty value takes precedence whenever that display is connected.
+
 The numeric virtual-key value is stable across keyboard layouts. Its displayed punctuation label follows the current Windows keyboard layout.
 
 Missing, malformed, or unreadable settings load defaults. Settings saves replace the file atomically through a temporary file.
@@ -648,7 +651,7 @@ Persisted shelf data includes:
 
 - Shelf Batch identity, creation time, and order;
 - Shelf Item identity, order, path, name, file/folder type, and pinned state;
-- Edge Rail monitor and side;
+- remembered Edge Rail dismissal monitor;
 - preferred shelf width and optional Manual Height Override while content exists.
 
 Not persisted:
@@ -673,8 +676,8 @@ If the shelf database is corrupt or cannot be opened through a recoverable stora
 - Drop Shelf and Edge Rail remain inside the monitor work area.
 - Hotkey, tray, and ordinary launch use the cursor monitor.
 - Shake-to-open uses the current cursor monitor and nearby placement.
-- Edge Rail remains on its configured or remembered monitor instead of following the cursor.
-- A disconnected remembered monitor resolves to a connected fallback while unavailable.
+- Edge Rail follows the configured-monitor and remembered-monitor precedence defined in section 11.1 instead of following the cursor.
+- An unavailable configured or remembered monitor temporarily resolves to the Windows primary display. This fallback does not rewrite settings, and a display-change fallback alone does not replace remembered placement.
 - Display, device, and DPI changes trigger event-driven repositioning or reflow.
 
 Top and bottom Edge Rail docking are not supported.

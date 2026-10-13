@@ -1,0 +1,83 @@
+<script setup lang="ts">
+import type { ShelfItem } from "../../composables/useShelf";
+
+const props = defineProps<{ item: ShelfItem; busy: boolean }>();
+const emit = defineEmits<{
+  pin: [itemId: string, pinned: boolean];
+  remove: [itemId: string];
+  drag: [itemId: string];
+}>();
+let pointerStart: { id: number; x: number; y: number } | undefined;
+
+function pointerDown(event: PointerEvent) {
+  if (event.button !== 0 || props.busy) return;
+  pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+}
+
+function pointerMove(event: PointerEvent) {
+  if (!pointerStart || event.pointerId !== pointerStart.id) return;
+  if (!(event.buttons & 1)) { pointerStart = undefined; return; }
+  if (Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) < 6) return;
+  pointerStart = undefined;
+  (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+  emit("drag", props.item.id);
+}
+</script>
+
+<template>
+  <li class="item-row" :data-item-id="item.id" :aria-label="`${item.name}, ${item.path}, ${item.availability}`">
+    <div
+      class="item-drag"
+      :title="item.path"
+      :aria-label="`Drag ${item.path} to copy`"
+      @pointerdown.prevent="pointerDown"
+      @pointermove="pointerMove"
+      @pointerup="pointerStart = undefined"
+      @pointercancel="pointerStart = undefined"
+      @dragstart.prevent
+    >
+      <span class="item-icon" aria-hidden="true">{{ item.isFolder ? "▰" : "▤" }}</span>
+      <span class="item-info">
+        <span class="item-name">{{ item.name }}</span>
+        <span class="item-path">{{ item.path }}</span>
+      </span>
+    </div>
+    <div class="item-actions">
+      <span class="availability">{{ item.isPinned ? "Pinned · " : "" }}{{ item.availability }}</span>
+      <button
+        class="action pin"
+        type="button"
+        :disabled="busy"
+        :aria-label="`${item.isPinned ? 'Unpin' : 'Pin'} ${item.name}`"
+        :aria-pressed="item.isPinned"
+        @click="emit('pin', item.id, !item.isPinned)"
+      >{{ item.isPinned ? "Unpin" : "Pin" }}</button>
+      <button
+        class="action remove"
+        type="button"
+        :disabled="busy"
+        :aria-label="`Remove ${item.name}`"
+        title="Remove reference; the source is not deleted"
+        @click="emit('remove', item.id)"
+      >Remove</button>
+    </div>
+  </li>
+</template>
+
+<style scoped>
+.item-row { min-width: 0; border: 1px solid #3b475c; border-radius: 7px; padding: 6px; background: #202a3b; }
+.item-drag { display: flex; align-items: center; gap: 7px; cursor: grab; user-select: none; touch-action: none; }
+.item-drag:active { cursor: grabbing; }
+.item-icon { flex-shrink: 0; color: #a5b4fc; font-size: 20px; }
+.item-info { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.item-name, .item-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-name { font-size: 12px; }
+.item-path { color: #a7b4cb; font-size: 10px; }
+.item-actions { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
+.availability { flex: 1; color: #a7b4cb; font-size: 10px; }
+.action { border: 1px solid #46536a; border-radius: 4px; padding: 2px 5px; color: inherit; background: transparent; font: inherit; font-size: 10px; cursor: pointer; }
+.pin[aria-pressed="true"] { border-color: #a5b4fc; color: #a5b4fc; }
+.action:focus-visible { outline: 2px solid #a5b4fc; }
+.action:disabled { opacity: .45; cursor: default; }
+</style>

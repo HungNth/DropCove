@@ -21,5 +21,5 @@ A collapsed UI strip docked at the screen edge indicating held items and allowin
 _Avoid_: Sidebar, dock, toolbar
 
 **Shake-to-open**:
-A gesture triggering the shelf display by rapidly shaking the mouse cursor while dragging files.
+The gesture of rapidly moving the pointer back and forth while holding the left mouse button to request that the Shelf appear near the pointer.
 _Avoid_: Mouse jiggle, cursor flick
