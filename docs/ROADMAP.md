@@ -319,4 +319,64 @@ Before completion:
 
 ### Deferred
 
-- No target requirement is intentionally deferred beyond `0.0.8`. Advancing to another version requires a new approved scope; advancing to `0.1.0` or `1.0.0` requires explicit approval.
+- Frontend toolchain and dependency modernization in `0.0.9`, and compact Drop Shelf and Edge Rail UI refinement in `0.0.10`.
+
+## 0.0.9 — Frontend toolchain and dependency modernization
+
+**Status:** Planned.
+
+### Scope
+
+- Upgrade `package.json` dependencies and devDependencies to the latest target versions: `@vueuse/core` (`15.0.0`), `pinia` (`4.0.3`), `vue-router` (`5.4.0`), `@vitejs/plugin-vue` (`6.0.10`), `tailwindcss` (`4.3.3`), `typescript` (`7.0.2`), `vite` (`8.3.4`), and `vue-tsc` (`3.3.13`).
+- Update companion packages (`vue`, `@tauri-apps/api`, `@tauri-apps/cli`, `@tauri-apps/plugin-opener`, and Tailwind CSS v4 Vite/PostCSS tooling) as needed to maintain full compatibility across the upgraded stack.
+- Migrate configuration and stylesheet directives where required by Tailwind CSS v4, Vite 8, and TypeScript 7 without regressing light, dark, or high-contrast theme tokens.
+- Verify full compatibility with the existing application workflows, typechecking, frontend bundling, and Windows x64 Tauri packaging.
+
+### Implemented
+
+- Not started.
+
+### Verification
+
+Before completion:
+
+- Confirm `pnpm install` resolves cleanly with the upgraded dependency graph and lockfile.
+- Pass `vue-tsc` typechecking and `vite build` with zero errors under TypeScript `7.0.2`, `vue-tsc` `3.3.13`, and Vite `8.3.4`.
+- Pass the native Windows x64 test suite and `cargo xwin build --release`.
+- Build and launch `DropCove-Setup-0.0.9.exe` on Windows 11 x64 and verify that Drop Shelf, Edge Rail, Manage Items, Settings, and native drag-and-drop workflows operate without visual or runtime regressions.
+
+### Deferred
+
+- Compact Drop Shelf and Edge Rail UI refinement in `0.0.10`.
+
+## 0.0.10 — Compact Drop Shelf and Edge Rail UI refinement
+
+**Status:** Planned.
+
+### Scope
+
+- Eliminate the corner gap and outer border artifact at all four corners of the Drop Shelf (and related popup surfaces) so the rounded surface border aligns flush with the transparent window frame.
+- Fix Edge Rail corner rendering so both desktop-facing corners (top and bottom) are symmetrically rounded with a continuous border while the screen-edge corners remain square (fixing the current bug where the bottom desktop-facing corner is square and mismatched with the rounded top border).
+- Remove the Drop Shelf header (`DropCove` title and `References, not copies` subtitle) across all states, and simplify the empty Drop Shelf prompt to a downward icon and `"Drop here"`.
+- Remove the drag-hint subtitle (`"Drag batch to copy"`, `"Drag to copy"`, and `"Pinned · Drag to copy"`) from all single-item and multi-item batch cards across Drop Shelf and Edge Rail to reduce card and row height.
+- Replace `Pin`, tri-state `Pin All`, `Remove`, `Manage Items`, and `Close` text buttons with compact single-row icon controls across `ShelfBatchCard` and `ManageItems`, complete with hover, `focus-visible`, tooltip, and accessible name/state support.
+- Replace `Clear Temporary Items` with a trash-can icon button positioned at the bottom-left corner of both the Drop Shelf and the expanded Edge Rail.
+- Remove the `Retained Batches (N)` header title from the expanded Edge Rail and replace `Open Shelf` with a directional icon button positioned at the top-right corner when docked on the `Left` screen edge and at the top-left corner when docked on the `Right` screen edge.
+
+### Implemented
+
+- Not started.
+
+### Verification
+
+Before completion:
+
+- Inspect all four corners of the Drop Shelf and the desktop-facing vs. screen-edge corners of the Edge Rail (collapsed and expanded, `Left` and `Right` edges) on Windows 11 x64 across Dark, Light, and Contrast themes to confirm symmetric corner rounding and no interior gap or mismatched border.
+- Verify that the Drop Shelf renders without the top title/subtitle header, displays only the icon and `"Drop here"` when empty, and renders compact batch cards without drag-hint text.
+- Exercise single-row icon actions (`Pin`, `Pin All`, `Manage Items`, `Remove`, and `Close`) across Drop Shelf, Edge Rail, and Manage Items via pointer and keyboard (`Tab`, `Shift+Tab`, `Enter`, `Space`), verifying hover, focus rings, tooltips, and `aria-label`/`aria-pressed` semantics.
+- Verify the bottom-left trash-can icon triggers `Clear Temporary Items` confirmation on both Drop Shelf and expanded Edge Rail, and verify the top-corner `Open Shelf` icon switches between top-right (`Left` edge) and top-left (`Right` edge) according to the active docking edge.
+- Build and launch `DropCove-Setup-0.0.10.exe` on Windows 11 x64 and pass the full native regression and smoke suite.
+
+### Deferred
+
+- No target requirement is intentionally deferred beyond `0.0.10`. Advancing to another version requires a new approved scope; advancing to `0.1.0` or `1.0.0` requires explicit approval.
