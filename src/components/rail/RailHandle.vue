@@ -160,7 +160,8 @@ async function startBatchDrag(batchId: string) {
       };
       return;
     }
-    await runAction("start_batch_drag", { token: preparation.token });
+    await invoke("start_batch_drag", { token: preparation.token });
+    await refreshBatches();
   } catch (error) {
     if (!disposed) status.value = String(error);
   } finally {

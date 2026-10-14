@@ -12,6 +12,7 @@ export interface HotKey {
 }
 
 export type RailEdge = "Left" | "Right";
+export type ShakeSensitivity = "Low" | "Normal" | "High";
 export interface MonitorChoice { id: string; label: string; connected: boolean }
 
 export interface SettingsSnapshot {
@@ -22,6 +23,8 @@ export interface SettingsSnapshot {
   railEdge: RailEdge;
   railMonitorId: string;
   showRailOverFullscreen: boolean;
+  shakeEnabled: boolean;
+  shakeSensitivity: ShakeSensitivity;
   monitors: MonitorChoice[];
 }
 
@@ -125,6 +128,17 @@ export function useSettings() {
     } finally { if (!disposed) busy.value = false; }
   }
 
+  async function setShake(enabled: boolean, sensitivity: ShakeSensitivity) {
+    if (busy.value || disposed) return;
+    busy.value = true;
+    try {
+      const next = await invoke<SettingsSnapshot>("set_shake", { enabled, sensitivity });
+      if (!disposed) { snapshot.value = next; status.value = ""; }
+    } catch (error) {
+      if (!disposed) status.value = String(error);
+    } finally { if (!disposed) busy.value = false; }
+  }
+
 
   async function save() {
     if (busy.value || disposed) return;
@@ -197,6 +211,7 @@ export function useSettings() {
     setStartWithWindows,
     setRailPlacement,
     setShowRailOverFullscreen,
+    setShake,
     monitors,
     save,
     cancel,

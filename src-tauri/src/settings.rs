@@ -2,7 +2,7 @@
 
 use crate::{
     resident,
-    settings_store::{HotKey, RailEdge, Settings, SettingsStore},
+    settings_store::{HotKey, RailEdge, Settings, SettingsStore, ShakeSensitivity},
     settings_transaction::{self, Integrations},
     windows_hotkey,
     windows_startup::{RegistryValue, StartupRegistration},
@@ -32,6 +32,8 @@ pub(crate) struct SettingsSnapshot {
     pub(crate) rail_edge: RailEdge,
     pub(crate) rail_monitor_id: String,
     pub(crate) show_rail_over_fullscreen: bool,
+    pub(crate) shake_enabled: bool,
+    pub(crate) shake_sensitivity: ShakeSensitivity,
     pub(crate) monitors: Vec<crate::edge_rail::MonitorChoice>,
 }
 struct SettingsSession {
@@ -87,6 +89,9 @@ pub(crate) fn initialize(
     if let Err(error) = startup_result {
         warnings.push(format!("Start with Windows could not be applied: {error}. Desired setting remains {}; Save can retry", desired.start_with_windows));
     }
+    if let Err(error) = crate::windows_shake::initialize(window, &desired) {
+        warnings.push(format!("Shake-to-open unavailable: {error}; tray, hotkey, Shelf and Rail remain available; Save can retry"));
+    }
     app.manage(SettingsState {
         session: Mutex::new(Some(SettingsSession {
             profile: profile.to_path_buf(),
@@ -138,6 +143,8 @@ pub(crate) fn get_snapshot(app: &AppHandle) -> Result<SettingsSnapshot, String> 
         rail_edge: settings.rail_edge,
         rail_monitor_id: settings.rail_monitor_id.clone(),
         show_rail_over_fullscreen: settings.show_rail_over_fullscreen,
+        shake_enabled: settings.shake_enabled,
+        shake_sensitivity: settings.shake_sensitivity,
         monitors: crate::edge_rail::choices()?,
     })
 }
@@ -295,6 +302,27 @@ pub(crate) fn set_show_rail_over_fullscreen(
     }
     emit_snapshot(app)
 }
+pub(crate) fn set_shake(
+    app: &AppHandle,
+    enabled: bool,
+    sensitivity: ShakeSensitivity,
+) -> Result<SettingsSnapshot, String> {
+    if app.get_webview_window(SETTINGS_WINDOW_LABEL).is_none() {
+        return Err("Settings window is not open".into());
+    }
+    {
+        let state = app.state::<SettingsState>();
+        let mut session = state.lock()?;
+        let session = session
+            .as_mut()
+            .ok_or("settings coordinator is not initialized")?;
+        let candidate = session.draft.get_or_insert_with(|| session.desired.clone());
+        candidate.shake_enabled = enabled;
+        candidate.shake_sensitivity = sensitivity;
+    }
+    emit_snapshot(app)
+}
+
 pub(crate) fn handle_hotkey(app: &AppHandle, id: i32) -> Result<(), String> {
     let recording_key = {
         let state = app.state::<SettingsState>();
@@ -324,6 +352,7 @@ struct NativeIntegrations<'a> {
 }
 impl Integrations for NativeIntegrations<'_> {
     type RailSnapshot = Option<crate::edge_rail::Placement>;
+    type ShakeSnapshot = crate::windows_shake::RuntimeSnapshot;
     fn rail_snapshot(&self) -> Result<Self::RailSnapshot, String> {
         resident::rail_placement(self.app)
     }
@@ -335,6 +364,22 @@ impl Integrations for NativeIntegrations<'_> {
     }
     fn rail_description(&self) -> Result<String, String> {
         crate::edge_rail::description(self.app)
+    }
+    fn shake_snapshot(&self) -> Result<Self::ShakeSnapshot, String> {
+        crate::windows_shake::snapshot(self.app)
+    }
+    fn shake_apply(&mut self, settings: &Settings) -> Result<(), String> {
+        let window = self
+            .app
+            .get_webview_window("main")
+            .ok_or("Drop Shelf window is missing")?;
+        crate::windows_shake::initialize(&window, settings)
+    }
+    fn shake_restore(&mut self, previous: &Self::ShakeSnapshot) -> Result<(), String> {
+        crate::windows_shake::restore(self.app, previous)
+    }
+    fn shake_description(&self) -> Result<String, String> {
+        crate::windows_shake::description(self.app)
     }
     fn register(&mut self, key: &HotKey) -> Result<i32, String> {
         windows_hotkey::register(self.app, key)
@@ -470,6 +515,7 @@ pub(crate) fn on_settings_window_focus_changed(app: &AppHandle, focused: bool) {
     }
 }
 pub(crate) fn shutdown(app: &AppHandle) -> Result<(), String> {
+    crate::windows_shake::shutdown(app)?;
     windows_hotkey::shutdown(app)?;
     if let Some(window) = app.get_webview_window(SETTINGS_WINDOW_LABEL) {
         window.close().map_err(|error| error.to_string())?;

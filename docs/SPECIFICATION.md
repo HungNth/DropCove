@@ -600,8 +600,8 @@ Availability is refreshed at restore and drag boundaries. DropCove does not cont
 | Docking edge                      | Right                  | Left or Right                                                       | `0.0.5`    |
 | Target monitor                    | Use remembered monitor | A display identifier or remembered placement; unavailable saved displays remain selectable | `0.0.5`    |
 | Show over fullscreen applications | Off                    | Controls Edge Rail fullscreen hiding                                | `0.0.5`    |
-| Enable shake gesture              | On                     | Installs/removes global pointer hook                                | Shake version |
-| Shake sensitivity                 | Normal                 | Low, Normal, High                                                   | Shake version |
+| Enable shake gesture              | On                     | Installs/removes global pointer hook                                | `0.0.6`    |
+| Shake sensitivity                 | Normal                 | Low, Normal, High                                                   | `0.0.6`    |
 
 There is no setting to disable the Edge Rail while retaining its standard non-empty dismissal behavior.
 
@@ -659,7 +659,27 @@ Serialized content in `0.0.5`:
 }
 ```
 
-The `0.0.5` schema is a clean cutover: all five top-level fields are required and unknown fields remain rejected. A `0.0.4` settings file without the Rail fields therefore follows the normal malformed-settings path: preserve the original bytes, load `0.0.5` defaults in memory, warn, and replace the file only after a successful explicit Save.
+Serialized content in `0.0.6`:
+
+```json
+{
+    "HotKey": {
+        "Control": true,
+        "Alt": false,
+        "Shift": true,
+        "Windows": false,
+        "VirtualKey": 32
+    },
+    "StartWithWindows": true,
+    "RailEdge": "Right",
+    "RailMonitorId": "",
+    "ShowRailOverFullscreen": false,
+    "ShakeEnabled": true,
+    "ShakeSensitivity": "Normal"
+}
+```
+
+Each schema extension (`0.0.5` and `0.0.6`) is a clean cutover: all top-level fields for the active version are required and unknown fields remain rejected. Earlier-version settings files without the newer fields follow the normal malformed-settings path: preserve the original bytes, load active defaults in memory, warn, and replace the file only after a successful explicit Save.
 
 `RailEdge` and `RailMonitorId` are user preferences. An empty `RailMonitorId` selects the remembered dismissal monitor stored in shelf state; a non-empty value takes precedence whenever that display is connected.
 

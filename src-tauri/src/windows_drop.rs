@@ -161,14 +161,26 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         let can_copy = resolved_effect == DROPEFFECT_COPY;
         self.can_copy.set(can_copy);
         *effect = resolved_effect;
+        if self.window.label() == "main" {
+            if let Err(error) = crate::resident::shake_drag_inside(self.window.app_handle(), true) {
+                let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
+            }
+        }
         if self.window.label() == crate::edge_rail::LABEL && can_copy {
             let now = crate::resident::now_monotonic_ms();
-            match self.window.state::<crate::resident::ResidentState>().on_rail_pointer_enter(now) {
+            match self
+                .window
+                .state::<crate::resident::ResidentState>()
+                .on_rail_pointer_enter(now)
+            {
                 Ok(rail) => {
                     if let Some(due) = rail.expand_due_ms {
                         let remaining = (due.saturating_sub(now)).max(1) as u32;
-                        if let Err(error) = crate::edge_rail::arm_rail_timer(self.window.app_handle(), remaining) {
-                            let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
+                        if let Err(error) =
+                            crate::edge_rail::arm_rail_timer(self.window.app_handle(), remaining)
+                        {
+                            let _ =
+                                crate::resident::publish_warning(self.window.app_handle(), &error);
                         }
                     } else {
                         crate::edge_rail::cancel_rail_timer(self.window.app_handle());
@@ -199,14 +211,27 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
 
     fn DragLeave(&self) -> Result<()> {
         self.can_copy.set(false);
+        if self.window.label() == "main" {
+            if let Err(error) = crate::resident::shake_drag_inside(self.window.app_handle(), false)
+            {
+                let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
+            }
+        }
         if self.window.label() == crate::edge_rail::LABEL {
             let now = crate::resident::now_monotonic_ms();
-            match self.window.state::<crate::resident::ResidentState>().on_rail_pointer_leave(now) {
+            match self
+                .window
+                .state::<crate::resident::ResidentState>()
+                .on_rail_pointer_leave(now)
+            {
                 Ok(rail) => {
                     if let Some(due) = rail.collapse_due_ms {
                         let remaining = (due.saturating_sub(now)).max(1) as u32;
-                        if let Err(error) = crate::edge_rail::arm_rail_timer(self.window.app_handle(), remaining) {
-                            let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
+                        if let Err(error) =
+                            crate::edge_rail::arm_rail_timer(self.window.app_handle(), remaining)
+                        {
+                            let _ =
+                                crate::resident::publish_warning(self.window.app_handle(), &error);
                         }
                     } else {
                         crate::edge_rail::cancel_rail_timer(self.window.app_handle());
@@ -230,9 +255,19 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         // SAFETY: OLE provides this output pointer for this callback only.
         let effect = unsafe { requested_effect(effect)? };
         let own_drag = self.window.state::<DragSession>().is_active();
-        let paths = match data.as_ref() {
-            Some(data) => storage_paths(data)?,
-            None => Vec::new(),
+        let shake_id = if self.window.label() == "main" {
+            crate::resident::shake_drop_started(self.window.app_handle())
+                .map_err(|_| Error::from_hresult(E_FAIL))?
+        } else {
+            None
+        };
+        let paths = match data.as_ref().map(storage_paths).transpose() {
+            Ok(paths) => paths.unwrap_or_default(),
+            Err(error) => {
+                let _ =
+                    crate::resident::complete_shake_drop(self.window.app_handle(), shake_id, false);
+                return Err(error);
+            }
         };
         let supported = paths.iter().any(Option::is_some);
         let resolved_effect = evaluate_storage_drop(own_drag, *effect, supported);
@@ -240,6 +275,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         self.can_copy.set(false);
         let _ = self.window.emit("shelf-drag-over", false);
         if resolved_effect != DROPEFFECT_COPY {
+            let _ = crate::resident::complete_shake_drop(self.window.app_handle(), shake_id, false);
             return Ok(());
         }
         let window = self.window.clone();
@@ -247,14 +283,25 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         // The IDataObject never crosses threads. Only its owned path projection does.
         tauri::async_runtime::spawn_blocking(move || match state.accept_drop(paths) {
             Ok(result) => {
+                if let Err(error) = crate::resident::complete_shake_drop(
+                    window.app_handle(),
+                    shake_id,
+                    result.snapshot.is_some(),
+                ) {
+                    let _ = crate::resident::publish_warning(window.app_handle(), &error);
+                }
                 if let Some(snapshot) = result.snapshot.as_ref() {
                     if let Err(error) = crate::resident::synchronize(
                         window.app_handle(),
                         !snapshot.batches.is_empty(),
                     )
                     .and_then(|()| crate::manage_items::synchronize(window.app_handle()))
-                    .and_then(|()| crate::resident::update_rail_content(window.app_handle(), snapshot.batches.len()))
-                    {
+                    .and_then(|()| {
+                        crate::resident::update_rail_content(
+                            window.app_handle(),
+                            snapshot.batches.len(),
+                        )
+                    }) {
                         let _ = crate::resident::publish_warning(window.app_handle(), &error);
                     }
                     let _ = window.app_handle().emit("shelf-changed", ());
@@ -262,6 +309,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
                 let _ = window.app_handle().emit("shelf-drop", result);
             }
             Err(error) => {
+                let _ = crate::resident::complete_shake_drop(window.app_handle(), shake_id, false);
                 let _ = crate::resident::publish_warning(window.app_handle(), &error.to_string());
             }
         });
@@ -271,7 +319,11 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
 }
 
 pub(crate) fn register(window: &WebviewWindow) -> tauri::Result<()> {
-    if window.app_handle().try_state::<RegisteredDropWindows>().is_none() {
+    if window
+        .app_handle()
+        .try_state::<RegisteredDropWindows>()
+        .is_none()
+    {
         window.app_handle().manage(RegisteredDropWindows::default());
     }
     let window = window.clone();

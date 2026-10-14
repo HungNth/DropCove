@@ -1,5 +1,9 @@
 use std::sync::{Mutex, MutexGuard};
 
+use crate::{
+    shelf::{ShelfBatch, ShelfState},
+    windows_drag::DragSession,
+};
 use serde::Deserialize;
 use tauri::{
     AppHandle, Emitter, LogicalSize, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
@@ -17,10 +21,6 @@ use windows::Win32::{
             WM_MOUSEACTIVATE, WM_NCDESTROY, WM_SHOWWINDOW, WS_EX_NOACTIVATE,
         },
     },
-};
-use crate::{
-    shelf::{ShelfBatch, ShelfState},
-    windows_drag::DragSession,
 };
 
 const LABEL: &str = "manage-items";
@@ -271,50 +271,63 @@ pub(crate) fn open(
         state.origin_label = Some(owner_label.to_owned());
     }
     if owner_label == "edge-rail" {
-        app.state::<crate::resident::ResidentState>().set_rail_transient_reason(
-            crate::resident::RailTransientReason::ManageItems,
-            true,
-        )?;
+        app.state::<crate::resident::ResidentState>()
+            .set_rail_transient_reason(crate::resident::RailTransientReason::ManageItems, true)?;
     }
-    let setup_result = (|| {
-        let hwnd = popup.hwnd().map_err(|error| error.to_string())?;
-        // SAFETY: This HWND belongs to the live managed popup. Hidden Tao creation leaves the
-        // nonclient frame unrecalculated; FRAMECHANGED applies its undecorated layout before showing.
-        // NOACTIVATE preserves keyboard focus while keeping normal pointer activation available.
-        unsafe {
-            if owner_label == "edge-rail" {
-                let extended = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-                SetWindowLongPtrW(hwnd, GWL_EXSTYLE, extended | WS_EX_NOACTIVATE.0 as isize);
-                let _ = RemoveWindowSubclass(hwnd, Some(popup_message), POPUP_SUBCLASS);
-                if !SetWindowSubclass(hwnd, Some(popup_message), POPUP_SUBCLASS, 0).as_bool() {
-                    return Err("could not install no-activate guard on Manage Items popup".to_owned());
+    let (setup_sender, setup_receiver) = std::sync::mpsc::channel();
+    let setup_popup = popup.clone();
+    let rail_origin = owner_label == "edge-rail";
+    app.run_on_main_thread(move || {
+        let setup_result = (|| {
+            let hwnd = setup_popup.hwnd().map_err(|error| error.to_string())?;
+            // SAFETY: This HWND belongs to the live managed popup. Hidden Tao creation leaves the
+            // nonclient frame unrecalculated; FRAMECHANGED applies its undecorated layout before showing.
+            // NOACTIVATE preserves keyboard focus while keeping normal pointer activation available.
+            unsafe {
+                if rail_origin {
+                    let extended = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, extended | WS_EX_NOACTIVATE.0 as isize);
+                    let _ = RemoveWindowSubclass(hwnd, Some(popup_message), POPUP_SUBCLASS);
+                    if !SetWindowSubclass(hwnd, Some(popup_message), POPUP_SUBCLASS, 0).as_bool() {
+                        return Err(
+                            "could not install no-activate guard on Manage Items popup".to_owned()
+                        );
+                    }
+                } else {
+                    let extended = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, extended & !(WS_EX_NOACTIVATE.0 as isize));
+                    let _ = RemoveWindowSubclass(hwnd, Some(popup_message), POPUP_SUBCLASS);
                 }
-            } else {
-                let extended = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-                SetWindowLongPtrW(hwnd, GWL_EXSTYLE, extended & !(WS_EX_NOACTIVATE.0 as isize));
-                let _ = RemoveWindowSubclass(hwnd, Some(popup_message), POPUP_SUBCLASS);
+                SetWindowPos(
+                    hwnd,
+                    None,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+                )
+                .map_err(|error| error.to_string())?;
             }
-            SetWindowPos(
-                hwnd,
-                None,
-                0,
-                0,
-                0,
-                0,
-                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-            )
-            .map_err(|error| error.to_string())?;
-        }
-        Ok(hwnd)
-    })();
+            Ok(hwnd)
+        })();
+        let _ = setup_sender.send(setup_result.map(|hwnd| hwnd.0 as isize));
+    })
+    .map_err(|error| error.to_string())?;
+    let setup_result = setup_receiver
+        .recv()
+        .map_err(|error| error.to_string())?
+        .map(|hwnd| HWND(hwnd as *mut _));
     let hwnd = match setup_result {
         Ok(hwnd) => hwnd,
         Err(error) => {
             if owner_label == "edge-rail" {
-                let _ = app.state::<crate::resident::ResidentState>().set_rail_transient_reason(
-                    crate::resident::RailTransientReason::ManageItems,
-                    false,
-                );
+                let _ = app
+                    .state::<crate::resident::ResidentState>()
+                    .set_rail_transient_reason(
+                        crate::resident::RailTransientReason::ManageItems,
+                        false,
+                    );
             }
             return Err(error);
         }
@@ -370,10 +383,12 @@ pub(crate) fn open(
         Ok(()) => Ok(()),
         Err(error) => {
             if owner_label == "edge-rail" {
-                let _ = app.state::<crate::resident::ResidentState>().set_rail_transient_reason(
-                    crate::resident::RailTransientReason::ManageItems,
-                    false,
-                );
+                let _ = app
+                    .state::<crate::resident::ResidentState>()
+                    .set_rail_transient_reason(
+                        crate::resident::RailTransientReason::ManageItems,
+                        false,
+                    );
             }
             Err(error)
         }
@@ -426,10 +441,10 @@ pub(crate) fn close(app: &AppHandle) -> Result<(), String> {
         state.pending_close = false;
         state.origin_label = None;
     }
-    if let Ok(Some(remaining)) = app.state::<crate::resident::ResidentState>().set_rail_transient_reason(
-        crate::resident::RailTransientReason::ManageItems,
-        false,
-    ) {
+    if let Ok(Some(remaining)) = app
+        .state::<crate::resident::ResidentState>()
+        .set_rail_transient_reason(crate::resident::RailTransientReason::ManageItems, false)
+    {
         let _ = crate::edge_rail::arm_rail_timer(app, remaining as u32);
     }
     app.emit("shelf-changed", ())
@@ -479,10 +494,12 @@ pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) {
                     state.pending_close = false;
                     let origin = state.origin_label.take();
                     if origin.as_deref() == Some("edge-rail") {
-                        let _ = app.state::<crate::resident::ResidentState>().set_rail_transient_reason(
-                            crate::resident::RailTransientReason::ManageItems,
-                            false,
-                        );
+                        let _ = app
+                            .state::<crate::resident::ResidentState>()
+                            .set_rail_transient_reason(
+                                crate::resident::RailTransientReason::ManageItems,
+                                false,
+                            );
                     }
                     Ok(())
                 }

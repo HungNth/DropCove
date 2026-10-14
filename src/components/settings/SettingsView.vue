@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { nextTick, onMounted, useTemplateRef } from "vue";
-import { useSettings, type RailEdge } from "../../composables/useSettings";
+import { useSettings, type RailEdge, type ShakeSensitivity } from "../../composables/useSettings";
 import RailPlacementFields from "./RailPlacementFields.vue";
+import ShakeSettingsFields from "./ShakeSettingsFields.vue";
 
 const {
   snapshot,
@@ -13,6 +14,7 @@ const {
   setStartWithWindows,
   setRailPlacement,
   setShowRailOverFullscreen,
+  setShake,
   monitors,
   save,
   cancel,
@@ -69,6 +71,13 @@ async function onFullscreenChange(enabled: boolean, event: Event) {
   if (input instanceof HTMLInputElement) {
     input.checked = Boolean(snapshot.value?.showRailOverFullscreen);
   }
+}
+
+async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, event: Event) {
+  const input = event.currentTarget;
+  await setShake(enabled, sensitivity);
+  if (input instanceof HTMLInputElement) input.checked = Boolean(snapshot.value?.shakeEnabled);
+  if (input instanceof HTMLSelectElement) input.value = snapshot.value?.shakeSensitivity ?? "Normal";
 }
 </script>
 
@@ -137,6 +146,8 @@ async function onFullscreenChange(enabled: boolean, event: Event) {
       <RailPlacementFields v-if="snapshot" :edge="snapshot.railEdge" :monitor-id="snapshot.railMonitorId"
         :show-over-fullscreen="Boolean(snapshot.showRailOverFullscreen)"
         :monitors="monitors" :disabled="busy" @change="onPlacementChange" @fullscreen-change="onFullscreenChange" />
+      <ShakeSettingsFields v-if="snapshot" :enabled="snapshot.shakeEnabled"
+        :sensitivity="snapshot.shakeSensitivity" :disabled="busy" @change="onShakeChange" />
     </div>
 
     <div v-if="status" class="status" role="alert" aria-live="assertive">

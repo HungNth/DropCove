@@ -221,7 +221,7 @@ Plan: [Specification](../.scratch/edge-rail-workflow/spec.md) · [Delivery map a
 - Ticket 05 release: [DropCove-Setup-0.0.5.exe](../build/DropCove-Setup-0.0.5.exe), 3,196,216 bytes, SHA-256 `01e9f3bf40e766a86be6cd53056c2c632070ac36df1da3898991f096e3ecfc38`. Version/package/crate/lock/Tauri, built/installed PE and uninstall metadata report 0.0.5. Freshly compiled 0.0.5 suite passed **75/75**; cargo-xwin NSIS packaging included vue-tsc/Vite.
 - Installed native proof: primary launch & single-instance activation, empty dismissal to Hidden, non-empty dismissal to 16×280 Rail Handle, 200ms/300ms hover expansion/collapse, OLE drop-in and duplicate suppression, outbound Copy drag-out with Temporary consumption and Pinned retention, no-activate Manage Items flyout and Clear Temporary, Open Shelf transition, geometric fullscreen occlusion and handle-only restoration, Settings view with `ShowRailOverFullscreen` Save/Cancel, and final-item removal hiding both surfaces. See [ticket 05 evidence](../.scratch/edge-rail-workflow/issues/05-release-0.0.5.md#answer).
 - Owned test uninstaller executed, test directories removed, Run key and original 0.0.3 user uninstall/shortcuts restored with unchanged ambient executable hash. User ambient installation stays 0.0.3; 0.0.5 installer is available separately. No commit created. Limits: dual 96-DPI physical monitors tested; mixed-DPI scaling covered by deterministic geometry tests.
-Release gates completed on available hardware. Dual 96-DPI physical monitors verified; mixed-DPI scaling remains covered by deterministic geometry tests. Version 0.0.6 (Shake-to-open) remains unstarted pending user review.
+Release gates completed on available hardware. Dual 96-DPI physical monitors verified; mixed-DPI scaling remains covered by deterministic geometry tests. Version 0.0.5 was committed as `f0cdc3d` after explicit user approval.
 
 ### Deferred
 
@@ -229,7 +229,7 @@ Release gates completed on available hardware. Dual 96-DPI physical monitors ver
 
 ## 0.0.6 — Shake-to-open
 
-**Status:** Planned.
+**Status:** Completed — three Shake-to-open tickets resolved; 0.0.7 remains unstarted pending user review.
 
 ### Scope
 
@@ -241,16 +241,18 @@ Release gates completed on available hardware. Dual 96-DPI physical monitors ver
 
 ### Implemented
 
-- Not started.
+- Dedicated `WH_MOUSE_LL` message-pumping thread, bounded 256-sample capture queue, axis-reversal detector, Low/Normal/High sensitivity, 600 ms detection window, and 500 ms cooldown.
+- Resident-owned, session-ID-bound transient presentation: no-activate near-cursor reveal, accepted-batch Visible promotion, and Hidden/EdgeDocked restoration after release, rejection, duplicate-only input, unsupported input, cancellation, or failure. Application-owned drag-out is excluded from Shake activation.
+- Seven-field strict settings cutover, enabled/Normal defaults, actual Enable/Sensitivity controls, draft/Save/Cancel semantics, and transactional hook snapshot/apply/restore. Hook failures warn without removing other resident workflows.
+- Regression fixes found through native delivery checks: symmetric Shelf show/hide despite Tao visibility caching; owner-thread Manage Items subclass installation; fullscreen reevaluation after docking/Shake restoration; and Rail whole-batch drag bypassing an already-held busy guard.
 
 ### Verification
 
-Before completion:
-
-- Exercise Low, Normal, and High sensitivity at their documented movement and reversal thresholds.
-- Verify the `600 ms` detection window, `500 ms` cooldown, left-button requirement, placement near the pointer, and each restoration outcome.
-- Force hook registration failure and observe a warning while tray, hotkey, Drop Shelf, and Edge Rail remain usable.
-- Build and launch `DropCove-Setup-0.0.6.exe` on Windows 11 x64.
+- Final `vue-tsc`/Vite and cargo-xwin/NSIS builds passed; fresh native test binary `dropcove_lib-7669ec7c64b55353.exe` passed **82/82**. Vendor CRT PDB linker warnings remain nonfatal; no source dead-code warnings remain.
+- [DropCove-Setup-0.0.6.exe](../build/DropCove-Setup-0.0.6.exe): **3,203,433 bytes**, SHA-256 `898acd9a3993f7c618a231abcb38debe95f81bdadba219d4f4c25f2b8c2ecf41`. Installed executable: **13,202,944 bytes**, SHA-256 `955ca1f8ecd243b561b9e40a72705024eb054d0f6113f32f59af906a5f2df4e4`; PE product/file version and isolated uninstall registration report `0.0.6`.
+- Final installed Windows checks proved sensitivity profiles, left-button gating, no-activate reveal, 600 ms expiry, cooldown, Hidden Start/secondary activation, exact restoration, real OLE accepted/duplicate/unsupported/canceled outcomes, native pointer whole-batch Copy consumption with Pinned retention, Manage Items, Rail timers, geometric fullscreen hide/restore, actual Settings controls and footer reachability, Save/Cancel, hook disable/re-enable, Clear Temporary, final-item hiding, and clean Exit.
+- Native runtime-failure dispatch produced an observed Windows notification and retained resident workflows; unchanged Save reinstalled the hook. Separately, debugger fault injection changed only the hook-type argument of one call in an owned test process, producing actual Win32 `ERROR_INVALID_HOOK_FILTER` (`0x80070592`), a native warning toast, atomic file rollback, resident survival, and successful explicit Save retry. No DLL/code bytes or global OS settings were patched. See [release evidence and limits](../.scratch/shake-to-open/issues/03-release-0.0.6.md#answer).
+- Owned installer/profile/WebView/fixture/probe processes and directories were removed. Original `0.0.3` uninstall values and shortcut destinations were restored; all Run values and ambient executable SHA-256 stayed unchanged. All changes remain uncommitted. Pointer smoke used injected Windows input on two 96-DPI monitors; physical polling-rate variation, mixed-DPI hardware, and spontaneous host-policy hook denial were not exercised.
 
 ### Deferred
 

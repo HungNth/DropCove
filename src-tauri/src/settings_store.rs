@@ -294,6 +294,14 @@ pub(crate) enum RailEdge {
     Right,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum ShakeSensitivity {
+    Low,
+    #[default]
+    Normal,
+    High,
+}
+
 /// Active settings contract; missing or unknown fields are malformed, never migrated.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
@@ -303,6 +311,8 @@ pub struct Settings {
     pub(crate) rail_edge: RailEdge,
     pub(crate) rail_monitor_id: String,
     pub(crate) show_rail_over_fullscreen: bool,
+    pub(crate) shake_enabled: bool,
+    pub(crate) shake_sensitivity: ShakeSensitivity,
 }
 
 impl Default for Settings {
@@ -313,6 +323,8 @@ impl Default for Settings {
             rail_edge: RailEdge::Right,
             rail_monitor_id: String::new(),
             show_rail_over_fullscreen: false,
+            shake_enabled: true,
+            shake_sensitivity: ShakeSensitivity::Normal,
         }
     }
 }
@@ -773,7 +785,7 @@ mod tests {
     fn rail_schema_requires_all_fields_and_preserves_old_configuration_until_save() {
         let temp = TempDir::new("rail-cutover");
         let store = SettingsStore::new(&temp.path);
-        let previous = br#"{"HotKey":{"Control":true,"Alt":true,"Shift":false,"Windows":false,"VirtualKey":75},"StartWithWindows":false}"#;
+        let previous = br#"{"HotKey":{"Control":true,"Alt":true,"Shift":false,"Windows":false,"VirtualKey":75},"StartWithWindows":false,"RailEdge":"Left","RailMonitorId":"display","ShowRailOverFullscreen":true}"#;
         fs::write(store.path(), previous).unwrap();
         let (loaded, warning) = store.load();
         assert_eq!(loaded, Settings::default());
@@ -794,6 +806,8 @@ mod tests {
             "RailEdge",
             "RailMonitorId",
             "ShowRailOverFullscreen",
+            "ShakeEnabled",
+            "ShakeSensitivity",
         ] {
             let mut missing = value.clone();
             missing.as_object_mut().unwrap().remove(field);
@@ -849,7 +863,7 @@ mod tests {
         assert_eq!(fs::read_to_string(store.path()).unwrap(), old_format);
 
         // Write valid JSON with invalid HotKey (no modifiers)
-        let invalid_hk_json = r#"{"HotKey":{"Control":false,"Alt":false,"Shift":false,"Windows":false,"VirtualKey":65},"StartWithWindows":true,"RailEdge":"Right","RailMonitorId":"","ShowRailOverFullscreen":false}"#;
+        let invalid_hk_json = r#"{"HotKey":{"Control":false,"Alt":false,"Shift":false,"Windows":false,"VirtualKey":65},"StartWithWindows":true,"RailEdge":"Right","RailMonitorId":"","ShowRailOverFullscreen":false,"ShakeEnabled":true,"ShakeSensitivity":"Normal"}"#;
         fs::write(store.path(), invalid_hk_json).unwrap();
 
         let (settings2, warning2) = store.load();

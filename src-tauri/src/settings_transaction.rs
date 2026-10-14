@@ -7,10 +7,15 @@ use crate::{
 
 pub(crate) trait Integrations {
     type RailSnapshot;
+    type ShakeSnapshot;
     fn rail_snapshot(&self) -> Result<Self::RailSnapshot, String>;
     fn rail_apply(&mut self, settings: &Settings) -> Result<(), String>;
     fn rail_restore(&mut self, previous: &Self::RailSnapshot) -> Result<(), String>;
     fn rail_description(&self) -> Result<String, String>;
+    fn shake_snapshot(&self) -> Result<Self::ShakeSnapshot, String>;
+    fn shake_apply(&mut self, settings: &Settings) -> Result<(), String>;
+    fn shake_restore(&mut self, previous: &Self::ShakeSnapshot) -> Result<(), String>;
+    fn shake_description(&self) -> Result<String, String>;
     fn register(&mut self, key: &HotKey) -> Result<i32, String>;
     fn unregister(&mut self, id: i32) -> Result<(), String>;
     fn registered(&self, id: i32) -> bool;
@@ -60,6 +65,9 @@ pub(crate) fn apply(
     let previous_rail = integrations
         .rail_snapshot()
         .map_err(|error| failure(error, active_key, active_token, true))?;
+    let previous_shake = integrations
+        .shake_snapshot()
+        .map_err(|error| failure(error, active_key, active_token, true))?;
     let changed = active_token.is_none() || active_key != candidate.hot_key;
     let token = if changed {
         integrations
@@ -72,10 +80,13 @@ pub(crate) fn apply(
     };
     let mut file_attempted = false;
     let mut rail_attempted = false;
+    let mut shake_attempted = false;
     let result = (|| {
         integrations.startup_apply(candidate.start_with_windows)?;
         rail_attempted = true;
         integrations.rail_apply(candidate)?;
+        shake_attempted = true;
+        integrations.shake_apply(candidate)?;
         file_attempted = true;
         store.write(candidate)?;
         if changed {
@@ -97,6 +108,11 @@ pub(crate) fn apply(
             if let Err(restore) = store.restore_raw(previous_file.as_deref()) {
                 rollback_errors.push(format!("settings restore: {restore}"));
             }
+        }
+    }
+    if shake_attempted {
+        if let Err(restore) = integrations.shake_restore(&previous_shake) {
+            rollback_errors.push(format!("Shake restore: {restore}"));
         }
     }
     if rail_attempted {
@@ -150,8 +166,11 @@ pub(crate) fn apply(
     let rail = integrations
         .rail_description()
         .unwrap_or_else(|query| format!("query failed: {query}"));
+    let shake = integrations
+        .shake_description()
+        .unwrap_or_else(|query| format!("query failed: {query}"));
     let message = format!(
-        "Settings failed: {error}; rollback incomplete: {}. Retained state: old shortcut registered={}; candidate registered={candidate_retained}; active shortcut={}; startup={startup}; rail={rail}; settings file={file}",
+        "Settings failed: {error}; rollback incomplete: {}. Retained state: old shortcut registered={}; candidate registered={candidate_retained}; active shortcut={}; startup={startup}; rail={rail}; Shake={shake}; settings file={file}",
         rollback_errors.join("; "), old_retained.is_some(),
         retained_token.map(|_| retained_key.label()).unwrap_or_else(|| "none (tray/launch access remains)".into()),
     );
@@ -189,6 +208,9 @@ mod tests {
         keys: BTreeMap<i32, HotKey>,
         startup: Option<RegistryValue>,
         rail: Settings,
+        shake: Settings,
+        fail_shake: bool,
+        fail_shake_restore: bool,
         fail_rail: bool,
         fail_rail_restore: bool,
         conflict: bool,
@@ -210,6 +232,7 @@ mod tests {
     }
     impl Integrations for Native {
         type RailSnapshot = Settings;
+        type ShakeSnapshot = Settings;
         fn rail_snapshot(&self) -> Result<Settings, String> {
             Ok(self.rail.clone())
         }
@@ -231,6 +254,29 @@ mod tests {
             Ok(format!(
                 "{:?} {}",
                 self.rail.rail_edge, self.rail.rail_monitor_id
+            ))
+        }
+        fn shake_snapshot(&self) -> Result<Settings, String> {
+            Ok(self.shake.clone())
+        }
+        fn shake_apply(&mut self, settings: &Settings) -> Result<(), String> {
+            self.shake = settings.clone();
+            if self.fail_shake {
+                return Err("hook registration rejected".into());
+            }
+            Ok(())
+        }
+        fn shake_restore(&mut self, previous: &Settings) -> Result<(), String> {
+            if self.fail_shake_restore {
+                return Err("hook restoration rejected".into());
+            }
+            self.shake = previous.clone();
+            Ok(())
+        }
+        fn shake_description(&self) -> Result<String, String> {
+            Ok(format!(
+                "{} {:?}",
+                self.shake.shake_enabled, self.shake.shake_sensitivity
             ))
         }
         fn register(&mut self, key: &HotKey) -> Result<i32, String> {
@@ -293,12 +339,17 @@ mod tests {
             start_with_windows: false,
             rail_edge: crate::settings_store::RailEdge::Left,
             rail_monitor_id: "other-display".into(),
+            shake_enabled: false,
+            shake_sensitivity: crate::settings_store::ShakeSensitivity::High,
             ..Settings::default()
         };
         let native = Native {
             keys: BTreeMap::from([(1, old.hot_key)]),
             startup: Some(old_startup()),
             rail: old.clone(),
+            shake: old.clone(),
+            fail_shake: false,
+            fail_shake_restore: false,
             fail_rail: false,
             fail_rail_restore: false,
             conflict: false,
@@ -440,5 +491,28 @@ mod tests {
             Some(2)
         );
         assert_eq!(store.load().0, candidate);
+    }
+    #[test]
+    fn failed_shake_application_and_restore_preserve_transaction_invariants() {
+        let profile = Profile::new();
+        let (store, mut native, old, candidate) = fixture(&profile);
+        native.fail_shake = true;
+        let original = store.read_raw().unwrap();
+        let failure = apply(&store, &mut native, &candidate, old.hot_key, Some(1))
+            .err()
+            .unwrap();
+        assert_eq!(failure.active_token, Some(1));
+        assert_eq!((&native.shake, &native.rail), (&old, &old));
+        assert_eq!(store.read_raw().unwrap(), original);
+        native.fail_shake_restore = true;
+        let incomplete = apply(&store, &mut native, &candidate, old.hot_key, Some(1))
+            .err()
+            .unwrap();
+        assert!(incomplete
+            .warning
+            .as_ref()
+            .unwrap()
+            .contains("Shake=false High"));
+        assert_eq!(store.load().0, old);
     }
 }

@@ -425,6 +425,10 @@ sequenceDiagram
 
 Sensitivity profiles change minimum movement and required reversal count. A 500 ms detector cooldown prevents immediate retriggering. The low-level callback performs minimal work and queues analysis instead of polling cursor position.
 
+The 0.0.6 adapter installs `WH_MOUSE_LL` on a dedicated message-pumping thread. Its callback copies scalar input into a bounded 256-sample queue and schedules detection after the callback returns. Only detection/release results are posted to the Shelf HWND; Resident, Window, and Settings operations run on Tauri's UI thread. Teardown removes the hook and joins the thread before releasing receiver ownership. Queued results carry a runtime generation so a disabled or replaced hook cannot reopen the Shelf.
+
+The Resident coordinator assigns each transient Shake session an ID. Native OLE drop entry marks the matching session pending before off-thread persistence starts; only that session's completion may promote or restore presentation. Application-owned drag-out cannot start a Shake session. Rail restoration and normal docking reevaluate fullscreen coverage after committing the display transition, avoiding stale occlusion state.
+
 ## 14. Presentation projections and visual resources
 
 - Compact cards keep bounded preview data; a batch requests visuals for at most its first three Shelf Items.

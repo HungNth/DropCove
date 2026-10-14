@@ -19,6 +19,7 @@ mod windows_foreground;
 mod windows_hotkey;
 mod windows_instance;
 mod windows_paths;
+mod windows_shake;
 mod windows_startup;
 
 use shelf::{ShelfSnapshot, ShelfState};
@@ -248,7 +249,11 @@ fn storage_drag_on_window_thread(
         struct RailDragGuard<'a>(&'a tauri::AppHandle);
         impl Drop for RailDragGuard<'_> {
             fn drop(&mut self) {
-                match self.0.state::<resident::ResidentState>().set_rail_drag_active(false) {
+                match self
+                    .0
+                    .state::<resident::ResidentState>()
+                    .set_rail_drag_active(false)
+                {
                     Ok(Some(remaining)) => {
                         if let Err(error) = edge_rail::arm_rail_timer(self.0, remaining as u32) {
                             let _ = resident::publish_warning(self.0, &error);
@@ -261,7 +266,10 @@ fn storage_drag_on_window_thread(
                 }
             }
         }
-        if let Err(error) = drag_app.state::<resident::ResidentState>().set_rail_drag_active(true) {
+        if let Err(error) = drag_app
+            .state::<resident::ResidentState>()
+            .set_rail_drag_active(true)
+        {
             let _ = sender.send(Err(error));
             return;
         }
@@ -509,7 +517,10 @@ fn set_rail_transient_hold(
         "batch-drag" => resident::RailTransientReason::BatchDragConfirmation,
         _ => return Err(format!("unknown rail transient hold reason '{reason}'")),
     };
-    if let Some(remaining) = app.state::<resident::ResidentState>().set_rail_transient_reason(reason_enum, active)? {
+    if let Some(remaining) = app
+        .state::<resident::ResidentState>()
+        .set_rail_transient_reason(reason_enum, active)?
+    {
         let _ = edge_rail::arm_rail_timer(&app, remaining as u32);
     }
     Ok(())
@@ -528,6 +539,19 @@ fn set_show_rail_over_fullscreen(
     enabled: bool,
 ) -> Result<settings::SettingsSnapshot, String> {
     settings::set_show_rail_over_fullscreen(&app, enabled)
+}
+
+#[tauri::command]
+fn set_shake(
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    enabled: bool,
+    sensitivity: settings_store::ShakeSensitivity,
+) -> Result<settings::SettingsSnapshot, String> {
+    if window.label() != settings::SETTINGS_WINDOW_LABEL {
+        return Err("Shake configuration is only available in Settings".into());
+    }
+    settings::set_shake(&app, enabled, sensitivity)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -550,6 +574,7 @@ pub fn run() {
             app.manage(manage_items::ManageItemsState::default());
             app.manage(shelf_resize::ResizeState::default());
             app.manage(resident::ResidentState::default());
+            app.manage(windows_shake::ShakeRuntimeState::default());
             let window = app.get_webview_window("main").ok_or_else(|| {
                 std::io::Error::new(std::io::ErrorKind::NotFound, "Drop Shelf window is missing")
             })?;
@@ -632,6 +657,7 @@ pub fn run() {
             cancel_batch_drag,
             start_batch_drag,
             set_start_with_windows,
+            set_shake,
             get_settings,
             start_settings_recording,
             cancel_settings_recording,
