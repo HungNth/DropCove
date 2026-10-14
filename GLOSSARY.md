@@ -39,3 +39,19 @@ _Avoid_: Sidebar, dock, toolbar
 **Shake-to-open**:
 The gesture of rapidly moving the pointer back and forth while holding the left mouse button to request that the Shelf appear near the pointer.
 _Avoid_: Mouse jiggle, cursor flick
+
+**Recovery Backup**:
+The failed Shelf persistence artifacts retained together after a recoverable database failure for manual recovery.
+_Avoid_: Recovered Shelf, salvaged database, automatic repair
+
+**Cooperative Shutdown**:
+An update or uninstall request that closes the Resident Instance through normal teardown and proceeds only after confirmed exit.
+_Avoid_: Force kill, terminate process
+
+**Installer-Owned Shortcut**:
+A Start Menu or Desktop shortcut created and still controlled by the DropCove installer.
+_Avoid_: Any DropCove-named shortcut, user shortcut
+
+**Profile Data**:
+The durable and recovery information owned by one DropCove profile and retained across update and uninstall.
+_Avoid_: Program files, installation directory

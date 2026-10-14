@@ -592,4 +592,5 @@ mod tests {
         assert_eq!(session.store.read_raw().unwrap(), original);
         std::fs::remove_dir_all(directory).unwrap();
     }
+
 }

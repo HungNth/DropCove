@@ -515,4 +515,39 @@ mod tests {
             .contains("Shake=false High"));
         assert_eq!(store.load().0, old);
     }
+    #[test]
+    fn combined_shake_apply_and_rail_restore_failures_report_retained_configuration() {
+        let profile = Profile::new();
+        let (store, mut native, old, candidate) = fixture(&profile);
+        let original = store.read_raw().unwrap();
+
+        // Shake application fails after startup and rail were applied.
+        // During rollback, rail restore also fails while startup restores cleanly.
+        native.fail_shake = true;
+        native.fail_rail_restore = true;
+        let failure = apply(&store, &mut native, &candidate, old.hot_key, Some(1))
+            .err()
+            .unwrap();
+
+        // Rollback was incomplete due to rail restore error
+        assert!(failure.warning.as_ref().unwrap().contains("rollback incomplete"));
+        assert!(failure.message.contains("rail restore: native rail restore rejected"));
+        // Retained state accurately describes startup restored to previous and rail retained candidate
+        assert!(failure.message.contains("startup=previous Run value"));
+        assert!(failure.message.contains("rail=Left other-display"));
+        assert_eq!(failure.active_key, old.hot_key);
+        assert_eq!(failure.active_token, Some(1));
+        // File was not rewritten
+        assert_eq!(store.read_raw().unwrap(), original);
+        assert_eq!(store.load().0, old);
+
+        // Clean retry is possible once native environment clears the fault
+        native.fail_shake = false;
+        native.fail_rail_restore = false;
+        assert_eq!(
+            apply(&store, &mut native, &candidate, old.hot_key, Some(1)).ok(),
+            Some(2)
+        );
+        assert_eq!(store.load().0, candidate);
+    }
 }

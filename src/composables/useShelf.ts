@@ -32,8 +32,8 @@ interface ShelfSnapshot {
   batches: ShelfBatch[];
   preferredWidth: number;
   height: number;
+  warning?: string | null;
 }
-
 interface DropResult {
   snapshot: ShelfSnapshot | null;
   skipped: number;
@@ -65,6 +65,7 @@ export function useShelf() {
   const pendingConfirmation = shallowRef<PendingDragConfirmation | null>(null);
   const confirmingClearTemporary = shallowRef(false);
   let readyConfirmation: PendingDragConfirmation | null = null;
+  let pendingRecoveryWarning: string | null = null;
   const window = getCurrentWindow();
   const unlisteners: UnlistenFn[] = [];
   let disposed = false;
@@ -121,14 +122,20 @@ export function useShelf() {
   async function refresh() {
     const request = ++refreshRequest;
     const snapshot = await invoke<ShelfSnapshot>("get_shelf");
-    if (!disposed && request === refreshRequest) await apply(snapshot, request);
+    if (!disposed && request === refreshRequest) {
+      await apply(snapshot, request);
+      pendingRecoveryWarning = snapshot.warning ?? null;
+      if (pendingRecoveryWarning && !status.value && !disposed) {
+        status.value = pendingRecoveryWarning;
+      }
+    }
   }
   async function runAction(command: string, arguments_: Record<string, unknown> = {}) {
     busy.value = true;
     try {
       await invoke<ShelfSnapshot>(command, arguments_);
       await refresh();
-      if (!disposed) status.value = "";
+      if (!disposed) status.value = pendingRecoveryWarning ?? "";
     } catch (error) {
       if (!disposed) status.value = String(error);
     } finally {
@@ -214,7 +221,7 @@ export function useShelf() {
         if (!payload.snapshot || disposed) return;
         try {
           await refresh();
-          status.value = payload.skipped ? `${payload.skipped} unsupported item(s) skipped.` : "";
+          status.value = payload.skipped ? `${payload.skipped} unsupported item(s) skipped.` : (pendingRecoveryWarning ?? "");
         } catch (error) { status.value = String(error); }
       }));
       await retainListener(window.listen<boolean>("shelf-drag-over", ({ payload }) => {
@@ -280,6 +287,15 @@ export function useShelf() {
     },
     startItemDrag: (itemId: string) => perform("start_item_drag", { itemId }),
     startBatchDrag,
-    dismissStatus: () => { status.value = ""; },
+    dismissStatus: () => {
+      const current = status.value;
+      if (pendingRecoveryWarning && current === pendingRecoveryWarning) {
+        pendingRecoveryWarning = null;
+        status.value = "";
+        void invoke("acknowledge_shelf_warning");
+      } else {
+        status.value = pendingRecoveryWarning ?? "";
+      }
+    },
   };
 }

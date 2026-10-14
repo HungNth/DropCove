@@ -293,7 +293,9 @@ Release gates completed on available hardware. Dual 96-DPI physical monitors ver
 
 ## 0.0.8 — Recovery and distribution hardening
 
-**Status:** Planned.
+**Status:** Completed — five vertical slices implemented and verified; Version 0.0.9 remains unstarted.
+
+**Plan:** [Recovery and Distribution Hardening specification](../.scratch/recovery-distribution-hardening/spec.md) and five vertical slices. Primary-source research and ADR-0003/ADR-0004 record the recovery and lifecycle decisions.
 
 ### Scope
 
@@ -305,17 +307,21 @@ Release gates completed on available hardware. Dual 96-DPI physical monitors ver
 
 ### Implemented
 
-- Not started.
+- Evidence-preserving SQLite recovery with exclusive timestamped backup directories, streaming original-SHM staging before read-only validation, clean recreation, fatal obstruction handling, and retained warning fallback.
+- Extended behavioral failure coverage using the existing Shelf store and settings/integration coordinator; no second transaction framework.
+- Current-user custom NSIS wizard, VC++ x64 check, remembered validated directory, shortcut ownership/defaults, and one shared Start Menu path for all folder configurations.
+- Profile-scoped cooperative shutdown with a five-second deadline and confirmed process/lease exit; safe update/repair/downgrade rejection and owned-artifact uninstall cleanup.
+- Consistent 0.0.8 metadata and a packaged release candidate; no 0.0.9/0.0.10 implementation started.
 
 ### Verification
 
-Before completion:
+Observed verification:
 
-- Corrupt or obstruct the shelf database and observe preserved evidence, clean recovery, empty startup, and a warning containing the backup path.
-- Inject persistence and integration failures and observe no user-visible partial mutation or silent loss of the prior safe configuration.
-- Install, update, and uninstall through the documented wizard and resident-process shutdown paths; verify profile preservation and startup-registration removal.
-- Exercise the end-to-end example in `SPECIFICATION.md` and every target requirement assigned to `0.0.2` through `0.0.8`.
-- Build and launch `DropCove-Setup-0.0.8.exe` on Windows 11 x64.
+- Frontend typecheck/Vite build and cargo-xwin packaging passed; final Windows native executable ran **101 tests, 101 passed, 0 failed**. External SDK `LNK4099` missing-PDB warnings remain; no source warning was suppressed.
+- Candidate [DropCove-Setup-0.0.8.exe](../build/DropCove-Setup-0.0.8.exe): **3,231,316 bytes**, SHA-256 `b4b5eb44a85e21fd9e552e0516852cace0fb5f2dc13562e6787e8d2f69bc1288`. Installed executable: **13,383,168 bytes**, SHA-256 `0720386a0b23510f652f08299464b20f4eef17b707719d4879bd65c1ce0c5b08`; PE and uninstall metadata report 0.0.8.
+- Actual native recovery, rollback, restart, wizard, conflict, repair/update, busy-timeout abort, startup cleanup, and profile-preserving uninstall smoke passed. Windows Sandbox verified missing VC++ abort on the exact 0.0.8 setup (exit 2, no executable created).
+- Exact installed 0.0.8 rendered **14 cards for 200 batches** and **8 rows for a 2,000-item batch**, with correct collection-size semantics. Upgrade preserved Shelf state; uninstall preserved the complete owned profile byte-for-byte.
+- Complete release gate passed: user confirmed manual desktop acceptance (mixed-DPI, display swap, disconnect/reconnect, visual recovery notifications, and prior workflows) on 2026-10-14. Release 0.0.8 verified.
 
 ### Deferred
 

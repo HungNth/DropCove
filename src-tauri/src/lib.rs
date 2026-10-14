@@ -150,6 +150,12 @@ async fn get_shelf(state: State<'_, ShelfState>) -> Result<ShelfSnapshot, String
 }
 
 #[tauri::command]
+fn acknowledge_shelf_warning(state: State<'_, ShelfState>) -> Result<(), String> {
+    state.acknowledge_warning();
+    Ok(())
+}
+
+#[tauri::command]
 async fn accept_drop(
     paths: Vec<Option<String>>,
     app: tauri::AppHandle,
@@ -560,14 +566,32 @@ fn set_shake(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 // Acquire before Tauri creates windows or opens profile persistence: secondaries only activate.
 pub fn run() {
-    let launch =
-        windows_instance::resolve_launch().unwrap_or_else(|error| fatal_startup_error(error));
+    let shutdown_requested = std::env::args_os()
+        .skip(1)
+        .any(|arg| arg == std::ffi::OsStr::new("--shutdown"));
+    let launch = windows_instance::resolve_launch().unwrap_or_else(|error| {
+        if shutdown_requested {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        fatal_startup_error(error)
+    });
     let profile = launch.profile;
+    if launch.shutdown {
+        if let Err(error) = windows_instance::shutdown(&profile) {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     let mut lease = match windows_instance::acquire(&profile, launch.autostart) {
         Ok(windows_instance::Launch::Primary(lease)) => lease,
         Ok(windows_instance::Launch::Secondary) => return,
         Err(error) => fatal_startup_error(error),
     };
+    let (shelf_state, recovery_backup) =
+        ShelfState::open_or_recover(profile.join("shelf.db"))
+            .unwrap_or_else(|error| fatal_startup_error(error));
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
@@ -577,7 +601,7 @@ pub fn run() {
             }
         })
         .setup(move |app| {
-            app.manage(ShelfState::open(profile.join("shelf.db"))?);
+            app.manage(shelf_state);
             app.manage(windows_drag::DragSession::default());
             app.manage(manage_items::ManageItemsState::default());
             app.manage(shelf_resize::ResizeState::default());
@@ -595,6 +619,10 @@ pub fn run() {
             resident_tray::register(app.handle()).map_err(std::io::Error::other)?;
             windows_foreground::register(&window).map_err(std::io::Error::other)?;
             settings::publish_startup_warning_if_any(app.handle());
+            app.state::<ShelfState>()
+                .deliver_recovery_warning(recovery_backup.as_deref(), |msg| {
+                    resident::publish_warning(app.handle(), msg)
+                });
             if !launch.autostart {
                 resident::show_shelf(app.handle()).map_err(std::io::Error::other)?;
             }
@@ -676,7 +704,8 @@ pub fn run() {
             get_shelf_visual,
             get_surface_generation,
             invalidate_surface_visuals,
-            cancel_shelf_visual
+            cancel_shelf_visual,
+            acknowledge_shelf_warning,
         ])
         .run(tauri::generate_context!());
 

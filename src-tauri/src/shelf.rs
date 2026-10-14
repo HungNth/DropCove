@@ -63,6 +63,8 @@ pub(crate) struct ShelfSnapshot {
     pub(crate) batches: Vec<ShelfBatch>,
     pub(crate) preferred_width: f64,
     pub(crate) height: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) warning: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -119,12 +121,270 @@ pub(crate) enum ShelfError {
     InvalidSystemClock,
     #[error("timestamp does not fit in SQLite INTEGER")]
     TimestampOverflow,
+    #[error("database recovery failed to move `{path}` to `{backup_dir}`: {source}")]
+    RecoveryMoveFailed {
+        path: String,
+        backup_dir: std::path::PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("database recovery move failed and rollback could not fully restore artifacts; source: `{source_dir}`, backup: `{backup_dir}`: {details}")]
+    RecoveryRollbackFailed {
+        source_dir: std::path::PathBuf,
+        backup_dir: std::path::PathBuf,
+        details: String,
+    },
+    #[error("failed to recreate clean database at `{path}` after preserving recovery backup at `{backup_dir}`: {details}")]
+    RecoveryRecreationFailed {
+        path: String,
+        backup_dir: std::path::PathBuf,
+        details: String,
+    },
+}
+
+fn days_to_ymd(days: i64) -> (i64, u32, u32) {
+    let z = days + 719468;
+    let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
+    let doe = (z - era * 146097) as u32;
+    let yoe = (doe - doe / 1024 + doe / 1461 - doe / 142401) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
+}
+
+fn format_utc_timestamp(time: SystemTime) -> String {
+    let dur = time.duration_since(UNIX_EPOCH).unwrap_or_default();
+    let secs = dur.as_secs();
+    let days = (secs / 86400) as i64;
+    let day_secs = (secs % 86400) as u32;
+    let (year, month, day) = days_to_ymd(days);
+    let hour = day_secs / 3600;
+    let min = (day_secs % 3600) / 60;
+    let sec = day_secs % 60;
+    format!("{year:04}{month:02}{day:02}T{hour:02}{min:02}{sec:02}Z")
+}
+
+fn is_recoverable_error(err: &ShelfError) -> bool {
+    match err {
+        ShelfError::DatabaseCorrupt(_) => true,
+        ShelfError::Database(rusqlite_err) => match rusqlite_err {
+            rusqlite::Error::SqliteFailure(err, msg) => {
+                let code = err.code;
+                if matches!(
+                    code,
+                    rusqlite::ffi::ErrorCode::DatabaseCorrupt
+                        | rusqlite::ffi::ErrorCode::NotADatabase
+                ) {
+                    return true;
+                }
+                if matches!(code, rusqlite::ffi::ErrorCode::Unknown) {
+                    if let Some(msg) = msg {
+                        let msg_lower = msg.to_ascii_lowercase();
+                        return msg_lower.contains("no such table")
+                            || msg_lower.contains("no such column");
+                    }
+                }
+                false
+            }
+            rusqlite::Error::SqlInputError { error, msg, .. } => {
+                if matches!(error.code, rusqlite::ffi::ErrorCode::Unknown) {
+                    let msg_lower = msg.to_ascii_lowercase();
+                    msg_lower.contains("no such table") || msg_lower.contains("no such column")
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn stage_shm_file(shm_path: &Path) -> Result<std::path::PathBuf, ShelfError> {
+    let mut source_file = fs::File::open(shm_path).map_err(|source| ShelfError::FileSystem {
+        path: shm_path.display().to_string(),
+        source,
+    })?;
+    let pid = std::process::id();
+    let mut attempt = 0u64;
+    let (mut stage_file, stage_path) = loop {
+        let mut os = shm_path.as_os_str().to_os_string();
+        os.push(format!(".stage-{pid}-{attempt}"));
+        let candidate = std::path::PathBuf::from(os);
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(file) => break (file, candidate),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                attempt += 1;
+            }
+            Err(source) => {
+                return Err(ShelfError::FileSystem {
+                    path: candidate.display().to_string(),
+                    source,
+                });
+            }
+        }
+    };
+    if let Err(source) = std::io::copy(&mut source_file, &mut stage_file)
+        .and_then(|_| stage_file.sync_all())
+    {
+        drop(stage_file);
+        let _ = fs::remove_file(&stage_path);
+        return Err(ShelfError::FileSystem {
+            path: stage_path.display().to_string(),
+            source,
+        });
+    }
+    Ok(stage_path)
+}
+
+fn restore_staged_shm(shm_path: &Path, stage_path: &Path) -> Result<(), ShelfError> {
+    if fs::rename(stage_path, shm_path).is_ok() {
+        return Ok(());
+    }
+    let copy_result = (|| -> std::io::Result<()> {
+        let mut src = fs::File::open(stage_path)?;
+        let mut dst = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(shm_path)?;
+        std::io::copy(&mut src, &mut dst)?;
+        Ok(())
+    })();
+    match copy_result {
+        Ok(()) => {
+            let _ = fs::remove_file(stage_path);
+            Ok(())
+        }
+        Err(err) => Err(ShelfError::RecoveryRollbackFailed {
+            source_dir: shm_path.to_path_buf(),
+            backup_dir: stage_path.to_path_buf(),
+            details: format!(
+                "failed to restore original SHM evidence from staged copy `{}` to `{}`: {err}",
+                stage_path.display(),
+                shm_path.display()
+            ),
+        }),
+    }
+}
+
+fn validate_existing_database(path: &Path, shm_path: &Path) -> Result<(), ShelfError> {
+    use std::io::Read;
+    let mut file = fs::File::open(path).map_err(|source| ShelfError::FileSystem {
+        path: path.display().to_string(),
+        source,
+    })?;
+    let metadata = file.metadata().map_err(|source| ShelfError::FileSystem {
+        path: path.display().to_string(),
+        source,
+    })?;
+    if metadata.len() == 0 {
+        return Ok(());
+    }
+    let mut header = [0u8; 16];
+    match file.read_exact(&mut header) {
+        Ok(()) => {
+            if header != *b"SQLite format 3\0" {
+                return Err(ShelfError::DatabaseCorrupt("file is not a database".into()));
+            }
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::UnexpectedEof => {
+            return Err(ShelfError::DatabaseCorrupt(
+                "file is truncated / not a database".into(),
+            ));
+        }
+        Err(err) => {
+            return Err(ShelfError::FileSystem {
+                path: path.display().to_string(),
+                source: err,
+            });
+        }
+    }
+    drop(file);
+
+    let had_shm = shm_path.exists();
+    let staged_shm = if had_shm {
+        Some(stage_shm_file(shm_path)?)
+    } else {
+        None
+    };
+
+    let validation_result = (|| -> Result<(), ShelfError> {
+        let ro_conn = Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        ro_conn.busy_timeout(Duration::from_secs(5))?;
+        let integrity: String =
+            ro_conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+        if integrity != "ok" {
+            return Err(ShelfError::DatabaseCorrupt(integrity));
+        }
+
+        ro_conn
+            .query_row(
+                "SELECT id, created_at, position FROM shelf_batches LIMIT 1",
+                [],
+                |_| Ok(()),
+            )
+            .optional()?;
+        ro_conn
+            .query_row(
+                "SELECT id, batch_id, position, path, name, is_folder, is_pinned FROM shelf_items LIMIT 1",
+                [],
+                |_| Ok(()),
+            )
+            .optional()?;
+        ro_conn
+            .query_row(
+                "SELECT id, rail_monitor FROM shelf_ui_state LIMIT 1",
+                [],
+                |_| Ok(()),
+            )
+            .optional()?;
+        ro_conn
+            .query_row(
+                "SELECT id, preferred_width, manual_height FROM shelf_settings LIMIT 1",
+                [],
+                |_| Ok(()),
+            )
+            .optional()?;
+
+        Ok(())
+    })();
+
+    match validation_result {
+        Ok(()) => {
+            if let Some(stage_path) = staged_shm {
+                let _ = fs::remove_file(stage_path);
+            }
+            Ok(())
+        }
+        Err(err) => {
+            if let Some(stage_path) = staged_shm {
+                restore_staged_shm(shm_path, &stage_path)?;
+            } else if shm_path.exists() {
+                let _ = fs::remove_file(shm_path);
+            }
+            Err(err)
+        }
+    }
 }
 
 #[derive(Clone)]
 pub(crate) struct ShelfState {
     store: Arc<Mutex<Option<ShelfStore>>>,
+    pending_warning: Arc<Mutex<Option<String>>>,
 }
+
 
 // A checked guard keeps all existing Shelf operations behind the same lifetime boundary.
 // Its private Option cannot be cleared while this guard holds the store mutex.
@@ -153,11 +413,180 @@ impl ShelfState {
     pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self, ShelfError> {
         Ok(Self {
             store: Arc::new(Mutex::new(Some(ShelfStore::open(path.as_ref())?))),
+            pending_warning: Arc::new(Mutex::new(None)),
         })
     }
 
+    pub(crate) fn acknowledge_warning(&self) {
+        if let Ok(mut lock) = self.pending_warning.lock() {
+            *lock = None;
+        }
+    }
+
+    pub(crate) fn deliver_recovery_warning(
+        &self,
+        backup_dir: Option<&Path>,
+        notify: impl FnOnce(&str) -> Result<(), String>,
+    ) {
+        let Some(backup_dir) = backup_dir else {
+            return;
+        };
+        let warning_message = format!(
+            "Shelf database was corrupted and preserved in:\n{}\n\nStarted with an empty Shelf.",
+            backup_dir.display()
+        );
+        if let Err(error) = notify(&warning_message) {
+            eprintln!("recovery warning notification delivery failed: {error}");
+            if let Ok(mut lock) = self.pending_warning.lock() {
+                *lock = Some(warning_message);
+            }
+        }
+    }
+
+    pub(crate) fn open_or_recover(
+        path: impl AsRef<Path>,
+    ) -> Result<(Self, Option<std::path::PathBuf>), ShelfError> {
+        Self::open_or_recover_at(path.as_ref(), SystemTime::now())
+    }
+
+    pub(crate) fn open_or_recover_at(
+        path: &Path,
+        now: SystemTime,
+    ) -> Result<(Self, Option<std::path::PathBuf>), ShelfError> {
+        if !path.exists() {
+            let state = Self::open(path)?;
+            return Ok((state, None));
+        }
+
+        let parent = path.parent().unwrap_or_else(|| Path::new("."));
+        let mut wal_os = path.as_os_str().to_os_string();
+        wal_os.push("-wal");
+        let wal_path = std::path::PathBuf::from(wal_os);
+
+        let mut shm_os = path.as_os_str().to_os_string();
+        shm_os.push("-shm");
+        let shm_path = std::path::PathBuf::from(shm_os);
+
+        match validate_existing_database(path, &shm_path) {
+            Ok(()) => {
+                let store = ShelfStore::open_internal(path, false)?;
+                Ok((
+                    Self {
+                        store: Arc::new(Mutex::new(Some(store))),
+                        pending_warning: Arc::new(Mutex::new(None)),
+                    },
+                    None,
+                ))
+            }
+            Err(err) if is_recoverable_error(&err) => {
+                let recovery_area = parent.join("recovery");
+                fs::create_dir_all(&recovery_area).map_err(|source| ShelfError::FileSystem {
+                    path: recovery_area.display().to_string(),
+                    source,
+                })?;
+
+                let timestamp = format_utc_timestamp(now);
+                let base_name = format!("shelf-corrupt-{timestamp}");
+                let mut suffix = 0usize;
+                let backup_dir = loop {
+                    let candidate = if suffix == 0 {
+                        recovery_area.join(&base_name)
+                    } else {
+                        recovery_area.join(format!("{base_name}-{suffix}"))
+                    };
+                    match fs::create_dir(&candidate) {
+                        Ok(()) => break candidate,
+                        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                            suffix += 1;
+                        }
+                        Err(source) => {
+                            return Err(ShelfError::FileSystem {
+                                path: candidate.display().to_string(),
+                                source,
+                            });
+                        }
+                    }
+                };
+                let file_name = path
+                    .file_name()
+                    .ok_or(ShelfError::InvalidPath)?;
+
+                let mut to_move = Vec::new();
+                to_move.push((path.to_path_buf(), backup_dir.join(file_name)));
+                if wal_path.exists() {
+                    to_move.push((
+                        wal_path.clone(),
+                        backup_dir.join(wal_path.file_name().unwrap()),
+                    ));
+                }
+                if shm_path.exists() {
+                    to_move.push((
+                        shm_path.clone(),
+                        backup_dir.join(shm_path.file_name().unwrap()),
+                    ));
+                }
+
+                let mut moved = Vec::new();
+                let mut move_failure = None;
+                for (src, dst) in &to_move {
+                    if let Err(e) = fs::rename(src, dst) {
+                        move_failure = Some((src.clone(), dst.clone(), e));
+                        break;
+                    }
+                    moved.push((src, dst));
+                }
+
+                if let Some((failed_src, failed_dst, move_err)) = move_failure {
+                    let mut rollback_errs = Vec::new();
+                    for (src, dst) in moved.into_iter().rev() {
+                        if let Err(e) = fs::rename(dst, src) {
+                            rollback_errs.push((dst.clone(), src.clone(), e));
+                        }
+                    }
+                    let _ = fs::remove_dir(&backup_dir);
+                    if !rollback_errs.is_empty() {
+                        return Err(ShelfError::RecoveryRollbackFailed {
+                            source_dir: parent.to_path_buf(),
+                            backup_dir,
+                            details: format!(
+                                "failed to move `{}` to `{}` ({move_err}); rollback failed to restore {} artifact(s)",
+                                failed_src.display(),
+                                failed_dst.display(),
+                                rollback_errs.len()
+                            ),
+                        });
+                    }
+                    return Err(ShelfError::RecoveryMoveFailed {
+                        path: failed_src.display().to_string(),
+                        backup_dir,
+                        source: move_err,
+                    });
+                }
+
+                let clean_store = ShelfStore::open_internal(path, false).map_err(|clean_err| {
+                    ShelfError::RecoveryRecreationFailed {
+                        path: path.display().to_string(),
+                        backup_dir: backup_dir.clone(),
+                        details: clean_err.to_string(),
+                    }
+                })?;
+
+                Ok((
+                    Self {
+                        store: Arc::new(Mutex::new(Some(clean_store))),
+                        pending_warning: Arc::new(Mutex::new(None)),
+                    },
+                    Some(backup_dir),
+                ))
+            }
+            Err(unrecoverable) => Err(unrecoverable),
+        }
+    }
+
     pub(crate) fn snapshot(&self) -> Result<ShelfSnapshot, ShelfError> {
-        self.store()?.snapshot()
+        let mut snapshot = self.store()?.snapshot()?;
+        snapshot.warning = self.pending_warning.lock().ok().and_then(|w| w.clone());
+        Ok(snapshot)
     }
 
     pub(crate) fn rail_monitor(&self) -> Result<Option<String>, ShelfError> {
@@ -420,6 +849,22 @@ impl ShelfState {
         )?;
         Ok(())
     }
+    #[cfg(test)]
+    fn install_test_rail_monitor_failure(&self) -> Result<(), ShelfError> {
+        self.store()?.connection.execute_batch(
+            "CREATE TEMP TRIGGER fail_rail_monitor_update
+             BEFORE UPDATE ON shelf_ui_state
+             BEGIN
+                 SELECT RAISE(FAIL, 'forced rail monitor update failure');
+             END;
+             CREATE TEMP TRIGGER fail_rail_monitor_insert
+             BEFORE INSERT ON shelf_ui_state
+             BEGIN
+                 SELECT RAISE(FAIL, 'forced rail monitor insert failure');
+             END;",
+        )?;
+        Ok(())
+    }
 }
 
 struct ShelfStore {
@@ -434,6 +879,10 @@ struct ShelfStore {
 
 impl ShelfStore {
     fn open(path: &Path) -> Result<Self, ShelfError> {
+        Self::open_internal(path, true)
+    }
+
+    fn open_internal(path: &Path, run_integrity: bool) -> Result<Self, ShelfError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|source| ShelfError::FileSystem {
                 path: parent.display().to_string(),
@@ -444,12 +893,13 @@ impl ShelfStore {
         let connection = Connection::open(path)?;
         connection.busy_timeout(Duration::from_secs(5))?;
 
-        let integrity: String =
-            connection.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
-        if integrity != "ok" {
-            return Err(ShelfError::DatabaseCorrupt(integrity));
+        if run_integrity {
+            let integrity: String =
+                connection.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+            if integrity != "ok" {
+                return Err(ShelfError::DatabaseCorrupt(integrity));
+            }
         }
-
         connection.pragma_update(None, "foreign_keys", "ON")?;
         connection.pragma_update(None, "journal_mode", "WAL")?;
         connection.execute_batch(
@@ -487,6 +937,13 @@ impl ShelfStore {
             )
             .optional()?
             .unwrap_or(180.0);
+        connection
+            .query_row(
+                "SELECT rail_monitor FROM shelf_ui_state WHERE id = 1",
+                [],
+                |_| Ok(()),
+            )
+            .optional()?;
         let mut store = Self {
             connection,
             width,
@@ -563,6 +1020,7 @@ impl ShelfStore {
             batches,
             preferred_width: width,
             height: 180.0,
+            warning: None,
         };
         let mut items_statement = connection.prepare(
             "SELECT id, batch_id, position, path, name, is_folder, is_pinned
@@ -974,6 +1432,7 @@ impl ShelfStore {
                 batches: Vec::new(),
                 preferred_width: self.width,
                 height: self.height,
+                warning: None,
             });
         }
 
@@ -2428,5 +2887,559 @@ mod tests {
         let pending_snap = reopened.snapshot().unwrap();
         assert_eq!(pending_snap.preferred_width, 320.0);
         assert_eq!(pending_snap.height, 240.0);
+    }
+
+    #[test]
+    fn corrupt_database_with_wal_and_shm_is_preserved_byte_for_byte_and_recovers_empty_shelf() {
+        let directory = TestDirectory::new("recovery-corrupt-all");
+        let database = directory.path().join("shelf.db");
+        let wal = directory.path().join("shelf.db-wal");
+        let shm = directory.path().join("shelf.db-shm");
+
+        let corrupt_db_bytes = b"corrupted sqlite database header and content";
+        let corrupt_wal_bytes = b"corrupted wal content";
+        let corrupt_shm_bytes = b"corrupted shm content";
+
+        fs::write(&database, corrupt_db_bytes).unwrap();
+        fs::write(&wal, corrupt_wal_bytes).unwrap();
+        fs::write(&shm, corrupt_shm_bytes).unwrap();
+
+        let (state, backup_dir) =
+            ShelfState::open_or_recover(&database).expect("recovery should succeed");
+        let backup_dir = backup_dir.expect("backup directory should be returned");
+
+        assert!(backup_dir.exists(), "backup directory must exist");
+        assert_eq!(
+            backup_dir.parent().unwrap(),
+            directory.path().join("recovery"),
+            "backup directory must live under profile recovery area"
+        );
+        let dir_name = backup_dir.file_name().unwrap().to_string_lossy();
+        assert!(
+            dir_name.starts_with("shelf-corrupt-"),
+            "backup directory must start with shelf-corrupt-, got {dir_name}"
+        );
+
+        assert_eq!(
+            fs::read(backup_dir.join("shelf.db")).unwrap(),
+            corrupt_db_bytes
+        );
+        assert_eq!(
+            fs::read(backup_dir.join("shelf.db-wal")).unwrap(),
+            corrupt_wal_bytes
+        );
+        assert_eq!(
+            fs::read(backup_dir.join("shelf.db-shm")).unwrap(),
+            corrupt_shm_bytes
+        );
+
+        if wal.exists() {
+            assert_ne!(
+                fs::read(&wal).unwrap(),
+                corrupt_wal_bytes,
+                "active wal must not contain original corrupt bytes"
+            );
+        }
+        if shm.exists() {
+            assert_ne!(
+                fs::read(&shm).unwrap(),
+                corrupt_shm_bytes,
+                "active shm must not contain original corrupt bytes"
+            );
+        }
+
+        let snapshot = state
+            .snapshot()
+            .expect("recovered shelf snapshot should load");
+        assert!(snapshot.batches.is_empty(), "recovered shelf must start empty");
+    }
+
+    #[test]
+    fn recovery_accepts_missing_sidecars_and_preserves_only_existing() {
+        // Subcase A: No sidecars
+        {
+            let directory = TestDirectory::new("recovery-no-sidecars");
+            let database = directory.path().join("shelf.db");
+            fs::write(&database, b"corrupted db without sidecars").unwrap();
+
+            let (state, backup_dir) = ShelfState::open_or_recover(&database).unwrap();
+            let backup = backup_dir.unwrap();
+            assert_eq!(backup.parent().unwrap(), directory.path().join("recovery"));
+            assert_eq!(
+                fs::read(backup.join("shelf.db")).unwrap(),
+                b"corrupted db without sidecars"
+            );
+            assert!(!backup.join("shelf.db-wal").exists());
+            assert!(!backup.join("shelf.db-shm").exists());
+            assert!(state.snapshot().unwrap().batches.is_empty());
+        }
+
+        // Subcase B: WAL only
+        {
+            let directory = TestDirectory::new("recovery-wal-only");
+            let database = directory.path().join("shelf.db");
+            let wal = directory.path().join("shelf.db-wal");
+            fs::write(&database, b"corrupted db").unwrap();
+            fs::write(&wal, b"wal only").unwrap();
+
+            let (state, backup_dir) = ShelfState::open_or_recover(&database).unwrap();
+            let backup = backup_dir.unwrap();
+            assert_eq!(backup.parent().unwrap(), directory.path().join("recovery"));
+            assert_eq!(fs::read(backup.join("shelf.db")).unwrap(), b"corrupted db");
+            assert_eq!(fs::read(backup.join("shelf.db-wal")).unwrap(), b"wal only");
+            assert!(!backup.join("shelf.db-shm").exists());
+            assert!(state.snapshot().unwrap().batches.is_empty());
+        }
+
+        // Subcase C: SHM only
+        {
+            let directory = TestDirectory::new("recovery-shm-only");
+            let database = directory.path().join("shelf.db");
+            let shm = directory.path().join("shelf.db-shm");
+            fs::write(&database, b"corrupted db").unwrap();
+            fs::write(&shm, b"shm only").unwrap();
+
+            let (state, backup_dir) = ShelfState::open_or_recover(&database).unwrap();
+            let backup = backup_dir.unwrap();
+            assert_eq!(backup.parent().unwrap(), directory.path().join("recovery"));
+            assert_eq!(fs::read(backup.join("shelf.db")).unwrap(), b"corrupted db");
+            assert_eq!(fs::read(backup.join("shelf.db-shm")).unwrap(), b"shm only");
+            assert!(!backup.join("shelf.db-wal").exists());
+            assert!(state.snapshot().unwrap().batches.is_empty());
+        }
+    }
+
+    #[test]
+    fn recovery_backup_name_collision_resolves_deterministic_numeric_suffix_under_recovery_area() {
+        use std::time::{Duration, UNIX_EPOCH};
+        let directory = TestDirectory::new("recovery-collision");
+        let database = directory.path().join("shelf.db");
+        let fixed_time = UNIX_EPOCH + Duration::from_secs(1776182400); // 2026-04-14T16:00:00Z
+
+        // First corrupt episode
+        fs::write(&database, b"first corrupt db").unwrap();
+        let (state1, backup1) =
+            ShelfState::open_or_recover_at(&database, fixed_time).unwrap();
+        let backup1 = backup1.unwrap();
+        assert_eq!(
+            backup1,
+            directory
+                .path()
+                .join("recovery")
+                .join("shelf-corrupt-20260414T160000Z")
+        );
+        assert_eq!(fs::read(backup1.join("shelf.db")).unwrap(), b"first corrupt db");
+        assert!(state1.snapshot().unwrap().batches.is_empty());
+        drop(state1);
+
+        // Second corrupt episode at same timestamp -> must produce -1
+        fs::write(&database, b"second corrupt db").unwrap();
+        let (state2, backup2) =
+            ShelfState::open_or_recover_at(&database, fixed_time).unwrap();
+        let backup2 = backup2.unwrap();
+        assert_eq!(
+            backup2,
+            directory
+                .path()
+                .join("recovery")
+                .join("shelf-corrupt-20260414T160000Z-1")
+        );
+        assert_eq!(fs::read(backup2.join("shelf.db")).unwrap(), b"second corrupt db");
+        // Prior backup1 must be completely untouched
+        assert_eq!(fs::read(backup1.join("shelf.db")).unwrap(), b"first corrupt db");
+        assert!(state2.snapshot().unwrap().batches.is_empty());
+        drop(state2);
+
+        // Third corrupt episode at same timestamp -> must produce -2
+        fs::write(&database, b"third corrupt db").unwrap();
+        let (state3, backup3) =
+            ShelfState::open_or_recover_at(&database, fixed_time).unwrap();
+        let backup3 = backup3.unwrap();
+        assert_eq!(
+            backup3,
+            directory
+                .path()
+                .join("recovery")
+                .join("shelf-corrupt-20260414T160000Z-2")
+        );
+        assert_eq!(fs::read(backup3.join("shelf.db")).unwrap(), b"third corrupt db");
+        assert_eq!(fs::read(backup1.join("shelf.db")).unwrap(), b"first corrupt db");
+        assert_eq!(fs::read(backup2.join("shelf.db")).unwrap(), b"second corrupt db");
+        assert!(state3.snapshot().unwrap().batches.is_empty());
+    }
+
+    #[test]
+    fn clean_and_missing_database_do_not_create_recovery_backup() {
+        let directory = TestDirectory::new("recovery-clean");
+        let database = directory.path().join("shelf.db");
+        let recovery_area = directory.path().join("recovery");
+
+        // 1. Missing database
+        assert!(!database.exists());
+        let (state, backup) = ShelfState::open_or_recover(&database).unwrap();
+        assert!(backup.is_none(), "missing db must not create recovery backup");
+        assert!(!recovery_area.exists(), "recovery directory must not be created");
+        assert!(database.exists(), "clean database must be initialized");
+        assert!(state.snapshot().unwrap().batches.is_empty());
+
+        // Populate database
+        state
+            .accept_drop(vec![Some(
+                directory.source_file().to_string_lossy().into_owned(),
+            )])
+            .unwrap();
+        drop(state);
+
+        // 2. Existing clean database
+        let (reopened, backup) = ShelfState::open_or_recover(&database).unwrap();
+        assert!(backup.is_none(), "clean existing db must not create recovery backup");
+        assert!(!recovery_area.exists(), "recovery directory must not be created");
+        assert_eq!(reopened.snapshot().unwrap().batches.len(), 1);
+    }
+
+    #[test]
+    fn schema_invalid_database_is_recovered_and_preserves_evidence() {
+        let directory = TestDirectory::new("recovery-schema-invalid");
+        let database = directory.path().join("shelf.db");
+
+        // Create a sqlite database with wrong columns in shelf_batches
+        {
+            let conn = rusqlite::Connection::open(&database).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE shelf_batches (id TEXT PRIMARY KEY, wrong_column INTEGER);",
+            )
+            .unwrap();
+        }
+        let original_bytes = fs::read(&database).unwrap();
+
+        let (state, backup) = ShelfState::open_or_recover(&database).unwrap();
+        let backup_dir = backup.expect("schema-invalid db must trigger recovery");
+        assert_eq!(backup_dir.parent().unwrap(), directory.path().join("recovery"));
+        assert_eq!(fs::read(backup_dir.join("shelf.db")).unwrap(), original_bytes);
+
+        // Clean database now has correct schema and starts empty
+        assert!(state.snapshot().unwrap().batches.is_empty());
+        // Normal operations work on the clean database
+        let dropped = state
+            .accept_drop(vec![Some(
+                directory.source_file().to_string_lossy().into_owned(),
+            )])
+            .unwrap();
+        assert!(dropped.snapshot.is_some());
+    }
+
+    #[test]
+    fn unrecoverable_filesystem_failure_aborts_without_clean_shelf_or_data_loss() {
+        let directory = TestDirectory::new("recovery-fs-fail");
+        let database = directory.path().join("shelf.db");
+        let wal = directory.path().join("shelf.db-wal");
+
+        let corrupt_db = b"corrupted db content";
+        let corrupt_wal = b"corrupted wal content";
+        fs::write(&database, corrupt_db).unwrap();
+        fs::write(&wal, corrupt_wal).unwrap();
+
+        // Block the recovery directory by creating a regular file named "recovery"
+        fs::write(directory.path().join("recovery"), b"blocking file").unwrap();
+
+        let result = ShelfState::open_or_recover(&database);
+        assert!(result.is_err(), "must fail fatally when recovery directory cannot be created");
+
+        // Original evidence must remain intact and untouched
+        assert_eq!(fs::read(&database).unwrap(), corrupt_db);
+        assert_eq!(fs::read(&wal).unwrap(), corrupt_wal);
+    }
+
+    #[test]
+    fn recovery_partial_move_failure_restores_moved_first_artifact() {
+        use std::time::{Duration, UNIX_EPOCH};
+        let directory = TestDirectory::new("recovery-partial-move");
+        let database = directory.path().join("shelf.db");
+        let wal = directory.path().join("shelf.db-wal");
+        let fixed_time = UNIX_EPOCH + Duration::from_secs(1776182400);
+
+        let corrupt_db = b"corrupted db content";
+        let corrupt_wal = b"corrupted wal content";
+        fs::write(&database, corrupt_db).unwrap();
+        fs::write(&wal, corrupt_wal).unwrap();
+        #[cfg(windows)]
+        use std::os::windows::fs::OpenOptionsExt;
+        let _wal_lock = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(1 | 2) // FILE_SHARE_READ | FILE_SHARE_WRITE (no FILE_SHARE_DELETE)
+            .open(&wal)
+            .unwrap();
+
+        let result = ShelfState::open_or_recover_at(&database, fixed_time);
+        assert!(result.is_err(), "must fail when second artifact move fails");
+
+        drop(_wal_lock);
+
+        // First artifact (database) was moved then restored back to source
+        assert_eq!(fs::read(&database).unwrap(), corrupt_db);
+        assert_eq!(fs::read(&wal).unwrap(), corrupt_wal);
+    }
+
+    #[test]
+    fn recovery_warning_delivery_failure_retains_snapshot_warning_until_acknowledged() {
+        let directory = TestDirectory::new("recovery-warning-fallback");
+        let database = directory.path().join("shelf.db");
+        fs::write(&database, b"corrupted db content").unwrap();
+
+        let (state, backup_dir) = ShelfState::open_or_recover(&database).unwrap();
+        let backup_path = backup_dir.expect("recovery backup should exist");
+
+        // Simulate notification-area delivery failure at the startup seam
+        let mut attempted_message = None;
+        state.deliver_recovery_warning(Some(&backup_path), |msg| {
+            attempted_message = Some(msg.to_owned());
+            Err("notification channel unavailable".into())
+        });
+
+        let msg = attempted_message.expect("notifier should be called with warning message");
+        assert!(
+            msg.contains(&backup_path.display().to_string()),
+            "warning must include Recovery Backup path"
+        );
+        assert!(
+            msg.contains("empty Shelf"),
+            "warning must identify that Shelf started empty"
+        );
+
+        // Warning is exposed on ShelfSnapshot and retained across multiple reads before dismissal
+        let first_read = state.snapshot().unwrap();
+        assert_eq!(first_read.warning.as_deref(), Some(msg.as_str()));
+        let second_read = state.snapshot().unwrap();
+        assert_eq!(second_read.warning.as_deref(), Some(msg.as_str()));
+
+        // Acknowledging warning after user dismissal clears it from subsequent snapshots
+        state.acknowledge_warning();
+        assert_eq!(state.snapshot().unwrap().warning, None);
+    }
+
+    #[test]
+    fn valid_header_corrupt_btree_with_wal_and_shm_preserves_shm_bytes_without_wal_index_overwrite() {
+        let directory = TestDirectory::new("recovery-valid-header-shm");
+        let database = directory.path().join("shelf.db");
+        let wal = directory.path().join("shelf.db-wal");
+        let shm = directory.path().join("shelf.db-shm");
+
+        // Create a real WAL-mode SQLite database and close the connection cleanly
+        {
+            let state = ShelfState::open(&database).unwrap();
+            state
+                .accept_drop(vec![Some(
+                    directory.source_file().to_string_lossy().into_owned(),
+                )])
+                .unwrap();
+            state.close().unwrap();
+        }
+
+        // Corrupt the interior B-tree page data while keeping the 16-byte SQLite format 3 header intact
+        let mut corrupt_db_bytes = fs::read(&database).unwrap();
+        for byte in &mut corrupt_db_bytes[100..200] {
+            *byte = 0xFF;
+        }
+        let corrupt_wal_bytes = b"original WAL evidence";
+        let corrupt_shm_bytes = b"original SHM evidence";
+
+        fs::write(&database, &corrupt_db_bytes).unwrap();
+        fs::write(&wal, corrupt_wal_bytes).unwrap();
+        fs::write(&shm, corrupt_shm_bytes).unwrap();
+
+        let (state, backup_dir) =
+            ShelfState::open_or_recover(&database).expect("recovery should succeed");
+        let backup_dir = backup_dir.expect("backup directory should be returned");
+
+        assert_eq!(
+            fs::read(backup_dir.join("shelf.db")).unwrap(),
+            corrupt_db_bytes,
+            "preserved shelf.db must match original corrupt bytes"
+        );
+        assert_eq!(
+            fs::read(backup_dir.join("shelf.db-wal")).unwrap(),
+            corrupt_wal_bytes,
+            "preserved shelf.db-wal must match original WAL evidence"
+        );
+        assert_eq!(
+            fs::read(backup_dir.join("shelf.db-shm")).unwrap(),
+            corrupt_shm_bytes,
+            "preserved shelf.db-shm must be the exact 21-byte original SHM evidence, not overwritten by 32KB WAL index"
+        );
+        assert!(state.snapshot().unwrap().batches.is_empty());
+    }
+
+    #[test]
+    fn failed_batch_intake_preserves_visible_and_durable_state() {
+        let directory = TestDirectory::new("intake-rollback");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        // Populate initial batch
+        let initial = state
+            .accept_drop(vec![Some(
+                directory.source_file().to_string_lossy().into_owned(),
+            )])
+            .unwrap()
+            .snapshot
+            .unwrap();
+        let initial_json = serde_json::to_value(&initial).unwrap();
+
+        // Install trigger that fails item inserts
+        state.install_test_insert_failure().unwrap();
+
+        // Attempt to accept a new batch
+        let fail_path = directory.0.join("new_file.txt");
+        fs::write(&fail_path, b"new").unwrap();
+        let result = state.accept_drop(vec![Some(fail_path.to_string_lossy().into_owned())]);
+        assert!(result.is_err(), "Intake must fail when insert fails");
+
+        // Verify visible snapshot is identical to prior snapshot
+        let visible = state.snapshot().unwrap();
+        assert_eq!(
+            serde_json::to_value(&visible).unwrap(),
+            initial_json,
+            "Visible snapshot must be unmodified after failed intake"
+        );
+
+        // Reopen database and verify durable snapshot matches prior state
+        drop(visible);
+        drop(state);
+        let reopened = ShelfState::open(&database).unwrap();
+        let durable = reopened.snapshot().unwrap();
+        assert_eq!(
+            serde_json::to_value(&durable).unwrap(),
+            initial_json,
+            "Durable snapshot after restart must match prior state"
+        );
+    }
+
+    #[test]
+    fn failed_batch_removal_preserves_visible_and_durable_state() {
+        let directory = TestDirectory::new("remove-batch-rollback");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        let file_a = directory.0.join("a.txt");
+        let file_b = directory.0.join("b.txt");
+        fs::write(&file_a, b"a").unwrap();
+        fs::write(&file_b, b"b").unwrap();
+
+        state
+            .accept_drop(vec![Some(file_a.to_string_lossy().into_owned())])
+            .unwrap();
+        let snap = state
+            .accept_drop(vec![Some(file_b.to_string_lossy().into_owned())])
+            .unwrap()
+            .snapshot
+            .unwrap();
+        let initial_json = serde_json::to_value(&snap).unwrap();
+        let target_batch_id = snap.batches[0].id.clone();
+
+        // Install trigger that fails deletes on shelf_batches
+        state
+            .store()
+            .unwrap()
+            .connection
+            .execute_batch(
+                "CREATE TEMP TRIGGER fail_batch_delete BEFORE DELETE ON shelf_batches
+                 BEGIN SELECT RAISE(FAIL, 'forced batch delete failure'); END;",
+            )
+            .unwrap();
+
+        // Attempt to remove batch
+        assert!(state.remove_batch(&target_batch_id).is_err());
+
+        // Visible snapshot is preserved
+        assert_eq!(
+            serde_json::to_value(state.snapshot().unwrap()).unwrap(),
+            initial_json
+        );
+
+        // Durable snapshot on reopen is preserved
+        drop(state);
+        let reopened = ShelfState::open(&database).unwrap();
+        assert_eq!(
+            serde_json::to_value(reopened.snapshot().unwrap()).unwrap(),
+            initial_json
+        );
+    }
+
+    #[test]
+    fn failed_batch_drag_copy_consumption_preserves_visible_and_durable_state() {
+        let directory = TestDirectory::new("batch-copy-rollback");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        let file_a = directory.0.join("a.txt");
+        let file_b = directory.0.join("b.txt");
+        fs::write(&file_a, b"a").unwrap();
+        fs::write(&file_b, b"b").unwrap();
+
+        let snap = state
+            .accept_drop(vec![
+                Some(file_a.to_string_lossy().into_owned()),
+                Some(file_b.to_string_lossy().into_owned()),
+            ])
+            .unwrap()
+            .snapshot
+            .unwrap();
+        let initial_json = serde_json::to_value(&snap).unwrap();
+        let batch_id = snap.batches[0].id.clone();
+
+        let prep = state.prepare_batch_drag(&batch_id).unwrap();
+        let token = prep.token.unwrap();
+
+        // Install trigger that fails item deletes
+        state.install_test_delete_failure().unwrap();
+
+        // Attempt to complete batch drag as Copy (consumption)
+        let result = state.complete_batch_drag(&token, DragOutcome::Copy);
+        assert!(result.is_err(), "Copy completion must fail if delete fails");
+
+        // Visible snapshot retains prior state
+        assert_eq!(
+            serde_json::to_value(state.snapshot().unwrap()).unwrap(),
+            initial_json
+        );
+
+        // Durable snapshot on reopen is preserved
+        drop(state);
+        let reopened = ShelfState::open(&database).unwrap();
+        assert_eq!(
+            serde_json::to_value(reopened.snapshot().unwrap()).unwrap(),
+            initial_json
+        );
+    }
+
+    #[test]
+    fn failed_rail_monitor_persistence_preserves_prior_durable_value_and_reopen() {
+        let directory = TestDirectory::new("rail-mon-fail");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        // Initially set remembered rail monitor to "display-1"
+        state.remember_rail_monitor(Some("display-1")).unwrap();
+        assert_eq!(state.rail_monitor().unwrap().as_deref(), Some("display-1"));
+
+        // Verify durable state on reopen
+        drop(state);
+        let state = ShelfState::open(&database).unwrap();
+        assert_eq!(state.rail_monitor().unwrap().as_deref(), Some("display-1"));
+
+        // Install trigger failing shelf_ui_state updates and inserts
+        state.install_test_rail_monitor_failure().unwrap();
+
+        // Attempt to update rail monitor to "display-2"
+        let res = state.remember_rail_monitor(Some("display-2"));
+        assert!(res.is_err(), "Updating rail monitor must fail when trigger aborts");
+
+        // Querying rail_monitor returns the unchanged durable value ("display-1")
+        assert_eq!(state.rail_monitor().unwrap().as_deref(), Some("display-1"));
+
+        // Reopen database: restart reflects the actual durable value ("display-1")
+        drop(state);
+        let reopened = ShelfState::open(&database).unwrap();
+        assert_eq!(reopened.rail_monitor().unwrap().as_deref(), Some("display-1"));
     }
 }
