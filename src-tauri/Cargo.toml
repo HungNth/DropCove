@@ -1,6 +1,6 @@
 [package]
 name = "dropcove"
-version = "0.0.8"
+version = "0.0.9"
 description = "DropCove Resident Workspace"
 authors = ["DropCove Contributors"]
 edition = "2021"
@@ -9,6 +9,10 @@ edition = "2021"
 name = "dropcove_lib"
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
 
 [dependencies]
 tauri = { version = "2.12", features = ["tray-icon"] }

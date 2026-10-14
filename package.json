@@ -1,8 +1,11 @@
 {
   "name": "dropcove",
   "private": true,
-  "version": "0.0.8",
+  "version": "0.0.9",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
@@ -12,19 +15,16 @@
   "dependencies": {
     "@tauri-apps/api": "^2.12.3",
     "@tauri-apps/plugin-opener": "^2.7.1",
-    "@vueuse/core": "^12.8.2",
-    "pinia": "^3.0.4",
-    "vue": "^3.5.43",
-    "vue-router": "^4.6.4"
+    "@vueuse/core": "^15.0.0",
+    "vue": "^3.5.44"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/cli": "^2.12.2",
-    "@vitejs/plugin-vue": "^5.2.4",
-    "autoprefixer": "^10.6.1",
-    "postcss": "^8.5.29",
-    "tailwindcss": "^3.4.19",
-    "typescript": "~5.7.3",
-    "vite": "^6.4.4",
-    "vue-tsc": "^2.2.12"
+    "@vitejs/plugin-vue": "^6.0.10",
+    "tailwindcss": "^4.3.3",
+    "typescript": "6.0.2",
+    "vite": "^8.3.4",
+    "vue-tsc": "^3.3.13"
   }
 }

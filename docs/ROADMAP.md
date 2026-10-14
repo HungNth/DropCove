@@ -329,30 +329,43 @@ Observed verification:
 
 ## 0.0.9 — Frontend toolchain and dependency modernization
 
-**Status:** Planned.
+**Status:** Completed — all three tickets resolved; user confirmed final exact-candidate acceptance on 2026-10-14. Version 0.0.10 remains unstarted.
+
+**Plan:** [Frontend Toolchain Modernization specification](../.scratch/frontend-toolchain-modernization/spec.md). [Primary-source upgrade research](../.scratch/frontend-toolchain-modernization/research/frontend-upgrade-constraints.md) records the exact compatibility constraints.
 
 ### Scope
 
-- Upgrade `package.json` dependencies and devDependencies to the latest target versions: `@vueuse/core` (`15.0.0`), `pinia` (`4.0.3`), `vue-router` (`5.4.0`), `@vitejs/plugin-vue` (`6.0.10`), `tailwindcss` (`4.3.3`), `typescript` (`7.0.2`), `vite` (`8.3.4`), and `vue-tsc` (`3.3.13`).
-- Update companion packages (`vue`, `@tauri-apps/api`, `@tauri-apps/cli`, `@tauri-apps/plugin-opener`, and Tailwind CSS v4 Vite/PostCSS tooling) as needed to maintain full compatibility across the upgraded stack.
-- Migrate configuration and stylesheet directives where required by Tailwind CSS v4, Vite 8, and TypeScript 7 without regressing light, dark, or high-contrast theme tokens.
-- Verify full compatibility with the existing application workflows, typechecking, frontend bundling, and Windows x64 Tauri packaging.
+- Remove unused `pinia` and `vue-router` dependencies and Pinia's empty application registration; preserve Tauri window-label dispatch and composable state ownership.
+- Upgrade the active stack to `@vueuse/core` `15.0.0`, `@vitejs/plugin-vue` `6.0.10`, `tailwindcss` `4.3.3`, `vite` `8.3.4`, `vue-tsc` `3.3.13`, TypeScript `6.0.2`, and compatible Vue `3.5.44`; declare Node `>=22`.
+- Keep TypeScript `7.0.2` out of the executable graph because vue-tsc `3.3.13` cannot load its native compiler. Preserve full Vue single-file-component typechecking and defer TypeScript 7 until upstream compatibility exists.
+- Migrate Tailwind through `@tailwindcss/vite`, remove obsolete PostCSS/Autoprefixer and empty JavaScript Tailwind configuration, and preserve body utilities plus all Dark, Light, and Windows Contrast `--dc-*` tokens.
+- Preserve the Vite/Tauri development ports, host, WebSocket/HMR behavior, native-source watch exclusion, production frontend output, application workflows, and Windows x64 cargo-xwin/NSIS packaging.
+- Keep all release metadata at `0.0.8` until dependency resolution, typecheck/build, native tests, runtime smoke, and packaging pass; then synchronize and verify one exact `0.0.9` candidate.
 
 ### Implemented
 
-- Not started.
+- Approved build graph implemented: VueUse 15, Vue 3.5.44, Vite 8, plugin-vue 6, Tailwind v4 Vite integration, vue-tsc 3.3.13, and TypeScript 6.0.2. Unused Pinia/Vue Router and direct PostCSS/Autoprefixer/configuration were removed.
+- Node `>=22` declared; Vite WebSocket configuration migrated to `server.ws`; Vite client types cover TypeScript 6 stylesheet side-effect imports.
+- Added Tauri's standard default `custom-protocol` feature after user approval of the standalone packaging gap. The installed candidate now serves embedded assets from `http://tauri.localhost/`, not the Vite development server.
+- Version metadata synchronized to 0.0.9 only after technical pre-release gates. TypeScript 7 remains deferred, and 0.0.10 remains unstarted.
 
 ### Verification
 
-Before completion:
+- Frozen strict-peer pnpm install and full vue-tsc/Vite/Tailwind production build passed. Final production-feature Windows test executable ran **101 tests, 101 passed, 0 failed**. Cargo-xwin/Tauri NSIS packaging passed; external SDK LNK4099 warnings remain unsuppressed.
+- Native development smoke proved Vite client mount and WebSocket connection on the configured 1420/1421 ports; disposable HMR and native-source watcher-exclusion probes passed and were removed.
+- Exact installed candidate registered PE/installer version 0.0.9, mounted embedded Shelf/Manage Items, loaded Shell Visuals, accepted 71 batches, virtualized 70 items to 8 rows, and preserved references after preparation/cancel. Silent install, same-version repair with Cooperative Shutdown, relaunch, and uninstall/Profile Data preservation passed.
 
-- Confirm `pnpm install` resolves cleanly with the upgraded dependency graph and lockfile.
-- Pass `vue-tsc` typechecking and `vite build` with zero errors under TypeScript `7.0.2`, `vue-tsc` `3.3.13`, and Vite `8.3.4`.
-- Pass the native Windows x64 test suite and `cargo xwin build --release`.
-- Build and launch `DropCove-Setup-0.0.9.exe` on Windows 11 x64 and verify that Drop Shelf, Edge Rail, Manage Items, Settings, and native drag-and-drop workflows operate without visual or runtime regressions.
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `build/DropCove-Setup-0.0.9.exe` | 3,228,174 | `6a340c51059c06060e0c81a3464c9d9e4a50528cfe5eeb6095d59cec5cf97fca` |
+| Installed `dropcove.exe` | 13,383,168 | `f8a9d9ad75637d935159c6d1a8aa55f1f43e07b207c4b514a1f913d2f1aca082` |
+
+- User confirmed all outstanding exact-candidate acceptance tests passed on 2026-10-14: interactive setup/Finish launch, Settings and expanded Rail, Dark/Light/Windows Contrast, focus/reduced motion, Explorer Copy/Move/cancel, and hotkey/startup/Shake workflows.
+- Original installation registration, shortcut bytes, Profile Data, and resident were preserved; owned smoke artifacts were removed. Temporary-profile startup polluted the shared Run value before a valid baseline was captured; user approved reconciliation to the verified real installation/profile. Exact original startup bytes are not claimed restored; [Ticket 03](../.scratch/frontend-toolchain-modernization/issues/03-release-0.0.9.md) records the exception.
 
 ### Deferred
 
+- TypeScript 7 until vue-tsc/Volar supports its native compiler without dropping Vue single-file-component checks.
 - Compact Drop Shelf and Edge Rail UI refinement in `0.0.10`.
 
 ## 0.0.10 — Compact Drop Shelf and Edge Rail UI refinement
@@ -385,4 +398,4 @@ Before completion:
 
 ### Deferred
 
-- No target requirement is intentionally deferred beyond `0.0.10`. Advancing to another version requires a new approved scope; advancing to `0.1.0` or `1.0.0` requires explicit approval.
+- TypeScript 7 remains dependency-driven and unassigned until vue-tsc/Volar supports it. Any product scope after `0.0.10`, including `0.1.0` or `1.0.0`, requires explicit approval.
