@@ -57,7 +57,7 @@ const {
       <p class="empty-hint">Drag it out later to copy</p>
     </section>
     <BatchDragConfirmation :pending="pendingConfirmation" @confirm="confirmBatchDrag" @cancel="cancelBatchDrag" @drag="dragConfirmedBatch" />
-    <ClearTemporaryConfirmation :open="confirmingClearTemporary" @confirm="confirmClearTemporary" @cancel="cancelClearTemporary" />
+    <ClearTemporaryConfirmation :open="confirmingClearTemporary" :focus-on-open="true" @confirm="confirmClearTemporary" @cancel="cancelClearTemporary" />
     <footer v-if="hasTemporaryItems" class="footer">
       <button
         type="button"

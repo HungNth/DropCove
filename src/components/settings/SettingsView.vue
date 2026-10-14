@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, useTemplateRef } from "vue";
-import { useSettings } from "../../composables/useSettings";
+import { useSettings, type RailEdge } from "../../composables/useSettings";
+import RailPlacementFields from "./RailPlacementFields.vue";
 
 const {
   snapshot,
@@ -10,6 +11,9 @@ const {
   cancelRecording,
   recordKey,
   setStartWithWindows,
+  setRailPlacement,
+  setShowRailOverFullscreen,
+  monitors,
   save,
   cancel,
   dismissStatus,
@@ -49,6 +53,22 @@ async function onStartupChange(event: Event) {
   await setStartWithWindows(input.checked);
   // Restore the authoritative projection even when the draft operation was rejected.
   input.checked = Boolean(snapshot.value?.startWithWindows);
+}
+
+async function onPlacementChange(edge: RailEdge, monitorId: string, event: Event) {
+  const input = event.currentTarget;
+  await setRailPlacement(edge, monitorId);
+  if (input instanceof HTMLSelectElement) {
+    input.value = input.name === "rail-edge" ? snapshot.value?.railEdge ?? "Right" : snapshot.value?.railMonitorId ?? "";
+  }
+}
+
+async function onFullscreenChange(enabled: boolean, event: Event) {
+  const input = event.currentTarget;
+  await setShowRailOverFullscreen(enabled);
+  if (input instanceof HTMLInputElement) {
+    input.checked = Boolean(snapshot.value?.showRailOverFullscreen);
+  }
 }
 </script>
 
@@ -114,6 +134,9 @@ async function onStartupChange(event: Event) {
           Automatically launch DropCove in the background when signing in.
         </p>
       </section>
+      <RailPlacementFields v-if="snapshot" :edge="snapshot.railEdge" :monitor-id="snapshot.railMonitorId"
+        :show-over-fullscreen="Boolean(snapshot.showRailOverFullscreen)"
+        :monitors="monitors" :disabled="busy" @change="onPlacementChange" @fullscreen-change="onFullscreenChange" />
     </div>
 
     <div v-if="status" class="status" role="alert" aria-live="assertive">

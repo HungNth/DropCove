@@ -160,6 +160,28 @@ impl ShelfState {
         self.store()?.snapshot()
     }
 
+    pub(crate) fn rail_monitor(&self) -> Result<Option<String>, ShelfError> {
+        Ok(self
+            .store()?
+            .connection
+            .query_row(
+                "SELECT rail_monitor FROM shelf_ui_state WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?
+            .flatten())
+    }
+
+    pub(crate) fn remember_rail_monitor(&self, monitor: Option<&str>) -> Result<(), ShelfError> {
+        self.store()?.connection.execute(
+            "INSERT INTO shelf_ui_state (id, rail_monitor) VALUES (1, ?1)
+             ON CONFLICT(id) DO UPDATE SET rail_monitor = excluded.rail_monitor",
+            [monitor],
+        )?;
+        Ok(())
+    }
+
     pub(crate) fn accept_drop(&self, paths: Vec<Option<String>>) -> Result<DropResult, ShelfError> {
         let mut items: Vec<IncomingItem> = Vec::with_capacity(paths.len());
         let mut skipped = 0;

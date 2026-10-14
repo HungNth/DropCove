@@ -385,6 +385,7 @@ This favors continued application availability while preserving evidence for man
 - An empty `RailMonitorId` uses the remembered `shelf_ui_state.rail_monitor` when connected. An unavailable remembered monitor temporarily falls back to the Windows primary display.
 - If no remembered monitor exists during non-empty shelf dismissal, the monitor containing the Drop Shelf is used.
 - Every non-empty shelf dismissal stores the actual selected monitor. A display-change fallback while already docked does not by itself rewrite remembered placement.
+- Open Shelf resolves to the monitor where the rail is currently docked, including any configured-monitor selection or temporary primary-display fallback; it does not jump to a stale remembered monitor.
 - Display and DPI changes trigger reflow through window/display events.
 
 The Drop Shelf is borderless but retains native resize behavior on all edges and corners. The Edge Rail is a separate no-activate window so hover, drop-in, drag-out, and management do not steal foreground focus.
@@ -394,9 +395,11 @@ The Drop Shelf is borderless but retains native resize behavior on all edges and
 Two foreground trackers have distinct responsibilities:
 
 1. **Drop Shelf tracker** — while the shelf is visible, foreground changes reassert its topmost z-order without activating it.
-2. **Edge Rail tracker** — while rail visibility is requested and showing over fullscreen is disabled, foreground changes reevaluate whether the selected monitor is fully covered. The rail hides while covered and returns afterward.
+2. **Edge Rail tracker** — while rail visibility is requested and showing over fullscreen is disabled, foreground changes reevaluate whether the selected monitor is fully covered. The rail hides while covered, closes rail flyouts and unconfirmed Clear prompts, and returns as a collapsed handle afterward without canceling an active native drag.
 
 The fullscreen rule is geometric monitor coverage, not application-name or game detection.
+
+The no-activate Edge Rail does not add a global keyboard-navigation hook. Keyboard access continues through the global hotkey and the Drop Shelf's focused workflow.
 
 ## 13. Shake-to-open pipeline
 

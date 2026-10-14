@@ -12,12 +12,12 @@ use windows::Win32::{
     UI::{
         Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
         WindowsAndMessaging::{
-            SetWindowPos, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
-            WM_NCDESTROY, WM_SHOWWINDOW,
+            GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, MA_NOACTIVATE,
+            SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+            WM_MOUSEACTIVATE, WM_NCDESTROY, WM_SHOWWINDOW, WS_EX_NOACTIVATE,
         },
     },
 };
-
 use crate::{
     shelf::{ShelfBatch, ShelfState},
     windows_drag::DragSession,
@@ -28,6 +28,7 @@ const WIDTH: f64 = 280.0;
 const MAX_HEIGHT: f64 = 480.0;
 const MARGIN: f64 = 16.0;
 const OWNER_SUBCLASS: usize = 0xDC02;
+const POPUP_SUBCLASS: usize = 0xDC03;
 
 #[derive(Clone, Copy, Deserialize)]
 pub(crate) struct AnchorRect {
@@ -42,6 +43,7 @@ struct PopupState {
     batch_id: Option<String>,
     keyboard: bool,
     pending_close: bool,
+    origin_label: Option<String>,
 }
 #[derive(Default)]
 pub(crate) struct ManageItemsState(Mutex<PopupState>);
@@ -110,10 +112,11 @@ unsafe extern "system" fn owner_message(
     subclass: usize,
     data: usize,
 ) -> LRESULT {
-    // SAFETY: The registered subclass keeps its non-null AppHandle context alive through this call.
-    let app = unsafe { &*(data as *const AppHandle) };
+    // SAFETY: Clone the AppHandle before calling into resident functions to prevent use-after-free
+    // in case a reentrant message (e.g. WM_NCDESTROY) deallocates data.
+    let app = unsafe { (*(data as *const AppHandle)).clone() };
     if (message == WM_SHOWWINDOW && wparam.0 == 0) || message == WM_NCDESTROY {
-        if let Err(error) = close(app) {
+        if let Err(error) = close(&app) {
             eprintln!("management owner cleanup failed: {error}");
         }
     }
@@ -131,6 +134,29 @@ unsafe extern "system" fn owner_message(
     unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
 }
 
+/// # Safety
+/// Installed on the Manage Items popup HWND when opened from Edge Rail to prevent activation.
+/// Forwards all other native window messages to the subclass chain.
+unsafe extern "system" fn popup_message(
+    hwnd: HWND,
+    message: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    subclass: usize,
+    _: usize,
+) -> LRESULT {
+    if message == WM_MOUSEACTIVATE {
+        return LRESULT(MA_NOACTIVATE as isize);
+    }
+    if message == WM_NCDESTROY {
+        unsafe {
+            let _ = RemoveWindowSubclass(hwnd, Some(popup_message), subclass);
+        }
+    }
+    // SAFETY: Forward unhandled messages to default subclass procedure.
+    unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
+}
+
 pub(crate) fn active_batch(app: &AppHandle) -> Result<Option<String>, String> {
     Ok(app.state::<ManageItemsState>().lock()?.batch_id.clone())
 }
@@ -144,6 +170,7 @@ pub(crate) fn open(
     batch: &ShelfBatch,
     anchor: AnchorRect,
     keyboard: bool,
+    origin: &str,
 ) -> Result<(), String> {
     if ![anchor.x, anchor.y, anchor.width, anchor.height]
         .into_iter()
@@ -156,9 +183,13 @@ pub(crate) fn open(
     if app.state::<DragSession>().is_active() {
         return Err("cannot replace management during native drag".to_owned());
     }
+    if origin != "main" && origin != "edge-rail" {
+        return Err("unsupported Manage Items origin window".to_owned());
+    }
+    let owner_label = origin;
     let owner = app
-        .get_webview_window("main")
-        .ok_or("Drop Shelf window is missing")?;
+        .get_webview_window(owner_label)
+        .ok_or_else(|| format!("{owner_label} window is missing"))?;
     let scale = owner.scale_factor().map_err(|error| error.to_string())?;
     let position = owner
         .inner_position()
@@ -237,80 +268,140 @@ pub(crate) fn open(
         state.batch_id = Some(batch.id.clone());
         state.keyboard = keyboard;
         state.pending_close = false;
+        state.origin_label = Some(owner_label.to_owned());
     }
-    let hwnd = popup.hwnd().map_err(|error| error.to_string())?;
-    // SAFETY: This HWND belongs to the live managed popup. Hidden Tao creation leaves the
-    // nonclient frame unrecalculated; FRAMECHANGED applies its undecorated layout before showing.
-    // NOACTIVATE preserves keyboard focus while keeping normal pointer activation available.
-    unsafe {
-        SetWindowPos(
-            hwnd,
-            None,
-            0,
-            0,
-            0,
-            0,
-            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-        )
+    if owner_label == "edge-rail" {
+        app.state::<crate::resident::ResidentState>().set_rail_transient_reason(
+            crate::resident::RailTransientReason::ManageItems,
+            true,
+        )?;
     }
-    .map_err(|error| error.to_string())?;
-    let outer = popup
-        .outer_size()
-        .map_err(|error| error.to_string())?
-        .to_logical::<f64>(scale);
-    let inner = popup
-        .inner_size()
-        .map_err(|error| error.to_string())?
-        .to_logical::<f64>(scale);
-    if outer.height > work.height {
-        popup
-            .set_size(LogicalSize::new(
-                WIDTH,
-                (work.height - (outer.height - inner.height)).max(1.0),
-            ))
-            .map_err(|error| error.to_string())?;
-    }
-    let outer = popup
-        .outer_size()
-        .map_err(|error| error.to_string())?
-        .to_logical::<f64>(scale);
-    let (x, y) = placement(screen_anchor, (outer.width, outer.height), work);
-    // SAFETY: The live owned HWND is moved/shown in physical screen coordinates without
-    // activation. Placement bounds include its native border, not just the 280-pixel client.
-    unsafe {
-        SetWindowPos(
-            hwnd,
-            None,
-            (x * scale).round() as i32,
-            (y * scale).round() as i32,
-            0,
-            0,
-            if keyboard {
-                SWP_NOSIZE | SWP_SHOWWINDOW
+    let setup_result = (|| {
+        let hwnd = popup.hwnd().map_err(|error| error.to_string())?;
+        // SAFETY: This HWND belongs to the live managed popup. Hidden Tao creation leaves the
+        // nonclient frame unrecalculated; FRAMECHANGED applies its undecorated layout before showing.
+        // NOACTIVATE preserves keyboard focus while keeping normal pointer activation available.
+        unsafe {
+            if owner_label == "edge-rail" {
+                let extended = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                SetWindowLongPtrW(hwnd, GWL_EXSTYLE, extended | WS_EX_NOACTIVATE.0 as isize);
+                let _ = RemoveWindowSubclass(hwnd, Some(popup_message), POPUP_SUBCLASS);
+                if !SetWindowSubclass(hwnd, Some(popup_message), POPUP_SUBCLASS, 0).as_bool() {
+                    return Err("could not install no-activate guard on Manage Items popup".to_owned());
+                }
             } else {
-                SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW
-            },
-        )
+                let extended = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                SetWindowLongPtrW(hwnd, GWL_EXSTYLE, extended & !(WS_EX_NOACTIVATE.0 as isize));
+                let _ = RemoveWindowSubclass(hwnd, Some(popup_message), POPUP_SUBCLASS);
+            }
+            SetWindowPos(
+                hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            )
+            .map_err(|error| error.to_string())?;
+        }
+        Ok(hwnd)
+    })();
+    let hwnd = match setup_result {
+        Ok(hwnd) => hwnd,
+        Err(error) => {
+            if owner_label == "edge-rail" {
+                let _ = app.state::<crate::resident::ResidentState>().set_rail_transient_reason(
+                    crate::resident::RailTransientReason::ManageItems,
+                    false,
+                );
+            }
+            return Err(error);
+        }
+    };
+    let show_result = (|| {
+        let outer = popup
+            .outer_size()
+            .map_err(|error| error.to_string())?
+            .to_logical::<f64>(scale);
+        let inner = popup
+            .inner_size()
+            .map_err(|error| error.to_string())?
+            .to_logical::<f64>(scale);
+        if outer.height > work.height {
+            popup
+                .set_size(LogicalSize::new(
+                    WIDTH,
+                    (work.height - (outer.height - inner.height)).max(1.0),
+                ))
+                .map_err(|error| error.to_string())?;
+        }
+        let outer = popup
+            .outer_size()
+            .map_err(|error| error.to_string())?
+            .to_logical::<f64>(scale);
+        let (x, y) = placement(screen_anchor, (outer.width, outer.height), work);
+        // SAFETY: The live owned HWND is moved/shown in physical screen coordinates without
+        // activation. Placement bounds include its native border, not just the 280-pixel client.
+        unsafe {
+            SetWindowPos(
+                hwnd,
+                None,
+                (x * scale).round() as i32,
+                (y * scale).round() as i32,
+                0,
+                0,
+                if keyboard {
+                    SWP_NOSIZE | SWP_SHOWWINDOW
+                } else {
+                    SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW
+                },
+            )
+        }
+        .map_err(|error| error.to_string())?;
+        if keyboard {
+            popup.set_focus().map_err(|error| error.to_string())?;
+        }
+        popup
+            .emit("manage-items-opened", keyboard)
+            .map_err(|error| error.to_string())
+    })();
+    match show_result {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            if owner_label == "edge-rail" {
+                let _ = app.state::<crate::resident::ResidentState>().set_rail_transient_reason(
+                    crate::resident::RailTransientReason::ManageItems,
+                    false,
+                );
+            }
+            Err(error)
+        }
     }
-    .map_err(|error| error.to_string())?;
-    if keyboard {
-        popup.set_focus().map_err(|error| error.to_string())?;
-    }
-    popup
-        .emit("manage-items-opened", keyboard)
-        .map_err(|error| error.to_string())
 }
 
 pub(crate) fn close_explicit(app: &AppHandle) -> Result<(), String> {
     if app.state::<DragSession>().is_active() {
         return Ok(());
     }
-    let Some(batch_id) = app.state::<ManageItemsState>().lock()?.batch_id.clone() else {
+    let (batch_id, origin_label) = {
+        let state = app.state::<ManageItemsState>();
+        let state = state.lock()?;
+        (state.batch_id.clone(), state.origin_label.clone())
+    };
+    let Some(batch_id) = batch_id else {
         return Ok(());
     };
     close(app)?;
-    if let Some(owner) = app.get_webview_window("main") {
-        owner.set_focus().map_err(|error| error.to_string())?;
+    let origin = origin_label.as_deref().unwrap_or("main");
+    if origin == "main" {
+        if let Some(owner) = app.get_webview_window("main") {
+            owner.set_focus().map_err(|error| error.to_string())?;
+            owner
+                .emit("manage-items-closed", batch_id)
+                .map_err(|error| error.to_string())?;
+        }
+    } else if let Some(owner) = app.get_webview_window("edge-rail") {
         owner
             .emit("manage-items-closed", batch_id)
             .map_err(|error| error.to_string())?;
@@ -333,6 +424,13 @@ pub(crate) fn close(app: &AppHandle) -> Result<(), String> {
         state.batch_id = None;
         state.keyboard = false;
         state.pending_close = false;
+        state.origin_label = None;
+    }
+    if let Ok(Some(remaining)) = app.state::<crate::resident::ResidentState>().set_rail_transient_reason(
+        crate::resident::RailTransientReason::ManageItems,
+        false,
+    ) {
+        let _ = crate::edge_rail::arm_rail_timer(app, remaining as u32);
     }
     app.emit("shelf-changed", ())
         .map_err(|error| error.to_string())
@@ -361,7 +459,7 @@ pub(crate) fn synchronize(app: &AppHandle) -> Result<(), String> {
 
 pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) {
     let app = window.app_handle();
-    let result = if window.label() == "main"
+    let result = if (window.label() == "main" || window.label() == "edge-rail")
         && matches!(
             event,
             WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed
@@ -379,6 +477,13 @@ pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) {
                     state.batch_id = None;
                     state.keyboard = false;
                     state.pending_close = false;
+                    let origin = state.origin_label.take();
+                    if origin.as_deref() == Some("edge-rail") {
+                        let _ = app.state::<crate::resident::ResidentState>().set_rail_transient_reason(
+                            crate::resident::RailTransientReason::ManageItems,
+                            false,
+                        );
+                    }
                     Ok(())
                 }
                 Err(error) => Err(error),

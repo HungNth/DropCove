@@ -6,6 +6,11 @@ use crate::{
 };
 
 pub(crate) trait Integrations {
+    type RailSnapshot;
+    fn rail_snapshot(&self) -> Result<Self::RailSnapshot, String>;
+    fn rail_apply(&mut self, settings: &Settings) -> Result<(), String>;
+    fn rail_restore(&mut self, previous: &Self::RailSnapshot) -> Result<(), String>;
+    fn rail_description(&self) -> Result<String, String>;
     fn register(&mut self, key: &HotKey) -> Result<i32, String>;
     fn unregister(&mut self, id: i32) -> Result<(), String>;
     fn registered(&self, id: i32) -> bool;
@@ -39,7 +44,7 @@ fn failure(
 pub(crate) fn apply(
     store: &SettingsStore,
     integrations: &mut impl Integrations,
-    candidate: Settings,
+    candidate: &Settings,
     active_key: HotKey,
     active_token: Option<i32>,
 ) -> Result<i32, ApplicationFailure> {
@@ -52,6 +57,9 @@ pub(crate) fn apply(
     let previous_startup = integrations
         .startup_snapshot()
         .map_err(|error| failure(error, active_key, active_token, true))?;
+    let previous_rail = integrations
+        .rail_snapshot()
+        .map_err(|error| failure(error, active_key, active_token, true))?;
     let changed = active_token.is_none() || active_key != candidate.hot_key;
     let token = if changed {
         integrations
@@ -63,10 +71,13 @@ pub(crate) fn apply(
             .ok_or_else(|| failure("active shortcut disappeared".into(), active_key, None, true))?
     };
     let mut file_attempted = false;
+    let mut rail_attempted = false;
     let result = (|| {
         integrations.startup_apply(candidate.start_with_windows)?;
+        rail_attempted = true;
+        integrations.rail_apply(candidate)?;
         file_attempted = true;
-        store.write(&candidate)?;
+        store.write(candidate)?;
         if changed {
             if let Some(old) = active_token {
                 integrations.unregister(old)?;
@@ -86,6 +97,11 @@ pub(crate) fn apply(
             if let Err(restore) = store.restore_raw(previous_file.as_deref()) {
                 rollback_errors.push(format!("settings restore: {restore}"));
             }
+        }
+    }
+    if rail_attempted {
+        if let Err(restore) = integrations.rail_restore(&previous_rail) {
+            rollback_errors.push(format!("rail restore: {restore}"));
         }
     }
     if integrations.startup_snapshot().as_ref().ok() != Some(&previous_startup) {
@@ -131,8 +147,11 @@ pub(crate) fn apply(
         Ok(None) => "absent".to_owned(),
         Err(query) => format!("query failed: {query}"),
     };
+    let rail = integrations
+        .rail_description()
+        .unwrap_or_else(|query| format!("query failed: {query}"));
     let message = format!(
-        "Settings failed: {error}; rollback incomplete: {}. Retained state: old shortcut registered={}; candidate registered={candidate_retained}; active shortcut={}; startup={startup}; settings file={file}",
+        "Settings failed: {error}; rollback incomplete: {}. Retained state: old shortcut registered={}; candidate registered={candidate_retained}; active shortcut={}; startup={startup}; rail={rail}; settings file={file}",
         rollback_errors.join("; "), old_retained.is_some(),
         retained_token.map(|_| retained_key.label()).unwrap_or_else(|| "none (tray/launch access remains)".into()),
     );
@@ -169,6 +188,9 @@ mod tests {
     struct Native {
         keys: BTreeMap<i32, HotKey>,
         startup: Option<RegistryValue>,
+        rail: Settings,
+        fail_rail: bool,
+        fail_rail_restore: bool,
         conflict: bool,
         fail_apply: bool,
         fail_restore: bool,
@@ -187,6 +209,30 @@ mod tests {
         }
     }
     impl Integrations for Native {
+        type RailSnapshot = Settings;
+        fn rail_snapshot(&self) -> Result<Settings, String> {
+            Ok(self.rail.clone())
+        }
+        fn rail_apply(&mut self, settings: &Settings) -> Result<(), String> {
+            self.rail = settings.clone();
+            if self.fail_rail {
+                return Err("rail placement failed after effect".into());
+            }
+            Ok(())
+        }
+        fn rail_restore(&mut self, previous: &Settings) -> Result<(), String> {
+            if self.fail_rail_restore {
+                return Err("native rail restore rejected".into());
+            }
+            self.rail = previous.clone();
+            Ok(())
+        }
+        fn rail_description(&self) -> Result<String, String> {
+            Ok(format!(
+                "{:?} {}",
+                self.rail.rail_edge, self.rail.rail_monitor_id
+            ))
+        }
         fn register(&mut self, key: &HotKey) -> Result<i32, String> {
             if self.conflict {
                 return Err("shortcut occupied".into());
@@ -245,10 +291,16 @@ mod tests {
                 virtual_key: 0x4B,
             },
             start_with_windows: false,
+            rail_edge: crate::settings_store::RailEdge::Left,
+            rail_monitor_id: "other-display".into(),
+            ..Settings::default()
         };
         let native = Native {
             keys: BTreeMap::from([(1, old.hot_key)]),
             startup: Some(old_startup()),
+            rail: old.clone(),
+            fail_rail: false,
+            fail_rail_restore: false,
             conflict: false,
             fail_apply: false,
             fail_restore: false,
@@ -264,7 +316,7 @@ mod tests {
             let original_file = store.read_raw().unwrap();
             native.conflict = !fail_startup;
             native.fail_apply = fail_startup;
-            let failure = apply(&store, &mut native, candidate, old.hot_key, Some(1))
+            let failure = apply(&store, &mut native, &candidate, old.hot_key, Some(1))
                 .err()
                 .unwrap();
             assert_eq!(failure.active_token, Some(1));
@@ -284,13 +336,14 @@ mod tests {
             .share_mode(1)
             .open(profile.0.join("settings.json"))
             .unwrap();
-        let failure = apply(&store, &mut native, candidate, old.hot_key, Some(1))
+        let failure = apply(&store, &mut native, &candidate, old.hot_key, Some(1))
             .err()
             .unwrap();
         assert!(!failure.message.contains("rollback incomplete"));
         assert_eq!(native.startup, Some(old_startup()));
         assert_eq!(native.keys, BTreeMap::from([(1, old.hot_key)]));
         assert_eq!(store.read_raw().unwrap(), original_file);
+        assert_eq!(native.rail, old);
         drop(lock);
     }
     #[test]
@@ -299,7 +352,7 @@ mod tests {
         let (store, mut native, old, candidate) = fixture(&profile);
         let original_file = store.read_raw().unwrap();
         native.fail_retire = true;
-        let failure = apply(&store, &mut native, candidate, old.hot_key, Some(1))
+        let failure = apply(&store, &mut native, &candidate, old.hot_key, Some(1))
             .err()
             .unwrap();
         assert_eq!(failure.active_key, old.hot_key);
@@ -314,7 +367,7 @@ mod tests {
         candidate.start_with_windows = true;
         native.fail_apply = true;
         native.fail_restore = true;
-        let failure = apply(&store, &mut native, candidate, old.hot_key, Some(1))
+        let failure = apply(&store, &mut native, &candidate, old.hot_key, Some(1))
             .err()
             .unwrap();
         assert!(failure
@@ -329,7 +382,7 @@ mod tests {
         native.fail_apply = false;
         native.fail_restore = false;
         assert_eq!(
-            apply(&store, &mut native, candidate, old.hot_key, Some(1)).ok(),
+            apply(&store, &mut native, &candidate, old.hot_key, Some(1)).ok(),
             Some(2)
         );
         assert_eq!(store.load().0, candidate);
@@ -341,11 +394,51 @@ mod tests {
         let (store, mut native, old, _) = fixture(&profile);
         native.startup = None;
         assert_eq!(
-            apply(&store, &mut native, old, old.hot_key, Some(1)).ok(),
+            apply(&store, &mut native, &old, old.hot_key, Some(1)).ok(),
             Some(1)
         );
         assert_eq!(native.keys, BTreeMap::from([(1, old.hot_key)]));
         assert_eq!(native.startup, Some(new_startup()));
         assert_eq!(store.load().0, old);
+    }
+    #[test]
+    fn failed_rail_application_restores_disk_startup_shortcut_and_previous_placement() {
+        let profile = Profile::new();
+        let (store, mut native, old, candidate) = fixture(&profile);
+        native.fail_rail = true;
+        let original = store.read_raw().unwrap();
+        let failure = apply(&store, &mut native, &candidate, old.hot_key, Some(1))
+            .err()
+            .unwrap();
+        assert_eq!(failure.active_token, Some(1));
+        assert_eq!(native.rail, old);
+        assert_eq!(native.keys, BTreeMap::from([(1, old.hot_key)]));
+        assert_eq!(native.startup, Some(old_startup()));
+        assert_eq!(store.read_raw().unwrap(), original);
+    }
+    #[test]
+    fn failed_rail_restore_reports_retained_candidate_and_later_save_can_retry() {
+        let profile = Profile::new();
+        let (store, mut native, old, candidate) = fixture(&profile);
+        native.fail_rail = true;
+        native.fail_rail_restore = true;
+        let failure = apply(&store, &mut native, &candidate, old.hot_key, Some(1))
+            .err()
+            .unwrap();
+        assert_eq!(native.rail, candidate);
+        assert_eq!(store.load().0, old);
+        assert_eq!(failure.active_token, Some(1));
+        assert!(failure
+            .warning
+            .as_ref()
+            .unwrap()
+            .contains("Left other-display"));
+        native.fail_rail = false;
+        native.fail_rail_restore = false;
+        assert_eq!(
+            apply(&store, &mut native, &candidate, old.hot_key, Some(1)).ok(),
+            Some(2)
+        );
+        assert_eq!(store.load().0, candidate);
     }
 }

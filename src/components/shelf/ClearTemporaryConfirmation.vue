@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, useTemplateRef, watch } from "vue";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean;
-}>();
+  focusOnOpen?: boolean;
+}>(), {
+  focusOnOpen: true,
+});
 
 const emit = defineEmits<{
   confirm: [];
@@ -19,7 +22,9 @@ watch(() => props.open, async (isOpen) => {
     if (!dialog.value?.open) {
       dialog.value?.showModal();
     }
-    cancelButton.value?.focus();
+    if (props.focusOnOpen) {
+      cancelButton.value?.focus();
+    }
   } else {
     if (dialog.value?.open) {
       dialog.value.close();

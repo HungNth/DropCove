@@ -2,7 +2,7 @@
 
 use crate::{
     resident,
-    settings_store::{HotKey, Settings, SettingsStore},
+    settings_store::{HotKey, RailEdge, Settings, SettingsStore},
     settings_transaction::{self, Integrations},
     windows_hotkey,
     windows_startup::{RegistryValue, StartupRegistration},
@@ -20,7 +20,7 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindo
 pub(crate) const SETTINGS_WINDOW_LABEL: &str = "settings";
 const SETTINGS_EVENT: &str = "settings-changed";
 const SETTINGS_WIDTH: f64 = 420.0;
-const SETTINGS_HEIGHT: f64 = 380.0;
+const SETTINGS_HEIGHT: f64 = 520.0;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +29,10 @@ pub(crate) struct SettingsSnapshot {
     pub(crate) label: String,
     pub(crate) listening: bool,
     pub(crate) start_with_windows: bool,
+    pub(crate) rail_edge: RailEdge,
+    pub(crate) rail_monitor_id: String,
+    pub(crate) show_rail_over_fullscreen: bool,
+    pub(crate) monitors: Vec<crate::edge_rail::MonitorChoice>,
 }
 struct SettingsSession {
     profile: PathBuf,
@@ -87,7 +91,7 @@ pub(crate) fn initialize(
         session: Mutex::new(Some(SettingsSession {
             profile: profile.to_path_buf(),
             store,
-            desired,
+            desired: desired.clone(),
             active_key: desired.hot_key,
             active_token,
             draft: None,
@@ -108,7 +112,9 @@ pub(crate) fn publish_startup_warning_if_any(app: &AppHandle) {
     let warning = {
         let state = app.state::<SettingsState>();
         let warning = match state.lock() {
-            Ok(mut session) => session.as_mut().and_then(|session| session.startup_warning.take()),
+            Ok(mut session) => session
+                .as_mut()
+                .and_then(|session| session.startup_warning.take()),
             Err(error) => Some(error),
         };
         warning
@@ -123,12 +129,16 @@ pub(crate) fn get_snapshot(app: &AppHandle) -> Result<SettingsSnapshot, String> 
     let session = session
         .as_ref()
         .ok_or("settings coordinator is not initialized")?;
-    let settings = session.draft.unwrap_or(session.desired);
+    let settings = session.draft.as_ref().unwrap_or(&session.desired);
     Ok(SettingsSnapshot {
         hot_key: settings.hot_key,
         label: settings.hot_key.label(),
         listening: session.listening,
         start_with_windows: settings.start_with_windows,
+        rail_edge: settings.rail_edge,
+        rail_monitor_id: settings.rail_monitor_id.clone(),
+        show_rail_over_fullscreen: settings.show_rail_over_fullscreen,
+        monitors: crate::edge_rail::choices()?,
     })
 }
 fn emit_snapshot(app: &AppHandle) -> Result<SettingsSnapshot, String> {
@@ -194,7 +204,10 @@ fn record_draft(session: &mut SettingsSession, key: HotKey) -> Result<(), String
     if !session.listening {
         return Err("shortcut recorder is not listening".into());
     }
-    session.draft.get_or_insert(session.desired).hot_key = key;
+    session
+        .draft
+        .get_or_insert_with(|| session.desired.clone())
+        .hot_key = key;
     session.listening = false;
     Ok(())
 }
@@ -226,8 +239,59 @@ pub(crate) fn set_start_with_windows(
             .ok_or("settings coordinator is not initialized")?;
         session
             .draft
-            .get_or_insert(session.desired)
+            .get_or_insert_with(|| session.desired.clone())
             .start_with_windows = enabled;
+    }
+    emit_snapshot(app)
+}
+pub(crate) fn active(app: &AppHandle) -> Result<Settings, String> {
+    let state = app.state::<SettingsState>();
+    let session = state.lock()?;
+    Ok(session
+        .as_ref()
+        .ok_or("settings coordinator is not initialized")?
+        .desired
+        .clone())
+}
+pub(crate) fn set_rail_placement(
+    app: &AppHandle,
+    edge: RailEdge,
+    monitor_id: String,
+) -> Result<SettingsSnapshot, String> {
+    if app.get_webview_window(SETTINGS_WINDOW_LABEL).is_none() {
+        return Err("Settings window is not open".into());
+    }
+    {
+        let state = app.state::<SettingsState>();
+        let mut session = state.lock()?;
+        let session = session
+            .as_mut()
+            .ok_or("settings coordinator is not initialized")?;
+        let mut candidate = session.draft.as_ref().unwrap_or(&session.desired).clone();
+        candidate.rail_edge = edge;
+        candidate.rail_monitor_id = monitor_id;
+        candidate.validate()?;
+        session.draft = Some(candidate);
+    }
+    emit_snapshot(app)
+}
+pub(crate) fn set_show_rail_over_fullscreen(
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<SettingsSnapshot, String> {
+    if app.get_webview_window(SETTINGS_WINDOW_LABEL).is_none() {
+        return Err("Settings window is not open".into());
+    }
+    {
+        let state = app.state::<SettingsState>();
+        let mut session = state.lock()?;
+        let session = session
+            .as_mut()
+            .ok_or("settings coordinator is not initialized")?;
+        let mut candidate = session.draft.as_ref().unwrap_or(&session.desired).clone();
+        candidate.show_rail_over_fullscreen = enabled;
+        candidate.validate()?;
+        session.draft = Some(candidate);
     }
     emit_snapshot(app)
 }
@@ -247,8 +311,10 @@ pub(crate) fn handle_hotkey(app: &AppHandle, id: i32) -> Result<(), String> {
         return record_key(app, key);
     }
     match app.state::<resident::ResidentState>().visibility()? {
-        resident::Visibility::Visible => resident::hide_shelf(app),
-        resident::Visibility::Hidden => resident::show_shelf(app),
+        resident::Visibility::Visible => resident::dismiss_shelf(app),
+        resident::Visibility::Hidden | resident::Visibility::EdgeDocked => {
+            resident::show_shelf(app)
+        }
     }
 }
 
@@ -257,6 +323,19 @@ struct NativeIntegrations<'a> {
     startup: StartupRegistration,
 }
 impl Integrations for NativeIntegrations<'_> {
+    type RailSnapshot = Option<crate::edge_rail::Placement>;
+    fn rail_snapshot(&self) -> Result<Self::RailSnapshot, String> {
+        resident::rail_placement(self.app)
+    }
+    fn rail_apply(&mut self, settings: &Settings) -> Result<(), String> {
+        resident::apply_rail_settings(self.app, settings)
+    }
+    fn rail_restore(&mut self, previous: &Self::RailSnapshot) -> Result<(), String> {
+        resident::restore_rail(self.app, previous.as_ref())
+    }
+    fn rail_description(&self) -> Result<String, String> {
+        crate::edge_rail::description(self.app)
+    }
     fn register(&mut self, key: &HotKey) -> Result<i32, String> {
         windows_hotkey::register(self.app, key)
     }
@@ -300,7 +379,7 @@ pub(crate) fn save(app: &AppHandle) -> Result<(), String> {
             return Err("cannot Save while shortcut recording is active".into());
         }
         (
-            session.draft.unwrap_or(session.desired),
+            session.draft.as_ref().unwrap_or(&session.desired).clone(),
             session.active_key,
             session.active_token,
             session.store.clone(),
@@ -324,7 +403,7 @@ pub(crate) fn save(app: &AppHandle) -> Result<(), String> {
     let token = match settings_transaction::apply(
         &store,
         &mut integrations,
-        candidate,
+        &candidate,
         active_key,
         active_token,
     ) {
@@ -348,9 +427,9 @@ pub(crate) fn save(app: &AppHandle) -> Result<(), String> {
         let session = session
             .as_mut()
             .ok_or("settings coordinator is not initialized")?;
-        session.desired = candidate;
         session.active_key = candidate.hot_key;
         session.active_token = Some(token);
+        session.desired = candidate;
         session.draft = None;
         session.listening = false;
     }
@@ -416,6 +495,7 @@ mod tests {
                 virtual_key: 0x87,
             },
             start_with_windows: true,
+            ..Settings::default()
         };
         let candidate = HotKey {
             virtual_key: 0x4B,
@@ -424,12 +504,12 @@ mod tests {
         let mut session = SettingsSession {
             profile: directory.clone(),
             store: SettingsStore::new(&directory),
-            desired,
+            desired: desired.clone(),
             active_key: desired.hot_key,
             active_token: Some(12),
             draft: Some(Settings {
                 start_with_windows: false,
-                ..desired
+                ..desired.clone()
             }),
             listening: true,
             startup_warning: None,
@@ -451,7 +531,8 @@ mod tests {
             session.draft,
             Some(Settings {
                 hot_key: candidate,
-                start_with_windows: false
+                start_with_windows: false,
+                ..desired.clone()
             })
         );
         assert!(!session.listening);

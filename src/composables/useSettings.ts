@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, shallowRef } from "vue";
+import { computed, onMounted, onUnmounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -11,11 +11,18 @@ export interface HotKey {
   VirtualKey: number;
 }
 
+export type RailEdge = "Left" | "Right";
+export interface MonitorChoice { id: string; label: string; connected: boolean }
+
 export interface SettingsSnapshot {
   hotKey: HotKey;
   label: string;
   listening: boolean;
   startWithWindows: boolean;
+  railEdge: RailEdge;
+  railMonitorId: string;
+  showRailOverFullscreen: boolean;
+  monitors: MonitorChoice[];
 }
 
 export function useSettings() {
@@ -26,6 +33,13 @@ export function useSettings() {
   const unlisteners: UnlistenFn[] = [];
   let disposed = false;
   let refreshRequest = 0;
+  const monitors = computed(() => {
+    const choices = snapshot.value?.monitors ?? [];
+    const saved = snapshot.value?.railMonitorId;
+    return saved && !choices.some((choice) => choice.id.toLowerCase() === saved.toLowerCase())
+      ? [...choices, { id: saved, label: "Unavailable saved display", connected: false }]
+      : choices;
+  });
 
   async function refresh() {
     const request = ++refreshRequest;
@@ -88,6 +102,27 @@ export function useSettings() {
     } finally {
       if (!disposed) busy.value = false;
     }
+  }
+
+  async function setRailPlacement(edge: RailEdge, monitorId: string) {
+    if (busy.value || disposed) return;
+    busy.value = true;
+    try {
+      const next = await invoke<SettingsSnapshot>("set_rail_placement", { edge, monitorId });
+      if (!disposed) { snapshot.value = next; status.value = ""; }
+    } catch (error) {
+      if (!disposed) status.value = String(error);
+    } finally { if (!disposed) busy.value = false; }
+  }
+  async function setShowRailOverFullscreen(enabled: boolean) {
+    if (busy.value || disposed) return;
+    busy.value = true;
+    try {
+      const next = await invoke<SettingsSnapshot>("set_show_rail_over_fullscreen", { enabled });
+      if (!disposed) { snapshot.value = next; status.value = ""; }
+    } catch (error) {
+      if (!disposed) status.value = String(error);
+    } finally { if (!disposed) busy.value = false; }
   }
 
 
@@ -160,6 +195,9 @@ export function useSettings() {
     cancelRecording,
     recordKey,
     setStartWithWindows,
+    setRailPlacement,
+    setShowRailOverFullscreen,
+    monitors,
     save,
     cancel,
     dismissStatus: () => { status.value = ""; },

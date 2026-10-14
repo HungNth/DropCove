@@ -3,7 +3,7 @@ use std::sync::{
     Mutex,
 };
 
-use tauri::{AppHandle, Manager, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 use windows::Win32::{
     Foundation::{HWND, POINT, RECT},
@@ -17,7 +17,7 @@ use windows::Win32::{
     },
 };
 
-use crate::{manage_items, shelf::ShelfState};
+use crate::{edge_rail, manage_items, settings_store::Settings, shelf::ShelfState};
 
 const SHELF_WINDOW_LABEL: &str = "main";
 
@@ -26,6 +26,7 @@ const SHELF_WINDOW_LABEL: &str = "main";
 pub(crate) enum Visibility {
     Hidden,
     Visible,
+    EdgeDocked,
 }
 
 impl Default for Visibility {
@@ -34,32 +35,303 @@ impl Default for Visibility {
     }
 }
 
-/// Thread-safe coordinator state for the resident instance.
+pub(crate) const RAIL_WIDTH: f64 = 280.0;
+pub(crate) const RAIL_HANDLE_WIDTH: f64 = 16.0;
+pub(crate) const RAIL_MIN_HEIGHT: f64 = 280.0;
+pub(crate) const RAIL_MAX_HEIGHT: f64 = 640.0;
+pub(crate) const RAIL_EXPAND_DELAY_MS: u64 = 200;
+pub(crate) const RAIL_COLLAPSE_DELAY_MS: u64 = 300;
+
+static MONOTONIC_START: std::sync::LazyLock<std::time::Instant> =
+    std::sync::LazyLock::new(std::time::Instant::now);
+
+pub(crate) fn now_monotonic_ms() -> u64 {
+    std::time::Instant::now()
+        .duration_since(*MONOTONIC_START)
+        .as_millis() as u64
+}
+pub(crate) fn calculate_rail_height(batch_count: usize) -> f64 {
+    let height = 68.0 * (batch_count as f64) + 68.0;
+    height.clamp(RAIL_MIN_HEIGHT, RAIL_MAX_HEIGHT)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct RailPresentation {
+    pub(crate) expanded: bool,
+    pub(crate) width: f64,
+    pub(crate) height: f64,
+    pub(crate) expand_due_ms: Option<u64>,
+    pub(crate) collapse_due_ms: Option<u64>,
+}
+
+impl Default for RailPresentation {
+    fn default() -> Self {
+        Self {
+            expanded: false,
+            width: RAIL_HANDLE_WIDTH,
+            height: RAIL_MIN_HEIGHT,
+            expand_due_ms: None,
+            collapse_due_ms: None,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RailTransientReason {
+    ManageItems = 1 << 0,
+    ClearConfirmation = 1 << 1,
+    BatchDragConfirmation = 1 << 2,
+    ActiveDrag = 1 << 3,
+}
+
+#[derive(Default)]
+struct Presentation {
+    visibility: Visibility,
+    rail_placement: Option<edge_rail::Placement>,
+    rail: RailPresentation,
+    transient_holds: u8,
+    pointer_inside: bool,
+    fullscreen_occluded: bool,
+}
 #[derive(Default)]
 pub(crate) struct ResidentState {
-    visibility: Mutex<Visibility>,
+    presentation: Mutex<Presentation>,
+    had_content: AtomicBool,
     showing: AtomicBool,
     exiting: AtomicBool,
 }
 
 impl ResidentState {
     pub(crate) fn visibility(&self) -> Result<Visibility, String> {
-        self.visibility
+        self.presentation
             .lock()
-            .map(|v| *v)
+            .map(|v| v.visibility)
             .map_err(|_| "resident coordinator state lock is poisoned".to_owned())
+    }
+
+    fn placement(&self) -> Result<Option<edge_rail::Placement>, String> {
+        self.presentation
+            .lock()
+            .map(|value| value.rail_placement.clone())
+            .map_err(|_| "resident presentation lock is poisoned".into())
     }
 
     fn set_visibility(&self, next: Visibility) -> Result<(), String> {
         let mut guard = self
-            .visibility
+            .presentation
             .lock()
             .map_err(|_| "resident coordinator state lock is poisoned".to_owned())?;
-        *guard = next;
+        guard.visibility = next;
+        if next != Visibility::EdgeDocked {
+            guard.rail_placement = None;
+            guard.rail = RailPresentation::default();
+            guard.transient_holds &= RailTransientReason::ActiveDrag as u8;
+        }
         Ok(())
     }
-}
 
+    pub(crate) fn set_rail_transient_reason(
+        &self,
+        reason: RailTransientReason,
+        active: bool,
+    ) -> Result<Option<u64>, String> {
+        let now = now_monotonic_ms();
+        let mut guard = self
+            .presentation
+            .lock()
+            .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+        let mask = reason as u8;
+        if active {
+            guard.transient_holds |= mask;
+            guard.rail.collapse_due_ms = None;
+            Ok(None)
+        } else {
+            guard.transient_holds &= !mask;
+            if guard.visibility == Visibility::EdgeDocked
+                && guard.rail.expanded
+                && guard.transient_holds == 0
+                && !guard.pointer_inside
+                && guard.rail.collapse_due_ms.is_none()
+            {
+                guard.rail.collapse_due_ms = Some(now + RAIL_COLLAPSE_DELAY_MS);
+                Ok(Some(RAIL_COLLAPSE_DELAY_MS))
+            } else {
+                Ok(None)
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn has_rail_transient_hold(&self) -> Result<bool, String> {
+        self.presentation
+            .lock()
+            .map(|p| p.transient_holds != 0)
+            .map_err(|_| "resident presentation lock is poisoned".to_owned())
+    }
+
+    pub(crate) fn set_rail_drag_active(&self, active: bool) -> Result<Option<u64>, String> {
+        self.set_rail_transient_reason(RailTransientReason::ActiveDrag, active)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn rail_drag_active(&self) -> Result<bool, String> {
+        self.presentation
+            .lock()
+            .map(|p| (p.transient_holds & (RailTransientReason::ActiveDrag as u8)) != 0)
+            .map_err(|_| "resident presentation lock is poisoned".to_owned())
+    }
+
+    pub(crate) fn is_fullscreen_occluded(&self) -> Result<bool, String> {
+        self.presentation
+            .lock()
+            .map(|p| p.fullscreen_occluded)
+            .map_err(|_| "resident presentation lock is poisoned".to_owned())
+    }
+
+    pub(crate) fn has_transient_reason(&self, reason: RailTransientReason) -> Result<bool, String> {
+        self.presentation
+            .lock()
+            .map(|p| (p.transient_holds & (reason as u8)) != 0)
+            .map_err(|_| "resident presentation lock is poisoned".to_owned())
+    }
+    pub(crate) fn rail_presentation(&self) -> Result<RailPresentation, String> {
+        self.presentation
+            .lock()
+            .map(|p| p.rail)
+            .map_err(|_| String::from("resident presentation lock is poisoned"))
+    }
+
+    pub(crate) fn set_rail_presentation(&self, rail: RailPresentation) -> Result<(), String> {
+        self.presentation
+            .lock()
+            .map(|mut p| {
+                p.rail = rail;
+            })
+            .map_err(|_| String::from("resident presentation lock is poisoned"))
+    }
+
+    pub(crate) fn on_rail_pointer_enter(&self, now_ms: u64) -> Result<RailPresentation, String> {
+        let mut guard = self
+            .presentation
+            .lock()
+            .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+        guard.pointer_inside = true;
+        if guard.visibility != Visibility::EdgeDocked {
+            return Ok(guard.rail);
+        }
+        guard.rail.collapse_due_ms = None;
+        if !guard.rail.expanded && guard.rail.expand_due_ms.is_none() {
+            guard.rail.expand_due_ms = Some(now_ms + RAIL_EXPAND_DELAY_MS);
+        }
+        Ok(guard.rail)
+    }
+
+    pub(crate) fn on_rail_pointer_leave(&self, now_ms: u64) -> Result<RailPresentation, String> {
+        let mut guard = self
+            .presentation
+            .lock()
+            .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+        guard.pointer_inside = false;
+        if guard.visibility != Visibility::EdgeDocked {
+            return Ok(guard.rail);
+        }
+        guard.rail.expand_due_ms = None;
+        if guard.rail.expanded && guard.transient_holds == 0 && guard.rail.collapse_due_ms.is_none() {
+            guard.rail.collapse_due_ms = Some(now_ms + RAIL_COLLAPSE_DELAY_MS);
+        }
+        Ok(guard.rail)
+    }
+
+    pub(crate) fn plan_tick_rail(
+        &self,
+        now_ms: u64,
+        batch_count: usize,
+    ) -> Result<Option<RailPresentation>, String> {
+        let guard = self
+            .presentation
+            .lock()
+            .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+        if guard.visibility != Visibility::EdgeDocked || batch_count == 0 {
+            return Ok(None);
+        }
+        let mut next = guard.rail;
+        let mut changed = false;
+        if let Some(due) = next.expand_due_ms {
+            if now_ms >= due {
+                next.expand_due_ms = None;
+                next.expanded = true;
+                next.width = RAIL_WIDTH;
+                next.height = calculate_rail_height(batch_count);
+                changed = true;
+            }
+        }
+        if let Some(due) = next.collapse_due_ms {
+            if guard.transient_holds != 0 {
+                next.collapse_due_ms = None;
+                changed = true;
+            } else if now_ms >= due {
+                next.collapse_due_ms = None;
+                next.expanded = false;
+                next.width = RAIL_HANDLE_WIDTH;
+                next.height = RAIL_MIN_HEIGHT;
+                changed = true;
+            }
+        }
+        if changed {
+            Ok(Some(next))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub(crate) fn tick_rail(
+        &self,
+        now_ms: u64,
+        batch_count: usize,
+    ) -> Result<Option<RailPresentation>, String> {
+        let planned = self.plan_tick_rail(now_ms, batch_count)?;
+        if let Some(next) = planned {
+            let mut guard = self
+                .presentation
+                .lock()
+                .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+            guard.rail = next;
+            Ok(Some(next))
+        } else {
+            let mut guard = self
+                .presentation
+                .lock()
+                .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+            if guard.visibility != Visibility::EdgeDocked || batch_count == 0 {
+                guard.rail.expand_due_ms = None;
+                guard.rail.collapse_due_ms = None;
+            }
+            Ok(None)
+        }
+    }
+
+    pub(crate) fn update_rail_content(&self, batch_count: usize) -> Result<Option<RailPresentation>, String> {
+        let mut guard = self
+            .presentation
+            .lock()
+            .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+        if guard.visibility != Visibility::EdgeDocked {
+            return Ok(None);
+        }
+        if batch_count == 0 {
+            guard.rail.expand_due_ms = None;
+            guard.rail.collapse_due_ms = None;
+            return Ok(None);
+        }
+        if guard.rail.expanded {
+            let next_height = calculate_rail_height(batch_count);
+            if next_height > guard.rail.height {
+                guard.rail.height = next_height;
+                return Ok(Some(guard.rail));
+            }
+        }
+        Ok(None)
+    }
+}
 /// Native geometry calculation inputs and outcome for placement.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct WorkArea {
@@ -156,16 +428,37 @@ pub(crate) trait WindowOps {
 /// Production implementation of WindowOps using Win32 API and Tauri window handle.
 pub(crate) struct NativeWindowOps<'a> {
     window: &'a WebviewWindow,
+    target: Option<&'a edge_rail::DisplayMonitor>,
 }
 
 impl<'a> NativeWindowOps<'a> {
     pub(crate) fn new(window: &'a WebviewWindow) -> Self {
-        Self { window }
+        Self {
+            window,
+            target: None,
+        }
+    }
+
+    fn on_monitor(window: &'a WebviewWindow, target: &'a edge_rail::DisplayMonitor) -> Self {
+        Self {
+            window,
+            target: Some(target),
+        }
     }
 }
 
 impl<'a> WindowOps for NativeWindowOps<'a> {
     fn get_cursor_and_monitor_work_area(&self) -> Result<((i32, i32), WorkArea, u32), String> {
+        if let Some(target) = self.target {
+            return Ok((
+                (
+                    target.work.left + target.work.width() / 2,
+                    target.work.top + target.work.height() / 2,
+                ),
+                target.work,
+                target.dpi,
+            ));
+        }
         let mut point = POINT::default();
         // SAFETY: Point is a valid stack pointer.
         unsafe {
@@ -356,6 +649,108 @@ fn coordinate_repair(ops: &dyn WindowOps, state: &ResidentState) -> Result<(), S
     Ok(())
 }
 
+pub(crate) fn coordinate_fullscreen(
+    state: &ResidentState,
+    occluded: bool,
+    show_over_fullscreen: bool,
+    mut hide_or_show_rail: impl FnMut() -> Result<(), String>,
+    close_transients: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    let mut guard = state
+        .presentation
+        .lock()
+        .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+
+    if show_over_fullscreen {
+        return Ok(());
+    }
+
+    if occluded {
+        if !guard.fullscreen_occluded {
+            guard.fullscreen_occluded = true;
+            // Clear non-drag transient holds (keep active drag)
+            guard.transient_holds &= RailTransientReason::ActiveDrag as u8;
+            guard.rail = RailPresentation::default();
+            drop(guard);
+            hide_or_show_rail()?;
+            close_transients()?;
+        }
+    } else if guard.fullscreen_occluded {
+        guard.fullscreen_occluded = false;
+        guard.rail = RailPresentation::default();
+        drop(guard);
+        hide_or_show_rail()?;
+    }
+    Ok(())
+}
+
+pub(crate) fn evaluate_fullscreen_coverage(app: &AppHandle) -> Result<(), String> {
+    let state = app.state::<ResidentState>();
+    if state.visibility()? != Visibility::EdgeDocked {
+        return Ok(());
+    }
+    let placement = match rail_placement(app)? {
+        Some(p) => p,
+        None => return Ok(()),
+    };
+    let settings = crate::settings::active(app)?;
+    let occluded = is_monitor_occluded_by_foreground(&placement.monitor.monitor_rect);
+    coordinate_fullscreen(
+        state.inner(),
+        occluded,
+        settings.show_rail_over_fullscreen,
+        || {
+            if occluded && !settings.show_rail_over_fullscreen {
+                edge_rail::hide(app)
+            } else {
+                let rail = state.rail_presentation()?;
+                edge_rail::show(app, &placement, rail.width, rail.height, rail.expanded)
+            }
+        },
+        || {
+            manage_items::close(app)?;
+            let _ = app.emit("rail-transients-closed", ());
+            Ok(())
+        },
+    )
+}
+
+fn is_monitor_occluded_by_foreground(monitor_rect: &WorkArea) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
+    };
+    use windows::Win32::System::Threading::GetCurrentProcessId;
+    use windows::Win32::Foundation::RECT;
+
+    // SAFETY: GetForegroundWindow returns the current foreground HWND or NULL.
+    let foreground = unsafe { GetForegroundWindow() };
+    if foreground.0.is_null() {
+        return false;
+    }
+    let mut pid = 0;
+    // SAFETY: GetWindowThreadProcessId inspects foreground HWND safely.
+    unsafe { GetWindowThreadProcessId(foreground, Some(&mut pid)) };
+    if pid == unsafe { GetCurrentProcessId() } {
+        return false;
+    }
+    // SAFETY: Standard window visibility and minimized state inspection.
+    if !unsafe { IsWindowVisible(foreground) }.as_bool() || unsafe { IsIconic(foreground) }.as_bool() {
+        return false;
+    }
+    let mut rect = RECT::default();
+    // SAFETY: GetWindowRect fills the RECT buffer safely.
+    if unsafe { GetWindowRect(foreground, &mut rect) }.is_err() {
+        return false;
+    }
+    let window_rect = WorkArea {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+    };
+    edge_rail::rect_covers_monitor(&window_rect, monitor_rect)
+}
+
 fn coordinate_exit(
     state: &ResidentState,
     busy: bool,
@@ -376,7 +771,7 @@ fn coordinate_exit(
 
 pub(crate) fn repair_topmost(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<ResidentState>();
-    if state.visibility()? == Visibility::Hidden {
+    if state.visibility()? != Visibility::Visible {
         return Ok(());
     }
     let window = app
@@ -396,6 +791,7 @@ pub(crate) fn exit(app: &AppHandle) -> Result<(), String> {
         || app.state::<ShelfState>().has_pending_operations();
     coordinate_exit(state.inner(), busy, || {
         manage_items::close(app)?;
+        edge_rail::hide(app)?;
         crate::windows_foreground::shutdown(app)?;
         crate::windows_drop::unregister(app);
         app.state::<ShelfState>()
@@ -411,46 +807,345 @@ pub(crate) fn exit(app: &AppHandle) -> Result<(), String> {
 /// Public API: show shelf on cursor monitor using durable preferred sizing.
 /// Always shows rather than toggles; repeated calls are idempotent and reposition to current cursor.
 pub(crate) fn show_shelf(app: &AppHandle) -> Result<(), String> {
+    show_shelf_at(app, None)
+}
+
+fn show_shelf_at(
+    app: &AppHandle,
+    monitor: Option<&edge_rail::DisplayMonitor>,
+) -> Result<(), String> {
     let window = app
         .get_webview_window(SHELF_WINDOW_LABEL)
-        .ok_or_else(|| "Drop Shelf window is missing".to_owned())?;
-
-    let shelf_state = app.state::<ShelfState>();
-    let snapshot = shelf_state
+        .ok_or("Drop Shelf window is missing")?;
+    let snapshot = app
+        .state::<ShelfState>()
         .snapshot()
-        .map_err(|e| format!("failed to get shelf snapshot: {e}"))?;
+        .map_err(|e| e.to_string())?;
+    let state = app.state::<ResidentState>();
+    let previous = state.visibility()?;
+    let previous_rail = rail_placement(app)?;
+    state
+        .had_content
+        .store(!snapshot.batches.is_empty(), Ordering::Release);
+    edge_rail::hide(app)?;
+    let ops = match monitor {
+        Some(monitor) => NativeWindowOps::on_monitor(&window, monitor),
+        None => NativeWindowOps::new(&window),
+    };
+    if let Err(error) = coordinate_show(&ops, &state, snapshot.preferred_width, snapshot.height) {
+        if previous == Visibility::EdgeDocked {
+            ops.hide_window()?;
+            state.set_visibility(previous)?;
+            restore_rail(app, previous_rail.as_ref())?;
+        }
+        return Err(error);
+    }
+    Ok(())
+}
 
-    let resident_state = app.state::<ResidentState>();
-    let ops = NativeWindowOps::new(&window);
+pub(crate) fn rail_placement(app: &AppHandle) -> Result<Option<edge_rail::Placement>, String> {
+    app.state::<ResidentState>().placement()
+}
+fn set_rail_placement(
+    app: &AppHandle,
+    placement: Option<edge_rail::Placement>,
+) -> Result<(), String> {
+    app.state::<ResidentState>()
+        .presentation
+        .lock()
+        .map_err(|_| "resident presentation lock is poisoned")?
+        .rail_placement = placement;
+    Ok(())
+}
+pub(crate) fn restore_rail(
+    app: &AppHandle,
+    placement: Option<&edge_rail::Placement>,
+) -> Result<(), String> {
+    if app.state::<ResidentState>().visibility()? == Visibility::EdgeDocked {
+        let rail = app.state::<ResidentState>().rail_presentation()?;
+        match placement {
+            Some(placement) => edge_rail::show(app, placement, rail.width, rail.height, rail.expanded)?,
+            None => edge_rail::hide(app)?,
+        }
+    }
+    set_rail_placement(app, placement.cloned())
+}
+pub(crate) fn apply_rail_settings(app: &AppHandle, settings: &Settings) -> Result<(), String> {
+    if app.state::<ResidentState>().visibility()? != Visibility::EdgeDocked {
+        return Ok(());
+    }
+    let placement = edge_rail::placement(app, settings)?;
+    let rail = app.state::<ResidentState>().rail_presentation()?;
+    edge_rail::show(app, &placement, rail.width, rail.height, rail.expanded)?;
+    set_rail_placement(app, Some(placement))
+}
+pub(crate) fn update_rail_content(app: &AppHandle, batch_count: usize) -> Result<(), String> {
+    let state = app.state::<ResidentState>();
+    if state.visibility()? != Visibility::EdgeDocked {
+        return Ok(());
+    }
+    let prior_rail = state.rail_presentation()?;
+    if let Some(rail) = state.update_rail_content(batch_count)? {
+        let placement = match rail_placement(app)? {
+            Some(p) => p,
+            None => {
+                state.set_rail_presentation(prior_rail)?;
+                return Err(String::from("docked rail has no placement"));
+            }
+        };
+        if let Err(error) = edge_rail::show(app, &placement, rail.width, rail.height, rail.expanded) {
+            state.set_rail_presentation(prior_rail)?;
+            return Err(error);
+        }
+    }
+    Ok(())
+}
+pub(crate) fn tick_rail(app: &AppHandle) -> Result<(), String> {
+    let now = now_monotonic_ms();
+    let state = app.state::<ResidentState>();
+    if state.visibility()? != Visibility::EdgeDocked {
+        return Ok(());
+    }
+    let shelf = app.state::<ShelfState>();
+    let batch_count = shelf
+        .snapshot()
+        .map_err(|e| format!("cannot tick rail without shelf state: {e}"))?
+        .batches
+        .len();
+    if let Some(next) = state.plan_tick_rail(now, batch_count)? {
+        let placement = match rail_placement(app)? {
+            Some(p) => p,
+            None => {
+                return Err(String::from("docked rail has no placement"));
+            }
+        };
+        edge_rail::show(app, &placement, next.width, next.height, next.expanded)?;
+        state.set_rail_presentation(next)?;
+    } else {
+        state.tick_rail(now, batch_count)?;
+    }
+    Ok(())
+}
+pub(crate) fn reflow_rail(app: &AppHandle) -> Result<(), String> {
+    apply_rail_settings(app, &crate::settings::active(app)?)
+}
+pub(crate) fn open_shelf_from_rail(app: &AppHandle) -> Result<(), String> {
+    if app.state::<ResidentState>().visibility()? != Visibility::EdgeDocked {
+        return Err("Rail Handle is not docked".into());
+    }
+    manage_items::close(app)?;
+    let _ = app.emit("rail-transients-closed", ());
+    let placement = rail_placement(app)?.ok_or("docked rail has no placement")?;
+    show_shelf_at(app, Some(&placement.monitor))
+}
 
-    coordinate_show(
-        &ops,
-        resident_state.inner(),
-        snapshot.preferred_width,
-        snapshot.height,
+fn coordinate_dock(
+    ops: &dyn WindowOps,
+    state: &ResidentState,
+    shelf: &ShelfState,
+    placement: &edge_rail::Placement,
+    show_rail: impl FnOnce() -> Result<(), String>,
+    hide_rail: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    let previous = shelf.rail_monitor().map_err(|e| e.to_string())?;
+    let mut shelf_hidden = false;
+    let result = (|| {
+        show_rail()?;
+        shelf
+            .remember_rail_monitor(Some(&placement.monitor.id))
+            .map_err(|e| e.to_string())?;
+        ops.hide_window()?;
+        shelf_hidden = true;
+        let mut presentation = state
+            .presentation
+            .lock()
+            .map_err(|_| "resident presentation lock is poisoned")?;
+        presentation.visibility = Visibility::EdgeDocked;
+        presentation.rail_placement = Some(placement.clone());
+        Ok::<(), String>(())
+    })();
+    if let Err(error) = result {
+        let hide = hide_rail();
+        let show = if shelf_hidden {
+            ops.show_and_activate()
+        } else {
+            Ok(())
+        };
+        let restore = if shelf.rail_monitor().map_err(|e| e.to_string())? != previous {
+            shelf
+                .remember_rail_monitor(previous.as_deref())
+                .map_err(|e| e.to_string())
+        } else {
+            Ok(())
+        };
+        if hide.is_err() || restore.is_err() || show.is_err() {
+            return Err(format!("rail dismissal failed: {error}; restore incomplete: rail={hide:?}, monitor={restore:?}, shelf={show:?}"));
+        }
+        return Err(error);
+    }
+    Ok(())
+}
+pub(crate) fn dismiss_shelf(app: &AppHandle) -> Result<(), String> {
+    let state = app.state::<ResidentState>();
+    if state.visibility()? != Visibility::Visible {
+        return Ok(());
+    }
+    let window = app
+        .get_webview_window(SHELF_WINDOW_LABEL)
+        .ok_or("Drop Shelf window is missing")?;
+    let shelf = app.state::<ShelfState>();
+    let snapshot = shelf.snapshot().map_err(|e| e.to_string())?;
+    state
+        .had_content
+        .store(!snapshot.batches.is_empty(), Ordering::Release);
+    manage_items::close(app)?;
+    if snapshot.batches.is_empty() {
+        edge_rail::hide(app)?;
+        return coordinate_hide(&NativeWindowOps::new(&window), &state, || Ok(()));
+    }
+    let placement = edge_rail::placement(app, &crate::settings::active(app)?)?;
+    let rail = state.rail_presentation()?;
+    coordinate_dock(
+        &NativeWindowOps::new(&window),
+        &state,
+        &shelf,
+        &placement,
+        || edge_rail::show(app, &placement, rail.width, rail.height, rail.expanded),
+        || edge_rail::hide(app),
     )
 }
 
-/// Public API: hide shelf without terminating residency or modifying durable references.
-/// Transitions `Visible` to `Hidden`.
-pub(crate) fn hide_shelf(app: &AppHandle) -> Result<(), String> {
+fn coordinate_content(
+    state: &ResidentState,
+    has_content: bool,
+    hide: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    if has_content {
+        state.had_content.store(true, Ordering::Release);
+        return Ok(());
+    }
+    let is_docked = state.visibility()? == Visibility::EdgeDocked;
+    let had_content = state.had_content.load(Ordering::Acquire);
+    if !had_content && !is_docked {
+        return Ok(());
+    }
+    hide()?;
+    state.set_visibility(Visibility::Hidden)?;
+    state.had_content.store(false, Ordering::Release);
+    Ok(())
+}
+
+fn synchronize_on_window_thread(app: &AppHandle, has_content: bool) -> Result<(), String> {
+    coordinate_content(&app.state::<ResidentState>(), has_content, || {
+        manage_items::close(app)?;
+        let _ = app.emit("rail-transients-closed", ());
+        edge_rail::hide(app)?;
+        if let Some(window) = app.get_webview_window(SHELF_WINDOW_LABEL) {
+            window.hide().map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    })
+}
+
+pub(crate) fn synchronize(app: &AppHandle, has_content: bool) -> Result<(), String> {
+    use windows::Win32::{
+        System::Threading::GetCurrentThreadId, UI::WindowsAndMessaging::GetWindowThreadProcessId,
+    };
     let window = app
         .get_webview_window(SHELF_WINDOW_LABEL)
-        .ok_or_else(|| "Drop Shelf window is missing".to_owned())?;
-
-    let resident_state = app.state::<ResidentState>();
-    let ops = NativeWindowOps::new(&window);
-
+        .ok_or("Drop Shelf window is missing")?;
+    let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+    // SAFETY: Our live main HWND determines the serialized owner-thread transition path.
+    if unsafe { GetWindowThreadProcessId(hwnd, None) == GetCurrentThreadId() } {
+        return synchronize_on_window_thread(app, has_content);
+    }
+    let (sender, receiver) = std::sync::mpsc::channel();
     let app_handle = app.clone();
-    coordinate_hide(&ops, resident_state.inner(), move || {
-        manage_items::close(&app_handle)
+    app.run_on_main_thread(move || {
+        let _ = sender.send(synchronize_on_window_thread(&app_handle, has_content));
     })
+    .map_err(|e| e.to_string())?;
+    receiver.recv().map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::cell::RefCell;
+
+    #[test]
+    fn docking_native_failure_restores_visible_shelf_and_remembered_monitor() {
+        use std::{
+            fs,
+            time::{SystemTime, UNIX_EPOCH},
+        };
+        let path = std::env::temp_dir().join(format!(
+            "dc-dock-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let shelf = ShelfState::open(path.join("shelf.db")).unwrap();
+        shelf.remember_rail_monitor(Some("original")).unwrap();
+        let state = ResidentState::default();
+        let work = WorkArea {
+            left: 0,
+            top: 0,
+            right: 1920,
+            bottom: 1032,
+        };
+        let placement = edge_rail::Placement {
+            monitor: edge_rail::DisplayMonitor {
+                id: "selected".into(),
+                label: "selected".into(),
+                device: "display".into(),
+                monitor_rect: work,
+                work,
+                dpi: 96,
+                primary: true,
+            },
+            edge: crate::settings_store::RailEdge::Right,
+        };
+        let mut ops = MockWindowOps::new((500, 500), work, 96);
+        coordinate_show(&ops, &state, 180.0, 180.0).unwrap();
+        ops.fail_hide = true;
+        let rail_visible = RefCell::new(false);
+        assert!(coordinate_dock(
+            &ops,
+            &state,
+            &shelf,
+            &placement,
+            || {
+                *rail_visible.borrow_mut() = true;
+                Ok(())
+            },
+            || {
+                *rail_visible.borrow_mut() = false;
+                Ok(())
+            }
+        )
+        .is_err());
+        assert_eq!(state.visibility().unwrap(), Visibility::Visible);
+        assert!(state.placement().unwrap().is_none());
+        assert!(!*rail_visible.borrow());
+        assert_eq!(shelf.rail_monitor().unwrap().as_deref(), Some("original"));
+        ops.fail_hide = false;
+        coordinate_dock(&ops, &state, &shelf, &placement, || Ok(()), || Ok(())).unwrap();
+        assert_eq!(state.visibility().unwrap(), Visibility::EdgeDocked);
+        assert_eq!(state.placement().unwrap().as_ref(), Some(&placement));
+        assert_eq!(shelf.rail_monitor().unwrap().as_deref(), Some("selected"));
+        coordinate_content(&state, true, || panic!("nonempty update hid the rail")).unwrap();
+        assert!(coordinate_content(&state, false, || Err("native hide rejected".into())).is_err());
+        assert_eq!(state.visibility().unwrap(), Visibility::EdgeDocked);
+        coordinate_content(&state, false, || Ok(())).unwrap();
+        assert_eq!(state.visibility().unwrap(), Visibility::Hidden);
+        assert!(state.placement().unwrap().is_none());
+        coordinate_content(&state, false, || panic!("empty no-op hid an intake window")).unwrap();
+        shelf.close().unwrap();
+        fs::remove_dir_all(path).unwrap();
+    }
 
     struct MockWindowOps {
         cursor: (i32, i32),
@@ -816,5 +1511,347 @@ mod tests {
         assert!(result.is_err());
         // Coordinator visibility remains Visible because native window hide failed
         assert_eq!(state.visibility().unwrap(), Visibility::Visible);
+    }
+
+    #[test]
+    fn rail_expansion_timers_height_and_empty_content_cancellation() {
+        let state = ResidentState::default();
+        state.set_visibility(Visibility::EdgeDocked).unwrap();
+
+        let mut now = 1000u64;
+
+        // Pointer hover requests expansion after 200 ms; leaving before deadline prevents expansion
+        state.on_rail_pointer_enter(now).unwrap();
+        now += 150;
+        let tick = state.tick_rail(now, 1).unwrap();
+        assert_eq!(tick, None);
+        assert!(!state.rail_presentation().unwrap().expanded);
+
+        state.on_rail_pointer_leave(now).unwrap();
+        now += 100;
+        let tick = state.tick_rail(now, 1).unwrap();
+        assert_eq!(tick, None);
+        assert!(!state.rail_presentation().unwrap().expanded);
+
+        // Hovering through 200 ms expands the rail
+        state.on_rail_pointer_enter(now).unwrap();
+        now += 200;
+        let tick = state.tick_rail(now, 1).unwrap();
+        assert!(tick.is_some());
+        let current = state.rail_presentation().unwrap();
+        assert!(current.expanded);
+        assert_eq!(current.width, 280.0);
+        assert_eq!(current.height, 280.0);
+
+        // Pointer leave collapses after 300 ms; re-entry before deadline cancels collapse
+        state.on_rail_pointer_leave(now).unwrap();
+        now += 150;
+        let tick = state.tick_rail(now, 1).unwrap();
+        assert_eq!(tick, None);
+        assert!(state.rail_presentation().unwrap().expanded);
+
+        state.on_rail_pointer_enter(now).unwrap();
+        now += 200;
+        let tick = state.tick_rail(now, 1).unwrap();
+        assert_eq!(tick, None);
+        assert!(state.rail_presentation().unwrap().expanded);
+
+        // Leaving through 300 ms collapses the rail
+        state.on_rail_pointer_leave(now).unwrap();
+        now += 300;
+        let tick = state.tick_rail(now, 1).unwrap();
+        assert!(tick.is_some());
+        let current = state.rail_presentation().unwrap();
+        assert!(!current.expanded);
+        assert_eq!(current.width, 16.0);
+
+        // Sizing rules: width is 280; 1-3 batches: 280; 4-8 bounded; 9+ 640
+        assert_eq!(calculate_rail_height(0), 280.0);
+        assert_eq!(calculate_rail_height(1), 280.0);
+        assert_eq!(calculate_rail_height(3), 280.0);
+        assert_eq!(calculate_rail_height(4), 340.0); // 68 * 4 + 68 = 340
+        assert_eq!(calculate_rail_height(8), 612.0); // 68 * 8 + 68 = 612
+        assert_eq!(calculate_rail_height(9), 640.0); // clamped to 640
+        assert_eq!(calculate_rail_height(20), 640.0);
+
+        // Removing content does not live-shrink expanded rail, next expansion recalculates
+        state.on_rail_pointer_enter(now).unwrap();
+        now += 200;
+        state.tick_rail(now, 8).unwrap();
+        let current = state.rail_presentation().unwrap();
+        assert!(current.expanded);
+        assert_eq!(current.height, 612.0);
+
+        // Content updated while expanded
+        let shrunk = state.update_rail_content(2).unwrap();
+        assert_eq!(shrunk, None); // no live shrink
+        assert_eq!(state.rail_presentation().unwrap().height, 612.0);
+
+        // Collapse and re-expand recalculates height
+        state.on_rail_pointer_leave(now).unwrap();
+        now += 300;
+        state.tick_rail(now, 2).unwrap();
+        assert!(!state.rail_presentation().unwrap().expanded);
+
+        state.on_rail_pointer_enter(now).unwrap();
+        now += 200;
+        state.tick_rail(now, 2).unwrap();
+        let current = state.rail_presentation().unwrap();
+        assert!(current.expanded);
+        assert_eq!(current.height, 280.0);
+
+        // Removing final item cancels pending timers and hides rail immediately
+        state.on_rail_pointer_leave(now).unwrap();
+        assert!(state.rail_presentation().unwrap().collapse_due_ms.is_some());
+        let hide_called = RefCell::new(false);
+        coordinate_content(&state, false, || {
+            *hide_called.borrow_mut() = true;
+            Ok(())
+        }).unwrap();
+        assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, None);
+        assert!(!state.rail_presentation().unwrap().expanded);
+        assert!(*hide_called.borrow());
+        assert_eq!(state.visibility().unwrap(), Visibility::Hidden);
+    }
+
+    #[test]
+    fn rail_management_transient_hold_open_and_inflight_drag_ownership() {
+        let state = ResidentState::default();
+        let work = WorkArea {
+            left: 0,
+            top: 0,
+            right: 1920,
+            bottom: 1032,
+        };
+        let placement = edge_rail::Placement {
+            monitor: edge_rail::DisplayMonitor {
+                id: "test".into(),
+                label: "test".into(),
+                device: "display".into(),
+                monitor_rect: work,
+                work,
+                dpi: 96,
+                primary: true,
+            },
+            edge: crate::settings_store::RailEdge::Right,
+        };
+        let ops = MockWindowOps::new((500, 500), work, 96);
+        coordinate_show(&ops, &state, 180.0, 180.0).unwrap();
+        let path = std::env::temp_dir().join(format!("dc-hold-{}", std::process::id()));
+        let shelf = ShelfState::open(path.join("shelf.db")).unwrap();
+        coordinate_dock(&ops, &state, &shelf, &placement, || Ok(()), || Ok(())).unwrap();
+
+        let mut now = 1000;
+        state.on_rail_pointer_enter(now).unwrap();
+        now += 200;
+        state.tick_rail(now, 2).unwrap();
+        assert!(state.rail_presentation().unwrap().expanded);
+
+        // Acquire multiple simultaneous transient holds (e.g. Manage Items + Clear confirmation)
+        state.set_rail_transient_reason(RailTransientReason::ManageItems, true).unwrap();
+        state.set_rail_transient_reason(RailTransientReason::ClearConfirmation, true).unwrap();
+        state.set_rail_transient_reason(RailTransientReason::BatchDragConfirmation, true).unwrap();
+        assert!(state.has_rail_transient_hold().unwrap());
+
+        // Releasing Clear confirmation while BatchDrag and Manage Items remain retains hold
+        state.set_rail_transient_reason(RailTransientReason::ClearConfirmation, false).unwrap();
+        assert!(state.has_rail_transient_hold().unwrap());
+        state.set_rail_transient_reason(RailTransientReason::BatchDragConfirmation, false).unwrap();
+        assert!(state.has_rail_transient_hold().unwrap());
+        // Pointer leaves while Manage Items hold active: must NOT schedule collapse
+        state.on_rail_pointer_leave(now).unwrap();
+        assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, None);
+
+        // Releasing Manage Items hold while pointer is ALREADY OUTSIDE must arm collapse without synthetic pointer event
+        let remaining = state.set_rail_transient_reason(RailTransientReason::ManageItems, false).unwrap();
+        assert_eq!(remaining, Some(RAIL_COLLAPSE_DELAY_MS));
+        assert!(state.rail_presentation().unwrap().collapse_due_ms.is_some());
+
+        // Re-entering before collapse deadline cancels collapse
+        state.on_rail_pointer_enter(now).unwrap();
+        assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, None);
+
+        // Pointer leaves again: collapse scheduled
+        state.on_rail_pointer_leave(now).unwrap();
+        assert!(state.rail_presentation().unwrap().collapse_due_ms.is_some());
+        let collapse_due = state.rail_presentation().unwrap().collapse_due_ms.unwrap();
+        let tick = state.tick_rail(collapse_due, 2).unwrap();
+        assert!(tick.is_some());
+        assert!(!state.rail_presentation().unwrap().expanded);
+
+        // Inflight OLE drag starts and finishes while pointer is outside
+        state.on_rail_pointer_enter(now).unwrap();
+        let expand_due = state.rail_presentation().unwrap().expand_due_ms.unwrap();
+        state.tick_rail(expand_due, 2).unwrap();
+        assert!(state.rail_presentation().unwrap().expanded);
+        state.set_rail_drag_active(true).unwrap();
+        state.on_rail_pointer_leave(now).unwrap();
+        assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, None);
+
+        // Drag finishes while pointer is outside (e.g. dropped in File Explorer): automatically arms collapse!
+        let remaining = state.set_rail_drag_active(false).unwrap();
+        assert_eq!(remaining, Some(RAIL_COLLAPSE_DELAY_MS));
+        assert!(state.rail_presentation().unwrap().collapse_due_ms.is_some());
+        let collapse_due = state.rail_presentation().unwrap().collapse_due_ms.unwrap();
+        let tick = state.tick_rail(collapse_due, 2).unwrap();
+        assert!(tick.is_some());
+        assert!(!state.rail_presentation().unwrap().expanded);
+        // Removing the final item hides the rail immediately regardless of holds
+        state.on_rail_pointer_enter(now).unwrap();
+        now += 200;
+        state.tick_rail(now, 1).unwrap();
+        assert!(state.rail_presentation().unwrap().expanded);
+        state.set_rail_transient_reason(RailTransientReason::ManageItems, true).unwrap();
+
+        let hide_called = RefCell::new(false);
+        coordinate_content(&state, false, || {
+            *hide_called.borrow_mut() = true;
+            Ok(())
+        }).unwrap();
+        assert_eq!(state.visibility().unwrap(), Visibility::Hidden);
+        assert!(!state.rail_presentation().unwrap().expanded);
+        assert!(!state.has_rail_transient_hold().unwrap());
+        assert!(*hide_called.borrow());
+
+        // Re-docking rail after hiding does not inherit stale holds; normal pointer leave collapses
+        coordinate_dock(&ops, &state, &shelf, &placement, || Ok(()), || Ok(())).unwrap();
+        assert_eq!(state.visibility().unwrap(), Visibility::EdgeDocked);
+        state.on_rail_pointer_enter(now).unwrap();
+        now += 200;
+        state.tick_rail(now, 2).unwrap();
+        assert!(state.rail_presentation().unwrap().expanded);
+        state.on_rail_pointer_leave(now).unwrap();
+        assert!(state.rail_presentation().unwrap().collapse_due_ms.is_some());
+        now += 300;
+        let tick = state.tick_rail(now, 2).unwrap();
+        assert!(tick.is_some());
+        assert!(!state.rail_presentation().unwrap().expanded);
+
+        shelf.close().unwrap();
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn fullscreen_coverage_evaluation_and_transient_dismissal_without_canceling_drag() {
+        let state = ResidentState::default();
+        let work = WorkArea {
+            left: 0,
+            top: 0,
+            right: 1920,
+            bottom: 1032,
+        };
+        let monitor_rect = WorkArea {
+            left: 0,
+            top: 0,
+            right: 1920,
+            bottom: 1080,
+        };
+        let other_monitor_rect = WorkArea {
+            left: 1920,
+            top: 0,
+            right: 3840,
+            bottom: 1080,
+        };
+        let placement = edge_rail::Placement {
+            monitor: edge_rail::DisplayMonitor {
+                id: "test".into(),
+                label: "test".into(),
+                device: "display".into(),
+                monitor_rect,
+                work,
+                dpi: 96,
+                primary: true,
+            },
+            edge: crate::settings_store::RailEdge::Right,
+        };
+        let ops = MockWindowOps::new((500, 500), work, 96);
+        let path = std::env::temp_dir().join(format!("dc-fs-{}", std::process::id()));
+        let shelf = ShelfState::open(path.join("shelf.db")).unwrap();
+        coordinate_dock(&ops, &state, &shelf, &placement, || Ok(()), || Ok(())).unwrap();
+
+        // Expand rail and set transients + active drag
+        let mut now = 1000;
+        state.on_rail_pointer_enter(now).unwrap();
+        now += 200;
+        state.tick_rail(now, 2).unwrap();
+        assert!(state.rail_presentation().unwrap().expanded);
+
+        state.set_rail_transient_reason(RailTransientReason::ManageItems, true).unwrap();
+        state.set_rail_transient_reason(RailTransientReason::ClearConfirmation, true).unwrap();
+        state.set_rail_drag_active(true).unwrap();
+
+        // Fullscreen on a DIFFERENT monitor does NOT occlude or hide rail
+        let occluded_other = edge_rail::rect_covers_monitor(&other_monitor_rect, &monitor_rect);
+        assert!(!occluded_other);
+
+        // Geometric coverage on the rail's monitor
+        let occluded_same = edge_rail::rect_covers_monitor(&monitor_rect, &monitor_rect);
+        assert!(occluded_same);
+
+        // Standard maximized window covering only work area does NOT cover monitor_rect
+        assert!(!edge_rail::rect_covers_monitor(&work, &monitor_rect));
+
+        // Now coordinate fullscreen occlusion with show_over_fullscreen = false
+        let rail_hidden = RefCell::new(false);
+        let transients_closed = RefCell::new(false);
+        coordinate_fullscreen(
+            &state,
+            true, // is occluded
+            false, // show_over_fullscreen = false
+            || {
+                *rail_hidden.borrow_mut() = true;
+                Ok(())
+            },
+            || {
+                *transients_closed.borrow_mut() = true;
+                Ok(())
+            },
+        ).unwrap();
+
+        assert!(*rail_hidden.borrow());
+        assert!(*transients_closed.borrow());
+        assert!(state.is_fullscreen_occluded().unwrap());
+        // Visibility remains EdgeDocked
+        assert_eq!(state.visibility().unwrap(), Visibility::EdgeDocked);
+        // Rail presentation reset to collapsed
+        assert!(!state.rail_presentation().unwrap().expanded);
+        // Non-drag transient holds are cleared
+        assert!(!state.has_transient_reason(RailTransientReason::ManageItems).unwrap());
+        assert!(!state.has_transient_reason(RailTransientReason::ClearConfirmation).unwrap());
+        // Active OLE drag remains preserved!
+        assert!(state.rail_drag_active().unwrap());
+
+        // Leaving fullscreen restores only collapsed rail handle
+        let rail_shown = RefCell::new(false);
+        coordinate_fullscreen(
+            &state,
+            false, // is un-occluded
+            false, // show_over_fullscreen = false
+            || {
+                *rail_shown.borrow_mut() = true;
+                Ok(())
+            },
+            || Ok(()),
+        ).unwrap();
+        assert!(*rail_shown.borrow());
+        assert!(!state.is_fullscreen_occluded().unwrap());
+        assert!(!state.rail_presentation().unwrap().expanded);
+
+        // If show_over_fullscreen is true, fullscreen coverage does NOT hide rail
+        let rail_hidden_overlay = RefCell::new(false);
+        coordinate_fullscreen(
+            &state,
+            true, // is occluded
+            true, // show_over_fullscreen = true
+            || {
+                *rail_hidden_overlay.borrow_mut() = true;
+                Ok(())
+            },
+            || Ok(()),
+        ).unwrap();
+        assert!(!*rail_hidden_overlay.borrow());
+
+        shelf.close().unwrap();
+        std::fs::remove_dir_all(path).unwrap();
     }
 }

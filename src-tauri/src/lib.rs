@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use tauri::{Manager, State};
 
+mod edge_rail;
 mod manage_items;
 mod resident;
 mod resident_tray;
@@ -36,6 +37,10 @@ where
 
 fn publish_shelf(app: &tauri::AppHandle, snapshot: ShelfSnapshot) -> Result<ShelfSnapshot, String> {
     manage_items::synchronize(app)?;
+    resident::synchronize(app, !snapshot.batches.is_empty())?;
+    let _ = resident::update_rail_content(app, snapshot.batches.len());
+    use tauri::Emitter;
+    let _ = app.emit("shelf-changed", ());
     Ok(snapshot)
 }
 
@@ -57,9 +62,11 @@ async fn open_manage_items(
     batch_id: String,
     anchor: manage_items::AnchorRect,
     keyboard: bool,
+    window: tauri::WebviewWindow,
     app: tauri::AppHandle,
     state: State<'_, ShelfState>,
 ) -> Result<(), String> {
+    let origin = window.label().to_owned();
     let state = state.inner().clone();
     run_blocking(move || {
         let batch = state
@@ -68,7 +75,7 @@ async fn open_manage_items(
         if batch.items.len() < 2 {
             return Err("Manage Items requires a multi-item batch".to_owned());
         }
-        manage_items::open(&app, &batch, anchor, keyboard)?;
+        manage_items::open(&app, &batch, anchor, keyboard, &origin)?;
         manage_items::synchronize(&app)
     })
     .await
@@ -149,8 +156,12 @@ async fn accept_drop(
         let result = state
             .accept_drop(paths)
             .map_err(|error| error.to_string())?;
-        if result.snapshot.is_some() {
+        if let Some(snapshot) = result.snapshot.as_ref() {
+            resident::synchronize(&app, !snapshot.batches.is_empty())?;
             manage_items::synchronize(&app)?;
+            let _ = resident::update_rail_content(&app, snapshot.batches.len());
+            use tauri::Emitter;
+            let _ = app.emit("shelf-changed", ());
         }
         Ok::<_, String>(result)
     })
@@ -234,6 +245,27 @@ fn storage_drag_on_window_thread(
     let (sender, receiver) = std::sync::mpsc::channel();
     let drag_app = app.clone();
     app.run_on_main_thread(move || {
+        struct RailDragGuard<'a>(&'a tauri::AppHandle);
+        impl Drop for RailDragGuard<'_> {
+            fn drop(&mut self) {
+                match self.0.state::<resident::ResidentState>().set_rail_drag_active(false) {
+                    Ok(Some(remaining)) => {
+                        if let Err(error) = edge_rail::arm_rail_timer(self.0, remaining as u32) {
+                            let _ = resident::publish_warning(self.0, &error);
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        let _ = resident::publish_warning(self.0, &error);
+                    }
+                }
+            }
+        }
+        if let Err(error) = drag_app.state::<resident::ResidentState>().set_rail_drag_active(true) {
+            let _ = sender.send(Err(error));
+            return;
+        }
+        let _guard = RailDragGuard(&drag_app);
         let session = drag_app.state::<windows_drag::DragSession>();
         let result = operation(&session).map_err(|error| error.to_string());
         // A disappearing caller leaves its references retained.
@@ -412,6 +444,92 @@ fn cancel_settings(app: tauri::AppHandle) -> Result<(), String> {
     settings::cancel(&app)
 }
 
+#[tauri::command]
+fn get_rail(app: tauri::AppHandle) -> Result<edge_rail::Projection, String> {
+    let edge = match resident::rail_placement(&app)? {
+        Some(placement) => placement.edge,
+        None => settings::active(&app)?.rail_edge,
+    };
+    let rail = app.state::<resident::ResidentState>().rail_presentation()?;
+    Ok(edge_rail::Projection {
+        edge,
+        expanded: rail.expanded,
+        width: rail.width,
+        height: rail.height,
+    })
+}
+
+#[tauri::command]
+fn on_rail_pointer_enter(app: tauri::AppHandle) -> Result<(), String> {
+    let now = resident::now_monotonic_ms();
+    let state = app.state::<resident::ResidentState>();
+    let rail = state.on_rail_pointer_enter(now)?;
+    if let Some(due) = rail.expand_due_ms {
+        let remaining = (due.saturating_sub(now)).max(1) as u32;
+        if let Err(error) = edge_rail::arm_rail_timer(&app, remaining) {
+            let _ = resident::publish_warning(&app, &error);
+        }
+    } else {
+        edge_rail::cancel_rail_timer(&app);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn on_rail_pointer_leave(app: tauri::AppHandle) -> Result<(), String> {
+    let now = resident::now_monotonic_ms();
+    let state = app.state::<resident::ResidentState>();
+    let rail = state.on_rail_pointer_leave(now)?;
+    if let Some(due) = rail.collapse_due_ms {
+        let remaining = (due.saturating_sub(now)).max(1) as u32;
+        if let Err(error) = edge_rail::arm_rail_timer(&app, remaining) {
+            let _ = resident::publish_warning(&app, &error);
+        }
+    } else {
+        edge_rail::cancel_rail_timer(&app);
+    }
+    Ok(())
+}
+#[tauri::command]
+fn tick_rail(app: tauri::AppHandle) -> Result<(), String> {
+    resident::tick_rail(&app)
+}
+#[tauri::command]
+fn open_shelf_from_rail(app: tauri::AppHandle) -> Result<(), String> {
+    resident::open_shelf_from_rail(&app)
+}
+#[tauri::command]
+fn set_rail_transient_hold(
+    active: bool,
+    reason: String,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let reason_enum = match reason.as_str() {
+        "clear" => resident::RailTransientReason::ClearConfirmation,
+        "batch-drag" => resident::RailTransientReason::BatchDragConfirmation,
+        _ => return Err(format!("unknown rail transient hold reason '{reason}'")),
+    };
+    if let Some(remaining) = app.state::<resident::ResidentState>().set_rail_transient_reason(reason_enum, active)? {
+        let _ = edge_rail::arm_rail_timer(&app, remaining as u32);
+    }
+    Ok(())
+}
+#[tauri::command]
+fn set_rail_placement(
+    app: tauri::AppHandle,
+    edge: settings_store::RailEdge,
+    monitor_id: String,
+) -> Result<settings::SettingsSnapshot, String> {
+    settings::set_rail_placement(&app, edge, monitor_id)
+}
+#[tauri::command]
+fn set_show_rail_over_fullscreen(
+    app: tauri::AppHandle,
+    enabled: bool,
+) -> Result<settings::SettingsSnapshot, String> {
+    settings::set_show_rail_over_fullscreen(&app, enabled)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 // Acquire before Tauri creates windows or opens profile persistence: secondaries only activate.
 pub fn run() {
@@ -439,6 +557,7 @@ pub fn run() {
             manage_items::register_owner(&window).map_err(std::io::Error::other)?;
             shelf_resize::register_owner(&window).map_err(std::io::Error::other)?;
             settings::initialize(app.handle(), &profile, &window).map_err(std::io::Error::other)?;
+            edge_rail::initialize(app.handle()).map_err(std::io::Error::other)?;
             resident_tray::register(app.handle()).map_err(std::io::Error::other)?;
             windows_foreground::register(&window).map_err(std::io::Error::other)?;
             settings::publish_startup_warning_if_any(app.handle());
@@ -454,7 +573,7 @@ pub fn run() {
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
-                    if let Err(error) = resident::hide_shelf(window.app_handle()) {
+                    if let Err(error) = resident::dismiss_shelf(window.app_handle()) {
                         use tauri::Emitter;
                         let _ = window.emit("shelf-error", error);
                     }
@@ -468,6 +587,9 @@ pub fn run() {
                             eprintln!("display reflow failed: {error}; warning delivery failed: {warning}");
                         }
                     }
+                    if let Err(error) = resident::reflow_rail(window.app_handle()) {
+                        let _ = resident::publish_warning(window.app_handle(), &error);
+                    }
                 }
             } else if window.label() == settings::SETTINGS_WINDOW_LABEL {
                 if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
@@ -476,8 +598,21 @@ pub fn run() {
                     settings::on_settings_window_focus_changed(window.app_handle(), *focused);
                 }
             }
+            if window.label() == edge_rail::LABEL && matches!(event, tauri::WindowEvent::ScaleFactorChanged { .. }) {
+                if let Err(error) = resident::reflow_rail(window.app_handle()) {
+                    let _ = resident::publish_warning(window.app_handle(), &error);
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
+            get_rail,
+            open_shelf_from_rail,
+            set_rail_transient_hold,
+            set_rail_placement,
+            set_show_rail_over_fullscreen,
+            on_rail_pointer_enter,
+            on_rail_pointer_leave,
+            tick_rail,
             get_shelf,
             accept_drop,
             save_size,

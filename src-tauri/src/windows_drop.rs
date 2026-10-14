@@ -129,6 +129,18 @@ unsafe fn requested_effect<'a>(effect: *mut DROPEFFECT) -> Result<&'a mut DROPEF
     }
 }
 
+pub(crate) fn evaluate_storage_drop(
+    own_drag_active: bool,
+    offered_effect: DROPEFFECT,
+    has_valid_storage_paths: bool,
+) -> DROPEFFECT {
+    if own_drag_active || !offered_effect.contains(DROPEFFECT_COPY) || !has_valid_storage_paths {
+        DROPEFFECT_NONE
+    } else {
+        DROPEFFECT_COPY
+    }
+}
+
 #[allow(non_snake_case)]
 impl IDropTarget_Impl for StorageDropTarget_Impl {
     fn DragEnter(
@@ -141,23 +153,36 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         // SAFETY: OLE provides this output pointer for this callback only.
         let effect = unsafe { requested_effect(effect)? };
         let own_drag = self.window.state::<DragSession>().is_active();
-        let supported = !own_drag
-            && data
-                .as_ref()
-                .and_then(|data| storage_paths(data).ok())
-                .is_some_and(|paths| paths.iter().any(Option::is_some));
-        let can_copy = effect.contains(DROPEFFECT_COPY) && supported;
+        let supported = data
+            .as_ref()
+            .and_then(|data| storage_paths(data).ok())
+            .is_some_and(|paths| paths.iter().any(Option::is_some));
+        let resolved_effect = evaluate_storage_drop(own_drag, *effect, supported);
+        let can_copy = resolved_effect == DROPEFFECT_COPY;
         self.can_copy.set(can_copy);
-        *effect = if can_copy {
-            DROPEFFECT_COPY
-        } else {
-            DROPEFFECT_NONE
-        };
+        *effect = resolved_effect;
+        if self.window.label() == crate::edge_rail::LABEL && can_copy {
+            let now = crate::resident::now_monotonic_ms();
+            match self.window.state::<crate::resident::ResidentState>().on_rail_pointer_enter(now) {
+                Ok(rail) => {
+                    if let Some(due) = rail.expand_due_ms {
+                        let remaining = (due.saturating_sub(now)).max(1) as u32;
+                        if let Err(error) = crate::edge_rail::arm_rail_timer(self.window.app_handle(), remaining) {
+                            let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
+                        }
+                    } else {
+                        crate::edge_rail::cancel_rail_timer(self.window.app_handle());
+                    }
+                }
+                Err(error) => {
+                    let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
+                }
+            }
+        }
         // A disappearing presentation listener does not affect the storage operation.
         let _ = self.window.emit("shelf-drag-over", can_copy);
         Ok(())
     }
-
     fn DragOver(
         &self,
         _keys: MODIFIERKEYS_FLAGS,
@@ -166,23 +191,35 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
     ) -> Result<()> {
         // SAFETY: OLE provides this output pointer for this callback only.
         let effect = unsafe { requested_effect(effect)? };
-        *effect = if !self.window.state::<DragSession>().is_active()
-            && self.can_copy.get()
-            && effect.contains(DROPEFFECT_COPY)
-        {
-            DROPEFFECT_COPY
-        } else {
-            DROPEFFECT_NONE
-        };
+        let own_drag = self.window.state::<DragSession>().is_active();
+        let resolved_effect = evaluate_storage_drop(own_drag, *effect, self.can_copy.get());
+        *effect = resolved_effect;
         Ok(())
     }
 
     fn DragLeave(&self) -> Result<()> {
         self.can_copy.set(false);
+        if self.window.label() == crate::edge_rail::LABEL {
+            let now = crate::resident::now_monotonic_ms();
+            match self.window.state::<crate::resident::ResidentState>().on_rail_pointer_leave(now) {
+                Ok(rail) => {
+                    if let Some(due) = rail.collapse_due_ms {
+                        let remaining = (due.saturating_sub(now)).max(1) as u32;
+                        if let Err(error) = crate::edge_rail::arm_rail_timer(self.window.app_handle(), remaining) {
+                            let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
+                        }
+                    } else {
+                        crate::edge_rail::cancel_rail_timer(self.window.app_handle());
+                    }
+                }
+                Err(error) => {
+                    let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
+                }
+            }
+        }
         let _ = self.window.emit("shelf-drag-over", false);
         Ok(())
     }
-
     fn Drop(
         &self,
         data: Ref<'_, IDataObject>,
@@ -192,19 +229,17 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
     ) -> Result<()> {
         // SAFETY: OLE provides this output pointer for this callback only.
         let effect = unsafe { requested_effect(effect)? };
-        let allowed =
-            !self.window.state::<DragSession>().is_active() && effect.contains(DROPEFFECT_COPY);
+        let own_drag = self.window.state::<DragSession>().is_active();
+        let paths = match data.as_ref() {
+            Some(data) => storage_paths(data)?,
+            None => Vec::new(),
+        };
+        let supported = paths.iter().any(Option::is_some);
+        let resolved_effect = evaluate_storage_drop(own_drag, *effect, supported);
         *effect = DROPEFFECT_NONE;
         self.can_copy.set(false);
         let _ = self.window.emit("shelf-drag-over", false);
-        if !allowed {
-            return Ok(());
-        }
-        let Some(data) = data.as_ref() else {
-            return Ok(());
-        };
-        let paths = storage_paths(data)?;
-        if !paths.iter().any(Option::is_some) {
+        if resolved_effect != DROPEFFECT_COPY {
             return Ok(());
         }
         let window = self.window.clone();
@@ -212,15 +247,22 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         // The IDataObject never crosses threads. Only its owned path projection does.
         tauri::async_runtime::spawn_blocking(move || match state.accept_drop(paths) {
             Ok(result) => {
-                if result.snapshot.is_some() {
-                    if let Err(error) = crate::manage_items::synchronize(window.app_handle()) {
-                        let _ = window.emit("shelf-error", error);
+                if let Some(snapshot) = result.snapshot.as_ref() {
+                    if let Err(error) = crate::resident::synchronize(
+                        window.app_handle(),
+                        !snapshot.batches.is_empty(),
+                    )
+                    .and_then(|()| crate::manage_items::synchronize(window.app_handle()))
+                    .and_then(|()| crate::resident::update_rail_content(window.app_handle(), snapshot.batches.len()))
+                    {
+                        let _ = crate::resident::publish_warning(window.app_handle(), &error);
                     }
+                    let _ = window.app_handle().emit("shelf-changed", ());
                 }
-                let _ = window.emit("shelf-drop", result);
+                let _ = window.app_handle().emit("shelf-drop", result);
             }
             Err(error) => {
-                let _ = window.emit("shelf-error", error.to_string());
+                let _ = crate::resident::publish_warning(window.app_handle(), &error.to_string());
             }
         });
         *effect = DROPEFFECT_COPY;
@@ -229,7 +271,9 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
 }
 
 pub(crate) fn register(window: &WebviewWindow) -> tauri::Result<()> {
-    window.app_handle().manage(RegisteredDropWindows::default());
+    if window.app_handle().try_state::<RegisteredDropWindows>().is_none() {
+        window.app_handle().manage(RegisteredDropWindows::default());
+    }
     let window = window.clone();
     let target_window = window.clone();
     window.with_webview(move |webview| {
@@ -261,12 +305,12 @@ pub(crate) fn register(window: &WebviewWindow) -> tauri::Result<()> {
                 if registered.is_empty() {
                     return Err(Error::from_hresult(E_FAIL).into());
                 }
-                *target_window
-                    .state::<RegisteredDropWindows>()
+                let registration_state = target_window.state::<RegisteredDropWindows>();
+                let mut guard = registration_state
                     .0
                     .lock()
-                    .map_err(|_| std::io::Error::other("drop registration lock is poisoned"))? =
-                    registered;
+                    .map_err(|_| std::io::Error::other("drop registration lock is poisoned"))?;
+                guard.extend(registered);
             }
             Ok(())
         })();

@@ -193,7 +193,9 @@ Release gates completed on available hardware. Mixed-DPI and physical sign-in re
 
 ## 0.0.5 — Edge Rail workflow
 
-**Status:** Planned.
+**Status:** Completed — tickets 01–05 resolved; Windows x64 current-user NSIS 0.0.5 built and verified from an isolated installed executable. 0.0.6+ remains unstarted.
+
+Plan: [Specification](../.scratch/edge-rail-workflow/spec.md) · [Delivery map and tickets](../.scratch/edge-rail-workflow/map.md). Implementation order: `01 → 02 → 03 → 04 → 05`.
 
 ### Scope
 
@@ -205,17 +207,21 @@ Release gates completed on available hardware. Mixed-DPI and physical sign-in re
 
 ### Implemented
 
-- Placement ownership and fallback are documented in [ADR-0002](adr/0002-edge-rail-placement-ownership.md); runtime implementation has not started.
+- Ticket 01: EdgeDocked/collapsed no-activate Rail Handle, persistent remembered monitor ownership, current-monitor Open Shelf, five-field clean settings cutover, edge/monitor Save/Cancel and placement rollback implemented. Fullscreen control remains hidden until ticket 04; expansion/actions are not started.
+- Ticket02: native one-shot hover/OLE timers, expanded summaries, canonical bounded rows/scrolling, shared Copy storage intake, projection synchronization and final-item deadline cleanup implemented.
+- Ticket 03: expanded rail management, item and batch Copy drag-out, rail-constrained Manage Items, Bulk Pinning, non-focus-stealing Clear/drag confirmations, transient hold lifecycle with outside-pointer collapse, and Open Shelf transition implemented.
+- Ticket 04: geometric fullscreen monitor coverage evaluation, event-driven foreground/location hooks without own-process suppression, `ShowRailOverFullscreen` setting with atomic transaction/rollback, and active drag survival across fullscreen transitions implemented.
 
 ### Verification
 
-Before completion:
-
-- Dismiss empty and non-empty shelves and observe `Hidden` and `EdgeDocked` respectively.
-- Exercise every rail action without foreground activation and verify expansion/collapse timing and size tiers.
-- Disconnect and reconnect configured and remembered monitors; observe primary-display fallback without settings loss.
-- Cover the selected monitor with a fullscreen foreground window and verify both fullscreen-policy settings.
-- Build and launch `DropCove-Setup-0.0.5.exe` on Windows 11 x64.
+- Ticket 01: final cargo-xwin embedded release build and vue-tsc/Vite succeeded; fresh native suite **71/71** passed. Actual Windows smoke proved 16×280 edge geometry, foreground preservation, current-monitor Open Shelf, settings Save/Cancel, real post-effect JSON/placement rollback, unavailable preference fallback, hidden restart and final-item hiding. Native show/hide cache mismatch found and fixed, then repro passed. Owned Exit/tabs/profile/WebView cleanup and unchanged Run entries verified. See [ticket 01 evidence](../.scratch/edge-rail-workflow/issues/01-edge-docked-handle-placement-settings.md#answer). Mixed-DPI/physical disconnect remain unobserved limits.
+- Ticket02 focused TDD checks passed; frontend and cargo-xwin embedded release build passed. Native hover/leave/re-entry, real OS-marshaled FileDrop Copy/Text rejection/Escape cancellation, growth/no-live-shrink/re-expansion, hidden Shelf/Rail DOM refresh and focus preservation verified. Final rendered rows64/gaps4 and scrolling measured after correcting flex shrink. See [ticket02 evidence and limits](../.scratch/edge-rail-workflow/issues/02-expanded-rail-storage-intake.md#answer). Full suite remains an end-of-delivery gate.
+- Ticket 03 fresh full suite **74/74** passed; frontend build and cargo-xwin release passed. Native smoke proved outbound Copy consumption/retention, Escape/cancellation, tri-state Bulk Pinning, item/batch removal, Clear Temporary (mixed/all-Pinned/all-Temporary), Open Shelf transition, and natural 300 ms collapse on outside-pointer hold release. Idempotent flyout subclass fix verified. See [ticket 03 evidence](../.scratch/edge-rail-workflow/issues/03-rail-management-copy-drag-out.md#answer).
+- Ticket 04 fresh full suite **75/75** passed; frontend build and cargo-xwin release passed. Native smoke proved geometric fullscreen occlusion hiding and handle-only restoration, cross-monitor isolation, `ShowRailOverFullscreen` toggle in Settings with Save/Cancel semantics, and active OLE drag survival without cancellation or corruption. See [ticket 04 evidence](../.scratch/edge-rail-workflow/issues/04-fullscreen-reflow-settings-transaction.md#answer).
+- Ticket 05 release: [DropCove-Setup-0.0.5.exe](../build/DropCove-Setup-0.0.5.exe), 3,196,216 bytes, SHA-256 `01e9f3bf40e766a86be6cd53056c2c632070ac36df1da3898991f096e3ecfc38`. Version/package/crate/lock/Tauri, built/installed PE and uninstall metadata report 0.0.5. Freshly compiled 0.0.5 suite passed **75/75**; cargo-xwin NSIS packaging included vue-tsc/Vite.
+- Installed native proof: primary launch & single-instance activation, empty dismissal to Hidden, non-empty dismissal to 16×280 Rail Handle, 200ms/300ms hover expansion/collapse, OLE drop-in and duplicate suppression, outbound Copy drag-out with Temporary consumption and Pinned retention, no-activate Manage Items flyout and Clear Temporary, Open Shelf transition, geometric fullscreen occlusion and handle-only restoration, Settings view with `ShowRailOverFullscreen` Save/Cancel, and final-item removal hiding both surfaces. See [ticket 05 evidence](../.scratch/edge-rail-workflow/issues/05-release-0.0.5.md#answer).
+- Owned test uninstaller executed, test directories removed, Run key and original 0.0.3 user uninstall/shortcuts restored with unchanged ambient executable hash. User ambient installation stays 0.0.3; 0.0.5 installer is available separately. No commit created. Limits: dual 96-DPI physical monitors tested; mixed-DPI scaling covered by deterministic geometry tests.
+Release gates completed on available hardware. Dual 96-DPI physical monitors verified; mixed-DPI scaling remains covered by deterministic geometry tests. Version 0.0.6 (Shake-to-open) remains unstarted pending user review.
 
 ### Deferred
 

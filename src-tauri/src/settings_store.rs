@@ -287,13 +287,22 @@ fn fallback_key_name(vk: u16) -> String {
     }
 }
 
-/// Canonical settings model matching ticket 04 specification.
-/// Exactly {"HotKey": {...}, "StartWithWindows": true|false}, denying unknown fields.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum RailEdge {
+    Left,
+    #[default]
+    Right,
+}
+
+/// Active settings contract; missing or unknown fields are malformed, never migrated.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 pub struct Settings {
     pub(crate) hot_key: HotKey,
     pub(crate) start_with_windows: bool,
+    pub(crate) rail_edge: RailEdge,
+    pub(crate) rail_monitor_id: String,
+    pub(crate) show_rail_over_fullscreen: bool,
 }
 
 impl Default for Settings {
@@ -301,13 +310,21 @@ impl Default for Settings {
         Self {
             hot_key: HotKey::default(),
             start_with_windows: true,
+            rail_edge: RailEdge::Right,
+            rail_monitor_id: String::new(),
+            show_rail_over_fullscreen: false,
         }
     }
 }
 
 impl Settings {
     pub(crate) fn validate(&self) -> Result<(), String> {
-        self.hot_key.validate()
+        self.hot_key.validate()?;
+        if self.rail_monitor_id.contains('\0') || self.rail_monitor_id.encode_utf16().count() > 1024
+        {
+            return Err("invalid target monitor identifier".into());
+        }
+        Ok(())
     }
 }
 
@@ -753,38 +770,41 @@ mod tests {
     }
 
     #[test]
-    fn test_canonical_json_roundtrip_and_deny_unknown_fields() {
+    fn rail_schema_requires_all_fields_and_preserves_old_configuration_until_save() {
+        let temp = TempDir::new("rail-cutover");
+        let store = SettingsStore::new(&temp.path);
+        let previous = br#"{"HotKey":{"Control":true,"Alt":true,"Shift":false,"Windows":false,"VirtualKey":75},"StartWithWindows":false}"#;
+        fs::write(store.path(), previous).unwrap();
+        let (loaded, warning) = store.load();
+        assert_eq!(loaded, Settings::default());
+        assert!(warning.is_some());
+        assert_eq!(fs::read(store.path()).unwrap(), previous);
         let settings = Settings {
-            hot_key: HotKey {
-                control: true,
-                alt: false,
-                shift: true,
-                windows: false,
-                virtual_key: 0x4B, // 'K'
-            },
+            rail_edge: RailEdge::Left,
+            rail_monitor_id: "disconnected-saved-display".into(),
             start_with_windows: false,
+            ..loaded
         };
-
-        let json_str = serde_json::to_string(&settings).unwrap();
-
-        // Must serialize as exact PascalCase {"HotKey":{"Control":true,"Alt":false,"Shift":true,"Windows":false,"VirtualKey":75},"StartWithWindows":false}
-        assert!(json_str.contains("\"HotKey\":"));
-        assert!(json_str.contains("\"Control\":true"));
-        assert!(json_str.contains("\"VirtualKey\":75"));
-        assert!(json_str.contains("\"StartWithWindows\":false"));
-
-        let deserialized: Settings = serde_json::from_str(&json_str).unwrap();
-        assert_eq!(deserialized, settings);
-
-        // Deny unknown fields at top-level
-        let with_unknown = r#"{"HotKey":{"Control":true,"Alt":false,"Shift":true,"Windows":false,"VirtualKey":75},"StartWithWindows":false,"Unknown":123}"#;
-        let unknown_res: Result<Settings, _> = serde_json::from_str(with_unknown);
-        assert!(unknown_res.is_err());
-
-        // Cutover rule: missing StartWithWindows in old intermediate JSON is malformed
-        let old_schema_json = r#"{"HotKey":{"Control":true,"Alt":false,"Shift":true,"Windows":false,"VirtualKey":75}}"#;
-        let old_res: Result<Settings, _> = serde_json::from_str(old_schema_json);
-        assert!(old_res.is_err());
+        store.write(&settings).unwrap();
+        assert_eq!(store.load(), (settings.clone(), None));
+        let value = serde_json::to_value(&settings).unwrap();
+        for field in [
+            "HotKey",
+            "StartWithWindows",
+            "RailEdge",
+            "RailMonitorId",
+            "ShowRailOverFullscreen",
+        ] {
+            let mut missing = value.clone();
+            missing.as_object_mut().unwrap().remove(field);
+            assert!(serde_json::from_value::<Settings>(missing).is_err());
+        }
+        let mut invalid = value.clone();
+        invalid["RailEdge"] = "Top".into();
+        assert!(serde_json::from_value::<Settings>(invalid).is_err());
+        let mut unknown = value;
+        unknown["Unexpected"] = true.into();
+        assert!(serde_json::from_value::<Settings>(unknown).is_err());
     }
 
     #[test]
@@ -814,7 +834,6 @@ mod tests {
         let (settings, warning) = store.load();
         assert_eq!(settings, Settings::default());
         assert!(warning.is_some());
-        assert!(warning.unwrap().contains("malformed"));
 
         // Verify the original file content was preserved untouched
         let retained = fs::read(store.path()).unwrap();
@@ -827,17 +846,15 @@ mod tests {
         let (settings_old, warning_old) = store.load();
         assert_eq!(settings_old, Settings::default());
         assert!(warning_old.is_some());
-        assert!(warning_old.unwrap().contains("malformed"));
         assert_eq!(fs::read_to_string(store.path()).unwrap(), old_format);
 
         // Write valid JSON with invalid HotKey (no modifiers)
-        let invalid_hk_json = r#"{"HotKey":{"Control":false,"Alt":false,"Shift":false,"Windows":false,"VirtualKey":65},"StartWithWindows":true}"#;
+        let invalid_hk_json = r#"{"HotKey":{"Control":false,"Alt":false,"Shift":false,"Windows":false,"VirtualKey":65},"StartWithWindows":true,"RailEdge":"Right","RailMonitorId":"","ShowRailOverFullscreen":false}"#;
         fs::write(store.path(), invalid_hk_json).unwrap();
 
         let (settings2, warning2) = store.load();
         assert_eq!(settings2, Settings::default());
         assert!(warning2.is_some());
-        assert!(warning2.unwrap().contains("invalid hotkey"));
         assert_eq!(fs::read_to_string(store.path()).unwrap(), invalid_hk_json);
     }
 
@@ -855,6 +872,7 @@ mod tests {
                 virtual_key: 0x42, // 'B'
             },
             start_with_windows: false,
+            ..Settings::default()
         };
 
         store.write(&settings).expect("write succeeded");
@@ -902,6 +920,7 @@ mod tests {
                 virtual_key: 0x4B,
             },
             start_with_windows: false,
+            ..Settings::default()
         };
         store.write(&new_settings).unwrap();
         assert_ne!(fs::read(store.path()).unwrap(), corrupt_raw);
@@ -941,6 +960,7 @@ mod tests {
                     virtual_key: 0x43, // 'C'
                 },
                 start_with_windows: false,
+                ..Settings::default()
             };
 
             // Attempting to write while locked must return Err

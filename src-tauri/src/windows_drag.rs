@@ -164,3 +164,58 @@ pub(crate) fn perform_storage_drag<'a>(
         Err(StorageDragError::UnexpectedStatus(status.0))
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use windows::Win32::System::Ole::DROPEFFECT_MOVE;
+
+    #[test]
+    fn own_drag_session_rejects_storage_drop_as_intake() {
+        let session = DragSession::default();
+
+        // When drag session is active (application-owned drag), offered COPY + valid storage paths -> DROPEFFECT_NONE
+        {
+            let _guard = session.enter().unwrap();
+            assert!(session.is_active());
+            assert_eq!(
+                crate::windows_drop::evaluate_storage_drop(
+                    session.is_active(),
+                    DROPEFFECT_COPY,
+                    true
+                ),
+                DROPEFFECT_NONE
+            );
+        }
+
+        // When guard drops (external drag), offered COPY + valid paths -> DROPEFFECT_COPY
+        assert!(!session.is_active());
+        assert_eq!(
+            crate::windows_drop::evaluate_storage_drop(
+                session.is_active(),
+                DROPEFFECT_COPY,
+                true
+            ),
+            DROPEFFECT_COPY
+        );
+
+        // Unsupported payloads (no valid paths) -> DROPEFFECT_NONE
+        assert_eq!(
+            crate::windows_drop::evaluate_storage_drop(
+                session.is_active(),
+                DROPEFFECT_COPY,
+                false
+            ),
+            DROPEFFECT_NONE
+        );
+
+        // Move only effect without Copy -> DROPEFFECT_NONE
+        assert_eq!(
+            crate::windows_drop::evaluate_storage_drop(
+                session.is_active(),
+                DROPEFFECT_MOVE,
+                true
+            ),
+            DROPEFFECT_NONE
+        );
+    }
+}

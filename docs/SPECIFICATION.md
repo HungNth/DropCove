@@ -202,7 +202,7 @@ Version staging: until the Edge Rail ships in `0.0.5`, `0.0.4` temporarily maps 
 | Second application launch | Existing process shows and activates Drop Shelf | Monitor containing cursor |
 | Global hotkey             | Toggles or shows Drop Shelf                     | Monitor containing cursor |
 | Tray icon                 | Shows and activates Drop Shelf                  | Monitor containing cursor |
-| Open Shelf from Edge Rail | Shows and activates Drop Shelf                  | Remembered rail monitor   |
+| Open Shelf from Edge Rail | Shows and activates Drop Shelf                  | Monitor where the rail is currently docked |
 | Shake-to-open             | Shows Drop Shelf near cursor                    | Monitor containing cursor |
 
 ### 7.1 Global hotkey
@@ -398,6 +398,7 @@ The Edge Rail appears when a non-empty Drop Shelf is dismissed.
 - The rail is an overlay and does not reserve desktop work area.
 - Screen-edge corners remain square; desktop-facing corners are rounded.
 - Rail interaction does not activate DropCove or steal focus from the current application.
+- Keyboard-only users open the Drop Shelf through the global hotkey and use its existing keyboard workflow; the no-activate Edge Rail does not install a second global keyboard hook for rail traversal.
 
 ### 11.2 Rail Handle and expansion
 
@@ -446,6 +447,8 @@ The expanded Edge Rail supports:
 **Show over fullscreen applications** is disabled by default.
 
 When disabled, the requested rail hides while the selected monitor is fully covered by the foreground window and returns when that condition ends. When enabled, the rail remains visible over fullscreen windows.
+
+When fullscreen hiding begins, DropCove closes Edge Rail Manage Items and discards any unconfirmed Clear Temporary Items prompt. When fullscreen coverage ends, only the collapsed Rail Handle returns. An already-running native drag is not canceled by this presentation change.
 
 ## 12. Drop-in behavior
 
@@ -637,6 +640,26 @@ Serialized content in `0.0.4`:
 ```
 
 Later owning versions extend this object with their settings; `0.0.4` does not persist inactive Rail or Shake fields.
+
+Serialized content in `0.0.5`:
+
+```json
+{
+    "HotKey": {
+        "Control": true,
+        "Alt": false,
+        "Shift": true,
+        "Windows": false,
+        "VirtualKey": 32
+    },
+    "StartWithWindows": true,
+    "RailEdge": "Right",
+    "RailMonitorId": "",
+    "ShowRailOverFullscreen": false
+}
+```
+
+The `0.0.5` schema is a clean cutover: all five top-level fields are required and unknown fields remain rejected. A `0.0.4` settings file without the Rail fields therefore follows the normal malformed-settings path: preserve the original bytes, load `0.0.5` defaults in memory, warn, and replace the file only after a successful explicit Save.
 
 `RailEdge` and `RailMonitorId` are user preferences. An empty `RailMonitorId` selects the remembered dismissal monitor stored in shelf state; a non-empty value takes precedence whenever that display is connected.
 
