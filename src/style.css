@@ -7,3 +7,165 @@ html, body, #app {
   margin: 0;
   padding: 0;
 }
+
+:root {
+  /* Surface and Canvas */
+  --dc-canvas: #0b111e;
+  --dc-surface: #141c2b;
+  --dc-surface-subtle: #1a2333;
+  --dc-surface-elevated: #202a3b;
+  --dc-surface-hover: #283556;
+  --dc-surface-active: #313f64;
+  --dc-backdrop: rgba(0, 0, 0, 0.45);
+
+  /* Typography */
+  --dc-text-primary: #edf2fc;
+  --dc-text-secondary: #cbd5e1;
+  --dc-text-muted: #a7b4cb;
+
+  /* Borders */
+  --dc-border-subtle: #232d42;
+  --dc-border-default: #46536a;
+  --dc-border-hover: #64748b;
+
+  /* Accent & Interactive */
+  --dc-accent: #6366f1;
+  --dc-accent-subtle: rgba(99, 102, 241, 0.15);
+  --dc-accent-hover: #4f46e5;
+  --dc-accent-text: #ffffff;
+  --dc-focus: #a5b4fc;
+  --dc-focus-outline-width: 2px;
+
+  /* Feedback: Warning & Danger */
+  --dc-warning: #efad70;
+  --dc-warning-surface: rgba(239, 173, 112, 0.12);
+  --dc-warning-border: #efad70;
+  --dc-warning-text: #fbbf24;
+
+  --dc-danger: #f87171;
+  --dc-danger-surface: #2a1b24;
+  --dc-danger-hover: #b91c1c;
+  --dc-danger-border: #f87171;
+  --dc-danger-text: #fca5a5;
+
+  /* Drag & Drop Emphasis */
+  --dc-drag-hover-border: #a5b4fc;
+  --dc-drag-hover-bg: #202b44;
+
+  /* States */
+  --dc-disabled-opacity: 0.45;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --dc-canvas: #f1f5f9;
+    --dc-surface: #ffffff;
+    --dc-surface-subtle: #f8fafc;
+    --dc-surface-elevated: #f1f5f9;
+    --dc-surface-hover: #e2e8f0;
+    --dc-surface-active: #e0e7ff;
+    --dc-backdrop: rgba(0, 0, 0, 0.35);
+
+    --dc-text-primary: #0f172a;
+    --dc-text-secondary: #334155;
+    --dc-text-muted: #64748b;
+
+    --dc-border-subtle: #e2e8f0;
+    --dc-border-default: #cbd5e1;
+    --dc-border-hover: #94a3b8;
+
+    --dc-accent: #4f46e5;
+    --dc-accent-subtle: #e0e7ff;
+    --dc-accent-hover: #4338ca;
+    --dc-accent-text: #ffffff;
+    --dc-focus: #4f46e5;
+
+    --dc-warning: #b45309;
+    --dc-warning-surface: #fef3c7;
+    --dc-warning-border: #f59e0b;
+    --dc-warning-text: #92400e;
+
+    --dc-danger: #dc2626;
+    --dc-danger-surface: #fee2e2;
+    --dc-danger-hover: #fca5a5;
+    --dc-danger-border: #ef4444;
+    --dc-danger-text: #991b1b;
+
+    --dc-drag-hover-border: #4f46e5;
+    --dc-drag-hover-bg: #e0e7ff;
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --dc-canvas: Canvas;
+    --dc-surface: Canvas;
+    --dc-surface-subtle: Canvas;
+    --dc-surface-elevated: ButtonFace;
+    --dc-surface-hover: Highlight;
+    --dc-surface-active: Highlight;
+    --dc-backdrop: rgba(0, 0, 0, 0.6);
+
+    --dc-text-primary: CanvasText;
+    --dc-text-secondary: CanvasText;
+    --dc-text-muted: CanvasText;
+
+    --dc-border-subtle: CanvasText;
+    --dc-border-default: ButtonText;
+    --dc-border-hover: Highlight;
+
+    --dc-accent: Highlight;
+    --dc-accent-subtle: Highlight;
+    --dc-accent-hover: Highlight;
+    --dc-accent-text: HighlightText;
+    --dc-focus: Highlight;
+
+    --dc-warning: LinkText;
+    --dc-warning-surface: Canvas;
+    --dc-warning-border: ButtonText;
+    --dc-warning-text: CanvasText;
+
+    --dc-danger: LinkText;
+    --dc-danger-surface: Canvas;
+    --dc-danger-hover: Highlight;
+    --dc-danger-border: ButtonText;
+    --dc-danger-text: CanvasText;
+
+    --dc-drag-hover-border: Highlight;
+    --dc-drag-hover-bg: Highlight;
+  }
+}
+
+/* Global focus indicator */
+:focus-visible {
+  outline: var(--dc-focus-outline-width, 2px) solid var(--dc-focus);
+  outline-offset: 1px;
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 1px;
+  }
+}
+
+
+/* Canonical 140ms state-change motion */
+.shelf,
+.management,
+.rail-surface,
+.card,
+.item-row {
+  transition: opacity 140ms cubic-bezier(0.16, 1, 0.3, 1), transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* Windows client-area animation policy (reduced motion) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

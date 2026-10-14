@@ -28,6 +28,10 @@ _Avoid_: Drop group, file list, collection
 An individual filesystem path reference stored within a shelf batch.
 _Avoid_: File copy, attachment, payload
 
+**Shell Visual**:
+A transient file/folder icon or image thumbnail that represents a Shelf Item without becoming part of Shelf state.
+_Avoid_: Stored preview, attachment preview, cached Shelf Item
+
 **Edge Rail**:
 A collapsed UI strip docked at the screen edge indicating held items and allowing quick interaction.
 _Avoid_: Sidebar, dock, toolbar

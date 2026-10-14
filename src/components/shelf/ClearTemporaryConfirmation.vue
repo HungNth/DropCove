@@ -74,22 +74,23 @@ onUnmounted(() => {
   max-height: calc(100% - 20px);
   box-sizing: border-box;
   padding: 10px;
-  border: 1px solid #f87171;
+  border: 1px solid var(--dc-danger-border);
   border-radius: 8px;
-  color: #e2e8f0;
-  background: #1b2438;
+  color: var(--dc-text-primary);
+  background: var(--dc-surface);
   font: 11px/1.4 "Segoe UI", sans-serif;
 }
 .confirmation::backdrop {
-  background: rgba(0, 0, 0, .45);
+  background: var(--dc-backdrop);
 }
 .question {
   margin: 0 0 6px;
   font-weight: 600;
+  color: var(--dc-text-primary);
 }
 .guidance {
   margin: 0 0 8px;
-  color: #bac6db;
+  color: var(--dc-text-muted);
 }
 .actions {
   display: flex;
@@ -98,23 +99,47 @@ onUnmounted(() => {
   gap: 6px;
 }
 .action {
-  border: 1px solid #475569;
+  border: 1px solid var(--dc-border-default);
   border-radius: 4px;
   padding: 4px 8px;
   color: inherit;
-  background: #243049;
+  background: var(--dc-surface-elevated);
   cursor: pointer;
   touch-action: none;
   user-select: none;
 }
+.action:hover {
+  border-color: var(--dc-border-hover);
+  background: var(--dc-surface-hover);
+}
 .danger {
-  border-color: #f87171;
-  background: #991b1b;
+  border-color: var(--dc-danger-border);
+  background: var(--dc-danger);
+  color: var(--dc-accent-text);
 }
 .danger:hover {
-  background: #b91c1c;
+  background: var(--dc-danger-hover);
 }
 .action:focus-visible {
-  outline: 2px solid #a5b4fc;
+  outline: 2px solid var(--dc-focus);
+}
+
+@media (forced-colors: active) {
+  .confirmation {
+    border-color: ButtonText;
+  }
+  .action {
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+  .danger {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .action:focus-visible {
+    outline: 2px solid Highlight !important;
+  }
 }
 </style>

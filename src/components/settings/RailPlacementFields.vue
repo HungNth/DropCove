@@ -62,11 +62,22 @@ function onFullscreen(event: Event) {
 
 <style scoped>
 .section { display: flex; flex-direction: column; gap: 8px; }
-.title { margin: 0; font-size: 12px; font-weight: 600; color: #cbd5e1; text-transform: uppercase; letter-spacing: .05em; }
-.field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #cbd5e1; }
-.field select { width: 100%; min-width: 0; padding: 6px; border: 1px solid #46536a; border-radius: 5px; background: #1b2438; color: #edf2fc; font: inherit; }
-.field select:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 1px; }
-.field select:disabled { opacity: .45; }
-.checkbox-field { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #cbd5e1; margin-top: 4px; cursor: pointer; }
-.checkbox-input { width: 14px; height: 14px; accent-color: #6366f1; }
+.title { margin: 0; font-size: 12px; font-weight: 600; color: var(--dc-text-secondary); text-transform: uppercase; letter-spacing: .05em; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--dc-text-secondary); }
+.field select { width: 100%; min-width: 0; padding: 6px; border: 1px solid var(--dc-border-default); border-radius: 5px; background: var(--dc-surface-elevated); color: var(--dc-text-primary); font: inherit; }
+.field select:focus-visible { outline: 2px solid var(--dc-focus); outline-offset: 1px; }
+.field select:disabled { opacity: var(--dc-disabled-opacity); }
+.checkbox-field { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dc-text-secondary); margin-top: 4px; cursor: pointer; }
+.checkbox-input { width: 14px; height: 14px; accent-color: var(--dc-accent); }
+
+@media (forced-colors: active) {
+  .field select {
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+  .field select:focus-visible {
+    outline: 2px solid Highlight !important;
+  }
+}
 </style>

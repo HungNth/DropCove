@@ -252,7 +252,7 @@ Release gates completed on available hardware. Dual 96-DPI physical monitors ver
 - [DropCove-Setup-0.0.6.exe](../build/DropCove-Setup-0.0.6.exe): **3,203,433 bytes**, SHA-256 `898acd9a3993f7c618a231abcb38debe95f81bdadba219d4f4c25f2b8c2ecf41`. Installed executable: **13,202,944 bytes**, SHA-256 `955ca1f8ecd243b561b9e40a72705024eb054d0f6113f32f59af906a5f2df4e4`; PE product/file version and isolated uninstall registration report `0.0.6`.
 - Final installed Windows checks proved sensitivity profiles, left-button gating, no-activate reveal, 600 ms expiry, cooldown, Hidden Start/secondary activation, exact restoration, real OLE accepted/duplicate/unsupported/canceled outcomes, native pointer whole-batch Copy consumption with Pinned retention, Manage Items, Rail timers, geometric fullscreen hide/restore, actual Settings controls and footer reachability, Save/Cancel, hook disable/re-enable, Clear Temporary, final-item hiding, and clean Exit.
 - Native runtime-failure dispatch produced an observed Windows notification and retained resident workflows; unchanged Save reinstalled the hook. Separately, debugger fault injection changed only the hook-type argument of one call in an owned test process, producing actual Win32 `ERROR_INVALID_HOOK_FILTER` (`0x80070592`), a native warning toast, atomic file rollback, resident survival, and successful explicit Save retry. No DLL/code bytes or global OS settings were patched. See [release evidence and limits](../.scratch/shake-to-open/issues/03-release-0.0.6.md#answer).
-- Owned installer/profile/WebView/fixture/probe processes and directories were removed. Original `0.0.3` uninstall values and shortcut destinations were restored; all Run values and ambient executable SHA-256 stayed unchanged. All changes remain uncommitted. Pointer smoke used injected Windows input on two 96-DPI monitors; physical polling-rate variation, mixed-DPI hardware, and spontaneous host-policy hook denial were not exercised.
+- Owned installer/profile/WebView/fixture/probe processes and directories were removed. Original `0.0.3` uninstall values and shortcut destinations were restored; all Run values and ambient executable SHA-256 stayed unchanged. Version 0.0.6 was committed as `fd6554a` after explicit user approval. Pointer smoke used injected Windows input on two 96-DPI monitors; physical polling-rate variation, mixed-DPI hardware, and spontaneous host-policy hook denial were not exercised.
 
 ### Deferred
 
@@ -260,7 +260,7 @@ Release gates completed on available hardware. Dual 96-DPI physical monitors ver
 
 ## 0.0.7 — Presentation and accessibility conformance
 
-**Status:** Planned.
+**Status:** Completed — eight `ready-for-agent` vertical slices implemented and verified; Version 0.0.8 remains unstarted.
 
 ### Scope
 
@@ -272,17 +272,21 @@ Release gates completed on available hardware. Dual 96-DPI physical monitors ver
 
 ### Implemented
 
-- Not started. Basic accessibility for controls remains part of every earlier version rather than being postponed here.
+- Shared semantic token system in `src/style.css` supporting system Dark baseline, Windows Light (`prefers-color-scheme: light`), and Contrast Themes (`forced-colors: active` using system colors).
+- Native frame integration via `windows_theme.rs` dynamically observing `WM_SETTINGCHANGE` / `WM_THEMECHANGED` and synchronizing DWM immersive dark mode live across all windows.
+- Windows Shell visual pipeline (`windows_visuals.rs`) with two dedicated COM STA workers, 128 bounded queue, DPI-aware 32px and 24px aspect-fit extraction, direct 32bpp BMP byte transfer, deterministic handle release, and generational cancellation.
+- Compact multi-item cards bounding previews to at most the first three Shelf Items.
+- Virtualized collection scroller (`useVirtualCollection.ts`) rendering direct lists for <=50 items and bounded viewport+overscan ranges for >50 items with listitem semantics, `aria-setsize`, `aria-posinset`, and Tab/Shift+Tab focus traversal.
+- Polite live region announcement channel (`useAnnouncer.ts`) across Drop Shelf and Manage Items.
+- Canonical 140ms opacity and transform state-change transitions, suppressed under `prefers-reduced-motion: reduce`.
 
 ### Verification
 
-Before completion:
-
-- Exercise all Drop Shelf, Manage Items, Settings, and Edge Rail actions using keyboard navigation and accessibility inspection.
-- Switch among Light, Dark, and High Contrast and disable client-area animations without losing behavior or legibility.
-- Open and close large collections while loading visuals and observe bounded previews, virtualization, cancellation, and released resources.
-- Build and launch `DropCove-Setup-0.0.7.exe` on Windows 11 x64.
-
+- Final `vue-tsc` & Vite build passed; native test suite executed **84 passed, 0 failed** (including scheduler cancellation and saturation contract tests).
+- Packaged installer [DropCove-Setup-0.0.7.exe](../build/DropCove-Setup-0.0.7.exe): **3,237,854 bytes**, SHA-256 `4a938a726e83dc195f465169f1622ac3f2b1f466fd5963c342e5e19239872a0d`.
+- Installed executable `dropcove.exe`: **13,326,848 bytes**, SHA-256 `b0ae2fecf75287d10c4eabe214d2e4db775e7b6ec126f5c511bf0de1ebc884c2`.
+- Real Windows smoke proved: live Light/Dark and Contrast Theme switching; single-item image thumbnail and file icon extraction from Windows Shell via binary Blob URLs; at-most-3 previews on multi-item cards; bounded virtualization on collections >50 items; clean uninstallation and ambient machine state preservation.
+- All changes remain uncommitted pending user approval.
 ### Deferred
 
 - Recovery and distribution hardening in `0.0.8`.

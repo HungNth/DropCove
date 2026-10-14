@@ -375,6 +375,8 @@ pub(crate) fn open(
         if keyboard {
             popup.set_focus().map_err(|error| error.to_string())?;
         }
+        let new_gen = app.state::<crate::windows_visuals::ShellVisualState>().0.advance_generation(crate::windows_visuals::SurfaceId::ManageItems);
+        let _ = app.emit("visual-generation-changed", crate::windows_visuals::GenerationChangedPayload { surface: crate::windows_visuals::SurfaceId::ManageItems, generation: new_gen });
         popup
             .emit("manage-items-opened", keyboard)
             .map_err(|error| error.to_string())
@@ -433,6 +435,8 @@ pub(crate) fn close(app: &AppHandle) -> Result<(), String> {
         popup.hide().map_err(|error| error.to_string())?;
         popup.close().map_err(|error| error.to_string())?;
     }
+    let new_gen = app.state::<crate::windows_visuals::ShellVisualState>().0.advance_generation(crate::windows_visuals::SurfaceId::ManageItems);
+    let _ = app.emit("visual-generation-changed", crate::windows_visuals::GenerationChangedPayload { surface: crate::windows_visuals::SurfaceId::ManageItems, generation: new_gen });
     {
         let state = app.state::<ManageItemsState>();
         let mut state = state.lock()?;

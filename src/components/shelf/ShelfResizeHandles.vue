@@ -27,7 +27,7 @@ function begin(event: PointerEvent, edge: ResizeEdge) {
 <style scoped>
 .resize-handles { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
 .resize-handle { position: absolute; pointer-events: auto; touch-action: none; }
-.resize-handles:has(.resize-handle:hover) { border-radius: 11px; box-shadow: inset 0 0 0 2px #a5b4fc; }
+.resize-handles:has(.resize-handle:hover) { border-radius: 11px; box-shadow: inset 0 0 0 2px var(--dc-focus); }
 .North, .South { left: 8px; right: 8px; height: 8px; cursor: ns-resize; }
 .North { top: 0; }
 .South { bottom: 0; }
@@ -39,4 +39,10 @@ function begin(event: PointerEvent, edge: ResizeEdge) {
 .NorthEast { top: 0; right: 0; cursor: nesw-resize; }
 .SouthWest { bottom: 0; left: 0; cursor: nesw-resize; }
 .SouthEast { bottom: 0; right: 0; cursor: nwse-resize; }
+
+@media (forced-colors: active) {
+  .resize-handles:has(.resize-handle:hover) {
+    box-shadow: inset 0 0 0 2px Highlight;
+  }
+}
 </style>

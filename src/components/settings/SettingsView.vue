@@ -184,10 +184,10 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
   flex-direction: column;
   height: 100%;
   box-sizing: border-box;
-  border: 1px solid #46536a;
+  border: 1px solid var(--dc-border-default);
   border-radius: 9px;
-  color: #edf2fc;
-  background: #141c2b;
+  color: var(--dc-text-primary);
+  background: var(--dc-surface);
   font-family: "Segoe UI", sans-serif;
 }
 
@@ -196,14 +196,14 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px 10px;
-  border-bottom: 1px solid #232d42;
+  border-bottom: 1px solid var(--dc-border-subtle);
 }
 
 .title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #edf2fc;
+  color: var(--dc-text-primary);
 }
 
 .content {
@@ -226,7 +226,7 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
   margin: 0;
   font-size: 12px;
   font-weight: 600;
-  color: #cbd5e1;
+  color: var(--dc-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -234,7 +234,7 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
 .description {
   margin: 0;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--dc-text-muted);
 }
 
 .field {
@@ -246,7 +246,7 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
 
 .field-label {
   font-size: 12px;
-  color: #cbd5e1;
+  color: var(--dc-text-secondary);
 }
 
 .recorder-row {
@@ -260,10 +260,10 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
   justify-content: center;
   min-width: 140px;
   padding: 6px 12px;
-  border: 1px solid #46536a;
+  border: 1px solid var(--dc-border-default);
   border-radius: 5px;
-  background: #1b2438;
-  color: #edf2fc;
+  background: var(--dc-surface-elevated);
+  color: var(--dc-text-primary);
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
@@ -272,24 +272,24 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
 }
 
 .recorder-button:hover:not(:disabled) {
-  border-color: #6366f1;
-  background: #202b44;
+  border-color: var(--dc-accent);
+  background: var(--dc-surface-hover);
 }
 
 .recorder-button.listening {
-  border-color: #818cf8;
-  background: #283556;
-  color: #a5b4fc;
-  box-shadow: 0 0 0 1px #818cf8;
+  border-color: var(--dc-accent);
+  background: var(--dc-accent-subtle);
+  color: var(--dc-accent);
+  box-shadow: 0 0 0 1px var(--dc-accent);
 }
 
 .recorder-button:focus-visible {
-  outline: 2px solid #a5b4fc;
+  outline: 2px solid var(--dc-focus);
   outline-offset: 1px;
 }
 
 .recorder-button:disabled {
-  opacity: 0.45;
+  opacity: var(--dc-disabled-opacity);
   cursor: default;
 }
 
@@ -302,12 +302,19 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
   50% { opacity: 0.5; }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .recorder-prompt {
+    animation: none;
+  }
+}
+
 .field-help {
   margin: 0;
   font-size: 11px;
-  color: #8292ab;
+  color: var(--dc-text-muted);
   line-height: 1.4;
 }
+
 .checkbox-row {
   display: inline-flex;
   align-items: center;
@@ -321,26 +328,25 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
   margin: 0;
   width: 15px;
   height: 15px;
-  accent-color: #6366f1;
+  accent-color: var(--dc-accent);
   cursor: pointer;
 }
 
 .checkbox-input:disabled {
   cursor: default;
-  opacity: 0.45;
+  opacity: var(--dc-disabled-opacity);
 }
 
 .checkbox-row:has(.checkbox-input:disabled) {
   cursor: default;
-  opacity: 0.45;
+  opacity: var(--dc-disabled-opacity);
 }
 
 .checkbox-label {
   font-size: 13px;
   font-weight: 500;
-  color: #edf2fc;
+  color: var(--dc-text-primary);
 }
-
 
 .status {
   display: flex;
@@ -348,10 +354,10 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
   gap: 6px;
   margin: 0 14px 10px;
   padding: 8px 10px;
-  border: 1px solid #efad70;
+  border: 1px solid var(--dc-warning-border);
   border-radius: 6px;
-  background: rgba(239, 173, 112, 0.1);
-  color: #fbbf24;
+  background: var(--dc-warning-surface);
+  color: var(--dc-warning-text);
   font-size: 11px;
   overflow-wrap: anywhere;
 }
@@ -368,7 +374,7 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
 }
 
 .dismiss:focus-visible {
-  outline: 2px solid #a5b4fc;
+  outline: 2px solid var(--dc-focus);
 }
 
 .footer {
@@ -377,8 +383,8 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
   justify-content: flex-end;
   gap: 8px;
   padding: 10px 14px;
-  border-top: 1px solid #232d42;
-  background: #101724;
+  border-top: 1px solid var(--dc-border-subtle);
+  background: var(--dc-surface-subtle);
   border-bottom-left-radius: 8px;
   border-bottom-right-radius: 8px;
 }
@@ -394,34 +400,61 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
 }
 
 .action-button:focus-visible {
-  outline: 2px solid #a5b4fc;
+  outline: 2px solid var(--dc-focus);
   outline-offset: 1px;
 }
 
 .action-button:disabled {
-  opacity: 0.45;
+  opacity: var(--dc-disabled-opacity);
   cursor: default;
 }
 
 .cancel {
-  border: 1px solid #46536a;
+  border: 1px solid var(--dc-border-default);
   background: transparent;
-  color: #cbd5e1;
+  color: var(--dc-text-secondary);
 }
 
 .cancel:hover:not(:disabled) {
-  background: #1b2438;
-  border-color: #64748b;
+  background: var(--dc-surface-elevated);
+  border-color: var(--dc-border-hover);
 }
 
 .save {
-  border: 1px solid #6366f1;
-  background: #4f46e5;
-  color: #ffffff;
+  border: 1px solid var(--dc-accent);
+  background: var(--dc-accent);
+  color: var(--dc-accent-text);
 }
 
 .save:hover:not(:disabled) {
-  background: #4338ca;
-  border-color: #818cf8;
+  background: var(--dc-accent-hover);
+  border-color: var(--dc-accent-hover);
+}
+
+@media (forced-colors: active) {
+  .settings {
+    border-color: ButtonText;
+  }
+  .header, .footer {
+    border-color: ButtonText;
+    background: Canvas;
+  }
+  .recorder-button, .action-button, .cancel {
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+  .recorder-button.listening {
+    border-color: Highlight;
+    color: Highlight;
+  }
+  .save {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .recorder-button:focus-visible, .action-button:focus-visible, .dismiss:focus-visible {
+    outline: 2px solid Highlight !important;
+  }
 }
 </style>

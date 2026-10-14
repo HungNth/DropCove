@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, shallowRef } from "vue";
+import { computed, onMounted, onUnmounted, shallowRef, useTemplateRef } from "vue";
+import { useVirtualCollection } from "../../composables/useVirtualCollection";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -201,10 +202,13 @@ async function openShelf() {
 onMounted(async () => {
   document.title = "DropCove Edge Rail";
   try {
-    unlistenRail = await getCurrentWindow().listen<Projection>("rail-changed", ({ payload }) => {
+    unlistenRail = await getCurrentWindow().listen<Projection>("rail-changed", async ({ payload }) => {
       if (!disposed) {
         edge.value = payload.edge;
         expanded.value = payload.expanded;
+        if (!payload.expanded) {
+          await invoke("invalidate_surface_visuals");
+        }
       }
     });
     unlistenShelf = await getCurrentWindow().listen("shelf-changed", async () => {
@@ -232,6 +236,9 @@ onUnmounted(() => {
   unlistenShelf?.();
   unlistenTransientsClosed?.();
 });
+
+const railListRef = useTemplateRef<HTMLElement>("railListRef");
+const railVirtual = useVirtualCollection(batches, railListRef, 1, 72, 4);
 </script>
 
 <template>
@@ -273,12 +280,24 @@ onUnmounted(() => {
           <button class="open-shelf-btn" type="button" @click="openShelf">Open Shelf</button>
         </div>
       </header>
-      <div class="batch-list" role="list">
+      <div
+        ref="railListRef"
+        class="batch-list"
+        role="list"
+        :style="railVirtual.enabled.value ? { position: 'relative' } : {}"
+      >
+        <div v-if="railVirtual.enabled.value" :style="{ height: `${railVirtual.totalHeight.value}px`, width: '100%', pointerEvents: 'none' }" />
         <ShelfBatchCard
-          v-for="batch in batches"
-          :key="batch.id"
-          :batch="batch"
+          v-for="entry in railVirtual.entries.value"
+          :key="entry.item.id"
+          :batch="entry.item"
           :busy="busy"
+          :data-virtual-index="entry.index"
+          :data-virtual-id="entry.item.id"
+          :role="'listitem'"
+          :aria-setsize="batches.length"
+          :aria-posinset="entry.index + 1"
+          :style="railVirtual.position(entry.index)"
           @remove="(id) => runAction('remove_batch', { batchId: id })"
           @pin-item="(id, pinned) => runAction('set_item_pinned', { itemId: id, pinned })"
           @pin-batch="(id, pinned) => runAction('set_batch_pinned', { batchId: id, pinned })"
@@ -320,10 +339,10 @@ onUnmounted(() => {
   height: 100vh;
   box-sizing: border-box;
   padding: 0;
-  border: 1px solid #46536a;
+  border: 1px solid var(--dc-border-default);
   border-radius: 8px 0 0 8px;
-  background: #141c2b;
-  color: #edf2fc;
+  background: var(--dc-surface);
+  color: var(--dc-text-primary);
   font-family: "Segoe UI", sans-serif;
   cursor: pointer;
 }
@@ -336,17 +355,18 @@ onUnmounted(() => {
   line-height: 14px;
 }
 .handle:hover {
-  background: #202b44;
-  border-color: #a5b4fc;
+  background: var(--dc-surface-hover);
+  border-color: var(--dc-border-hover);
 }
 .handle:focus-visible {
-  outline: 1px solid #a5b4fc;
+  outline: 2px solid var(--dc-focus);
   outline-offset: -2px;
 }
 .error {
   position: absolute;
   bottom: 8px;
   font-weight: bold;
+  color: var(--dc-danger);
 }
 .expanded-container {
   display: flex;
@@ -354,10 +374,10 @@ onUnmounted(() => {
   width: 100%;
   height: 100vh;
   box-sizing: border-box;
-  border: 1px solid #46536a;
+  border: 1px solid var(--dc-border-default);
   border-radius: 8px;
-  background: #141c2b;
-  color: #edf2fc;
+  background: var(--dc-surface);
+  color: var(--dc-text-primary);
   font-family: "Segoe UI", sans-serif;
   overflow: hidden;
 }
@@ -367,10 +387,11 @@ onUnmounted(() => {
   justify-content: space-between;
   height: 36px;
   padding: 0 8px;
-  border-bottom: 1px solid #2d3748;
+  border-bottom: 1px solid var(--dc-border-subtle);
   font-size: 11px;
   font-weight: 600;
-  background: #1a2333;
+  background: var(--dc-surface-subtle);
+  color: var(--dc-text-primary);
 }
 .rail-header-actions {
   align-items: center;
@@ -378,32 +399,39 @@ onUnmounted(() => {
 }
 .clear-btn {
   padding: 2px 6px;
-  border: 1px solid #475569;
+  border: 1px solid var(--dc-border-default);
   border-radius: 4px;
-  background: #1b2438;
-  color: #f87171;
+  background: var(--dc-surface-elevated);
+  color: var(--dc-danger);
   font-size: 10px;
   cursor: pointer;
 }
 .clear-btn:hover:not(:disabled) {
-  border-color: #f87171;
-  background: #2a1b24;
+  border-color: var(--dc-danger-border);
+  background: var(--dc-danger-surface);
+}
+.clear-btn:focus-visible {
+  outline: 2px solid var(--dc-focus);
 }
 .clear-btn:disabled {
-  opacity: .45;
+  opacity: var(--dc-disabled-opacity);
   cursor: default;
 }
 .open-shelf-btn {
   padding: 2px 6px;
-  border: 1px solid #46536a;
+  border: 1px solid var(--dc-border-default);
   border-radius: 4px;
-  background: #25334d;
-  color: #edf2fc;
+  background: var(--dc-surface-hover);
+  color: var(--dc-text-primary);
   font-size: 10px;
   cursor: pointer;
 }
 .open-shelf-btn:hover {
-  background: #3b4d71;
+  background: var(--dc-surface-active);
+  border-color: var(--dc-border-hover);
+}
+.open-shelf-btn:focus-visible {
+  outline: 2px solid var(--dc-focus);
 }
 .batch-list {
   display: flex;
@@ -418,9 +446,10 @@ onUnmounted(() => {
   height: 64px;
   flex: 0 0 64px;
   box-sizing: border-box;
-  border: 1px solid #2d3748;
+  border: 1px solid var(--dc-border-subtle);
   border-radius: 6px;
-  background: #1e293b;
+  background: var(--dc-surface-elevated);
+  color: var(--dc-text-primary);
 }
 .batch-list :deep(.card-drag) {
   min-height: 100%;
@@ -429,7 +458,7 @@ onUnmounted(() => {
 }
 .batch-icon {
   font-size: 18px;
-  color: #94a3b8;
+  color: var(--dc-accent);
 }
 .batch-summary {
   display: flex;
@@ -443,55 +472,45 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--dc-text-primary);
 }
 .batch-sub {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--dc-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .error-banner {
   padding: 4px 8px;
-  background: #7f1d1d;
-  color: #fca5a5;
+  background: var(--dc-danger-surface);
+  color: var(--dc-danger-text);
+  border: 1px solid var(--dc-danger-border);
   font-size: 10px;
 }
-@media (prefers-color-scheme: light) {
-  .handle {
-    background: #edf2fc;
-    color: #141c2b;
-  }
-  .handle:hover {
-    background: #dce5f6;
-  }
-  .expanded-container {
-    background: #f8fafc;
-    color: #0f172a;
-    border-color: #cbd5e1;
+
+@media (forced-colors: active) {
+  .handle, .expanded-container, .batch-list :deep(.card) {
+    border-color: ButtonText;
+    background: Canvas;
+    color: CanvasText;
   }
   .rail-header {
-    background: #e2e8f0;
-    border-color: #cbd5e1;
+    border-bottom-color: ButtonText;
+    background: Canvas;
+    color: CanvasText;
   }
-  .open-shelf-btn {
-    background: #cbd5e1;
-    color: #0f172a;
-    border-color: #94a3b8;
+  .handle {
+    background: ButtonFace;
+    color: ButtonText;
   }
-  .batch-row {
-    background: #ffffff;
-    border-color: #e2e8f0;
-  }
-  .batch-sub {
-    color: #64748b;
-  }
-}
-@media (forced-colors: active) {
-  .handle, .expanded-container, .batch-row {
+  .clear-btn, .open-shelf-btn {
     border-color: ButtonText;
     background: ButtonFace;
     color: ButtonText;
+  }
+  .clear-btn:focus-visible, .open-shelf-btn:focus-visible, .handle:focus-visible {
+    outline: 2px solid Highlight !important;
   }
 }
 </style>

@@ -1,6 +1,6 @@
 [package]
 name = "dropcove"
-version = "0.0.6"
+version = "0.0.7"
 description = "DropCove Resident Workspace"
 authors = ["DropCove Contributors"]
 edition = "2021"
@@ -24,6 +24,7 @@ windows = { version = "0.62.2", features = [
     "Win32_Foundation",
     "Win32_Globalization",
     "Win32_Graphics_Gdi",
+    "Win32_Graphics_Dwm",
     "Win32_UI_HiDpi",
     "Win32_UI_Accessibility",
     "Win32_UI_Input_KeyboardAndMouse",

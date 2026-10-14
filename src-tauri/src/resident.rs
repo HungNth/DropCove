@@ -1122,6 +1122,18 @@ fn show_shelf_at(
     state
         .had_content
         .store(!snapshot.batches.is_empty(), Ordering::Release);
+    if previous != Visibility::Visible {
+        let visual_state = app.state::<crate::windows_visuals::ShellVisualState>();
+        let new_gen = visual_state.0.advance_generation(crate::windows_visuals::SurfaceId::Shelf);
+        use tauri::Emitter;
+        let _ = app.emit(
+            "visual-generation-changed",
+            crate::windows_visuals::GenerationChangedPayload {
+                surface: crate::windows_visuals::SurfaceId::Shelf,
+                generation: new_gen,
+            },
+        );
+    }
     edge_rail::hide(app)?;
     let ops = match monitor {
         Some(monitor) => NativeWindowOps::on_monitor(&window, monitor),
@@ -1445,6 +1457,18 @@ pub(crate) fn dismiss_shelf(app: &AppHandle) -> Result<(), String> {
         .had_content
         .store(!snapshot.batches.is_empty(), Ordering::Release);
     manage_items::close(app)?;
+    {
+        let visual_state = app.state::<crate::windows_visuals::ShellVisualState>();
+        let new_gen = visual_state.0.advance_generation(crate::windows_visuals::SurfaceId::Shelf);
+        use tauri::Emitter;
+        let _ = app.emit(
+            "visual-generation-changed",
+            crate::windows_visuals::GenerationChangedPayload {
+                surface: crate::windows_visuals::SurfaceId::Shelf,
+                generation: new_gen,
+            },
+        );
+    }
     if snapshot.batches.is_empty() {
         edge_rail::hide(app)?;
         return coordinate_hide(&NativeWindowOps::new(&window), &state, || Ok(()));

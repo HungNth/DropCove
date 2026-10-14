@@ -21,6 +21,9 @@ mod windows_instance;
 mod windows_paths;
 mod windows_shake;
 mod windows_startup;
+mod windows_theme;
+pub(crate) mod windows_visuals;
+use windows_visuals::{get_shelf_visual, get_surface_generation, invalidate_surface_visuals, cancel_shelf_visual};
 
 use shelf::{ShelfSnapshot, ShelfState};
 
@@ -568,6 +571,11 @@ pub fn run() {
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .on_page_load(|webview, _| {
+            if let Ok(hwnd) = webview.window().hwnd() {
+                if let Err(error) = windows_theme::register(hwnd) { eprintln!("{error}"); }
+            }
+        })
         .setup(move |app| {
             app.manage(ShelfState::open(profile.join("shelf.db"))?);
             app.manage(windows_drag::DragSession::default());
@@ -575,6 +583,7 @@ pub fn run() {
             app.manage(shelf_resize::ResizeState::default());
             app.manage(resident::ResidentState::default());
             app.manage(windows_shake::ShakeRuntimeState::default());
+            app.manage(windows_visuals::ShellVisualState::new());
             let window = app.get_webview_window("main").ok_or_else(|| {
                 std::io::Error::new(std::io::ErrorKind::NotFound, "Drop Shelf window is missing")
             })?;
@@ -663,7 +672,11 @@ pub fn run() {
             cancel_settings_recording,
             record_settings_key,
             save_settings,
-            cancel_settings
+            cancel_settings,
+            get_shelf_visual,
+            get_surface_generation,
+            invalidate_surface_visuals,
+            cancel_shelf_visual
         ])
         .run(tauri::generate_context!());
 

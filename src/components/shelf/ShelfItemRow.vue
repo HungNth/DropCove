@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ShelfItem } from "../../composables/useShelf";
+import ShellVisual from "./ShellVisual.vue";
 
 const props = defineProps<{ item: ShelfItem; busy: boolean }>();
 const emit = defineEmits<{
@@ -37,7 +38,13 @@ function pointerMove(event: PointerEvent) {
       @pointercancel="pointerStart = undefined"
       @dragstart.prevent
     >
-      <span class="item-icon" aria-hidden="true">{{ item.isFolder ? "▰" : "▤" }}</span>
+      <ShellVisual
+        :item-id="item.id"
+        :is-folder="item.isFolder"
+        :name="item.name"
+        :size="32"
+        surface="manageItems"
+      />
       <span class="item-info">
         <span class="item-name">{{ item.name }}</span>
         <span class="item-path">{{ item.path }}</span>
@@ -66,18 +73,37 @@ function pointerMove(event: PointerEvent) {
 </template>
 
 <style scoped>
-.item-row { min-width: 0; border: 1px solid #3b475c; border-radius: 7px; padding: 6px; background: #202a3b; }
+.item-row { min-width: 0; border: 1px solid var(--dc-border-default); border-radius: 7px; padding: 6px; background: var(--dc-surface-elevated); color: var(--dc-text-primary); }
 .item-drag { display: flex; align-items: center; gap: 7px; cursor: grab; user-select: none; touch-action: none; }
 .item-drag:active { cursor: grabbing; }
-.item-icon { flex-shrink: 0; color: #a5b4fc; font-size: 20px; }
+.item-icon { flex-shrink: 0; color: var(--dc-accent); font-size: 20px; }
 .item-info { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .item-name, .item-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.item-name { font-size: 12px; }
-.item-path { color: #a7b4cb; font-size: 10px; }
+.item-name { font-size: 12px; color: var(--dc-text-primary); }
+.item-path { color: var(--dc-text-muted); font-size: 10px; }
 .item-actions { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
-.availability { flex: 1; color: #a7b4cb; font-size: 10px; }
-.action { border: 1px solid #46536a; border-radius: 4px; padding: 2px 5px; color: inherit; background: transparent; font: inherit; font-size: 10px; cursor: pointer; }
-.pin[aria-pressed="true"] { border-color: #a5b4fc; color: #a5b4fc; }
-.action:focus-visible { outline: 2px solid #a5b4fc; }
-.action:disabled { opacity: .45; cursor: default; }
+.availability { flex: 1; color: var(--dc-text-muted); font-size: 10px; }
+.action { border: 1px solid var(--dc-border-default); border-radius: 4px; padding: 2px 5px; color: inherit; background: transparent; font: inherit; font-size: 10px; cursor: pointer; }
+.action:hover { border-color: var(--dc-border-hover); background: var(--dc-surface-hover); }
+.pin[aria-pressed="true"] { border-color: var(--dc-accent); color: var(--dc-accent); }
+.action:focus-visible { outline: 2px solid var(--dc-focus); }
+.action:disabled { opacity: var(--dc-disabled-opacity); cursor: default; }
+
+@media (forced-colors: active) {
+  .item-row {
+    border-color: ButtonText;
+  }
+  .action {
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+  .pin[aria-pressed="true"] {
+    border-color: Highlight;
+    color: Highlight;
+  }
+  .action:focus-visible {
+    outline: 2px solid Highlight !important;
+  }
+}
 </style>

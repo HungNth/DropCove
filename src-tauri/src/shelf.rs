@@ -314,6 +314,10 @@ impl ShelfState {
             .ok_or_else(|| ShelfError::ItemNotFound(item_id.to_owned()))
     }
 
+    pub(crate) fn item_visual_target(&self, item_id: &str) -> Result<Option<(String, bool)>, ShelfError> {
+        self.store()?.item_visual_target(item_id)
+    }
+
     pub(crate) fn prepare_batch_drag(
         &self,
         batch_id: &str,
@@ -995,6 +999,17 @@ impl ShelfStore {
                 "SELECT path FROM shelf_items WHERE id = ?1",
                 [item_id],
                 |row| row.get(0),
+            )
+            .optional()?)
+    }
+
+    fn item_visual_target(&self, item_id: &str) -> Result<Option<(String, bool)>, ShelfError> {
+        Ok(self
+            .connection
+            .query_row(
+                "SELECT path, is_folder FROM shelf_items WHERE id = ?1",
+                [item_id],
+                |row| Ok((row.get(0)?, row.get::<_, bool>(1)?)),
             )
             .optional()?)
     }

@@ -2,6 +2,7 @@
 import { computed, useTemplateRef } from "vue";
 import type { ShelfAnchor, ShelfBatch } from "../../composables/useShelf";
 import BulkPinning from "./BulkPinning.vue";
+import ShellVisual from "./ShellVisual.vue";
 
 const props = defineProps<{ batch: ShelfBatch; busy: boolean }>();
 const emit = defineEmits<{
@@ -63,7 +64,23 @@ function pointerMove(event: PointerEvent) {
       @dragstart.prevent
     >
       <span class="card-icon" aria-hidden="true">
-        <span v-for="item in previews" :key="item.id">{{ item.isFolder ? "▰" : "▤" }}</span>
+        <ShellVisual
+          v-if="singleItem"
+          :item-id="singleItem.id"
+          :is-folder="singleItem.isFolder"
+          :name="singleItem.name"
+          :size="32"
+        />
+        <template v-else>
+          <ShellVisual
+            v-for="item in previews"
+            :key="item.id"
+            :item-id="item.id"
+            :is-folder="item.isFolder"
+            :name="item.name"
+            :size="24"
+          />
+        </template>
       </span>
       <span class="card-info">
         <span class="card-name">{{ title }}</span>
@@ -107,20 +124,44 @@ function pointerMove(event: PointerEvent) {
 </template>
 
 <style scoped>
-.card { position: relative; min-width: 0; border: 1px solid #3b475c; border-radius: 10px; background: #202a3b; }
+.card { position: relative; min-width: 0; border: 1px solid var(--dc-border-default); border-radius: 10px; background: var(--dc-surface-elevated); color: var(--dc-text-primary); }
 .card-drag { display: flex; align-items: center; gap: 8px; min-height: 54px; box-sizing: border-box; padding: 8px 24px 8px 8px; cursor: grab; user-select: none; touch-action: none; }
 .card-drag:active { cursor: grabbing; }
-.card-icon { display: flex; color: #a5b4fc; font-size: 18px; letter-spacing: -6px; padding-right: 6px; line-height: 1; }
+.card-icon { display: flex; color: var(--dc-accent); font-size: 18px; letter-spacing: -6px; padding-right: 6px; line-height: 1; }
 .card-info { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
-.card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.card-hint { color: #a7b4cb; font-size: 10px; }
-.remove { position: absolute; top: 3px; right: 3px; border: 0; padding: 2px 6px; color: #cbd5e1; background: transparent; font-size: 18px; cursor: pointer; }
+.card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--dc-text-primary); }
+.card-hint { color: var(--dc-text-muted); font-size: 10px; }
+.remove { position: absolute; top: 3px; right: 3px; border: 0; padding: 2px 6px; color: var(--dc-text-secondary); background: transparent; font-size: 18px; cursor: pointer; }
+.remove:hover { color: var(--dc-danger); }
 .single-item .card-drag { padding-right: 48px; }
-.pin { position: absolute; bottom: 4px; right: 4px; border: 1px solid #46536a; border-radius: 4px; padding: 2px 4px; color: #cbd5e1; background: #202a3b; font: inherit; font-size: 10px; cursor: pointer; }
-.pin[aria-pressed="true"] { border-color: #a5b4fc; color: #a5b4fc; }
+.pin { position: absolute; bottom: 4px; right: 4px; border: 1px solid var(--dc-border-default); border-radius: 4px; padding: 2px 4px; color: var(--dc-text-secondary); background: var(--dc-surface-elevated); font: inherit; font-size: 10px; cursor: pointer; }
+.pin:hover { border-color: var(--dc-border-hover); color: var(--dc-text-primary); }
+.pin[aria-pressed="true"] { border-color: var(--dc-accent); color: var(--dc-accent); }
 .multi-item .card-drag { padding-bottom: 26px; }
 .card-multi-actions { position: absolute; bottom: 4px; right: 4px; display: flex; align-items: center; gap: 4px; }
-.manage { border: 1px solid #46536a; border-radius: 4px; padding: 2px 4px; color: #cbd5e1; background: #202a3b; font: inherit; font-size: 10px; cursor: pointer; }
-.remove:focus-visible, .pin:focus-visible, .manage:focus-visible { outline: 2px solid #a5b4fc; border-radius: 4px; }
-.remove:disabled, .pin:disabled, .manage:disabled { opacity: .45; cursor: default; }
+.manage { border: 1px solid var(--dc-border-default); border-radius: 4px; padding: 2px 4px; color: var(--dc-text-secondary); background: var(--dc-surface-elevated); font: inherit; font-size: 10px; cursor: pointer; }
+.manage:hover { border-color: var(--dc-border-hover); color: var(--dc-text-primary); }
+.remove:focus-visible, .pin:focus-visible, .manage:focus-visible { outline: 2px solid var(--dc-focus); border-radius: 4px; }
+.remove:disabled, .pin:disabled, .manage:disabled { opacity: var(--dc-disabled-opacity); cursor: default; }
+
+@media (forced-colors: active) {
+  .card {
+    border-color: ButtonText;
+  }
+  .pin, .manage {
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+  .pin[aria-pressed="true"] {
+    border-color: Highlight;
+    color: Highlight;
+  }
+  .remove {
+    color: ButtonText;
+  }
+  .remove:focus-visible, .pin:focus-visible, .manage:focus-visible {
+    outline: 2px solid Highlight !important;
+  }
+}
 </style>

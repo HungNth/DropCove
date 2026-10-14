@@ -46,7 +46,8 @@ function toggle() {
     class="bulk-pin"
     type="button"
     :disabled="busy"
-    :aria-pressed="ariaPressed"
+    role="checkbox"
+    :aria-checked="ariaPressed"
     :aria-label="label"
     :title="title"
     @click="toggle"
@@ -55,7 +56,7 @@ function toggle() {
 
 <style scoped>
 .bulk-pin {
-  border: 1px solid #46536a;
+  border: 1px solid var(--dc-border-default);
   border-radius: 4px;
   padding: 2px 6px;
   color: inherit;
@@ -64,19 +65,42 @@ function toggle() {
   font-size: 11px;
   cursor: pointer;
 }
+.bulk-pin:hover {
+  border-color: var(--dc-border-hover);
+  background: var(--dc-surface-elevated);
+}
 .bulk-pin[aria-pressed="true"] {
-  border-color: #a5b4fc;
-  color: #a5b4fc;
+  border-color: var(--dc-accent);
+  color: var(--dc-accent);
 }
 .bulk-pin[aria-pressed="mixed"] {
-  border-color: #efad70;
-  color: #efad70;
+  border-color: var(--dc-warning);
+  color: var(--dc-warning);
 }
 .bulk-pin:focus-visible {
-  outline: 2px solid #a5b4fc;
+  outline: 2px solid var(--dc-focus);
 }
 .bulk-pin:disabled {
-  opacity: .45;
+  opacity: var(--dc-disabled-opacity);
   cursor: default;
+}
+
+@media (forced-colors: active) {
+  .bulk-pin {
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+  .bulk-pin[aria-pressed="true"] {
+    border-color: Highlight;
+    color: Highlight;
+  }
+  .bulk-pin[aria-pressed="mixed"] {
+    border-color: LinkText;
+    color: LinkText;
+  }
+  .bulk-pin:focus-visible {
+    outline: 2px solid Highlight !important;
+  }
 }
 </style>
