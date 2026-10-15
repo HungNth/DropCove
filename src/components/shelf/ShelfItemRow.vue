@@ -28,9 +28,13 @@ function pointerMove(event: PointerEvent) {
 </script>
 
 <template>
-  <li class="item-row" :data-item-id="item.id" :aria-label="`${item.name}, ${item.path}, ${item.availability}`">
+  <li
+    class="item-row flex items-center gap-[5px] min-w-0 h-[54px] box-border border border-dc-border-default rounded-[7px] p-[5px] bg-dc-surface-elevated text-dc-text-primary transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
+    :data-item-id="item.id"
+    :aria-label="`${item.name}, ${item.path}, ${item.availability}`"
+  >
     <div
-      class="item-drag"
+      class="item-drag flex flex-1 min-w-0 items-center gap-[5px] cursor-grab select-none touch-none active:cursor-grabbing"
       :title="item.path"
       :aria-label="`Drag ${item.path} to copy`"
       @pointerdown.prevent="pointerDown"
@@ -46,15 +50,15 @@ function pointerMove(event: PointerEvent) {
         :size="32"
         surface="manageItems"
       />
-      <span class="item-info">
-        <span class="item-name">{{ item.name }}</span>
-        <span class="item-path">{{ item.path }}</span>
+      <span class="item-info flex min-w-0 flex-col gap-[2px]">
+        <span class="item-name overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-dc-text-primary">{{ item.name }}</span>
+        <span class="item-path overflow-hidden text-ellipsis whitespace-nowrap text-dc-text-muted text-[10px]">{{ item.path }}</span>
       </span>
     </div>
-    <div class="item-actions">
-      <span class="availability">{{ item.isPinned ? "Pinned · " : "" }}{{ item.availability }}</span>
+    <div class="item-actions flex flex-none items-center gap-[3px]">
+      <span class="availability max-w-[60px] text-dc-text-muted text-[10px] [overflow-wrap:anywhere]">{{ item.isPinned ? "Pinned · " : "" }}{{ item.availability }}</span>
       <button
-        class="icon-action action pin"
+        class="action pin inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-dc-border-default rounded-[4px] bg-dc-surface-elevated text-dc-text-secondary cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
         type="button"
         :disabled="busy"
         :aria-label="`${item.isPinned ? 'Unpin' : 'Pin'} ${item.name}`"
@@ -63,7 +67,7 @@ function pointerMove(event: PointerEvent) {
         @click="emit('pin', item.id, !item.isPinned)"
       ><ActionIcon name="pin" :filled="item.isPinned" /></button>
       <button
-        class="icon-action action remove"
+        class="action remove inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-dc-border-default rounded-[4px] bg-dc-surface-elevated text-dc-text-secondary cursor-pointer [&.remove:hover:not(:disabled)]:border-dc-danger-border [&:hover:not(:disabled)]:bg-dc-surface-hover [&.remove:hover:not(:disabled)]:text-dc-danger aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
         type="button"
         :disabled="busy"
         :aria-label="`Remove ${item.name}`"
@@ -72,23 +76,5 @@ function pointerMove(event: PointerEvent) {
       ><ActionIcon name="remove" /></button>
     </div>
   </li>
-</template>
+  </template>
 
-<style scoped>
-.item-row { display: flex; align-items: center; gap: 5px; min-width: 0; height: 54px; box-sizing: border-box; border: 1px solid var(--dc-border-default); border-radius: 7px; padding: 5px; background: var(--dc-surface-elevated); color: var(--dc-text-primary); }
-.item-drag { display: flex; flex: 1; min-width: 0; align-items: center; gap: 5px; cursor: grab; user-select: none; touch-action: none; }
-.item-drag:active { cursor: grabbing; }
-.item-icon { flex-shrink: 0; color: var(--dc-accent); font-size: 20px; }
-.item-info { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-.item-name, .item-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.item-name { font-size: 12px; color: var(--dc-text-primary); }
-.item-path { color: var(--dc-text-muted); font-size: 10px; }
-.item-actions { display: flex; flex: none; align-items: center; gap: 3px; }
-.availability { max-width: 60px; color: var(--dc-text-muted); font-size: 10px; overflow-wrap: anywhere; }
-
-@media (forced-colors: active) {
-  .item-row {
-    border-color: ButtonText;
-  }
-}
-</style>

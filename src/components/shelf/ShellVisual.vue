@@ -26,51 +26,28 @@ watch(visualUrl, () => { failed.value = false; });
 </script>
 
 <template>
-  <span class="shell-visual" :data-item-id="itemId">
+  <span
+    class="shell-visual inline-flex items-center justify-center overflow-hidden leading-none"
+    :data-item-id="itemId"
+    :style="{
+      width: `${size}px`,
+      height: `${size}px`,
+      minWidth: `${size}px`,
+      minHeight: `${size}px`,
+    }"
+  >
     <img
       v-if="visualUrl && !failed"
       :src="visualUrl"
       alt=""
       aria-hidden="true"
       @error="failed = true"
-      class="shell-visual-img"
+      class="shell-visual-img block size-full max-w-full max-h-full object-contain select-none"
       draggable="false"
     />
-    <span v-else class="shell-visual-fallback" aria-hidden="true">
+    <span v-else class="shell-visual-fallback inline-flex items-center justify-center text-[18px] leading-none text-dc-accent" aria-hidden="true">
       {{ isFolder ? "▰" : "▤" }}
     </span>
   </span>
 </template>
 
-<style scoped>
-.shell-visual {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: v-bind("`${size}px`");
-  height: v-bind("`${size}px`");
-  min-width: v-bind("`${size}px`");
-  min-height: v-bind("`${size}px`");
-  overflow: hidden;
-  line-height: 1;
-}
-
-.shell-visual-img {
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  display: block;
-  user-select: none;
-}
-
-.shell-visual-fallback {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  line-height: 1;
-  color: var(--dc-accent);
-}
-</style>

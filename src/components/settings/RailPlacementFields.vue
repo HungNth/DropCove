@@ -28,29 +28,41 @@ function onFullscreen(event: Event) {
 </script>
 
 <template>
-  <section class="section" aria-labelledby="rail-section-title">
-    <h2 id="rail-section-title" class="title">Edge Rail</h2>
-    <label class="field">
+  <section class="flex flex-col gap-[8px]" aria-labelledby="rail-section-title">
+    <h2 id="rail-section-title" class="m-0 text-[12px] font-semibold text-dc-text-secondary uppercase tracking-[0.05em]">Edge Rail</h2>
+    <label class="flex flex-col gap-[6px] text-[12px] text-dc-text-secondary">
       <span>Docking edge</span>
-      <select name="rail-edge" :value="edge" :disabled="disabled" @change="onEdge">
+      <select
+        name="rail-edge"
+        class="w-full min-w-0 p-[6px] border border-dc-border-default rounded-[5px] bg-dc-surface-elevated text-dc-text-primary [font-family:inherit] focus-visible:outline-2 focus-visible:outline-dc-focus focus-visible:outline-offset-[1px] disabled:opacity-[var(--dc-disabled-opacity)] forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!"
+        :value="edge"
+        :disabled="disabled"
+        @change="onEdge"
+      >
         <option value="Left">Left</option>
         <option value="Right">Right</option>
       </select>
     </label>
-    <label class="field">
+    <label class="flex flex-col gap-[6px] text-[12px] text-dc-text-secondary">
       <span>Target monitor</span>
-      <select name="rail-monitor" :value="monitorId" :disabled="disabled" @change="onMonitor">
+      <select
+        name="rail-monitor"
+        class="w-full min-w-0 p-[6px] border border-dc-border-default rounded-[5px] bg-dc-surface-elevated text-dc-text-primary [font-family:inherit] focus-visible:outline-2 focus-visible:outline-dc-focus focus-visible:outline-offset-[1px] disabled:opacity-[var(--dc-disabled-opacity)] forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!"
+        :value="monitorId"
+        :disabled="disabled"
+        @change="onMonitor"
+      >
         <option value="">Use remembered monitor</option>
         <option v-for="monitor in monitors" :key="monitor.id" :value="monitor.id">
           {{ monitor.label }}{{ monitor.connected ? '' : ' (disconnected)' }}
         </option>
       </select>
     </label>
-    <label class="checkbox-field">
+    <label class="flex items-center gap-[8px] text-[12px] text-dc-text-secondary mt-[4px] cursor-pointer">
       <input
         type="checkbox"
         name="rail-fullscreen"
-        class="checkbox-input"
+        class="w-[14px] h-[14px] accent-dc-accent"
         :checked="showOverFullscreen"
         :disabled="disabled"
         @change="onFullscreen"
@@ -59,25 +71,3 @@ function onFullscreen(event: Event) {
     </label>
   </section>
 </template>
-
-<style scoped>
-.section { display: flex; flex-direction: column; gap: 8px; }
-.title { margin: 0; font-size: 12px; font-weight: 600; color: var(--dc-text-secondary); text-transform: uppercase; letter-spacing: .05em; }
-.field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--dc-text-secondary); }
-.field select { width: 100%; min-width: 0; padding: 6px; border: 1px solid var(--dc-border-default); border-radius: 5px; background: var(--dc-surface-elevated); color: var(--dc-text-primary); font: inherit; }
-.field select:focus-visible { outline: 2px solid var(--dc-focus); outline-offset: 1px; }
-.field select:disabled { opacity: var(--dc-disabled-opacity); }
-.checkbox-field { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dc-text-secondary); margin-top: 4px; cursor: pointer; }
-.checkbox-input { width: 14px; height: 14px; accent-color: var(--dc-accent); }
-
-@media (forced-colors: active) {
-  .field select {
-    border-color: ButtonText;
-    background: ButtonFace;
-    color: ButtonText;
-  }
-  .field select:focus-visible {
-    outline: 2px solid Highlight !important;
-  }
-}
-</style>

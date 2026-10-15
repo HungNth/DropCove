@@ -42,24 +42,24 @@ onUnmounted(() => {
 <template>
   <dialog
     ref="dialog"
-    class="confirmation"
+    class="confirmation max-w-[calc(100%-20px)] max-h-[calc(100%-20px)] box-border p-[10px] border border-dc-danger-border rounded-[8px] text-dc-text-primary bg-dc-surface text-[11px] leading-[1.4] font-['Segoe_UI',sans-serif] forced-colors:border-[ButtonText]"
     aria-label="Clear temporary items confirmation"
     @cancel.prevent="emit('cancel')"
   >
-    <p class="question">Clear all temporary items from the shelf?</p>
-    <p class="guidance">Pinned items remain on the shelf. Source files and folders on your computer are never deleted.</p>
-    <div class="actions">
+    <p class="m-0 mb-[6px] font-semibold text-dc-text-primary">Clear all temporary items from the shelf?</p>
+    <p class="m-0 mb-[8px] text-dc-text-muted">Pinned items remain on the shelf. Source files and folders on your computer are never deleted.</p>
+    <div class="flex flex-wrap justify-end gap-[6px]">
       <button
         ref="cancelButton"
         type="button"
-        class="action"
+        class="action border border-dc-border-default rounded-[4px] py-[4px] px-[8px] text-inherit bg-dc-surface-elevated cursor-pointer touch-none select-none hover:border-dc-border-hover hover:bg-dc-surface-hover focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!"
         @click="emit('cancel')"
       >
         Cancel
       </button>
       <button
         type="button"
-        class="action danger"
+        class="action danger border border-dc-danger-border rounded-[4px] py-[4px] px-[8px] text-dc-accent-text bg-dc-danger cursor-pointer touch-none select-none hover:border-dc-border-hover hover:bg-dc-danger-hover focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]! forced-colors:hover:border-dc-border-hover"
         @click="emit('confirm')"
       >
         Clear Temporary Items
@@ -69,77 +69,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.confirmation {
-  max-width: calc(100% - 20px);
-  max-height: calc(100% - 20px);
-  box-sizing: border-box;
-  padding: 10px;
-  border: 1px solid var(--dc-danger-border);
-  border-radius: 8px;
-  color: var(--dc-text-primary);
-  background: var(--dc-surface);
-  font: 11px/1.4 "Segoe UI", sans-serif;
-}
 .confirmation::backdrop {
   background: var(--dc-backdrop);
-}
-.question {
-  margin: 0 0 6px;
-  font-weight: 600;
-  color: var(--dc-text-primary);
-}
-.guidance {
-  margin: 0 0 8px;
-  color: var(--dc-text-muted);
-}
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-.action {
-  border: 1px solid var(--dc-border-default);
-  border-radius: 4px;
-  padding: 4px 8px;
-  color: inherit;
-  background: var(--dc-surface-elevated);
-  cursor: pointer;
-  touch-action: none;
-  user-select: none;
-}
-.action:hover {
-  border-color: var(--dc-border-hover);
-  background: var(--dc-surface-hover);
-}
-.danger {
-  border-color: var(--dc-danger-border);
-  background: var(--dc-danger);
-  color: var(--dc-accent-text);
-}
-.danger:hover {
-  background: var(--dc-danger-hover);
-}
-.action:focus-visible {
-  outline: 2px solid var(--dc-focus);
-}
-
-@media (forced-colors: active) {
-  .confirmation {
-    border-color: ButtonText;
-  }
-  .action {
-    border-color: ButtonText;
-    background: ButtonFace;
-    color: ButtonText;
-  }
-  .danger {
-    border-color: Highlight;
-    background: Highlight;
-    color: HighlightText;
-  }
-  .action:focus-visible {
-    outline: 2px solid Highlight !important;
-  }
 }
 </style>

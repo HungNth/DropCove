@@ -3,7 +3,7 @@ defineProps<{ name: "pin" | "list" | "remove" | "close" | "trash" | "left" | "ri
 </script>
 
 <template>
-  <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+  <svg class="block size-[16px] flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
     <template v-if="name === 'pin'">
       <path d="M8 3h8l-1 7 4 4v2H5v-2l4-4z" :fill="filled ? 'currentColor' : 'none'" />
       <path d="M12 16v5" />
@@ -19,6 +19,3 @@ defineProps<{ name: "pin" | "list" | "remove" | "close" | "trash" | "left" | "ri
   </svg>
 </template>
 
-<style scoped>
-.action-icon { display: block; width: 16px; height: 16px; flex: none; }
-</style>

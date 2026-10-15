@@ -28,44 +28,44 @@ function pointerMove(event: PointerEvent) {
 </script>
 
 <template>
-  <dialog ref="dialog" class="confirmation" aria-label="Drag available items confirmation" @cancel.prevent="emit('cancel')">
-    <p class="question">{{ pending?.unavailable }} unavailable item(s) will remain. Drag only the {{ pending?.available }} available item(s)?</p>
-    <p class="guidance">Drag the button to your destination, or confirm and then drag the batch again.</p>
-    <div class="actions">
-      <button type="button" class="action primary" @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerStart = undefined" @pointercancel="pointerStart = undefined" @click="emit('confirm')" @dragstart.prevent>Use available items</button>
-      <button type="button" class="action" @click="emit('cancel')">Cancel</button>
+  <dialog
+    ref="dialog"
+    class="confirmation max-w-[calc(100%-20px)] max-h-[calc(100%-20px)] box-border p-[10px] border border-dc-accent rounded-[8px] text-dc-text-primary bg-dc-surface text-[11px] leading-[1.4] font-['Segoe_UI',sans-serif] forced-colors:border-[ButtonText]"
+    aria-label="Drag available items confirmation"
+    @cancel.prevent="emit('cancel')"
+  >
+    <p class="m-0 mb-[6px] font-semibold text-dc-text-primary">
+      {{ pending?.unavailable }} unavailable item(s) will remain. Drag only the {{ pending?.available }} available item(s)?
+    </p>
+    <p class="m-0 mb-[8px] text-dc-text-muted">
+      Drag the button to your destination, or confirm and then drag the batch again.
+    </p>
+    <div class="flex flex-wrap gap-[6px]">
+      <button
+        type="button"
+        class="border border-dc-accent rounded-[4px] py-[4px] px-[8px] text-dc-accent-text bg-dc-accent cursor-pointer touch-none select-none hover:border-dc-border-hover hover:bg-dc-accent-hover focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]! forced-colors:hover:border-dc-border-hover"
+        @pointerdown="pointerDown"
+        @pointermove="pointerMove"
+        @pointerup="pointerStart = undefined"
+        @pointercancel="pointerStart = undefined"
+        @click="emit('confirm')"
+        @dragstart.prevent
+      >
+        Use available items
+      </button>
+      <button
+        type="button"
+        class="border border-dc-border-default rounded-[4px] py-[4px] px-[8px] text-inherit bg-dc-surface-elevated cursor-pointer touch-none select-none hover:border-dc-border-hover hover:bg-dc-surface-hover focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!"
+        @click="emit('cancel')"
+      >
+        Cancel
+      </button>
     </div>
   </dialog>
 </template>
 
 <style scoped>
-.confirmation { max-width: calc(100% - 20px); max-height: calc(100% - 20px); box-sizing: border-box; padding: 10px; border: 1px solid var(--dc-accent); border-radius: 8px; color: var(--dc-text-primary); background: var(--dc-surface); font: 11px/1.4 "Segoe UI", sans-serif; }
-.confirmation::backdrop { background: var(--dc-backdrop); }
-.question { margin: 0 0 6px; font-weight: 600; color: var(--dc-text-primary); }
-.guidance { margin: 0 0 8px; color: var(--dc-text-muted); }
-.actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.action { border: 1px solid var(--dc-border-default); border-radius: 4px; padding: 4px 8px; color: inherit; background: var(--dc-surface-elevated); cursor: pointer; touch-action: none; user-select: none; }
-.action:hover { border-color: var(--dc-border-hover); background: var(--dc-surface-hover); }
-.primary { border-color: var(--dc-accent); background: var(--dc-accent); color: var(--dc-accent-text); }
-.primary:hover { background: var(--dc-accent-hover); }
-.action:focus-visible { outline: 2px solid var(--dc-focus); }
-
-@media (forced-colors: active) {
-  .confirmation {
-    border-color: ButtonText;
-  }
-  .action {
-    border-color: ButtonText;
-    background: ButtonFace;
-    color: ButtonText;
-  }
-  .primary {
-    border-color: Highlight;
-    background: Highlight;
-    color: HighlightText;
-  }
-  .action:focus-visible {
-    outline: 2px solid Highlight !important;
-  }
+.confirmation::backdrop {
+  background: var(--dc-backdrop);
 }
 </style>

@@ -53,9 +53,13 @@ function pointerMove(event: PointerEvent) {
 </script>
 
 <template>
-  <article ref="card" class="card" :data-batch-id="batch.id">
+  <article
+    ref="card"
+    class="card relative flex items-center min-w-0 h-[48px] box-border border border-dc-border-default rounded-[8px] bg-dc-surface-elevated text-dc-text-primary transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
+    :data-batch-id="batch.id"
+  >
     <div
-      class="card-drag"
+      class="card-drag flex flex-1 min-w-0 items-center gap-[4px] h-full box-border p-[5px] cursor-grab select-none touch-none active:cursor-grabbing"
       :title="batch.items.length === 1 ? batch.items[0].path : title"
       :aria-label="batch.items.length === 1 ? `Drag ${title} to copy` : `Drag batch ${title} to copy`"
       @pointerdown.prevent="pointerDown"
@@ -64,7 +68,7 @@ function pointerMove(event: PointerEvent) {
       @pointercancel="pointerStart = undefined"
       @dragstart.prevent
     >
-      <span class="card-icon" aria-hidden="true">
+      <span class="card-icon flex flex-none items-center leading-none [&_.shell-visual+.shell-visual]:-ml-[14px]" aria-hidden="true">
         <ShellVisual
           v-if="singleItem"
           :item-id="singleItem.id"
@@ -83,14 +87,14 @@ function pointerMove(event: PointerEvent) {
           />
         </template>
       </span>
-      <span class="card-info">
-        <span class="card-name">{{ title }}</span>
+      <span class="card-info flex-1 min-w-0">
+        <span class="card-name block overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-dc-text-primary">{{ title }}</span>
       </span>
     </div>
-    <div class="card-actions">
+    <div class="card-actions flex flex-none items-center gap-[2px] pr-[4px]">
     <button
       v-if="singleItem"
-      class="icon-action pin"
+      class="pin inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-dc-border-default rounded-[4px] bg-dc-surface-elevated text-dc-text-secondary cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
       type="button"
       :disabled="busy"
       :aria-pressed="singleItem.isPinned"
@@ -105,7 +109,7 @@ function pointerMove(event: PointerEvent) {
         @pin="(id, pinned) => emit('pinBatch', id, pinned)"
       />
       <button
-        class="icon-action manage"
+        class="manage inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-dc-border-default rounded-[4px] bg-dc-surface-elevated text-dc-text-secondary cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
         type="button"
         :disabled="busy"
         :aria-label="`Manage ${title}`"
@@ -115,7 +119,7 @@ function pointerMove(event: PointerEvent) {
       ><ActionIcon name="list" /></button>
     </template>
     <button
-      class="icon-action remove"
+      class="remove inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-dc-border-default rounded-[4px] bg-dc-surface-elevated text-dc-text-secondary cursor-pointer [&.remove:hover:not(:disabled)]:border-dc-danger-border [&:hover:not(:disabled)]:bg-dc-surface-hover [&.remove:hover:not(:disabled)]:text-dc-danger aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
       type="button"
       :disabled="busy"
       :aria-label="`Remove batch ${title}`"
@@ -126,19 +130,3 @@ function pointerMove(event: PointerEvent) {
   </article>
 </template>
 
-<style scoped>
-.card { position: relative; display: flex; align-items: center; min-width: 0; height: 48px; box-sizing: border-box; border: 1px solid var(--dc-border-default); border-radius: 8px; background: var(--dc-surface-elevated); color: var(--dc-text-primary); }
-.card-drag { display: flex; flex: 1; min-width: 0; align-items: center; gap: 4px; height: 100%; box-sizing: border-box; padding: 5px; cursor: grab; user-select: none; touch-action: none; }
-.card-drag:active { cursor: grabbing; }
-.card-icon { display: flex; flex: none; align-items: center; line-height: 1; }
-.card-icon :deep(.shell-visual + .shell-visual) { margin-left: -14px; }
-.card-info { flex: 1; min-width: 0; }
-.card-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--dc-text-primary); }
-.card-actions { display: flex; flex: none; align-items: center; gap: 2px; padding-right: 4px; }
-
-@media (forced-colors: active) {
-  .card {
-    border-color: ButtonText;
-  }
-}
-</style>

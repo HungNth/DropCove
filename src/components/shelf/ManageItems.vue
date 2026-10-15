@@ -169,29 +169,36 @@ onUnmounted(() => {
 <template>
   <main
     ref="root"
-    class="management"
+    class="management flex flex-col h-full box-border border border-dc-border-default rounded-[9px] text-dc-text-primary bg-dc-surface font-['Segoe_UI',sans-serif] transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
     :aria-busy="busy"
     aria-label="Manage Items"
   >
-    <header class="header">
-      <div class="header-info">
-        <h1 class="title">Manage Items<span v-if="batch" class="count"> · {{ batch.items.length }}</span></h1>
-        <span v-if="batch" class="summary">{{ pinnedCount }}/{{ totalCount }} pinned</span>
+    <header class="header flex items-center justify-between gap-[6px] p-[9px]">
+      <div class="header-info flex min-w-0 flex-col gap-[2px]">
+        <h1 class="title m-0 text-[13px] text-dc-text-primary">Manage Items<span v-if="batch" class="count text-dc-text-muted font-normal"> · {{ batch.items.length }}</span></h1>
+        <span v-if="batch" class="summary text-dc-text-muted text-[11px]">{{ pinnedCount }}/{{ totalCount }} pinned</span>
       </div>
-      <div class="header-actions">
+      <div class="header-actions flex items-center gap-[6px]">
         <BulkPinning
           v-if="batch"
           :batch="batch"
           :busy="busy"
           @pin="(id, pinned) => setBatchPinned(id, pinned)"
         />
-        <button class="icon-action close" type="button" :disabled="busy" aria-label="Close Manage Items" title="Close Manage Items" @click="close"><ActionIcon name="close" /></button>
+        <button
+          class="close inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-dc-border-default rounded-[4px] bg-dc-surface-elevated text-dc-text-secondary cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
+          type="button"
+          :disabled="busy"
+          aria-label="Close Manage Items"
+          title="Close Manage Items"
+          @click="close"
+        ><ActionIcon name="close" /></button>
       </div>
     </header>
     <ul
       v-if="batch"
       ref="itemsContainer"
-      class="items"
+      class="items flex flex-col gap-[5px] min-h-0 overflow-y-auto overflow-x-hidden m-0 pt-0 px-[7px] pb-[7px] list-none"
       role="list"
       :aria-label="`Batch items (${batch.items.length})`"
       :style="virtual.enabled.value ? { position: 'relative' } : {}"
@@ -213,9 +220,9 @@ onUnmounted(() => {
         @drag="startItemDrag"
       />
     </ul>
-    <div v-if="status" class="status" role="alert">
+    <div v-if="status" class="status flex [align-items:start] gap-[4px] shrink-0 mt-auto mx-[7px] mb-[7px] p-[6px] border border-dc-warning-border bg-dc-warning-surface text-dc-warning-text rounded-[5px] text-[11px] [overflow-wrap:anywhere]" role="alert">
       <span>{{ status }}</span>
-      <button class="dismiss" type="button" aria-label="Dismiss status" @click="dismissStatus">×</button>
+      <button class="dismiss ml-auto border-0 border-none text-inherit bg-transparent cursor-pointer" type="button" aria-label="Dismiss status" @click="dismissStatus">×</button>
     </div>
     <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
       {{ announcement }}
@@ -223,30 +230,3 @@ onUnmounted(() => {
   </main>
 </template>
 
-<style scoped>
-.management { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; border: 1px solid var(--dc-border-default); border-radius: 9px; color: var(--dc-text-primary); background: var(--dc-surface); font-family: "Segoe UI", sans-serif; }
-.header { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 9px; }
-.header-info { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-.title { margin: 0; font-size: 13px; color: var(--dc-text-primary); }
-.count { color: var(--dc-text-muted); font-weight: normal; }
-.summary { color: var(--dc-text-muted); font-size: 11px; }
-.header-actions { display: flex; align-items: center; gap: 6px; }
-.close:focus-visible, .dismiss:focus-visible { outline: 2px solid var(--dc-focus); }
-.items { display: flex; flex-direction: column; gap: 5px; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0; padding: 0 7px 7px; list-style: none; }
-.status { display: flex; align-items: start; gap: 4px; flex-shrink: 0; margin: auto 7px 7px; padding: 6px; border: 1px solid var(--dc-warning-border); background: var(--dc-warning-surface); color: var(--dc-warning-text); border-radius: 5px; font-size: 11px; overflow-wrap: anywhere; }
-.dismiss { margin-left: auto; border: 0; color: inherit; background: transparent; cursor: pointer; }
-
-@media (forced-colors: active) {
-  .management {
-    border-color: ButtonText;
-  }
-  .close {
-    border-color: ButtonText;
-    background: ButtonFace;
-    color: ButtonText;
-  }
-  .close:focus-visible, .dismiss:focus-visible {
-    outline: 2px solid Highlight !important;
-  }
-}
-</style>

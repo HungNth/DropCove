@@ -83,29 +83,29 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
 
 <template>
   <main
-    class="settings"
+    class="settings flex flex-col h-full box-border border border-dc-border-default rounded-[9px] text-dc-text-primary bg-dc-surface font-['Segoe_UI',sans-serif] forced-colors:border-[ButtonText]"
     :aria-busy="busy"
     aria-label="Settings"
   >
-    <header class="header">
-      <h1 class="title">Settings</h1>
+    <header class="header flex items-center justify-between pt-[12px] px-[14px] pb-[10px] border-b border-b-dc-border-subtle forced-colors:border-[ButtonText] forced-colors:bg-[Canvas]">
+      <h1 class="title m-0 text-[14px] font-semibold text-dc-text-primary">Settings</h1>
     </header>
 
-    <div class="content">
-      <section class="section" aria-labelledby="hotkey-section-title">
-        <h2 id="hotkey-section-title" class="section-title">Global Hotkey</h2>
-        <p class="description">
+    <div class="content flex flex-col flex-1 min-h-0 overflow-y-auto p-[14px] gap-[16px]">
+      <section class="section flex flex-col gap-[8px]" aria-labelledby="hotkey-section-title">
+        <h2 id="hotkey-section-title" class="section-title m-0 text-[12px] font-semibold text-dc-text-secondary uppercase tracking-[0.05em]">Global Hotkey</h2>
+        <p class="description m-0 text-[12px] text-dc-text-muted">
           Toggle Drop Shelf visibility from anywhere.
         </p>
 
-        <div class="field">
-          <label id="hotkey-label" class="field-label">Shortcut</label>
-          <div class="recorder-row">
+        <div class="field flex flex-col gap-[6px] mt-[4px]">
+          <label id="hotkey-label" class="field-label text-[12px] text-dc-text-secondary">Shortcut</label>
+          <div class="recorder-row flex items-center">
             <button
               type="button"
               ref="recorder"
-              class="recorder-button"
-              :class="{ listening: snapshot?.listening }"
+              class="recorder-button inline-flex items-center justify-center min-w-[140px] py-[6px] px-[12px] border rounded-[5px] text-[12px] font-medium [font-family:inherit] cursor-pointer transition-[border-color,background-color] duration-[150ms,150ms] ease-[ease] [&:hover:not(:disabled)]:border-dc-accent [&:hover:not(:disabled)]:bg-dc-surface-hover focus-visible:outline-2 focus-visible:outline-dc-focus focus-visible:outline-offset-[1px] disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!"
+              :class="snapshot?.listening ? 'listening border-dc-accent bg-dc-accent-subtle text-dc-accent [box-shadow:0_0_0_1px_var(--dc-accent)] forced-colors:border-[Highlight] forced-colors:bg-[ButtonFace] forced-colors:text-[Highlight]' : 'border-dc-border-default bg-dc-surface-elevated text-dc-text-primary'"
               :disabled="busy && !snapshot?.listening"
               aria-labelledby="hotkey-label"
               :aria-pressed="Boolean(snapshot?.listening)"
@@ -113,11 +113,11 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
               @keydown="onRecorderKeydown"
               @blur="onRecorderBlur"
             >
-              <span v-if="snapshot?.listening" class="recorder-prompt">Press shortcut...</span>
+              <span v-if="snapshot?.listening" class="recorder-prompt animate-[dc-recorder-pulse_1.5s_infinite] motion-reduce:animate-none">Press shortcut...</span>
               <span v-else class="recorder-value">{{ snapshot?.label || "None" }}</span>
             </button>
           </div>
-          <p class="field-help">
+          <p class="field-help m-0 text-[11px] text-dc-text-muted leading-[1.4]">
             <span v-if="snapshot?.listening">
               Press key combination with modifier (Ctrl, Alt, Shift, or Win). Bare Tab or Esc cancels.
             </span>
@@ -127,19 +127,19 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
           </p>
         </div>
       </section>
-      <section class="section" aria-labelledby="startup-section-title">
-        <h2 id="startup-section-title" class="section-title">System Startup</h2>
-        <label class="checkbox-row">
+      <section class="section flex flex-col gap-[8px]" aria-labelledby="startup-section-title">
+        <h2 id="startup-section-title" class="section-title m-0 text-[12px] font-semibold text-dc-text-secondary uppercase tracking-[0.05em]">System Startup</h2>
+        <label class="checkbox-row inline-flex items-center gap-[8px] cursor-pointer select-none w-fit has-[:disabled]:cursor-default has-[:disabled]:opacity-[var(--dc-disabled-opacity)]">
           <input
             type="checkbox"
-            class="checkbox-input"
+            class="checkbox-input m-0 w-[15px] h-[15px] accent-dc-accent cursor-pointer disabled:cursor-default disabled:opacity-[var(--dc-disabled-opacity)]"
             :checked="Boolean(snapshot?.startWithWindows)"
             :disabled="busy || !snapshot"
             @change="onStartupChange"
           />
-          <span class="checkbox-label">Start with Windows</span>
+          <span class="checkbox-label text-[13px] font-medium text-dc-text-primary">Start with Windows</span>
         </label>
-        <p class="description">
+        <p class="description m-0 text-[12px] text-dc-text-muted">
           Automatically launch DropCove in the background when signing in.
         </p>
       </section>
@@ -150,15 +150,15 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
         :sensitivity="snapshot.shakeSensitivity" :disabled="busy" @change="onShakeChange" />
     </div>
 
-    <div v-if="status" class="status" role="alert" aria-live="assertive">
+    <div v-if="status" class="status flex items-start gap-[6px] mx-[14px] mb-[10px] p-[8px_10px] border border-dc-warning-border rounded-[6px] bg-dc-warning-surface text-dc-warning-text text-[11px] [overflow-wrap:anywhere]" role="alert" aria-live="assertive">
       <span>{{ status }}</span>
-      <button class="dismiss" type="button" aria-label="Dismiss status" @click="dismissStatus">×</button>
+      <button class="dismiss ml-auto border-0 border-none text-inherit bg-transparent text-[14px] leading-none cursor-pointer py-0 px-[2px] focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!" type="button" aria-label="Dismiss status" @click="dismissStatus">×</button>
     </div>
 
-    <footer class="footer">
+    <footer class="footer flex items-center justify-end gap-[8px] py-[10px] px-[14px] border-t border-t-dc-border-subtle bg-dc-surface-subtle rounded-b-[8px] forced-colors:border-[ButtonText] forced-colors:bg-[Canvas]">
       <button
         type="button"
-        class="action-button cancel"
+        class="action-button cancel py-[5px] px-[12px] rounded-[4px] [font-family:inherit] text-[12px] font-medium cursor-pointer transition-[background-color,border-color,opacity] duration-[150ms,150ms,150ms] ease-[ease] focus-visible:outline-2 focus-visible:outline-dc-focus focus-visible:outline-offset-[1px] disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default border border-dc-border-default bg-transparent text-dc-text-secondary [&:hover:not(:disabled)]:bg-dc-surface-elevated [&:hover:not(:disabled)]:border-dc-border-hover forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!"
         :disabled="busy"
         aria-label="Cancel and discard changes"
         @click="cancel"
@@ -167,7 +167,7 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
       </button>
       <button
         type="button"
-        class="action-button save"
+        class="action-button save py-[5px] px-[12px] rounded-[4px] [font-family:inherit] text-[12px] font-medium cursor-pointer transition-[background-color,border-color,opacity] duration-[150ms,150ms,150ms] ease-[ease] focus-visible:outline-2 focus-visible:outline-dc-focus focus-visible:outline-offset-[1px] disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default border border-dc-accent bg-dc-accent text-dc-accent-text [&:hover:not(:disabled)]:bg-dc-accent-hover [&:hover:not(:disabled)]:border-dc-accent-hover forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!"
         :disabled="busy || Boolean(snapshot?.listening)"
         aria-label="Save settings"
         @click="save"
@@ -178,283 +178,9 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
   </main>
 </template>
 
-<style scoped>
-.settings {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  box-sizing: border-box;
-  border: 1px solid var(--dc-border-default);
-  border-radius: 9px;
-  color: var(--dc-text-primary);
-  background: var(--dc-surface);
-  font-family: "Segoe UI", sans-serif;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--dc-border-subtle);
-}
-
-.title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--dc-text-primary);
-}
-
-.content {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 14px;
-  gap: 16px;
-}
-
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.section-title {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dc-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.description {
-  margin: 0;
-  font-size: 12px;
-  color: var(--dc-text-muted);
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.field-label {
-  font-size: 12px;
-  color: var(--dc-text-secondary);
-}
-
-.recorder-row {
-  display: flex;
-  align-items: center;
-}
-
-.recorder-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 140px;
-  padding: 6px 12px;
-  border: 1px solid var(--dc-border-default);
-  border-radius: 5px;
-  background: var(--dc-surface-elevated);
-  color: var(--dc-text-primary);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
-}
-
-.recorder-button:hover:not(:disabled) {
-  border-color: var(--dc-accent);
-  background: var(--dc-surface-hover);
-}
-
-.recorder-button.listening {
-  border-color: var(--dc-accent);
-  background: var(--dc-accent-subtle);
-  color: var(--dc-accent);
-  box-shadow: 0 0 0 1px var(--dc-accent);
-}
-
-.recorder-button:focus-visible {
-  outline: 2px solid var(--dc-focus);
-  outline-offset: 1px;
-}
-
-.recorder-button:disabled {
-  opacity: var(--dc-disabled-opacity);
-  cursor: default;
-}
-
-.recorder-prompt {
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
+<style>
+@keyframes dc-recorder-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .recorder-prompt {
-    animation: none;
-  }
-}
-
-.field-help {
-  margin: 0;
-  font-size: 11px;
-  color: var(--dc-text-muted);
-  line-height: 1.4;
-}
-
-.checkbox-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  user-select: none;
-  width: fit-content;
-}
-
-.checkbox-input {
-  margin: 0;
-  width: 15px;
-  height: 15px;
-  accent-color: var(--dc-accent);
-  cursor: pointer;
-}
-
-.checkbox-input:disabled {
-  cursor: default;
-  opacity: var(--dc-disabled-opacity);
-}
-
-.checkbox-row:has(.checkbox-input:disabled) {
-  cursor: default;
-  opacity: var(--dc-disabled-opacity);
-}
-
-.checkbox-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--dc-text-primary);
-}
-
-.status {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0 14px 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--dc-warning-border);
-  border-radius: 6px;
-  background: var(--dc-warning-surface);
-  color: var(--dc-warning-text);
-  font-size: 11px;
-  overflow-wrap: anywhere;
-}
-
-.dismiss {
-  margin-left: auto;
-  border: 0;
-  color: inherit;
-  background: transparent;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 2px;
-}
-
-.dismiss:focus-visible {
-  outline: 2px solid var(--dc-focus);
-}
-
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 10px 14px;
-  border-top: 1px solid var(--dc-border-subtle);
-  background: var(--dc-surface-subtle);
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-}
-
-.action-button {
-  padding: 5px 12px;
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s, opacity 0.15s;
-}
-
-.action-button:focus-visible {
-  outline: 2px solid var(--dc-focus);
-  outline-offset: 1px;
-}
-
-.action-button:disabled {
-  opacity: var(--dc-disabled-opacity);
-  cursor: default;
-}
-
-.cancel {
-  border: 1px solid var(--dc-border-default);
-  background: transparent;
-  color: var(--dc-text-secondary);
-}
-
-.cancel:hover:not(:disabled) {
-  background: var(--dc-surface-elevated);
-  border-color: var(--dc-border-hover);
-}
-
-.save {
-  border: 1px solid var(--dc-accent);
-  background: var(--dc-accent);
-  color: var(--dc-accent-text);
-}
-
-.save:hover:not(:disabled) {
-  background: var(--dc-accent-hover);
-  border-color: var(--dc-accent-hover);
-}
-
-@media (forced-colors: active) {
-  .settings {
-    border-color: ButtonText;
-  }
-  .header, .footer {
-    border-color: ButtonText;
-    background: Canvas;
-  }
-  .recorder-button, .action-button, .cancel {
-    border-color: ButtonText;
-    background: ButtonFace;
-    color: ButtonText;
-  }
-  .recorder-button.listening {
-    border-color: Highlight;
-    color: Highlight;
-  }
-  .save {
-    border-color: Highlight;
-    background: Highlight;
-    color: HighlightText;
-  }
-  .recorder-button:focus-visible, .action-button:focus-visible, .dismiss:focus-visible {
-    outline: 2px solid Highlight !important;
-  }
 }
 </style>

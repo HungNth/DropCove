@@ -244,36 +244,46 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
 
 <template>
   <div
-    class="rail-surface"
+    class="rail-surface size-full box-border overflow-hidden select-none transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
     :class="{ left: edge === 'Left', expanded }"
     @pointerenter="onPointerEnter"
     @pointerleave="onPointerLeave"
   >
     <button
       v-if="!expanded"
-      class="handle"
-      :class="{ left: edge === 'Left' }"
+      class="handle flex items-center justify-center size-full box-border p-0 border border-dc-border-default bg-dc-surface text-dc-text-primary font-['Segoe_UI',sans-serif] cursor-pointer hover:bg-dc-surface-hover hover:border-dc-border-hover focus-visible:outline-2 focus-visible:outline-dc-focus focus-visible:-outline-offset-2 forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[Highlight]"
+      :class="edge === 'Left' ? 'rounded-r-[8px] rounded-l-none' : 'rounded-l-[8px] rounded-r-none'"
       type="button"
       aria-label="Open Shelf"
       :title="status || 'Open Shelf'"
       @click="openShelf"
     >
-      <span class="label">Open Shelf</span>
-      <span v-if="status" class="error" role="alert" aria-live="assertive">!</span>
+      <span class="label [writing-mode:vertical-rl] text-[11px] leading-[14px]">Open Shelf</span>
+      <span v-if="status" class="error absolute bottom-[8px] font-bold text-dc-danger" role="alert" aria-live="assertive">!</span>
     </button>
     <section
       v-else
-      class="expanded-container"
+      class="expanded-container flex flex-col size-full box-border border border-dc-border-default bg-dc-surface text-dc-text-primary font-['Segoe_UI',sans-serif] overflow-hidden forced-colors:border-[ButtonText] forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]"
+      :class="edge === 'Left' ? 'rounded-r-[8px] rounded-l-none' : 'rounded-l-[8px] rounded-r-none'"
       role="region"
       aria-label="Expanded Edge Rail"
       :aria-busy="busy"
     >
-      <header class="rail-header">
-        <button class="icon-action open-shelf-btn" type="button" aria-label="Open Shelf" title="Open Shelf" @click="openShelf"><ActionIcon :name="edge === 'Left' ? 'right' : 'left'" /></button>
+      <header
+        class="rail-header flex flex-none h-[28px] box-border py-[2px] px-[6px] forced-colors:border-b-[ButtonText] forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]"
+        :class="edge === 'Left' ? 'justify-end' : 'justify-start'"
+      >
+        <button
+          class="open-shelf-btn inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-dc-border-default rounded-[4px] bg-dc-surface-elevated text-dc-text-secondary cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
+          type="button"
+          aria-label="Open Shelf"
+          title="Open Shelf"
+          @click="openShelf"
+        ><ActionIcon :name="edge === 'Left' ? 'right' : 'left'" /></button>
       </header>
       <div
         ref="railListRef"
-        class="batch-list"
+        class="batch-list flex flex-col gap-[4px] py-[4px] px-[6px] overflow-y-auto flex-1 min-h-0 [&_.card]:h-[48px] [&_.card]:flex-[0_0_48px] [&_.card]:box-border [&_.card]:border [&_.card]:border-dc-border-subtle [&_.card]:rounded-[6px] [&_.card]:bg-dc-surface-elevated [&_.card]:text-dc-text-primary forced-colors:[&_.card]:border-[ButtonText] forced-colors:[&_.card]:bg-[Canvas] forced-colors:[&_.card]:text-[CanvasText] [&_.card-drag]:min-h-full [&_.card-drag]:h-full [&_.card-drag]:box-border"
         role="list"
         :style="railVirtual.enabled.value ? { position: 'relative' } : {}"
       >
@@ -297,8 +307,16 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
           @drag-batch="startBatchDrag"
         />
       </div>
-      <footer class="rail-footer">
-        <button v-if="hasTemporaryItems" class="icon-action clear-btn" type="button" aria-label="Clear Temporary Items" title="Clear Temporary Items; pinned references remain and source files are not deleted" :disabled="busy || pendingConfirmation !== null" @click="requestClearTemporary"><ActionIcon name="trash" /></button>
+      <footer class="rail-footer flex flex-none [align-items:end] min-h-[24px] pt-0 px-[6px] pb-[4px]">
+        <button
+          v-if="hasTemporaryItems"
+          class="clear-btn inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-dc-border-default rounded-[4px] bg-dc-surface-elevated text-dc-danger cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:border-[ButtonText] forced-colors:text-dc-danger forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
+          type="button"
+          aria-label="Clear Temporary Items"
+          title="Clear Temporary Items; pinned references remain and source files are not deleted"
+          :disabled="busy || pendingConfirmation !== null"
+          @click="requestClearTemporary"
+        ><ActionIcon name="trash" /></button>
       </footer>
       <BatchDragConfirmation
         :pending="pendingConfirmation"
@@ -312,122 +330,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
         @confirm="confirmClearTemporary"
         @cancel="cancelClearTemporary"
       />
-      <span v-if="status" class="error-banner" role="alert" aria-live="assertive">{{ status }}</span>
+      <span v-if="status" class="error-banner py-[4px] px-[8px] bg-dc-danger-surface text-dc-danger-text border border-dc-danger-border text-[10px]" role="alert" aria-live="assertive">{{ status }}</span>
     </section>
   </div>
 </template>
-
-<style scoped>
-.rail-surface {
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
-  user-select: none;
-}
-.handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  padding: 0;
-  border: 1px solid var(--dc-border-default);
-  border-radius: 8px 0 0 8px;
-  background: var(--dc-surface);
-  color: var(--dc-text-primary);
-  font-family: "Segoe UI", sans-serif;
-  cursor: pointer;
-}
-.handle.left {
-  border-radius: 0 8px 8px 0;
-}
-.label {
-  writing-mode: vertical-rl;
-  font-size: 11px;
-  line-height: 14px;
-}
-.handle:hover {
-  background: var(--dc-surface-hover);
-  border-color: var(--dc-border-hover);
-}
-.handle:focus-visible {
-  outline: 2px solid var(--dc-focus);
-  outline-offset: -2px;
-}
-.error {
-  position: absolute;
-  bottom: 8px;
-  font-weight: bold;
-  color: var(--dc-danger);
-}
-.expanded-container {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  border: 1px solid var(--dc-border-default);
-  border-radius: 8px 0 0 8px;
-  background: var(--dc-surface);
-  color: var(--dc-text-primary);
-  font-family: "Segoe UI", sans-serif;
-  overflow: hidden;
-}
-.rail-surface.left .expanded-container { border-radius: 0 8px 8px 0; }
-.rail-header { display: flex; flex: none; justify-content: flex-start; height: 28px; box-sizing: border-box; padding: 2px 6px; }
-.rail-surface.left .rail-header { justify-content: flex-end; }
-.rail-footer { display: flex; flex: none; align-items: end; min-height: 24px; padding: 0 6px 4px; }
-.clear-btn { color: var(--dc-danger); }
-.batch-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 4px 6px;
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-}
-.batch-list :deep(.card) {
-  height: 48px;
-  flex: 0 0 48px;
-  box-sizing: border-box;
-  border: 1px solid var(--dc-border-subtle);
-  border-radius: 6px;
-  background: var(--dc-surface-elevated);
-  color: var(--dc-text-primary);
-}
-.batch-list :deep(.card-drag) {
-  min-height: 100%;
-  height: 100%;
-  box-sizing: border-box;
-}
-.error-banner {
-  padding: 4px 8px;
-  background: var(--dc-danger-surface);
-  color: var(--dc-danger-text);
-  border: 1px solid var(--dc-danger-border);
-  font-size: 10px;
-}
-
-@media (forced-colors: active) {
-  .handle, .expanded-container, .batch-list :deep(.card) {
-    border-color: ButtonText;
-    background: Canvas;
-    color: CanvasText;
-  }
-  .rail-header {
-    border-bottom-color: ButtonText;
-    background: Canvas;
-    color: CanvasText;
-  }
-  .handle {
-    background: ButtonFace;
-    color: ButtonText;
-  }
-  .clear-btn:focus-visible, .open-shelf-btn:focus-visible, .handle:focus-visible {
-    outline: 2px solid Highlight !important;
-  }
-}
-</style>

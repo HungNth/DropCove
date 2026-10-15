@@ -43,11 +43,20 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
 </script>
 
 <template>
-  <main class="shelf" :class="{ 'dragging-over': draggingOver, 'resize-hover': resizeHover }" :aria-busy="busy || resizing">
+  <main
+    class="shelf relative flex flex-col h-full box-border border rounded-[12px] text-dc-text-primary font-['Segoe_UI',sans-serif] transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
+    :class="{
+      'border-dc-border-default': !draggingOver && !resizeHover,
+      'bg-dc-surface': !draggingOver,
+      'bg-dc-drag-hover-bg': draggingOver,
+      'border-dc-drag-hover-border [box-shadow:inset_0_0_0_1px_var(--dc-drag-hover-border)]': draggingOver || resizeHover,
+    }"
+    :aria-busy="busy || resizing"
+  >
     <section
       v-if="batches.length"
       ref="gridRef"
-      class="grid"
+      class="grid grid-cols-[repeat(auto-fill,minmax(164px,1fr))] [align-content:start] gap-[4px] p-[7px] min-h-0 overflow-x-hidden overflow-y-auto"
       role="list"
       aria-label="Shelf batches"
       :style="virtual.enabled.value ? { position: 'relative' } : {}"
@@ -73,16 +82,16 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
         @drag-batch="startBatchDrag"
       />
     </section>
-    <section v-else class="empty" aria-label="Empty Drop Shelf">
-      <ActionIcon class="empty-icon" name="down" />
-      <p class="empty-text">Drop here</p>
+    <section v-else class="flex flex-1 flex-col items-center justify-center min-h-[70px] p-[12px] text-center" aria-label="Empty Drop Shelf">
+      <ActionIcon class="size-[32px]! text-dc-accent" name="down" />
+      <p class="mt-[8px] mb-0 text-[13px] text-dc-text-primary">Drop here</p>
     </section>
     <BatchDragConfirmation :pending="pendingConfirmation" @confirm="confirmBatchDrag" @cancel="cancelBatchDrag" @drag="dragConfirmedBatch" />
     <ClearTemporaryConfirmation :open="confirmingClearTemporary" :focus-on-open="true" @confirm="confirmClearTemporary" @cancel="cancelClearTemporary" />
-    <footer v-if="hasTemporaryItems" class="footer">
+    <footer v-if="hasTemporaryItems" class="flex justify-start mt-auto pt-[4px] px-[8px] pb-[8px]">
       <button
         type="button"
-        class="icon-action clear-temporary-action"
+        class="clear-temporary-action inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-dc-border-default rounded-[4px] bg-dc-surface-elevated text-dc-danger cursor-pointer [&:hover:not(:disabled)]:border-dc-danger-border [&:hover:not(:disabled)]:bg-dc-danger-surface [&:hover:not(:disabled)]:text-dc-danger aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:border-[ButtonText] forced-colors:text-dc-danger forced-colors:[&:hover:not(:disabled)]:border-dc-danger-border forced-colors:[&:hover:not(:disabled)]:bg-dc-danger-surface forced-colors:[&:hover:not(:disabled)]:text-dc-danger forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
         :disabled="busy || resizing || pendingConfirmation !== null"
         aria-label="Clear Temporary Items"
         title="Clear Temporary Items; pinned references remain and source files are not deleted"
@@ -91,9 +100,9 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
         <ActionIcon name="trash" />
       </button>
     </footer>
-    <div v-if="status" class="status" role="alert">
+    <div v-if="status" class="flex [align-items:start] gap-[4px] mt-auto mx-[8px] mb-[8px] p-[8px] border border-dc-warning-border bg-dc-warning-surface text-dc-warning-text rounded-[6px] text-[11px] [overflow-wrap:anywhere]" role="alert">
       <span>{{ status }}</span>
-      <button type="button" class="dismiss" aria-label="Dismiss status" @click="dismissStatus">×</button>
+      <button type="button" class="dismiss ml-auto border-0 border-none text-inherit bg-transparent cursor-pointer" aria-label="Dismiss status" @click="dismissStatus">×</button>
     </div>
     <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
       {{ announcement }}
@@ -102,27 +111,3 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
   </main>
 </template>
 
-<style scoped>
-.shelf { position: relative; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; border: 1px solid var(--dc-border-default); border-radius: 12px; color: var(--dc-text-primary); background: var(--dc-surface); font-family: "Segoe UI", sans-serif; }
-.dragging-over { border-color: var(--dc-drag-hover-border); box-shadow: inset 0 0 0 1px var(--dc-drag-hover-border); background: var(--dc-drag-hover-bg); }
-.resize-hover { border-color: var(--dc-drag-hover-border); box-shadow: inset 0 0 0 1px var(--dc-drag-hover-border); }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); align-content: start; gap: 4px; padding: 7px; min-height: 0; overflow-x: hidden; overflow-y: auto; }
-.empty { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; min-height: 70px; padding: 12px; text-align: center; }
-.empty-icon { width: 32px; height: 32px; color: var(--dc-accent); }
-.empty-text { margin: 8px 0 0; font-size: 13px; color: var(--dc-text-primary); }
-.status { display: flex; align-items: start; gap: 4px; margin: auto 8px 8px; padding: 8px; border: 1px solid var(--dc-warning-border); background: var(--dc-warning-surface); color: var(--dc-warning-text); border-radius: 6px; font-size: 11px; overflow-wrap: anywhere; }
-.dismiss { margin-left: auto; border: 0; color: inherit; background: none; cursor: pointer; }
-.dismiss:focus-visible { outline: 2px solid var(--dc-focus); }
-.footer { display: flex; justify-content: flex-start; margin-top: auto; padding: 4px 8px 8px; }
-.clear-temporary-action { color: var(--dc-danger); }
-.clear-temporary-action:hover:not(:disabled) { border-color: var(--dc-danger-border); background: var(--dc-danger-surface); color: var(--dc-danger); }
-
-@media (forced-colors: active) {
-  .shelf {
-    border-color: ButtonText;
-  }
-  .clear-temporary-action:focus-visible, .dismiss:focus-visible {
-    outline: 2px solid Highlight !important;
-  }
-}
-</style>

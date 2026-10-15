@@ -411,7 +411,7 @@ Observed verification:
 
 ## 0.0.11 — Tailwind component styling migration
 
-**Status:** Planned — approved roadmap scope; implementation has not started.
+**Status:** Completed — tickets 01–04 resolved; exact candidate 0.0.11 verified. Later versions remain unstarted.
 
 ### Scope
 
@@ -421,13 +421,25 @@ Observed verification:
 
 ### Implemented
 
-- Not started.
+- Replaced ordinary component-scoped CSS across all thirteen Vue style blocks and the global stylesheet with direct Tailwind CSS v4 utility classes.
+- Added value-free `@theme inline` aliases mapping all twenty-eight `--dc-*` semantic variables without establishing a second token source.
+- Preserved runtime dynamic style bindings for virtual container positioning and Shell Visual icon sizing.
+- Converted all action button controls to shared literal utility chains without wrapper components, styling props, or `@apply` abstractions.
+- Retained plain CSS only for semantic token declarations, theme media queries, reset, transparent WebView canvas, Windows forced-colors policy, global focus-visible indicator, and reduced-motion policy.
+- Synchronized all manifests to version `0.0.11` and produced exact release candidate `DropCove-Setup-0.0.11.exe`.
 
 ### Verification
 
-- Complete the existing frontend, native, Windows x64, and NSIS delivery checks required by the roadmap delivery rules.
-- Compare the real WebView2 Drop Shelf, Edge Rail, Manage Items, Settings, confirmation, and resize surfaces before and after migration in Dark, Light, and Windows Contrast Themes; require visual and behavioral parity, including keyboard focus, reduced motion, drag states, and virtualized collections.
-
+- Complete frontend build (`pnpm build`: vue-tsc single-file component typechecking and Vite production bundling) passed.
+- Cargo-xwin release compilation and complete native test executable passed (101/101 tests passed).
+- Identity-verified before/after WebView2 DOM comparisons matched 35 states and 2,292 stable DOM-path-aligned elements with 0 computed-style/geometry differences.
+- Exact release candidate hashes:
+  - Installer `build/DropCove-Setup-0.0.11.exe`: 3,232,765 bytes, SHA-256 `81e551a81e716f9d4bf40bcdec082537c8222559650e0a93bb33b9f8ea85d337`.
+  - Installed executable: 13,385,728 bytes, SHA-256 `d528988819c05e3bfb4c2a0c96ccdb5cdb52d6affd2fb872d8265b2696240abe` (unbundled executable SHA-256: `010d4f254b84d8b554ffaad7b819e0c51597d774f2ce77943cb6785bfb370373`).
+- User confirmed human acceptance across all interactive on-screen gates.
+- Installed lifecycle smoke verified silent installation, secondary routing, Cooperative Shutdown with exit 0, in-place upgrade, and uninstallation removing binary while preserving Profile Data.
+- Disposable baseline scripts and fixtures cleaned up.
+- Changes remain uncommitted pending user approval.
 ### Deferred
 
 - Compact scrollbar styling, persistent scroll-viewport insets, and Lucide icon replacement remain in `0.0.12` so the Tailwind migration has no intentional visual changes.
