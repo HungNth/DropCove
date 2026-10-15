@@ -195,14 +195,14 @@ onUnmounted(() => {
         ><ActionIcon name="close" /></button>
       </div>
     </header>
-    <ul
-      v-if="batch"
-      ref="itemsContainer"
-      class="items flex flex-col gap-[5px] min-h-0 overflow-y-auto overflow-x-hidden m-0 pt-0 px-[7px] pb-[7px] list-none"
-      role="list"
-      :aria-label="`Batch items (${batch.items.length})`"
-      :style="virtual.enabled.value ? { position: 'relative' } : {}"
-    >
+    <div v-if="batch" class="flex flex-col flex-1 min-h-0 pt-[4px]">
+      <ul
+        ref="itemsContainer"
+        class="items flex flex-col gap-[5px] min-h-0 overflow-y-auto overflow-x-hidden m-0 pt-0 px-[7px] pb-[3px] list-none"
+        role="list"
+        :aria-label="`Batch items (${batch.items.length})`"
+        :style="virtual.enabled.value ? { position: 'relative' } : {}"
+      >
       <div v-if="virtual.enabled.value" :style="{ height: `${virtual.totalHeight.value}px`, flex: 'none', width: '100%', pointerEvents: 'none' }" />
       <ShelfItemRow
         v-for="entry in virtual.entries.value"
@@ -219,7 +219,8 @@ onUnmounted(() => {
         @remove="(id) => { removeItem(id); announce('Item removed'); }"
         @drag="startItemDrag"
       />
-    </ul>
+      </ul>
+    </div>
     <div v-if="status" class="status flex [align-items:start] gap-[4px] shrink-0 mt-auto mx-[7px] mb-[7px] p-[6px] border border-dc-warning-border bg-dc-warning-surface text-dc-warning-text rounded-[5px] text-[11px] [overflow-wrap:anywhere]" role="alert">
       <span>{{ status }}</span>
       <button class="dismiss ml-auto border-0 border-none text-inherit bg-transparent cursor-pointer" type="button" aria-label="Dismiss status" @click="dismissStatus">×</button>

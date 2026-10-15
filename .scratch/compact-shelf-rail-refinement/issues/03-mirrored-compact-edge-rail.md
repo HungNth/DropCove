@@ -17,7 +17,7 @@
 - [x] Open Shelf is an inward directional icon at top-right for Left docking and top-left for Right docking, with native tooltip, accessible name, hover/focus treatment, and forced-color support.
 - [x] The collapsed Rail Handle retains its vertical label and entire existing activation target; no second small Open Shelf control is introduced.
 - [x] Clear Temporary Items is a bottom-left trash icon only while Temporary Items exist and continues to use the existing no-activate transient hold and confirmation lifecycle.
-- [x] Compact Edge Rail batch rows are `48` logical pixels high with a `4`-pixel gap. Expanded height follows `max(280, min(640, 52 × batch count + 52))`, keeping one through four batches at 280 pixels, growing five through eleven batches, and scrolling at 640 pixels for twelve or more.
+- [x] Compact Edge Rail batch rows are `48` logical pixels high with a `4`-pixel gap. Expanded height follows `max(280, min(640, 52 × batch count + 62))` after the approved 0.0.12 chrome-budget correction, keeping one through four batches at 280 pixels, growing five through eleven batches, and scrolling at 640 pixels for twelve or more.
 - [x] Compact rows preserve Shell Visuals, truncated names, all icon actions, direct item/batch drag regions, scrolling, virtualization, and Manage Items anchoring without clipping or overlap.
 - [x] Edge-dependent visual placement consumes the active Rail projection; it does not create a second docking-state source or alter settings/remembered-monitor ownership.
 - [x] Hover/drag-entry expansion delay, pointer/drag-leave collapse delay, no-activate behavior, transient hold-open, final-item hide, display/DPI reflow, fullscreen hide/restore, drop-in, drag-out, and Open Shelf monitor selection remain unchanged.

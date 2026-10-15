@@ -193,3 +193,67 @@ body { background: transparent; color: var(--dc-text-primary); }
     scroll-behavior: auto !important;
   }
 }
+
+/* Compact WebView2 scrollbars */
+
+.shelf [role="list"]::-webkit-scrollbar,
+.expanded-container .batch-list::-webkit-scrollbar,
+.management .items::-webkit-scrollbar,
+.settings .content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+.shelf [role="list"]::-webkit-scrollbar-track,
+.expanded-container .batch-list::-webkit-scrollbar-track,
+.management .items::-webkit-scrollbar-track,
+.settings .content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.shelf [role="list"]::-webkit-scrollbar-thumb,
+.expanded-container .batch-list::-webkit-scrollbar-thumb,
+.management .items::-webkit-scrollbar-thumb,
+.settings .content::-webkit-scrollbar-thumb {
+  background-color: var(--dc-border-default);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 4px;
+}
+
+.shelf [role="list"]::-webkit-scrollbar-thumb:hover,
+.expanded-container .batch-list::-webkit-scrollbar-thumb:hover,
+.management .items::-webkit-scrollbar-thumb:hover,
+.settings .content::-webkit-scrollbar-thumb:hover {
+  background-color: var(--dc-border-hover);
+}
+
+.shelf [role="list"]::-webkit-scrollbar-thumb:active,
+.expanded-container .batch-list::-webkit-scrollbar-thumb:active,
+.management .items::-webkit-scrollbar-thumb:active,
+.settings .content::-webkit-scrollbar-thumb:active {
+  background-color: var(--dc-accent);
+}
+
+@media (forced-colors: active) {
+
+  .shelf [role="list"]::-webkit-scrollbar-thumb,
+  .expanded-container .batch-list::-webkit-scrollbar-thumb,
+  .management .items::-webkit-scrollbar-thumb,
+  .settings .content::-webkit-scrollbar-thumb {
+    forced-color-adjust: none;
+    background-color: ButtonText;
+  }
+
+  .shelf [role="list"]::-webkit-scrollbar-thumb:hover,
+  .expanded-container .batch-list::-webkit-scrollbar-thumb:hover,
+  .management .items::-webkit-scrollbar-thumb:hover,
+  .settings .content::-webkit-scrollbar-thumb:hover,
+  .shelf [role="list"]::-webkit-scrollbar-thumb:active,
+  .expanded-container .batch-list::-webkit-scrollbar-thumb:active,
+  .management .items::-webkit-scrollbar-thumb:active,
+  .settings .content::-webkit-scrollbar-thumb:active {
+    background-color: Highlight;
+  }
+}

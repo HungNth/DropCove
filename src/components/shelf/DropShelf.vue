@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, useTemplateRef } from "vue";
+import { shallowRef, useTemplateRef } from "vue";
+import { useResizeObserver } from "@vueuse/core";
 import { useAnnouncer } from "../../composables/useAnnouncer";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
 import { useShelf } from "../../composables/useShelf";
@@ -35,9 +36,9 @@ const {
 } = useShelf();
 const { announcement, announce } = useAnnouncer();
 const gridRef = useTemplateRef<HTMLElement>("gridRef");
-const columns = computed(() => {
-  if (!gridRef.value) return 1;
-  return Math.max(1, Math.floor(gridRef.value.clientWidth / 164));
+const columns = shallowRef(1);
+useResizeObserver(gridRef, () => {
+  if (gridRef.value) columns.value = getComputedStyle(gridRef.value).gridTemplateColumns.split(" ").length;
 });
 const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
 </script>
@@ -53,15 +54,15 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
     }"
     :aria-busy="busy || resizing"
   >
-    <section
-      v-if="batches.length"
-      ref="gridRef"
-      class="grid grid-cols-[repeat(auto-fill,minmax(164px,1fr))] [align-content:start] gap-[4px] p-[7px] min-h-0 overflow-x-hidden overflow-y-auto"
-      role="list"
-      aria-label="Shelf batches"
-      :style="virtual.enabled.value ? { position: 'relative' } : {}"
-      @keydown="virtual.onTab"
-    >
+    <div v-if="batches.length" class="flex flex-col flex-1 min-h-0 pt-[4px]">
+      <section
+        ref="gridRef"
+        class="grid grid-cols-[repeat(auto-fill,minmax(164px,1fr))] [align-content:start] gap-[4px] pt-0 px-[7px] pb-[10px] min-h-0 overflow-x-hidden overflow-y-auto"
+        role="list"
+        aria-label="Shelf batches"
+        :style="virtual.enabled.value ? { position: 'relative' } : {}"
+        @keydown="virtual.onTab"
+      >
       <div v-if="virtual.enabled.value" :style="{ height: `${virtual.totalHeight.value}px`, width: '100%', pointerEvents: 'none' }" />
       <ShelfBatchCard
         v-for="entry in virtual.entries.value"
@@ -81,9 +82,10 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
         @drag-item="startItemDrag"
         @drag-batch="startBatchDrag"
       />
-    </section>
+      </section>
+    </div>
     <section v-else class="flex flex-1 flex-col items-center justify-center min-h-[70px] p-[12px] text-center" aria-label="Empty Drop Shelf">
-      <ActionIcon class="size-[32px]! text-dc-accent" name="down" />
+      <ActionIcon class="size-[28px]! text-dc-accent" name="down" />
       <p class="mt-[8px] mb-0 text-[13px] text-dc-text-primary">Drop here</p>
     </section>
     <BatchDragConfirmation :pending="pendingConfirmation" @confirm="confirmBatchDrag" @cancel="cancelBatchDrag" @drag="dragConfirmedBatch" />

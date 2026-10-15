@@ -281,12 +281,13 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
           @click="openShelf"
         ><ActionIcon :name="edge === 'Left' ? 'right' : 'left'" /></button>
       </header>
-      <div
-        ref="railListRef"
-        class="batch-list flex flex-col gap-[4px] py-[4px] px-[6px] overflow-y-auto flex-1 min-h-0 [&_.card]:h-[48px] [&_.card]:flex-[0_0_48px] [&_.card]:box-border [&_.card]:border [&_.card]:border-dc-border-subtle [&_.card]:rounded-[6px] [&_.card]:bg-dc-surface-elevated [&_.card]:text-dc-text-primary forced-colors:[&_.card]:border-[ButtonText] forced-colors:[&_.card]:bg-[Canvas] forced-colors:[&_.card]:text-[CanvasText] [&_.card-drag]:min-h-full [&_.card-drag]:h-full [&_.card-drag]:box-border"
-        role="list"
-        :style="railVirtual.enabled.value ? { position: 'relative' } : {}"
-      >
+      <div class="flex flex-col flex-1 min-h-0 pt-[4px]">
+        <div
+          ref="railListRef"
+          class="batch-list flex flex-col gap-[4px] pt-0 px-[6px] pb-[4px] overflow-y-auto flex-1 min-h-0 [&_.card]:h-[48px] [&_.card]:flex-[0_0_48px] [&_.card]:box-border [&_.card]:border [&_.card]:border-dc-border-subtle [&_.card]:rounded-[6px] [&_.card]:bg-dc-surface-elevated [&_.card]:text-dc-text-primary forced-colors:[&_.card]:border-[ButtonText] forced-colors:[&_.card]:bg-[Canvas] forced-colors:[&_.card]:text-[CanvasText] [&_.card-drag]:min-h-full [&_.card-drag]:h-full [&_.card-drag]:box-border"
+          role="list"
+          :style="railVirtual.enabled.value ? { position: 'relative' } : {}"
+        >
         <div v-if="railVirtual.enabled.value" :style="{ height: `${railVirtual.totalHeight.value}px`, flex: 'none', width: '100%', pointerEvents: 'none' }" />
         <ShelfBatchCard
           v-for="entry in railVirtual.entries.value"
@@ -306,6 +307,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
           @drag-item="(id) => runAction('start_item_drag', { itemId: id })"
           @drag-batch="startBatchDrag"
         />
+        </div>
       </div>
       <footer class="rail-footer flex flex-none [align-items:end] min-h-[24px] pt-0 px-[6px] pb-[4px]">
         <button

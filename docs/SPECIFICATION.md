@@ -422,7 +422,7 @@ The Edge Rail appears when a non-empty Drop Shelf is dismissed.
 For a positive batch count, target expanded height is:
 
 ```text
-max(280, min(640, 52 × batch count + 52))
+max(280, min(640, 52 × batch count + 62))
 ```
 
 Behavior:

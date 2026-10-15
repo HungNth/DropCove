@@ -10,6 +10,7 @@ export function useVirtualCollection<T extends { id: string }>(
   gap = 4,
 ) {
   const width = shallowRef(0);
+  const contentLeft = shallowRef(0);
   const height = shallowRef(0);
   const scrollTop = shallowRef(0);
   const itemHeight = shallowRef(initialHeight);
@@ -37,7 +38,7 @@ export function useVirtualCollection<T extends { id: string }>(
     return {
       position: "absolute" as const,
       top: `${Math.floor(index / columnCount.value) * stride.value}px`,
-      left: `${index % columnCount.value * (itemWidth.value + gap)}px`,
+      left: `${contentLeft.value + index % columnCount.value * (itemWidth.value + gap)}px`,
       width: `${itemWidth.value}px`,
       boxSizing: "border-box" as const,
     };
@@ -46,6 +47,7 @@ export function useVirtualCollection<T extends { id: string }>(
     const element = container.value;
     if (!element) return;
     const style = getComputedStyle(element);
+    contentLeft.value = parseFloat(style.paddingLeft);
     width.value = element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     height.value = element.clientHeight;
     scrollTop.value = element.scrollTop;

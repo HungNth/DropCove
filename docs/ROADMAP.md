@@ -447,7 +447,7 @@ Observed verification:
 
 ## 0.0.12 — Compact scrolling and Lucide icon consistency
 
-**Status:** Planned — approved roadmap scope; implementation has not started and begins only after `0.0.11` review.
+**Status:** Completed — tickets 01–03 resolved; exact Windows x64 NSIS candidate and installed lifecycle verified; user accepted the installed 0.0.12 candidate on 2026-10-15.
 
 ### Scope
 
@@ -458,7 +458,12 @@ Observed verification:
 
 ### Implemented
 
-- Not started.
+- Added compact native WebView2 scrollbar styling across the four approved scroll owners, with semantic idle/hover/active colors and forced-colors system mappings.
+- Added external 4-pixel collection viewport boundaries, retained horizontal scrollport padding, and redistributed vertical padding without increasing total clearance. Shared virtualization measures horizontal content origin from actual computed padding rather than component-specific offsets.
+- Made Drop Shelf virtual columns follow the actual CSS grid track count through resize observation.
+- Added `lucide-vue-next` 1.0.0 and replaced handwritten action/empty-state paths; observed 14-pixel actions, 24-pixel targets, 28-pixel empty-state glyph, filled Pin, and mixed Pin/Minus.
+- Corrected the expanded Edge Rail height budget to `max(280, min(640, 52*n+62))` with user approval; preserved header/footer, row density, targets, and min/max heights.
+- Synchronized version metadata to `0.0.12` after implementation acceptance and produced `build/DropCove-Setup-0.0.12.exe`.
 
 ### Verification
 
@@ -467,6 +472,38 @@ Observed verification:
 - Exercise both ordinary (≤50 items) and virtualized (>50 items) collections at the start, middle, and end of each applicable viewport; verify the persistent top inset, bounded mounting, correct width and column calculations, keyboard navigation, and unchanged drag and management workflows.
 - Inspect every Lucide replacement at normal and compact widths and verify the 24-pixel control target, 14-pixel action glyph, 28-pixel empty-state glyph, tooltip, accessible name, and pressed, checked, mixed, disabled, hover, and focus-visible states where applicable.
 
+Observed development smoke on 2026-10-15:
+- `pnpm build` passed Vue typechecking and Vite production bundling; cargo-xwin Windows x64 release build passed with non-fatal vendor CRT missing-PDB warnings.
+- Newly produced Windows native test executable passed 101/101 tests. `cargo xwin test` compiled successfully but attempted the unavailable Wine runner; the resulting executable was run directly on Windows.
+- Real WebView2 showed the top clip moving from y=1 to y=5 on the Drop Shelf, an 8-pixel scrollbar channel, 2-pixel transparent thumb borders, bounded virtual mounting, ordinary 11-batch and 50-item collections, and reactive 1/2/3-column layouts at widths 180/356/524.
+- Virtualized Manage Items reached item index 55 at maximum scroll with 10 mounted rows; Tab revealed the first item and Escape restored the originating Manage Items focus. Its boundary measured 4 pixels in Dark, Light, and emulated forced-colors modes. Actual Windows Contrast Theme acceptance remains unobserved.
+- Expanded Edge Rail reached batch index 56 at maximum scroll with 14 mounted cards and a 4-pixel boundary. At 11 batches, measured window height was 624, header 28, footer 28, borders 2, inner scrollport 562, and scroll content 572: a 10-pixel premature scroll range.
+- The approved formula `52*n+52` conflicts with the preserved header/footer/border budget: 11 rows plus gaps and total clearance need 576 pixels, but only 566 remain. Changing the formula or chrome geometry requires user approval; neither was silently changed.
+- Initial development smoke executable: 13,385,728 bytes, SHA-256 `49469a4eae7e0dfb652ca9007ea871ddc3f4d7a1e24cc7729d3ba07c0161b2e5`. After restoring scrollport horizontal padding and measuring the virtual horizontal origin from computed padding, the rebuilt executable was 13,385,728 bytes, SHA-256 `cbcd6e2c81e37652cb355cbf57a4adae8a6586e9c24512617df5922bf3ac84bd`. Both use metadata version 0.0.11; neither is a packaged 0.0.12 candidate.
+- Static Standards and Spec reviews returned no source findings; runtime evidence supersedes their inferred rail-fit claim. Settings runtime, physical scrollbar hover/drag, Left Rail, actual Windows Contrast Theme, full native drag workflow, and exact installer lifecycle remain unverified.
+- Corrected-build real WebView2 assertions passed: Drop Shelf retained 7 pixels on both sides of virtual cards at widths 180/356/524, with 1/2/3 columns and 8/16/24 mounted cards; Rail retained 6 pixels on both sides; Manage Items retained 7 pixels on both sides with 10 mounted rows. All three retained the fixed 4-pixel top boundary. Frontend and cargo-xwin builds passed again after the correction.
+- Owned smoke Residents exited through Cooperative Shutdown; browser attachments, fixtures, profiles, and WebView data were removed. Existing installed user Resident was not stopped. No Git commit was created.
+- Corrected Edge Rail height budget verification on 2026-10-15:
+  - Executable: `src-tauri/target/x86_64-pc-windows-msvc/release/dropcove.exe` (13,385,728 bytes, SHA-256 `db96271dd6654f184f7f8ff644ef1d8ba2be0940c1235bcd71b781bfa18d7276`).
+  - Real Windows WebView2 expanded Rail proved exact height formula `52*n+62` across batch counts 5 through 11 and 12 on an isolated profile with unique CDP port and owned fixtures seeded via `accept_drop`.
+  - Docked Drop Shelf to Edge Rail via native main window `WM_CLOSE`; expanded via `on_rail_pointer_enter` and `tick_rail`.
+  - Proved batch counts 5 through 11 match expected heights 322, 374, 426, 478, 530, 582, and 634 (52px step) with zero vertical scroll overflow (`scrollHeight == clientHeight`, no premature scrollbar).
+  - Count 11 measured window height 634, scroll content 572, inner scrollport 572; the former 10-pixel deficit is fully resolved.
+  - Proved batch count 12 achieves clamped maximum height 640, scroll content 624, client height 578, vertical overflow present (`scrollHeight > clientHeight`), and reachable maximum scroll with the 12th card fully visible in the viewport.
+  - Proved 4px fixed top viewport boundary outside the scrollport and 6px horizontal clearance between cards and the rail container / scrollbar channel across all tested counts.
+  - Clean cooperative shutdown (`--shutdown --profile`) exited code 0; primary process exited cleanly; owned profiles, WebView2 data, fixtures, and scaffolds deleted.
+  - Verification limits: Batch counts 1-4 and virtualized >50 items not re-exercised in this smoke run; left-docked rail edge, high DPI display scaling, actual Windows Contrast Theme, physical mouse drag/hover, Settings runtime, and packaging/installer remain unverified here.
+
+- Approved rail formula correction compiled successfully; focused native rail regression passed 1/1 and the complete rebuilt Windows native suite passed 101/101 on 2026-10-15. Real WebView2 tier verification eliminated premature overflow for every count 5–11; count 12 retained the 640-pixel cap and reachable final card. Remaining acceptance limits above are unchanged.
+
+Official candidate and acceptance on 2026-10-15:
+- User reported all requested interactions successful on the corrected development build, closing tickets 01 and 02. This is human-reported interaction/theme acceptance, not an agent observation or acceptance of the later exact installer.
+- Official `make build` passed frontend typechecking/bundling, cargo-xwin release compilation, and NSIS packaging. A first attempt could not replace the review executable while it was running; that exact profile was cooperatively shut down before the successful build.
+- Exact installer `build/DropCove-Setup-0.0.12.exe`: 3,233,822 bytes, SHA-256 `27f569cf9d37c59380a090d9e531128531689fd4958b056db40f78ec27428411`.
+- Bundled build executable: 13,385,728 bytes, SHA-256 `e1fadfff88382a1afca41240ba317c4206b5b3ec313507db8a97f23a8a9fdbd7`. Separately measured installed executable: 13,385,728 bytes, SHA-256 `296b50c7c31bcb335148c6b8042744375746f7c246f353a1b094efe8035eff0a`.
+- Exact installed lifecycle smoke passed silent installation and version registration, embedded frontend loading, intake/pinning/management/mixed glyph state, secondary routing, Cooperative Shutdown (exit 0), same-candidate reinstall/update, safe shortcut-conflict abort, and uninstall removing binary while preserving Profile Data. Owned smoke data/processes were cleaned up; original user installation/profile/shortcut/registry baseline restored.
+- Final Standards and Spec reviews found no actionable source defect. The user explicitly accepted the installed 0.0.12 candidate on 2026-10-15 after receiving its exact installer path and SHA-256, closing the final physical/theme acceptance gate. This is human-reported acceptance, separate from agent observations. Fractional/high-DPI and multi-monitor combinations were not measured by the agent. All changes remain uncommitted; no Git commit was authorized or created.
 ### Deferred
 
 - TypeScript 7 remains dependency-driven and unassigned until vue-tsc/Volar supports it.
+
