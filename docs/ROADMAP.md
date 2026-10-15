@@ -406,4 +406,55 @@ Observed verification:
 
 ### Deferred
 
-- TypeScript 7 remains dependency-driven and unassigned until vue-tsc/Volar supports it. Any product scope after `0.0.10`, including `0.1.0` or `1.0.0`, requires explicit approval.
+- TypeScript 7 remains dependency-driven and unassigned until vue-tsc/Volar supports it.
+- Tailwind component styling migration in `0.0.11` and compact scrolling and Lucide icon consistency in `0.0.12`, approved on 2026-10-15.
+
+## 0.0.11 — Tailwind component styling migration
+
+**Status:** Planned — approved roadmap scope; implementation has not started.
+
+### Scope
+
+- Replace ordinary component-scoped CSS across the frontend with Tailwind CSS v4 utilities without changing rendered appearance, dimensions, interaction, accessibility, or motion.
+- Retain only CSS required for application-wide semantic theme tokens, root sizing and reset behavior, Windows Light and Contrast Theme integration, reduced-motion and focus policy, WebView pseudo-elements, and runtime-computed geometry.
+- Remove superseded component style rules instead of preserving parallel Tailwind and handwritten CSS conventions.
+
+### Implemented
+
+- Not started.
+
+### Verification
+
+- Complete the existing frontend, native, Windows x64, and NSIS delivery checks required by the roadmap delivery rules.
+- Compare the real WebView2 Drop Shelf, Edge Rail, Manage Items, Settings, confirmation, and resize surfaces before and after migration in Dark, Light, and Windows Contrast Themes; require visual and behavioral parity, including keyboard focus, reduced motion, drag states, and virtualized collections.
+
+### Deferred
+
+- Compact scrollbar styling, persistent scroll-viewport insets, and Lucide icon replacement remain in `0.0.12` so the Tailwind migration has no intentional visual changes.
+- TypeScript 7 remains dependency-driven and unassigned until vue-tsc/Volar supports it.
+
+## 0.0.12 — Compact scrolling and Lucide icon consistency
+
+**Status:** Planned — approved roadmap scope; implementation has not started and begins only after `0.0.11` review.
+
+### Scope
+
+- Apply one compact scrollbar treatment to every user-facing vertical scroll surface in the Drop Shelf, Edge Rail, Manage Items, and Settings: an 8-pixel interaction channel, an approximately 4-pixel visible rounded thumb, a transparent track, semantic theme colors, visible idle state, stronger hover and drag states, and Windows Contrast Theme system-color behavior.
+- Preserve a fixed top viewport inset at every scroll position so fully or partially visible Shelf Batches and rows never touch the containing surface border; enforce the invariant across both non-virtualized and virtualized scroll containers in the Drop Shelf, Edge Rail, and Manage Items without fixed component-specific offsets.
+- Add `lucide-vue-next` and replace all handwritten action and empty-state SVG paths with Lucide icons while preserving tooltips, accessible names and states, focus behavior, and 24-by-24-pixel control targets; use 14-pixel action glyphs and a 28-pixel empty-state glyph.
+- Preserve narrow-surface layout, virtualization measurements, scrolling bounds, card and row density, drag workflows, and existing Drop Shelf and Edge Rail placement behavior.
+
+### Implemented
+
+- Not started.
+
+### Verification
+
+- Complete the existing frontend, native, Windows x64, and NSIS delivery checks required by the roadmap delivery rules.
+- Exercise the real WebView2 Drop Shelf, Edge Rail, Manage Items, and Settings scroll surfaces in Dark, Light, and Windows Contrast Themes, including idle, hover, drag, keyboard-focus, minimum-width, and maximum-scroll states.
+- Exercise both ordinary (≤50 items) and virtualized (>50 items) collections at the start, middle, and end of each applicable viewport; verify the persistent top inset, bounded mounting, correct width and column calculations, keyboard navigation, and unchanged drag and management workflows.
+- Inspect every Lucide replacement at normal and compact widths and verify the 24-pixel control target, 14-pixel action glyph, 28-pixel empty-state glyph, tooltip, accessible name, and pressed, checked, mixed, disabled, hover, and focus-visible states where applicable.
+
+### Deferred
+
+- TypeScript 7 remains dependency-driven and unassigned until vue-tsc/Volar supports it.
