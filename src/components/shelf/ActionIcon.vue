@@ -9,7 +9,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowDown
-} from "lucide-vue-next";
+} from "@lucide/vue";
 
 defineProps<{
   name: "pin" | "list" | "remove" | "close" | "trash" | "left" | "right" | "down";

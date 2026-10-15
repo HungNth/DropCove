@@ -14,9 +14,9 @@
       {
         "title": "DropCove",
         "visible": false,
-        "width": 180,
+        "width": 191,
         "height": 180,
-        "minWidth": 180,
+        "minWidth": 191,
         "minHeight": 180,
         "dragDropEnabled": false,
         "resizable": true,

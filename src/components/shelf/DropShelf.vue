@@ -54,10 +54,10 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
     }"
     :aria-busy="busy || resizing"
   >
-    <div v-if="batches.length" class="flex flex-col flex-1 min-h-0 pt-[4px]">
+    <div v-if="batches.length" class="flex flex-col flex-1 min-h-0 pt-[8px]">
       <section
         ref="gridRef"
-        class="grid grid-cols-[repeat(auto-fill,minmax(164px,1fr))] [align-content:start] gap-[4px] pt-0 px-[7px] pb-[10px] min-h-0 overflow-x-hidden overflow-y-auto"
+        class="grid grid-cols-[repeat(auto-fill,minmax(164px,1fr))] [align-content:start] gap-[4px] pt-0 px-[7px] pb-[8px] min-h-0 overflow-x-hidden overflow-y-auto"
         role="list"
         aria-label="Shelf batches"
         :style="virtual.enabled.value ? { position: 'relative' } : {}"

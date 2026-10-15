@@ -184,7 +184,7 @@ fn clamp_rect(hwnd: HWND, edge: ResizeEdge, rect: &mut RECT) -> Result<(), Strin
     }
     let work = monitor.rcWork;
     let dpi = scale(hwnd)?;
-    let min_width = ((180.0 * dpi).round() as i32 + outer.right - outer.left - client.right)
+    let min_width = ((191.0 * dpi).round() as i32 + outer.right - outer.left - client.right)
         .min(work.right - work.left);
     let min_height = ((180.0 * dpi).round() as i32 + outer.bottom - outer.top - client.bottom)
         .min(work.bottom - work.top);
@@ -234,7 +234,7 @@ fn complete(app: &AppHandle, hwnd: HWND) -> Result<(), String> {
                 let snapshot = app
                     .state::<ShelfState>()
                     .save_size(
-                        width.max(180.0),
+                        width.max(191.0),
                         manual_height(initial_height, height, edge),
                     )
                     .map_err(|error| error.to_string())?;

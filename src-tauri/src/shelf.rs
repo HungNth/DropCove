@@ -101,7 +101,7 @@ pub(crate) enum ShelfError {
     },
     #[error("path contains a NUL character or exceeds Windows string limits")]
     InvalidPath,
-    #[error("shelf width must be a finite value of at least 180 logical pixels")]
+    #[error("shelf width must be a finite value of at least 191 logical pixels")]
     InvalidWidth,
     #[error("shelf height must be a finite value of at least 180 logical pixels")]
     InvalidHeight,
@@ -677,7 +677,7 @@ impl ShelfState {
         width: f64,
         manual_height: Option<f64>,
     ) -> Result<ShelfSnapshot, ShelfError> {
-        if !width.is_finite() || width < 180.0 {
+        if !width.is_finite() || width < 191.0 {
             return Err(ShelfError::InvalidWidth);
         }
         if let Some(height) = manual_height {
@@ -933,10 +933,11 @@ impl ShelfStore {
             .query_row(
                 "SELECT preferred_width FROM shelf_settings WHERE id = 1",
                 [],
-                |row| row.get(0),
+                |row| row.get::<_, f64>(0),
             )
             .optional()?
-            .unwrap_or(180.0);
+            .unwrap_or(191.0)
+            .max(191.0);
         connection
             .query_row(
                 "SELECT rail_monitor FROM shelf_ui_state WHERE id = 1",
@@ -1158,7 +1159,7 @@ impl ShelfStore {
             })?;
         let snapshot = Self::read_snapshot(
             &transaction,
-            if empty { 180.0 } else { self.width },
+            if empty { 191.0 } else { self.width },
             if empty { 180.0 } else { self.height },
             &self.availability,
         )?;
@@ -1170,7 +1171,7 @@ impl ShelfStore {
         };
         transaction.commit()?;
         if empty {
-            self.width = 180.0;
+            self.width = 191.0;
             self.height = 180.0;
             self.pending_manual_height = None;
         } else {
@@ -1209,13 +1210,13 @@ impl ShelfStore {
             })?;
         let snapshot = Self::read_snapshot(
             &transaction,
-            if empty { 180.0 } else { self.width },
+            if empty { 191.0 } else { self.width },
             if empty { 180.0 } else { self.height },
             &self.availability,
         )?;
         transaction.commit()?;
         if empty {
-            self.width = 180.0;
+            self.width = 191.0;
             self.height = 180.0;
             self.pending_manual_height = None;
         } else {
@@ -1236,13 +1237,13 @@ impl ShelfStore {
             })?;
         let snapshot = Self::read_snapshot(
             &transaction,
-            if empty { 180.0 } else { self.width },
+            if empty { 191.0 } else { self.width },
             if empty { 180.0 } else { self.height },
             &self.availability,
         )?;
         transaction.commit()?;
         if empty {
-            self.width = 180.0;
+            self.width = 191.0;
             self.height = 180.0;
             self.pending_manual_height = None;
         } else {
@@ -1270,13 +1271,13 @@ impl ShelfStore {
             })?;
         let snapshot = Self::read_snapshot(
             &transaction,
-            if empty { 180.0 } else { self.width },
+            if empty { 191.0 } else { self.width },
             if empty { 180.0 } else { self.height },
             &self.availability,
         )?;
         transaction.commit()?;
         if empty {
-            self.width = 180.0;
+            self.width = 191.0;
             self.height = 180.0;
             self.pending_manual_height = None;
         } else {
@@ -1300,13 +1301,13 @@ impl ShelfStore {
             })?;
         let snapshot = Self::read_snapshot(
             &transaction,
-            if empty { 180.0 } else { self.width },
+            if empty { 191.0 } else { self.width },
             if empty { 180.0 } else { self.height },
             &self.availability,
         )?;
         transaction.commit()?;
         if empty {
-            self.width = 180.0;
+            self.width = 191.0;
             self.height = 180.0;
             self.pending_manual_height = None;
         } else {
@@ -1801,7 +1802,33 @@ mod tests {
         let snapshot = restored.snapshot().unwrap();
         assert_eq!((snapshot.preferred_width, snapshot.height), (348.0, 180.0));
         let empty = restored.remove_batch(&snapshot.batches[0].id).unwrap();
-        assert_eq!((empty.preferred_width, empty.height), (180.0, 180.0));
+        assert_eq!((empty.preferred_width, empty.height), (191.0, 180.0));
+    }
+
+    #[test]
+    fn restored_width_respects_minimum_and_grid_column_boundary() {
+        let directory = TestDirectory::new("minimum-width");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        state.accept_drop(vec![Some("C:\\first.txt".into())]).unwrap();
+        state.accept_drop(vec![Some("C:\\second.txt".into())]).unwrap();
+        state.save_size(191.0, None).unwrap();
+        drop(state);
+        let connection = rusqlite::Connection::open(&database).unwrap();
+        connection.execute("UPDATE shelf_settings SET preferred_width = 180", []).unwrap();
+        drop(connection);
+        let restored = ShelfState::open(&database).unwrap();
+        let snapshot = restored.snapshot().unwrap();
+        assert_eq!(snapshot.preferred_width, 191.0);
+        assert_eq!(snapshot.batches.len(), 2);
+        restored.save_size(347.0, None).unwrap();
+        drop(restored);
+        let restored = ShelfState::open(&database).unwrap();
+        assert_eq!(restored.snapshot().unwrap().height, 236.0);
+        restored.save_size(348.0, None).unwrap();
+        drop(restored);
+        let restored = ShelfState::open(&database).unwrap();
+        assert_eq!(restored.snapshot().unwrap().height, 180.0);
     }
 
     #[test]
@@ -2049,7 +2076,7 @@ mod tests {
 
         let after = state.remove_item(item_id).unwrap();
         assert!(after.batches.is_empty());
-        assert_eq!(after.preferred_width, 180.0);
+        assert_eq!(after.preferred_width, 191.0);
         assert_eq!(after.height, 180.0);
     }
 
@@ -2551,7 +2578,7 @@ mod tests {
 
         let cleared = state.clear_temporary().unwrap();
         assert!(cleared.batches.is_empty());
-        assert_eq!(cleared.preferred_width, 180.0);
+        assert_eq!(cleared.preferred_width, 191.0);
         assert_eq!(cleared.height, 180.0);
 
         // Sources are still on disk
@@ -2604,12 +2631,12 @@ mod tests {
         );
     }
     #[test]
-    fn save_size_validation_rejects_sub_180_and_non_finite() {
+    fn save_size_validation_rejects_below_minimum_and_non_finite() {
         let directory = TestDirectory::new("size-validation");
         let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
 
         assert!(matches!(
-            state.save_size(179.9, None),
+            state.save_size(190.9, None),
             Err(super::ShelfError::InvalidWidth)
         ));
         assert!(matches!(
@@ -2793,7 +2820,7 @@ mod tests {
     }
 
     #[test]
-    fn final_item_removal_resets_manual_and_staged_sizing_to_180() {
+    fn final_item_removal_resets_manual_and_staged_sizing_to_minimum() {
         let directory = TestDirectory::new("final-item-reset");
         let database = directory.path().join("shelf.db");
         let state = ShelfState::open(&database).unwrap();
@@ -2805,9 +2832,9 @@ mod tests {
         state.save_size(240.0, Some(220.0)).unwrap();
         let snap = state.snapshot().unwrap();
         let empty = state.remove_batch(&snap.batches[0].id).unwrap();
-        assert_eq!((empty.preferred_width, empty.height), (180.0, 180.0));
+        assert_eq!((empty.preferred_width, empty.height), (191.0, 180.0));
 
-        // Next intake after final removal defaults to 180x180
+        // Next intake after final removal defaults to 191x180.
         let reintake = state
             .accept_drop(vec![Some("C:\\batch2.txt".into())])
             .unwrap();
@@ -2816,7 +2843,7 @@ mod tests {
                 reintake.snapshot.as_ref().unwrap().preferred_width,
                 reintake.snapshot.as_ref().unwrap().height
             ),
-            (180.0, 180.0)
+            (191.0, 180.0)
         );
 
         // 2. Remove final item via consume_items (Copy outcome)
@@ -2825,7 +2852,7 @@ mod tests {
         let empty = state
             .complete_item_drag(&snap.batches[0].items[0].id, DragOutcome::Copy)
             .unwrap();
-        assert_eq!((empty.preferred_width, empty.height), (180.0, 180.0));
+        assert_eq!((empty.preferred_width, empty.height), (191.0, 180.0));
 
         // 3. Remove final item via preparation pruning (missing path)
         state
@@ -2838,7 +2865,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             (prep.snapshot.preferred_width, prep.snapshot.height),
-            (180.0, 180.0)
+            (191.0, 180.0)
         );
     }
 

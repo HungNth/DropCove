@@ -255,7 +255,7 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 
 ### 8.1 Window behavior
 
-- Minimum preferred size: `180 × 180` logical pixels.
+- Minimum preferred size: `191 × 180` logical pixels; restored preferred width is bounded by the current 191-pixel minimum.
 - Maximum actual bounds: current monitor work area.
 - Resizable from all four edges and all four corners.
 - Resize hit region: approximately `8` logical pixels around the perimeter.
@@ -272,7 +272,7 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 
 | Property                     |                                                 Value |
 | ---------------------------- | ----------------------------------------------------: |
-| Horizontal outer padding     |                                         8 px per side |
+| Collection horizontal insets |                                          7 px per side |
 | Gap between rows and columns |                                                  4 px |
 | Minimum card width           |                                                164 px |
 | Ordering                     | Newest batch first; left-to-right, then top-to-bottom |
@@ -282,16 +282,18 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 Column count is the largest positive integer `n` satisfying:
 
 ```text
-n × 164 + (n - 1) × 4 ≤ window width - 16
+n × 164 + (n - 1) × 4 ≤ window width - 16 - scrollbar channel width
 ```
 
-Examples:
+Examples without vertical overflow (subtract another 8 px of available width when the native scrollbar is present):
 
 | Window width | Columns |
 | -----------: | ------: |
-|   180–347 px |       1 |
+|   191–347 px |       1 |
 |   348–515 px |       2 |
 |   516–683 px |       3 |
+
+Both horizontal insets stay at 7 px with and without overflow. On the Drop Shelf, the 4-pixel painted scrollbar thumb starts at the content-side edge of its 8-pixel hit channel, so left-border-to-card and rightmost-card-to-visible-thumb clearances are both 7 px. The thumb stays rounded and keeps existing idle, hover, active, and Windows Contrast colors. A fixed 8-pixel collection boundary sits outside the top of the real scrollport; 8 pixels of bottom padding remain inside the scroll range. Short collections remain top-aligned. Ordinary and virtualized collections share these boundaries, and the final Shelf Batch remains fully reachable at maximum scroll. The approved 191-pixel minimum window width remains a conservative floor.
 
 ### 8.3 Automatic Shelf Growth
 
@@ -315,7 +317,7 @@ Rules:
 - a width-only resize preserves automatic-height eligibility;
 - a resize that changes height through a top, bottom, or corner edge creates a Manual Height Override;
 - the Manual Height Override remains until the final Shelf Item is removed;
-- removing the final item resets the next opening to `180 × 180`.
+- removing the final item resets the next opening to `191 × 180`.
 
 ## 9. Shelf Batch presentation
 
@@ -415,21 +417,23 @@ The Edge Rail appears when a non-empty Drop Shelf is dismissed.
 | Expanded width                      |      280 logical px |
 | Batch row height                    |       48 logical px |
 | Row gap                             |        4 logical px |
-| Maximum expanded height             |      640 logical px |
+| Maximum expanded height             |      642 logical px |
 | Hover or drag-entry expansion delay |              200 ms |
 | Pointer/drag leave collapse delay   |              300 ms |
 
 For a positive batch count, target expanded height is:
 
 ```text
-max(280, min(640, 52 × batch count + 62))
+max(280, min(642, 52 × batch count + 70))
 ```
+
+The expanded collection retains 48-pixel rows, 4-pixel gaps, symmetric 6-pixel horizontal insets, an 8-pixel fixed top boundary outside the actual scrollport, and 8 pixels of bottom clearance inside the scroll range. Its rounded 4-pixel painted scrollbar thumb starts at the content-side edge of the 8-pixel hit channel, making the rightmost-card-to-visible-thumb clearance equal to the 6-pixel left clearance. Existing scrollbar colors/states are retained; Manage Items and Settings thumb alignment is unchanged. Short collections remain top-aligned; the scrollbar appears only on overflow. Ordinary and virtualized collections share this geometry, and the final row remains reachable at maximum scroll.
 
 Behavior:
 
 - one through four batches remain at 280 px height;
 - five through eleven batches grow through bounded tiers;
-- twelve or more batches use 640 px and vertical scrolling;
+- twelve or more batches use 642 px and vertical scrolling;
 - new batches can grow an already expanded rail;
 - removal does not live-shrink the expanded rail; the next expansion recalculates it;
 - removing the final Shelf Item hides the rail immediately;

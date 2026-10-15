@@ -39,7 +39,7 @@ impl Default for Visibility {
 pub(crate) const RAIL_WIDTH: f64 = 280.0;
 pub(crate) const RAIL_HANDLE_WIDTH: f64 = 16.0;
 pub(crate) const RAIL_MIN_HEIGHT: f64 = 280.0;
-pub(crate) const RAIL_MAX_HEIGHT: f64 = 640.0;
+pub(crate) const RAIL_MAX_HEIGHT: f64 = 642.0;
 pub(crate) const RAIL_EXPAND_DELAY_MS: u64 = 200;
 pub(crate) const RAIL_COLLAPSE_DELAY_MS: u64 = 300;
 
@@ -52,7 +52,7 @@ pub(crate) fn now_monotonic_ms() -> u64 {
         .as_millis() as u64
 }
 pub(crate) fn calculate_rail_height(batch_count: usize) -> f64 {
-    let height = 52.0 * (batch_count as f64) + 62.0;
+    let height = 52.0 * (batch_count as f64) + 70.0;
     height.clamp(RAIL_MIN_HEIGHT, RAIL_MAX_HEIGHT)
 }
 
@@ -2058,10 +2058,10 @@ mod tests {
         assert_eq!(calculate_rail_height(0), 280.0);
         assert_eq!(calculate_rail_height(1), 280.0);
         assert_eq!(calculate_rail_height(4), 280.0);
-        assert_eq!(calculate_rail_height(5), 322.0);
-        assert_eq!(calculate_rail_height(11), 634.0);
-        assert_eq!(calculate_rail_height(12), 640.0);
-        assert_eq!(calculate_rail_height(20), 640.0);
+        assert_eq!(calculate_rail_height(5), 330.0);
+        assert_eq!(calculate_rail_height(11), 642.0);
+        assert_eq!(calculate_rail_height(12), 642.0);
+        assert_eq!(calculate_rail_height(20), 642.0);
 
         // Removing content does not live-shrink expanded rail, next expansion recalculates
         state.on_rail_pointer_enter(now).unwrap();
@@ -2069,12 +2069,12 @@ mod tests {
         state.tick_rail(now, 8).unwrap();
         let current = state.rail_presentation().unwrap();
         assert!(current.expanded);
-        assert_eq!(current.height, 478.0);
+        assert_eq!(current.height, 486.0);
 
         // Content updated while expanded
         let shrunk = state.update_rail_content(2).unwrap();
         assert_eq!(shrunk, None); // no live shrink
-        assert_eq!(state.rail_presentation().unwrap().height, 478.0);
+        assert_eq!(state.rail_presentation().unwrap().height, 486.0);
 
         // Collapse and re-expand recalculates height
         state.on_rail_pointer_leave(now).unwrap();

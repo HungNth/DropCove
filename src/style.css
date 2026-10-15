@@ -222,6 +222,13 @@ body { background: transparent; color: var(--dc-text-primary); }
   border-radius: 4px;
 }
 
+/* Keep the 4px painted thumb at the content edge of its 8px hit channel. */
+.shelf [role="list"]::-webkit-scrollbar-thumb,
+.expanded-container .batch-list::-webkit-scrollbar-thumb {
+  border-width: 2px 4px 2px 0;
+  border-radius: 2px 6px 6px 2px / 4px;
+}
+
 .shelf [role="list"]::-webkit-scrollbar-thumb:hover,
 .expanded-container .batch-list::-webkit-scrollbar-thumb:hover,
 .management .items::-webkit-scrollbar-thumb:hover,
