@@ -270,7 +270,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
       :aria-busy="busy"
     >
       <header
-        class="rail-header flex flex-none h-[28px] box-border py-[2px] px-[6px] forced-colors:border-b-[ButtonText] forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]"
+        class="rail-header flex flex-none items-start h-[28px] box-border pt-[4px] pb-0 px-[6px] forced-colors:border-b-[ButtonText] forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]"
         :class="edge === 'Left' ? 'justify-end' : 'justify-start'"
       >
         <button

@@ -507,3 +507,59 @@ Official candidate and acceptance on 2026-10-15:
 
 - TypeScript 7 remains dependency-driven and unassigned until vue-tsc/Volar supports it.
 
+## 0.0.13 — Surface spacing consistency
+
+**Status:** In progress — tickets 01–03 ready-for-human; candidate 0.0.13 built and exercised; final on-screen/theme acceptance pending.
+
+**Plan:** [Surface Spacing Consistency specification](../.scratch/surface-spacing-consistency/spec.md).
+
+### Scope
+
+- Keep an `8`-logical-pixel preferred separation between Manage Items and the originating Shelf Batch when opened from either the Drop Shelf or expanded Edge Rail, while preserving right/left/below/above preference, the `16`-pixel work-area margin, and on-screen clamping as the constrained fallback.
+- Align expanded Edge Rail Open Shelf and Clear Temporary Items controls to matching `4`-pixel outer vertical offsets with existing `24 × 24` targets, `6`-pixel horizontal insets, and mirrored Left/Right placement.
+- Preserve the current Rail height contract `max(280, min(642, 52 × batch count + 70))`, collection geometry, scrolling, themes, accessibility semantics, lifecycle, drag behavior, and source-file safety.
+
+### Planned verification
+
+- Deterministic native placement regression for all four candidate directions, all work-area corners, complete-gap eligibility, constrained work areas, and fallback clamping.
+- Frontend production build and complete cargo-xwin-produced Windows native regression executable.
+- Actual Windows Resident/WebView2 inspection for both Manage Items origins and both Rail docking edges in available Dark, Light, Windows Contrast, DPI, and monitor configurations; every unavailable configuration remains explicitly unobserved.
+- After implementation acceptance, synchronize version metadata to `0.0.13`, produce one exact Windows x64 NSIS candidate, and verify those installed bytes according to the delivery rules.
+
+### Deferred
+
+- TypeScript 7 remains dependency-driven and unassigned until vue-tsc/Volar supports it.
+- Any redesign beyond the approved Manage Items and Edge Rail spacing corrections.
+
+### Implemented
+
+- Added `GAP = 8.0` in `src-tauri/src/manage_items.rs` for right, left, below, and above placement candidates with complete monitor margin checks and fallback on-screen clamping.
+- Adjusted Edge Rail header in `src/components/rail/RailHandle.vue` to `items-start pt-[4px] pb-0` with `28px` height; preserved footer at `min-h-[24px] pb-[4px]`.
+- Preserved canonical Rail height formula `max(280, min(642, 52 × batch count + 70))`, collection bounds, and height tiers.
+- Synchronized canonical metadata across `VERSION`, `package.json`, `Cargo.toml`, and `tauri.conf.json` to `0.0.13`.
+
+### Observed verification on 2026-10-15
+
+- Frontend build (`vue-tsc && vite build`) and complete cargo-xwin Windows native regression passed (**104/104 tests passed**).
+- Real Windows Resident WebView2 surfaces measured:
+  - Drop Shelf Manage Items popup: card right `3523` to popup left `3531` = **8.0 logical px**.
+  - Left Edge Rail: card right `2193` to popup left `2201` = **8.0 logical px**.
+  - Right Edge Rail: card left `3567` to popup right `3559` = **8.0 logical px**.
+  - Edge Rail corner actions: Open Shelf at top `4px` (inner, `5px` outer) and Clear at bottom `4px` (inner, `5px` outer); header and footer measured exactly `28px` each.
+- Exact candidate artifacts:
+  - Installer `build/DropCove-Setup-0.0.13.exe`: **3,233,859 bytes**, SHA-256 `2f0e9588ef72b8ca098da23a81e1e967587dcc4ebcecb024457dcbc54aa65ac3`.
+  - Installed `dropcove.exe`: **13,387,264 bytes**, SHA-256 `a84dc4b6692947211d0c5f808fb2525951d673a471225f8cece03c19dc1ff3f9`.
+  - Unbundled target release binary: **13,387,264 bytes**, SHA-256 `268ebb2f0fbe2274ecc4ab8454d4abf006ba4058c3f5afb0693ab234f5104f74`.
+- Installed lifecycle smoke:
+  - Silent installation into isolated path registered DisplayVersion `0.0.13`.
+  - Embedded production loading with Vite stopped verified.
+  - Seeded batch intake via `accept_drop` IPC and restart restore.
+  - Measured Manage Items gap from card right `2103` to popup left `2111` = `8px`.
+  - Measured matching 4px Open Shelf/Clear vertical offsets.
+  - Secondary activation returned code 0; Cooperative Shutdown returned code 0.
+  - Reinstall/update of same candidate returned code 0; Start Menu shortcut verified.
+  - Uninstaller removed binary while preserving profile `shelf.db` (32,768 bytes).
+  - Temporary smoke files cleaned; registry baseline DisplayVersion 0.0.12 restored.
+- **Unobserved limits:** fractional DPI scaling, mixed-DPI multi-monitor environments, Windows Light Theme, actual Windows Contrast Theme, and live on-screen work-area boundary clamp remain unobserved in this release run.
+
+Final release gate requires user human acceptance. The user separately authorized committing the changes; this does not close the release acceptance gate.

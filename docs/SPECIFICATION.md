@@ -354,9 +354,11 @@ Manage Items provides item-level control for a multi-item Shelf Batch.
 
 - Width: `280` logical pixels.
 - Maximum height: `480` logical pixels on the Drop Shelf.
-- Placement preference: right, left, below, then above the originating card.
-- Fallback: clamp inside the monitor work area with a preferred `16`-pixel margin.
-- Only one Drop Shelf Manage Items popup is open at a time.
+- Placement preference: right, left, below, then above the originating card, with a preferred `8`-logical-pixel gap along the placement axis.
+- A preferred candidate is eligible only when the complete popup and gap fit inside the monitor work area with the preferred `16`-pixel margin.
+- Fallback: when no preferred candidate fits, clamp inside the permitted work area; containment takes precedence and the gap may shrink, disappear, or become unavoidable overlap.
+- The same separation and fallback contract applies when Manage Items is opened from the Drop Shelf or expanded Edge Rail.
+- Only one Manage Items popup is open at a time.
 
 The Edge Rail uses a matching management flyout constrained to the rail width and a bounded vertical scroller.
 
@@ -450,6 +452,8 @@ The expanded Edge Rail:
 - supports Pin/Unpin, Bulk Pinning, Remove Item, and Remove Batch;
 - shows a bottom-left Clear Temporary Items trash icon only while Temporary Items exist;
 - shows an inward Open Shelf arrow at top-right when docked Left and top-left when docked Right.
+
+Both expanded-Rail corner actions retain `24 × 24`-logical-pixel targets and `6`-pixel horizontal insets. Open Shelf is offset `4` pixels from the top edge within the existing `28`-pixel header budget; Clear Temporary Items is offset `4` pixels from the bottom edge while retaining the existing footer budget. These visual offsets mirror across Left and Right docking and do not change the height formula or expansion tiers.
 
 The collapsed Rail Handle remains the full Open Shelf activation target and retains its vertical label.
 

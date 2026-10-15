@@ -27,6 +27,7 @@ const LABEL: &str = "manage-items";
 const WIDTH: f64 = 280.0;
 const MAX_HEIGHT: f64 = 480.0;
 const MARGIN: f64 = 16.0;
+const GAP: f64 = 8.0;
 const OWNER_SUBCLASS: usize = 0xDC02;
 const POPUP_SUBCLASS: usize = 0xDC03;
 
@@ -73,10 +74,10 @@ fn placement(anchor: Rect, size: (f64, f64), work: Rect) -> (f64, f64) {
     let min_y = work.y + margin_y;
     let max_y = (work.y + work.height - height - margin_y).max(min_y);
     let candidates = [
-        (anchor.x + anchor.width, anchor.y),
-        (anchor.x - width, anchor.y),
-        (anchor.x, anchor.y + anchor.height),
-        (anchor.x, anchor.y - height),
+        (anchor.x + anchor.width + GAP, anchor.y),
+        (anchor.x - width - GAP, anchor.y),
+        (anchor.x, anchor.y + anchor.height + GAP),
+        (anchor.x, anchor.y - height - GAP),
     ];
     let (x, y) = candidates
         .into_iter()
@@ -545,7 +546,7 @@ mod tests {
                 size,
                 work
             ),
-            (280.0, 100.0)
+            (288.0, 100.0)
         );
         assert_eq!(
             placement(
@@ -558,7 +559,7 @@ mod tests {
                 size,
                 work
             ),
-            (440.0, 100.0)
+            (432.0, 100.0)
         );
         let narrow = Rect {
             width: 500.0,
@@ -575,7 +576,7 @@ mod tests {
                 size,
                 narrow
             ),
-            (120.0, 180.0)
+            (120.0, 188.0)
         );
         assert_eq!(
             placement(
@@ -588,7 +589,7 @@ mod tests {
                 size,
                 narrow
             ),
-            (120.0, 200.0)
+            (120.0, 192.0)
         );
         assert_eq!(
             placement(
@@ -603,5 +604,26 @@ mod tests {
             ),
             (604.0, 434.0)
         );
+    }
+
+    #[test]
+    fn management_placement_checks_all_candidates_before_corner_clamping() {
+        let work = Rect { x: -900.0, y: -700.0, width: 900.0, height: 700.0 };
+        for (x, y, expected) in [
+            (-884.0, -684.0, (-716.0, -684.0)),
+            (-176.0, -684.0, (-464.0, -684.0)),
+            (-884.0, -96.0, (-884.0, -354.0)),
+            (-176.0, -96.0, (-296.0, -266.0)),
+        ] {
+            let anchor = Rect { x, y, width: 160.0, height: 80.0 };
+            assert_eq!(placement(anchor, (280.0, 250.0), work), expected);
+        }
+    }
+
+    #[test]
+    fn management_placement_clamps_when_gap_cannot_fit_in_narrow_work_area() {
+        let work = Rect { x: 0.0, y: 0.0, width: 300.0, height: 260.0 };
+        let anchor = Rect { x: 70.0, y: 90.0, width: 160.0, height: 80.0 };
+        assert_eq!(placement(anchor, (280.0, 250.0), work), (10.0, 5.0));
     }
 }
