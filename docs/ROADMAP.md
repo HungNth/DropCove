@@ -370,7 +370,9 @@ Observed verification:
 
 ## 0.0.10 — Compact Drop Shelf and Edge Rail UI refinement
 
-**Status:** Planned.
+**Status:** Completed — all four tickets resolved; user confirmed final human acceptance on 2026-10-15. Git commit authorization remains separate.
+
+**Plan:** [Compact Shelf and Rail Refinement specification](../.scratch/compact-shelf-rail-refinement/spec.md), with four approved implementation tickets.
 
 ### Scope
 
@@ -384,17 +386,23 @@ Observed verification:
 
 ### Implemented
 
-- Not started.
+- Removed opaque root background and native Drop Shelf shadow; enabled transparent, shadow-free Manage Items windows. CSS owns rounded surface borders; internal confirmation dialogs remain independent modal surfaces.
+- Removed Drop Shelf title/subtitle and visible card drag hints; empty state now contains only a downward icon and `Drop here`. Full-path tooltips and accessible drag guidance remain.
+- Added dependency-free `currentColor` SVG action icons, 24-pixel controls, native tooltips, binary Pin `aria-pressed`, and three-state Bulk Pinning `aria-checked`.
+- Delivered 48-pixel batch cards, 54-pixel Manage Items rows, single trailing action rows, corrected flex virtual-scroll spacers, and compact Rail height tiers.
+- Mirrored collapsed/expanded Rail corner ownership, removed its header title, placed inward Open Shelf at the desktop-facing top corner and conditional Clear trash at bottom-left.
 
 ### Verification
 
-Before completion:
-
-- Inspect all four corners of the Drop Shelf and the desktop-facing vs. screen-edge corners of the Edge Rail (collapsed and expanded, `Left` and `Right` edges) on Windows 11 x64 across Dark, Light, and Contrast themes to confirm symmetric corner rounding and no interior gap or mismatched border.
-- Verify that the Drop Shelf renders without the top title/subtitle header, displays only the icon and `"Drop here"` when empty, and renders compact batch cards without drag-hint text.
-- Exercise single-row icon actions (`Pin`, `Pin All`, `Manage Items`, `Remove`, and `Close`) across Drop Shelf, Edge Rail, and Manage Items via pointer and keyboard (`Tab`, `Shift+Tab`, `Enter`, `Space`), verifying hover, focus rings, tooltips, and `aria-label`/`aria-pressed` semantics.
-- Verify the bottom-left trash-can icon triggers `Clear Temporary Items` confirmation on both Drop Shelf and expanded Edge Rail, and verify the top-corner `Open Shelf` icon switches between top-right (`Left` edge) and top-left (`Right` edge) according to the active docking edge.
-- Build and launch `DropCove-Setup-0.0.10.exe` on Windows 11 x64 and pass the full native regression and smoke suite.
+- `pnpm build` passed complete vue-tsc and production bundling. Cargo-xwin compiled the native regression executable; the focused rail-height test failed before the formula change and passed afterward. Full native suite: **101 passed, 0 failed**. Windows x64 release/Tauri NSIS packaging passed; external SDK missing-PDB LNK4099 warnings remain.
+- Real development WebView2 smoke exercised empty/populated Shelf, Pin and tri-state bulk transitions, Manage Items pointer/keyboard opening, Tab order, Escape, compact control semantics, Clear cancel/confirm, and Left/Right Rail. Media emulation inspected Dark, Light, and forced-colors; this is not actual Windows Contrast Theme acceptance.
+- Large native collections: 65 Shelf Batches and a 70-item batch; 48-pixel cards and 54-pixel management rows observed. Fixed flex spacer clamping: actual Manage Items scrollTop changed from a 163-pixel ceiling to 1500, with first virtual index 23 and 12 mounted rows. Left Rail expanded to 280 × 640 and scrolled to 2200 with bounded mounting.
+- The final exact setup is `build/DropCove-Setup-0.0.10.exe`: **3,231,015 bytes**, SHA-256 `f69173e3eb1d77d0292ede8cb4a2f6f2825cf082aee46ee06121bc8dddedfe9b`. Exact installed executable: **13,383,168 bytes**, SHA-256 `844a545a112ab957f1afc9e22680953d77683826445708262bbdafa2335af418`. Earlier hashes are superseded and are not acceptance artifacts.
+- Final installed bytes ran with Vite stopped, loaded embedded `http://tauri.localhost/` assets, and passed native Pin/Remove/Manage Items smoke. Real desktop capture inspected Shelf corners; installed Manage Items rendered in Dark/Light/forced-colors emulation.
+- Physical mouse/OLE smoke used an owned Windows Forms Copy destination, not Explorer: Temporary `item-3.txt` copied exact fixture bytes and its reference was consumed; Escape retained Temporary `item-4.txt`; Pinned `item-1.txt`/`item-2.txt` batch copied both exact source bytes and retained both references. All 75 fixture sources remained unchanged.
+- Exact candidate installed/reinstalled with exit 0; owned profile shutdown and uninstall exited 0. Uninstall removed the installed executable and preserved the owned Profile Data byte-for-byte. Shared shortcut bytes and installer registrations were restored; original application was restarted, and HKCU Run `DropCove` was restored after its startup reconciliation. Owned smoke processes, fixtures, WebView data, and temporary harness were removed.
+- **Ambient-profile restoration limit:** the default `shelf.db` hash differs from its pre-smoke hash after cooperative shutdown/restart. On 2026-10-15 the user accepted this limitation and confirmed ambient profile content remains valid; byte-for-byte database restoration was not claimed because no pre-smoke backup existed.
+- **Human gate:** User confirmed all outstanding acceptance tests passed on 2026-10-15 against the exact candidate recorded above (Windows Dark/Light/Contrast corner and keyboard/UI Automation checks, physical Explorer drag-in/drag-out, resident workflows, and ambient-profile content verification). No Git commit is created without separate authorization.
 
 ### Deferred
 

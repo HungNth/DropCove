@@ -260,8 +260,10 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 - Resizable from all four edges and all four corners.
 - Resize hit region: approximately `8` logical pixels around the perimeter.
 - Resize hover displays the appropriate pointer and an accent outline.
-- Header contains Settings and **Hide DropCove**.
-- Footer contains **Clear Temporary Items** when temporary content exists.
+- The rounded surface background and border align flush with the transparent window frame at all four corners.
+- No persistent title/subtitle header is shown.
+- The empty Drop Shelf shows only a downward icon and `Drop here`.
+- A bottom-left trash icon exposes **Clear Temporary Items** only while temporary content exists.
 - Status messages can be dismissed independently.
 - Foreground application changes reassert topmost z-order without activating the shelf.
 - `Esc` closes Manage Items first; a later `Esc` dismisses the shelf.
@@ -324,10 +326,10 @@ A single-item card displays:
 - file/folder icon or image thumbnail;
 - truncated display name;
 - direct card drag-out;
-- Pin/Unpin action;
-- Remove Batch action.
+- compact Pin/Unpin icon action;
+- compact Remove Batch icon action.
 
-It does not show Manage Items because its only Shelf Item is already directly accessible.
+It does not show Manage Items because its only Shelf Item is already directly accessible. Pin and Remove occupy one trailing icon-control row.
 
 ### 9.2 Multi-item batch
 
@@ -336,9 +338,11 @@ A multi-item card displays:
 - stacked preview using at most the first three Shelf Items;
 - item count/title summary;
 - whole-batch drag-out;
-- tri-state Bulk Pinning;
-- Manage Items action;
-- Remove Batch action.
+- compact tri-state Bulk Pinning icon action;
+- compact Manage Items icon action;
+- compact Remove Batch icon action.
+
+Visible drag-hint subtitles are not shown on either card type. Full paths and drag instructions remain available through tooltips and accessibility text. Multi-item actions occupy one trailing icon-control row.
 
 ## 10. Manage Items
 
@@ -358,9 +362,10 @@ The Edge Rail uses a matching management flyout constrained to the rail width an
 
 Header:
 
-- tri-state Bulk Pinning control;
+- title and item count;
 - `X/N pinned` summary;
-- explicit **Close Manage Items** button.
+- compact tri-state Bulk Pinning icon control;
+- compact Close icon control.
 
 Each row exposes:
 
@@ -368,9 +373,11 @@ Each row exposes:
 - item name;
 - shortened path with full path available through tooltip and accessibility text;
 - availability label;
-- Pin/Unpin;
-- Remove Item;
+- compact Pin/Unpin icon action;
+- compact Remove Item icon action;
 - direct item drag-out.
+
+Each header or row action group uses a single trailing icon-control row.
 
 ### 10.3 Lifecycle and keyboard behavior
 
@@ -396,7 +403,7 @@ The Edge Rail appears when a non-empty Drop Shelf is dismissed.
 - Every non-empty Drop Shelf dismissal stores the actual selected monitor. A display-change fallback while the rail is already docked does not by itself replace the remembered monitor.
 - The rail remains centered vertically in the selected monitor work area.
 - The rail is an overlay and does not reserve desktop work area.
-- Screen-edge corners remain square; desktop-facing corners are rounded.
+- Screen-edge corners remain square and both desktop-facing corners are symmetrically rounded with a continuous border. Left docking rounds the right corners; Right docking rounds the left corners.
 - Rail interaction does not activate DropCove or steal focus from the current application.
 - Keyboard-only users open the Drop Shelf through the global hotkey and use its existing keyboard workflow; the no-activate Edge Rail does not install a second global keyboard hook for rail traversal.
 
@@ -406,7 +413,7 @@ The Edge Rail appears when a non-empty Drop Shelf is dismissed.
 | ----------------------------------- | ------------------: |
 | Rail Handle size                    | 16 × 280 logical px |
 | Expanded width                      |      280 logical px |
-| Batch row height                    |       64 logical px |
+| Batch row height                    |       48 logical px |
 | Row gap                             |        4 logical px |
 | Maximum expanded height             |      640 logical px |
 | Hover or drag-entry expansion delay |              200 ms |
@@ -415,14 +422,14 @@ The Edge Rail appears when a non-empty Drop Shelf is dismissed.
 For a positive batch count, target expanded height is:
 
 ```text
-max(280, min(640, 68 × batch count + 68))
+max(280, min(640, 52 × batch count + 52))
 ```
 
 Behavior:
 
-- one through three batches remain at 280 px height;
-- four through eight batches grow through bounded tiers;
-- nine or more batches use 640 px and vertical scrolling;
+- one through four batches remain at 280 px height;
+- five through eleven batches grow through bounded tiers;
+- twelve or more batches use 640 px and vertical scrolling;
 - new batches can grow an already expanded rail;
 - removal does not live-shrink the expanded rail; the next expansion recalculates it;
 - removing the final Shelf Item hides the rail immediately;
@@ -430,17 +437,17 @@ Behavior:
 
 ### 11.3 Rail actions
 
-The expanded Edge Rail supports:
+The expanded Edge Rail:
 
-- inspect batch summaries;
-- drag one item from Manage Items;
-- drag an entire batch;
-- drop new files/folders into DropCove;
-- Pin/Unpin and Remove Item inside Manage Items;
-- Bulk Pinning inside Manage Items;
-- Remove Batch;
-- Clear Temporary Items;
-- Open Shelf.
+- omits a retained-batch header title;
+- supports inspection and drag-out of compact Shelf Batch rows;
+- supports drag of one item from Manage Items;
+- accepts new files/folders through drop-in;
+- supports Pin/Unpin, Bulk Pinning, Remove Item, and Remove Batch;
+- shows a bottom-left Clear Temporary Items trash icon only while Temporary Items exist;
+- shows an inward Open Shelf arrow at top-right when docked Left and top-left when docked Right.
+
+The collapsed Rail Handle remains the full Open Shelf activation target and retains its vertical label.
 
 ### 11.4 Fullscreen policy
 
@@ -728,11 +735,11 @@ Top and bottom Edge Rail docking are not supported.
 
 ## 19. Accessibility, theme, and motion
 
-- Action controls expose accessible names.
-- Keyboard users can open and close Manage Items, traverse actions, and restore focus to the originating control.
-- Bulk Pinning exposes Off, On, and Indeterminate states.
-- Status and recorder guidance use live accessibility announcements where required.
-- Full paths remain available through tooltips and accessibility text when visual text is shortened.
+- Action controls expose accessible names and use inline SVG icons that inherit the current text/system color.
+- Icon actions expose native tooltips, hover treatment, and visible `focus-visible` indicators.
+- Binary Pin controls expose `aria-pressed`; tri-state Bulk Pinning exposes `role="checkbox"` with `aria-checked="false"`, `"true"`, or `"mixed"`.
+- Keyboard users can open and close Manage Items, traverse actions, activate buttons with standard Enter/Space behavior, and restore focus to the originating control.
+- Full paths and drag instructions remain available through tooltips and accessibility text when visual text is shortened or omitted.
 - Theme-aware resources support Light, Dark, and High Contrast presentation.
 - Entrance, insertion, removal, and rail transitions are short opacity/scale effects.
 - Non-essential motion is skipped when Windows disables client-area animations.

@@ -235,6 +235,8 @@ pub(crate) fn open(
             .position(x, y)
             .resizable(false)
             .decorations(false)
+            .transparent(true)
+            .shadow(false)
             .skip_taskbar(true)
             .disable_drag_drop_handler()
             .visible(false)

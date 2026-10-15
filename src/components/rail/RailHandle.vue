@@ -8,6 +8,7 @@ import type { ShelfAnchor, ShelfBatch } from "../../composables/useShelf";
 import ShelfBatchCard from "../shelf/ShelfBatchCard.vue";
 import BatchDragConfirmation from "../shelf/BatchDragConfirmation.vue";
 import ClearTemporaryConfirmation from "../shelf/ClearTemporaryConfirmation.vue";
+import ActionIcon from "../shelf/ActionIcon.vue";
 
 interface ShelfSnapshot {
   batches: ShelfBatch[];
@@ -238,7 +239,7 @@ onUnmounted(() => {
 });
 
 const railListRef = useTemplateRef<HTMLElement>("railListRef");
-const railVirtual = useVirtualCollection(batches, railListRef, 1, 72, 4);
+const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
 </script>
 
 <template>
@@ -268,17 +269,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 72, 4);
       :aria-busy="busy"
     >
       <header class="rail-header">
-        <span class="rail-header-title">Retained Batches ({{ batches.length }})</span>
-        <div class="rail-header-actions">
-          <button
-            v-if="hasTemporaryItems"
-            class="clear-btn"
-            type="button"
-            :disabled="busy || pendingConfirmation !== null"
-            @click="requestClearTemporary"
-          >Clear Temporary Items</button>
-          <button class="open-shelf-btn" type="button" @click="openShelf">Open Shelf</button>
-        </div>
+        <button class="icon-action open-shelf-btn" type="button" aria-label="Open Shelf" title="Open Shelf" @click="openShelf"><ActionIcon :name="edge === 'Left' ? 'right' : 'left'" /></button>
       </header>
       <div
         ref="railListRef"
@@ -286,7 +277,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 72, 4);
         role="list"
         :style="railVirtual.enabled.value ? { position: 'relative' } : {}"
       >
-        <div v-if="railVirtual.enabled.value" :style="{ height: `${railVirtual.totalHeight.value}px`, width: '100%', pointerEvents: 'none' }" />
+        <div v-if="railVirtual.enabled.value" :style="{ height: `${railVirtual.totalHeight.value}px`, flex: 'none', width: '100%', pointerEvents: 'none' }" />
         <ShelfBatchCard
           v-for="entry in railVirtual.entries.value"
           :key="entry.item.id"
@@ -306,6 +297,9 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 72, 4);
           @drag-batch="startBatchDrag"
         />
       </div>
+      <footer class="rail-footer">
+        <button v-if="hasTemporaryItems" class="icon-action clear-btn" type="button" aria-label="Clear Temporary Items" title="Clear Temporary Items; pinned references remain and source files are not deleted" :disabled="busy || pendingConfirmation !== null" @click="requestClearTemporary"><ActionIcon name="trash" /></button>
+      </footer>
       <BatchDragConfirmation
         :pending="pendingConfirmation"
         @confirm="confirmBatchDrag"
@@ -326,7 +320,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 72, 4);
 <style scoped>
 .rail-surface {
   width: 100%;
-  height: 100vh;
+  height: 100%;
   box-sizing: border-box;
   overflow: hidden;
   user-select: none;
@@ -336,7 +330,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 72, 4);
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 100vh;
+  height: 100%;
   box-sizing: border-box;
   padding: 0;
   border: 1px solid var(--dc-border-default);
@@ -372,67 +366,20 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 72, 4);
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100vh;
+  height: 100%;
   box-sizing: border-box;
   border: 1px solid var(--dc-border-default);
-  border-radius: 8px;
+  border-radius: 8px 0 0 8px;
   background: var(--dc-surface);
   color: var(--dc-text-primary);
   font-family: "Segoe UI", sans-serif;
   overflow: hidden;
 }
-.rail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 36px;
-  padding: 0 8px;
-  border-bottom: 1px solid var(--dc-border-subtle);
-  font-size: 11px;
-  font-weight: 600;
-  background: var(--dc-surface-subtle);
-  color: var(--dc-text-primary);
-}
-.rail-header-actions {
-  align-items: center;
-  gap: 4px;
-}
-.clear-btn {
-  padding: 2px 6px;
-  border: 1px solid var(--dc-border-default);
-  border-radius: 4px;
-  background: var(--dc-surface-elevated);
-  color: var(--dc-danger);
-  font-size: 10px;
-  cursor: pointer;
-}
-.clear-btn:hover:not(:disabled) {
-  border-color: var(--dc-danger-border);
-  background: var(--dc-danger-surface);
-}
-.clear-btn:focus-visible {
-  outline: 2px solid var(--dc-focus);
-}
-.clear-btn:disabled {
-  opacity: var(--dc-disabled-opacity);
-  cursor: default;
-}
-.open-shelf-btn {
-  padding: 2px 6px;
-  border: 1px solid var(--dc-border-default);
-  border-radius: 4px;
-  background: var(--dc-surface-hover);
-  color: var(--dc-text-primary);
-  font-size: 10px;
-  cursor: pointer;
-}
-.open-shelf-btn:hover {
-  background: var(--dc-surface-active);
-  border-color: var(--dc-border-hover);
-}
-.open-shelf-btn:focus-visible {
-  outline: 2px solid var(--dc-focus);
-}
+.rail-surface.left .expanded-container { border-radius: 0 8px 8px 0; }
+.rail-header { display: flex; flex: none; justify-content: flex-start; height: 28px; box-sizing: border-box; padding: 2px 6px; }
+.rail-surface.left .rail-header { justify-content: flex-end; }
+.rail-footer { display: flex; flex: none; align-items: end; min-height: 24px; padding: 0 6px 4px; }
+.clear-btn { color: var(--dc-danger); }
 .batch-list {
   display: flex;
   flex-direction: column;
@@ -443,8 +390,8 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 72, 4);
   min-height: 0;
 }
 .batch-list :deep(.card) {
-  height: 64px;
-  flex: 0 0 64px;
+  height: 48px;
+  flex: 0 0 48px;
   box-sizing: border-box;
   border: 1px solid var(--dc-border-subtle);
   border-radius: 6px;
@@ -455,31 +402,6 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 72, 4);
   min-height: 100%;
   height: 100%;
   box-sizing: border-box;
-}
-.batch-icon {
-  font-size: 18px;
-  color: var(--dc-accent);
-}
-.batch-summary {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  gap: 2px;
-}
-.batch-name {
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--dc-text-primary);
-}
-.batch-sub {
-  font-size: 10px;
-  color: var(--dc-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .error-banner {
   padding: 4px 8px;
@@ -501,11 +423,6 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 72, 4);
     color: CanvasText;
   }
   .handle {
-    background: ButtonFace;
-    color: ButtonText;
-  }
-  .clear-btn, .open-shelf-btn {
-    border-color: ButtonText;
     background: ButtonFace;
     color: ButtonText;
   }

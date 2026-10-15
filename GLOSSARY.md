@@ -20,6 +20,10 @@ _Avoid_: Background mode, minimized launch
 The persistent workspace holding referenced files and folders organized into batches.
 _Avoid_: Clipboard, storage bin, drop bucket
 
+**Drop Shelf**:
+The floating window surface that presents the Shelf for direct interaction and management.
+_Avoid_: Shelf, main window
+
 **Shelf Batch**:
 A grouping of filesystem items that were dragged into DropCove together in a single drop operation.
 _Avoid_: Drop group, file list, collection
@@ -33,8 +37,12 @@ A transient file/folder icon or image thumbnail that represents a Shelf Item wit
 _Avoid_: Stored preview, attachment preview, cached Shelf Item
 
 **Edge Rail**:
-A collapsed UI strip docked at the screen edge indicating held items and allowing quick interaction.
+The screen-edge surface that presents the Shelf in collapsed and expanded states.
 _Avoid_: Sidebar, dock, toolbar
+
+**Rail Handle**:
+The collapsed state of the Edge Rail.
+_Avoid_: Edge Rail, sidebar tab
 
 **Shake-to-open**:
 The gesture of rapidly moving the pointer back and forth while holding the left mouse button to request that the Shelf appear near the pointer.

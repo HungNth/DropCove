@@ -5,6 +5,20 @@ html, body, #app {
   margin: 0;
   padding: 0;
 }
+body { background: transparent; color: var(--dc-text-primary); }
+
+.icon-action { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; box-sizing: border-box; padding: 0; border: 1px solid var(--dc-border-default); border-radius: 4px; background: var(--dc-surface-elevated); color: var(--dc-text-secondary); cursor: pointer; }
+.icon-action:hover:not(:disabled) { border-color: var(--dc-border-hover); background: var(--dc-surface-hover); color: var(--dc-text-primary); }
+.icon-action[aria-pressed="true"], .icon-action[aria-checked="true"] { border-color: var(--dc-accent); color: var(--dc-accent); }
+.icon-action[aria-checked="mixed"] { border-color: var(--dc-warning-border); color: var(--dc-warning); }
+.icon-action:disabled { opacity: var(--dc-disabled-opacity); cursor: default; }
+.icon-action.remove:hover:not(:disabled) { border-color: var(--dc-danger-border); color: var(--dc-danger); }
+@media (forced-colors: active) {
+  .icon-action { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
+  .icon-action:hover:not(:disabled) { background: Highlight; color: HighlightText; }
+  .icon-action[aria-pressed="true"], .icon-action[aria-checked="true"] { color: Highlight; border-color: Highlight; }
+  .icon-action[aria-checked="mixed"] { color: LinkText; border-color: LinkText; }
+}
 
 :root {
   /* Surface and Canvas */

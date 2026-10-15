@@ -8,6 +8,7 @@ import BulkPinning from "./BulkPinning.vue";
 import ShelfItemRow from "./ShelfItemRow.vue";
 import { useAnnouncer } from "../../composables/useAnnouncer";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
+import ActionIcon from "./ActionIcon.vue";
 
 const { batch, status, busy, refresh, setItemPinned, setBatchPinned, removeItem, startItemDrag, close, dismissStatus } = useManageItems();
 const { announcement, announce } = useAnnouncer();
@@ -18,7 +19,7 @@ const totalCount = computed(() => batch.value?.items.length ?? 0);
 const rootRef = useTemplateRef<HTMLElement>("root");
 const itemsContainerRef = useTemplateRef<HTMLElement>("itemsContainer");
 const itemsList = computed(() => batch.value?.items ?? []);
-const virtual = useVirtualCollection(itemsList, itemsContainerRef, 1, 60, 5);
+const virtual = useVirtualCollection(itemsList, itemsContainerRef, 1, 54, 5);
 const window = getCurrentWindow();
 const unlisteners: UnlistenFn[] = [];
 let cancelKeydownSeen = false;
@@ -184,7 +185,7 @@ onUnmounted(() => {
           :busy="busy"
           @pin="(id, pinned) => setBatchPinned(id, pinned)"
         />
-        <button class="close" type="button" :disabled="busy" aria-label="Close Manage Items" @click="close">Close</button>
+        <button class="icon-action close" type="button" :disabled="busy" aria-label="Close Manage Items" title="Close Manage Items" @click="close"><ActionIcon name="close" /></button>
       </div>
     </header>
     <ul
@@ -195,7 +196,7 @@ onUnmounted(() => {
       :aria-label="`Batch items (${batch.items.length})`"
       :style="virtual.enabled.value ? { position: 'relative' } : {}"
     >
-      <div v-if="virtual.enabled.value" :style="{ height: `${virtual.totalHeight.value}px`, width: '100%', pointerEvents: 'none' }" />
+      <div v-if="virtual.enabled.value" :style="{ height: `${virtual.totalHeight.value}px`, flex: 'none', width: '100%', pointerEvents: 'none' }" />
       <ShelfItemRow
         v-for="entry in virtual.entries.value"
         :key="entry.item.id"
@@ -225,15 +226,12 @@ onUnmounted(() => {
 <style scoped>
 .management { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; border: 1px solid var(--dc-border-default); border-radius: 9px; color: var(--dc-text-primary); background: var(--dc-surface); font-family: "Segoe UI", sans-serif; }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 9px; }
-.header-info { display: flex; align-items: baseline; gap: 8px; }
+.header-info { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .title { margin: 0; font-size: 13px; color: var(--dc-text-primary); }
 .count { color: var(--dc-text-muted); font-weight: normal; }
 .summary { color: var(--dc-text-muted); font-size: 11px; }
 .header-actions { display: flex; align-items: center; gap: 6px; }
-.close { border: 1px solid var(--dc-border-default); border-radius: 4px; padding: 3px 6px; color: inherit; background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
-.close:hover { border-color: var(--dc-border-hover); background: var(--dc-surface-hover); }
 .close:focus-visible, .dismiss:focus-visible { outline: 2px solid var(--dc-focus); }
-.close:disabled { opacity: var(--dc-disabled-opacity); cursor: default; }
 .items { display: flex; flex-direction: column; gap: 5px; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0; padding: 0 7px 7px; list-style: none; }
 .status { display: flex; align-items: start; gap: 4px; flex-shrink: 0; margin: auto 7px 7px; padding: 6px; border: 1px solid var(--dc-warning-border); background: var(--dc-warning-surface); color: var(--dc-warning-text); border-radius: 5px; font-size: 11px; overflow-wrap: anywhere; }
 .dismiss { margin-left: auto; border: 0; color: inherit; background: transparent; cursor: pointer; }

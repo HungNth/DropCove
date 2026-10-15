@@ -3,6 +3,7 @@ import { computed, useTemplateRef } from "vue";
 import type { ShelfAnchor, ShelfBatch } from "../../composables/useShelf";
 import BulkPinning from "./BulkPinning.vue";
 import ShellVisual from "./ShellVisual.vue";
+import ActionIcon from "./ActionIcon.vue";
 
 const props = defineProps<{ batch: ShelfBatch; busy: boolean }>();
 const emit = defineEmits<{
@@ -52,7 +53,7 @@ function pointerMove(event: PointerEvent) {
 </script>
 
 <template>
-  <article ref="card" class="card" :data-batch-id="batch.id" :class="{ 'single-item': singleItem, 'multi-item': !singleItem }">
+  <article ref="card" class="card" :data-batch-id="batch.id">
     <div
       class="card-drag"
       :title="batch.items.length === 1 ? batch.items[0].path : title"
@@ -84,84 +85,60 @@ function pointerMove(event: PointerEvent) {
       </span>
       <span class="card-info">
         <span class="card-name">{{ title }}</span>
-        <span class="card-hint">{{ singleItem?.isPinned ? "Pinned · Drag to copy" : batch.items.length === 1 ? "Drag to copy" : "Drag batch to copy" }}</span>
       </span>
     </div>
+    <div class="card-actions">
     <button
       v-if="singleItem"
-      class="pin"
+      class="icon-action pin"
       type="button"
       :disabled="busy"
       :aria-pressed="singleItem.isPinned"
       :aria-label="`${singleItem.isPinned ? 'Unpin' : 'Pin'} ${singleItem.name}`"
       :title="singleItem.isPinned ? 'Make temporary; consumed after successful Copy' : 'Keep this reference after successful Copy'"
       @click="emit('pinItem', singleItem.id, !singleItem.isPinned)"
-    >{{ singleItem.isPinned ? "Unpin" : "Pin" }}</button>
-    <div v-else class="card-multi-actions">
+    ><ActionIcon name="pin" :filled="singleItem.isPinned" /></button>
+    <template v-else>
       <BulkPinning
         :batch="batch"
         :busy="busy"
         @pin="(id, pinned) => emit('pinBatch', id, pinned)"
       />
       <button
-        class="manage"
+        class="icon-action manage"
         type="button"
         :disabled="busy"
         :aria-label="`Manage ${title}`"
+        title="Manage Items"
         @click="openManagement(false)"
         @keydown="onManageKeydown"
-      >Manage Items</button>
-    </div>
+      ><ActionIcon name="list" /></button>
+    </template>
     <button
-      class="remove"
+      class="icon-action remove"
       type="button"
       :disabled="busy"
       :aria-label="`Remove batch ${title}`"
       title="Remove reference; the source is not deleted"
       @click="emit('remove', batch.id)"
-    >×</button>
+    ><ActionIcon name="remove" /></button>
+    </div>
   </article>
 </template>
 
 <style scoped>
-.card { position: relative; min-width: 0; border: 1px solid var(--dc-border-default); border-radius: 10px; background: var(--dc-surface-elevated); color: var(--dc-text-primary); }
-.card-drag { display: flex; align-items: center; gap: 8px; min-height: 54px; box-sizing: border-box; padding: 8px 24px 8px 8px; cursor: grab; user-select: none; touch-action: none; }
+.card { position: relative; display: flex; align-items: center; min-width: 0; height: 48px; box-sizing: border-box; border: 1px solid var(--dc-border-default); border-radius: 8px; background: var(--dc-surface-elevated); color: var(--dc-text-primary); }
+.card-drag { display: flex; flex: 1; min-width: 0; align-items: center; gap: 4px; height: 100%; box-sizing: border-box; padding: 5px; cursor: grab; user-select: none; touch-action: none; }
 .card-drag:active { cursor: grabbing; }
-.card-icon { display: flex; color: var(--dc-accent); font-size: 18px; letter-spacing: -6px; padding-right: 6px; line-height: 1; }
-.card-info { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
-.card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--dc-text-primary); }
-.card-hint { color: var(--dc-text-muted); font-size: 10px; }
-.remove { position: absolute; top: 3px; right: 3px; border: 0; padding: 2px 6px; color: var(--dc-text-secondary); background: transparent; font-size: 18px; cursor: pointer; }
-.remove:hover { color: var(--dc-danger); }
-.single-item .card-drag { padding-right: 48px; }
-.pin { position: absolute; bottom: 4px; right: 4px; border: 1px solid var(--dc-border-default); border-radius: 4px; padding: 2px 4px; color: var(--dc-text-secondary); background: var(--dc-surface-elevated); font: inherit; font-size: 10px; cursor: pointer; }
-.pin:hover { border-color: var(--dc-border-hover); color: var(--dc-text-primary); }
-.pin[aria-pressed="true"] { border-color: var(--dc-accent); color: var(--dc-accent); }
-.multi-item .card-drag { padding-bottom: 26px; }
-.card-multi-actions { position: absolute; bottom: 4px; right: 4px; display: flex; align-items: center; gap: 4px; }
-.manage { border: 1px solid var(--dc-border-default); border-radius: 4px; padding: 2px 4px; color: var(--dc-text-secondary); background: var(--dc-surface-elevated); font: inherit; font-size: 10px; cursor: pointer; }
-.manage:hover { border-color: var(--dc-border-hover); color: var(--dc-text-primary); }
-.remove:focus-visible, .pin:focus-visible, .manage:focus-visible { outline: 2px solid var(--dc-focus); border-radius: 4px; }
-.remove:disabled, .pin:disabled, .manage:disabled { opacity: var(--dc-disabled-opacity); cursor: default; }
+.card-icon { display: flex; flex: none; align-items: center; line-height: 1; }
+.card-icon :deep(.shell-visual + .shell-visual) { margin-left: -14px; }
+.card-info { flex: 1; min-width: 0; }
+.card-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--dc-text-primary); }
+.card-actions { display: flex; flex: none; align-items: center; gap: 2px; padding-right: 4px; }
 
 @media (forced-colors: active) {
   .card {
     border-color: ButtonText;
-  }
-  .pin, .manage {
-    border-color: ButtonText;
-    background: ButtonFace;
-    color: ButtonText;
-  }
-  .pin[aria-pressed="true"] {
-    border-color: Highlight;
-    color: Highlight;
-  }
-  .remove {
-    color: ButtonText;
-  }
-  .remove:focus-visible, .pin:focus-visible, .manage:focus-visible {
-    outline: 2px solid Highlight !important;
   }
 }
 </style>

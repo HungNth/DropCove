@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ShelfItem } from "../../composables/useShelf";
 import ShellVisual from "./ShellVisual.vue";
+import ActionIcon from "./ActionIcon.vue";
 
 const props = defineProps<{ item: ShelfItem; busy: boolean }>();
 const emit = defineEmits<{
@@ -53,57 +54,41 @@ function pointerMove(event: PointerEvent) {
     <div class="item-actions">
       <span class="availability">{{ item.isPinned ? "Pinned · " : "" }}{{ item.availability }}</span>
       <button
-        class="action pin"
+        class="icon-action action pin"
         type="button"
         :disabled="busy"
         :aria-label="`${item.isPinned ? 'Unpin' : 'Pin'} ${item.name}`"
         :aria-pressed="item.isPinned"
+        :title="item.isPinned ? 'Make temporary; consumed after successful Copy' : 'Keep this reference after successful Copy'"
         @click="emit('pin', item.id, !item.isPinned)"
-      >{{ item.isPinned ? "Unpin" : "Pin" }}</button>
+      ><ActionIcon name="pin" :filled="item.isPinned" /></button>
       <button
-        class="action remove"
+        class="icon-action action remove"
         type="button"
         :disabled="busy"
         :aria-label="`Remove ${item.name}`"
         title="Remove reference; the source is not deleted"
         @click="emit('remove', item.id)"
-      >Remove</button>
+      ><ActionIcon name="remove" /></button>
     </div>
   </li>
 </template>
 
 <style scoped>
-.item-row { min-width: 0; border: 1px solid var(--dc-border-default); border-radius: 7px; padding: 6px; background: var(--dc-surface-elevated); color: var(--dc-text-primary); }
-.item-drag { display: flex; align-items: center; gap: 7px; cursor: grab; user-select: none; touch-action: none; }
+.item-row { display: flex; align-items: center; gap: 5px; min-width: 0; height: 54px; box-sizing: border-box; border: 1px solid var(--dc-border-default); border-radius: 7px; padding: 5px; background: var(--dc-surface-elevated); color: var(--dc-text-primary); }
+.item-drag { display: flex; flex: 1; min-width: 0; align-items: center; gap: 5px; cursor: grab; user-select: none; touch-action: none; }
 .item-drag:active { cursor: grabbing; }
 .item-icon { flex-shrink: 0; color: var(--dc-accent); font-size: 20px; }
 .item-info { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .item-name, .item-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-name { font-size: 12px; color: var(--dc-text-primary); }
 .item-path { color: var(--dc-text-muted); font-size: 10px; }
-.item-actions { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
-.availability { flex: 1; color: var(--dc-text-muted); font-size: 10px; }
-.action { border: 1px solid var(--dc-border-default); border-radius: 4px; padding: 2px 5px; color: inherit; background: transparent; font: inherit; font-size: 10px; cursor: pointer; }
-.action:hover { border-color: var(--dc-border-hover); background: var(--dc-surface-hover); }
-.pin[aria-pressed="true"] { border-color: var(--dc-accent); color: var(--dc-accent); }
-.action:focus-visible { outline: 2px solid var(--dc-focus); }
-.action:disabled { opacity: var(--dc-disabled-opacity); cursor: default; }
+.item-actions { display: flex; flex: none; align-items: center; gap: 3px; }
+.availability { max-width: 60px; color: var(--dc-text-muted); font-size: 10px; overflow-wrap: anywhere; }
 
 @media (forced-colors: active) {
   .item-row {
     border-color: ButtonText;
-  }
-  .action {
-    border-color: ButtonText;
-    background: ButtonFace;
-    color: ButtonText;
-  }
-  .pin[aria-pressed="true"] {
-    border-color: Highlight;
-    color: Highlight;
-  }
-  .action:focus-visible {
-    outline: 2px solid Highlight !important;
   }
 }
 </style>
