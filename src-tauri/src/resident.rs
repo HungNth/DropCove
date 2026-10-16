@@ -42,7 +42,6 @@ pub(crate) const RAIL_MIN_HEIGHT: f64 = 280.0;
 pub(crate) const RAIL_MAX_HEIGHT: f64 = 642.0;
 pub(crate) const RAIL_EXPAND_DELAY_MS: u64 = 200;
 pub(crate) const RAIL_COLLAPSE_DELAY_MS: u64 = 300;
-
 static MONOTONIC_START: std::sync::LazyLock<std::time::Instant> =
     std::sync::LazyLock::new(std::time::Instant::now);
 
@@ -392,6 +391,43 @@ impl ResidentState {
             guard.rail.expand_due_ms = Some(now_ms + RAIL_EXPAND_DELAY_MS);
         }
         Ok(guard.rail)
+    }
+
+    pub(crate) fn on_rail_button_pointer_enter(&self) -> Result<RailPresentation, String> {
+        let mut guard = self
+            .presentation
+            .lock()
+            .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+        guard.pointer_inside = true;
+        if guard.visibility != Visibility::EdgeDocked {
+            return Ok(guard.rail);
+        }
+        guard.rail.collapse_due_ms = None;
+        if !guard.rail.expanded {
+            guard.rail.expand_due_ms = None;
+        }
+        Ok(guard.rail)
+    }
+
+    pub(crate) fn on_rail_body_pointer_enter(&self, now_ms: u64) -> Result<RailPresentation, String> {
+        self.on_rail_pointer_enter(now_ms)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn on_rail_drag_enter(&self, now_ms: u64) -> Result<RailPresentation, String> {
+        self.on_rail_pointer_enter(now_ms)
+    }
+
+    pub(crate) fn reconcile_rail_pointer(
+        &self,
+        now_ms: u64,
+        region: RailPointerRegion,
+    ) -> Result<RailPresentation, String> {
+        match region {
+            RailPointerRegion::Outside => self.on_rail_pointer_leave(now_ms),
+            RailPointerRegion::Button => self.on_rail_button_pointer_enter(),
+            RailPointerRegion::Body => self.on_rail_body_pointer_enter(now_ms),
+        }
     }
 
     pub(crate) fn on_rail_pointer_leave(&self, now_ms: u64) -> Result<RailPresentation, String> {
@@ -1377,8 +1413,15 @@ pub(crate) fn tick_rail(app: &AppHandle) -> Result<(), String> {
         };
         edge_rail::show(app, &placement, next.width, next.height, next.expanded)?;
         state.set_rail_presentation(next)?;
+        edge_rail::cancel_rail_timer(app);
     } else {
         state.tick_rail(now, batch_count)?;
+        let rail = state.rail_presentation()?;
+        if let Some(due) = rail.expand_due_ms.or(rail.collapse_due_ms) {
+            let remaining = (due.saturating_sub(now)).max(1) as u32;
+            edge_rail::arm_rail_timer(app, remaining)?;
+        } else {
+        }
     }
     Ok(())
 }
@@ -1393,6 +1436,70 @@ pub(crate) fn open_shelf_from_rail(app: &AppHandle) -> Result<(), String> {
     let _ = app.emit("rail-transients-closed", ());
     let placement = rail_placement(app)?.ok_or("docked rail has no placement")?;
     show_shelf_at(app, Some(&placement.monitor))
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RailPointerRegion {
+    Outside,
+    Button,
+    Body,
+}
+
+pub(crate) fn classify_rail_pointer(
+    pt_x: i32,
+    pt_y: i32,
+    rect_left: i32,
+    rect_top: i32,
+    rect_right: i32,
+    rect_bottom: i32,
+    scale: f64,
+) -> RailPointerRegion {
+    if pt_x < rect_left || pt_x >= rect_right || pt_y < rect_top || pt_y >= rect_bottom {
+        return RailPointerRegion::Outside;
+    }
+    let button_bottom = rect_top + (16.0 * scale).round() as i32;
+    if pt_y < button_bottom {
+        RailPointerRegion::Button
+    } else {
+        RailPointerRegion::Body
+    }
+}
+
+pub(crate) fn reconcile_rail_pointer_after_drag(app: &AppHandle) -> Result<(), String> {
+    let window = match app.get_webview_window(edge_rail::LABEL) {
+        Some(w) => w,
+        None => return Ok(()),
+    };
+    let hwnd = match window.hwnd() {
+        Ok(h) => h,
+        Err(_) => return Ok(()),
+    };
+    let mut pt = POINT::default();
+    let cursor_ok = unsafe { GetCursorPos(&mut pt) }.is_ok();
+    let mut rect = RECT::default();
+    let rect_ok = unsafe { GetWindowRect(hwnd, &mut rect) }.is_ok();
+    let dpi = unsafe { GetDpiForWindow(hwnd) };
+    let scale = if dpi == 0 { 1.0 } else { f64::from(dpi) / 96.0 };
+
+    let region = if cursor_ok && rect_ok {
+        classify_rail_pointer(pt.x, pt.y, rect.left, rect.top, rect.right, rect.bottom, scale)
+    } else {
+        RailPointerRegion::Outside
+    };
+
+    let now = now_monotonic_ms();
+    let state = app.state::<ResidentState>();
+    let rail = state.reconcile_rail_pointer(now, region)?;
+    if let Some(due) = rail.expand_due_ms {
+        let remaining = (due.saturating_sub(now)).max(1) as u32;
+        let _ = edge_rail::arm_rail_timer(app, remaining);
+    } else if let Some(due) = rail.collapse_due_ms {
+        let remaining = (due.saturating_sub(now)).max(1) as u32;
+        let _ = edge_rail::arm_rail_timer(app, remaining);
+    } else {
+        edge_rail::cancel_rail_timer(app);
+    }
+    Ok(())
 }
 
 fn coordinate_dock(
@@ -2054,6 +2161,110 @@ mod tests {
         assert!(!current.expanded);
         assert_eq!(current.width, 16.0);
 
+        // Button enter never starts expansion and cancels pending body expansion
+        state.on_rail_button_pointer_enter().unwrap();
+        assert_eq!(state.rail_presentation().unwrap().expand_due_ms, None);
+        now += 250;
+        let tick = state.tick_rail(now, 1).unwrap();
+        assert_eq!(tick, None);
+        assert!(!state.rail_presentation().unwrap().expanded);
+
+        // Moving from button into body starts 200 ms expansion delay
+        state.on_rail_pointer_enter(now).unwrap();
+        assert!(state.rail_presentation().unwrap().expand_due_ms.is_some());
+        // Moving back to button before deadline cancels it
+        now += 100;
+        state.on_rail_button_pointer_enter().unwrap();
+        assert_eq!(state.rail_presentation().unwrap().expand_due_ms, None);
+        now += 200;
+        let tick = state.tick_rail(now, 1).unwrap();
+        assert_eq!(tick, None);
+        assert!(!state.rail_presentation().unwrap().expanded);
+
+        // Moving over button while already expanded does NOT collapse
+        state.on_rail_pointer_enter(now).unwrap();
+        now += 200;
+        state.tick_rail(now, 1).unwrap();
+        assert!(state.rail_presentation().unwrap().expanded);
+        state.on_rail_button_pointer_enter().unwrap();
+        assert!(state.rail_presentation().unwrap().expanded);
+        assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, None);
+        now += 350;
+        let tick = state.tick_rail(now, 1).unwrap();
+        assert_eq!(tick, None);
+        assert!(state.rail_presentation().unwrap().expanded);
+        // Leaving expanded rail arms 300 ms collapse delay
+        state.on_rail_pointer_leave(now).unwrap();
+        assert!(state.rail_presentation().unwrap().collapse_due_ms.is_some());
+        // Re-entering directly via Open Shelf button cancels the pending collapse
+        now += 150;
+        state.on_rail_button_pointer_enter().unwrap();
+        assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, None);
+        now += 200;
+        let tick = state.tick_rail(now, 1).unwrap();
+        assert_eq!(tick, None);
+        assert!(state.rail_presentation().unwrap().expanded);
+
+        // Leaving again arms 300 ms collapse delay
+        state.on_rail_pointer_leave(now).unwrap();
+        assert!(state.rail_presentation().unwrap().collapse_due_ms.is_some());
+        // Re-entering via expanded body/section also cancels the pending collapse
+        now += 150;
+        state.on_rail_body_pointer_enter(now).unwrap();
+        assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, None);
+        now += 200;
+        let tick = state.tick_rail(now, 1).unwrap();
+        assert_eq!(tick, None);
+        assert!(state.rail_presentation().unwrap().expanded);
+        // Finally collapse after leaving again
+        state.on_rail_pointer_leave(now).unwrap();
+        now += 300;
+        state.tick_rail(now, 1).unwrap();
+        assert!(!state.rail_presentation().unwrap().expanded);
+        assert_eq!(state.rail_presentation().unwrap().width, 16.0);
+        // Reconcile pointer after drag
+        // 1. Cursor over button: cancels pending expansion
+        state.on_rail_drag_enter(now).unwrap();
+        assert!(state.rail_presentation().unwrap().expand_due_ms.is_some());
+        state.reconcile_rail_pointer(now, RailPointerRegion::Button).unwrap();
+        assert_eq!(state.rail_presentation().unwrap().expand_due_ms, None);
+        now += 250;
+        assert_eq!(state.tick_rail(now, 1).unwrap(), None);
+        assert!(!state.rail_presentation().unwrap().expanded);
+
+        // 2. Cursor over body: preserves/starts expansion
+        state.reconcile_rail_pointer(now, RailPointerRegion::Body).unwrap();
+        assert!(state.rail_presentation().unwrap().expand_due_ms.is_some());
+        now += 200;
+        assert!(state.tick_rail(now, 1).unwrap().is_some());
+        assert!(state.rail_presentation().unwrap().expanded);
+
+        // 3. Cursor outside: collapses
+        state.reconcile_rail_pointer(now, RailPointerRegion::Outside).unwrap();
+        assert!(state.rail_presentation().unwrap().collapse_due_ms.is_some());
+        now += 300;
+        assert!(state.tick_rail(now, 1).unwrap().is_some());
+        assert!(!state.rail_presentation().unwrap().expanded);
+
+        // Test geometry classifier
+        // Rect: left=100, top=200, right=116, bottom=480 (16x280 at 1.0 scale)
+        // Top button is 16px tall: top=200..216
+        assert_eq!(classify_rail_pointer(99, 210, 100, 200, 116, 480, 1.0), RailPointerRegion::Outside);
+        assert_eq!(classify_rail_pointer(116, 210, 100, 200, 116, 480, 1.0), RailPointerRegion::Outside);
+        assert_eq!(classify_rail_pointer(110, 199, 100, 200, 116, 480, 1.0), RailPointerRegion::Outside);
+        assert_eq!(classify_rail_pointer(110, 480, 100, 200, 116, 480, 1.0), RailPointerRegion::Outside);
+        assert_eq!(classify_rail_pointer(110, 200, 100, 200, 116, 480, 1.0), RailPointerRegion::Button);
+        assert_eq!(classify_rail_pointer(110, 215, 100, 200, 116, 480, 1.0), RailPointerRegion::Button);
+        assert_eq!(classify_rail_pointer(110, 216, 100, 200, 116, 480, 1.0), RailPointerRegion::Body);
+        assert_eq!(classify_rail_pointer(110, 479, 100, 200, 116, 480, 1.0), RailPointerRegion::Body);
+
+        // Fractional DPI scaling (1.5x scale): top button is (16.0 * 1.5).round() = 24px: top=200..224
+        // Rect: left=100, top=200, right=124, bottom=620 (24x420 at 1.5 scale)
+        assert_eq!(classify_rail_pointer(110, 200, 100, 200, 124, 620, 1.5), RailPointerRegion::Button);
+        assert_eq!(classify_rail_pointer(110, 223, 100, 200, 124, 620, 1.5), RailPointerRegion::Button);
+        assert_eq!(classify_rail_pointer(110, 224, 100, 200, 124, 620, 1.5), RailPointerRegion::Body);
+        assert_eq!(classify_rail_pointer(110, 619, 100, 200, 124, 620, 1.5), RailPointerRegion::Body);
+
         // Compact rows retain the minimum surface and clamp at the work-area ceiling.
         assert_eq!(calculate_rail_height(0), 280.0);
         assert_eq!(calculate_rail_height(1), 280.0);
@@ -2102,6 +2313,43 @@ mod tests {
         assert!(!state.rail_presentation().unwrap().expanded);
         assert!(*hide_called.borrow());
         assert_eq!(state.visibility().unwrap(), Visibility::Hidden);
+    }
+    #[test]
+    fn rail_sub_deadline_tick_does_not_expand_early_and_preserves_deadline_until_due() {
+        let state = ResidentState::default();
+        state.set_visibility(Visibility::EdgeDocked).unwrap();
+        let now = 1000u64;
+        state.on_rail_pointer_enter(now).unwrap();
+        assert_eq!(state.rail_presentation().unwrap().expand_due_ms, Some(1200));
+
+        // Sub-deadline callback (e.g. WM_TIMER arrives early at 1194ms < 1200ms)
+        let early_tick = state.tick_rail(1194, 1).unwrap();
+        assert_eq!(early_tick, None, "early callback before 200ms must NOT expand");
+        assert!(!state.rail_presentation().unwrap().expanded);
+        // The deadline remains pending so caller re-arms remaining duration
+        assert_eq!(state.rail_presentation().unwrap().expand_due_ms, Some(1200));
+
+        // Subsequent callback when deadline is reached (at 1200ms) DOES expand
+        let due_tick = state.tick_rail(1200, 1).unwrap();
+        assert!(due_tick.is_some(), "callback at or after deadline must expand");
+        assert!(state.rail_presentation().unwrap().expanded);
+        assert_eq!(state.rail_presentation().unwrap().expand_due_ms, None);
+
+        // Collapse delay: pointer leave arms collapse for 1200 + 300 = 1500ms
+        state.on_rail_pointer_leave(1200).unwrap();
+        assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, Some(1500));
+
+        // Early callback before 300ms (e.g. at 1494ms < 1500ms) must NOT collapse
+        let early_collapse = state.tick_rail(1494, 1).unwrap();
+        assert_eq!(early_collapse, None, "early callback before 300ms must NOT collapse");
+        assert!(state.rail_presentation().unwrap().expanded);
+        assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, Some(1500));
+
+        // Subsequent callback when collapse deadline is reached (at 1500ms) DOES collapse
+        let due_collapse = state.tick_rail(1500, 1).unwrap();
+        assert!(due_collapse.is_some(), "callback at or after deadline must collapse");
+        assert!(!state.rail_presentation().unwrap().expanded);
+        assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, None);
     }
 
     #[test]

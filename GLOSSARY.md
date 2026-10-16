@@ -44,6 +44,10 @@ _Avoid_: Sidebar, dock, toolbar
 The collapsed state of the Edge Rail.
 _Avoid_: Edge Rail, sidebar tab
 
+**Open Shelf**:
+The action that shows and activates the Drop Shelf on the display where the Edge Rail is currently docked.
+_Avoid_: Expand Edge Rail, open Edge Rail
+
 **Shake-to-open**:
 The gesture of rapidly moving the pointer back and forth while holding the left mouse button to request that the Shelf appear near the pointer.
 _Avoid_: Mouse jiggle, cursor flick

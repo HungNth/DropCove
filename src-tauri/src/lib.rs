@@ -477,16 +477,26 @@ fn get_rail(app: tauri::AppHandle) -> Result<edge_rail::Projection, String> {
 }
 
 #[tauri::command]
-fn on_rail_pointer_enter(app: tauri::AppHandle) -> Result<(), String> {
+fn on_rail_body_pointer_enter(app: tauri::AppHandle) -> Result<(), String> {
     let now = resident::now_monotonic_ms();
     let state = app.state::<resident::ResidentState>();
-    let rail = state.on_rail_pointer_enter(now)?;
+    let rail = state.on_rail_body_pointer_enter(now)?;
     if let Some(due) = rail.expand_due_ms {
         let remaining = (due.saturating_sub(now)).max(1) as u32;
         if let Err(error) = edge_rail::arm_rail_timer(&app, remaining) {
             let _ = resident::publish_warning(&app, &error);
         }
     } else {
+        edge_rail::cancel_rail_timer(&app);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn on_rail_button_pointer_enter(app: tauri::AppHandle) -> Result<(), String> {
+    let state = app.state::<resident::ResidentState>();
+    let rail = state.on_rail_button_pointer_enter()?;
+    if rail.expand_due_ms.is_none() && rail.collapse_due_ms.is_none() {
         edge_rail::cancel_rail_timer(&app);
     }
     Ok(())
@@ -672,8 +682,9 @@ pub fn run() {
             set_rail_transient_hold,
             set_rail_placement,
             set_show_rail_over_fullscreen,
-            on_rail_pointer_enter,
             on_rail_pointer_leave,
+            on_rail_body_pointer_enter,
+            on_rail_button_pointer_enter,
             tick_rail,
             get_shelf,
             accept_drop,

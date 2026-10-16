@@ -479,10 +479,11 @@ mod tests {
                 x: 3816,
                 y: 306,
                 width: 24,
-                height: 420
+                height: 420,
             }
         );
         placement.edge = RailEdge::Left;
         assert_eq!(bounds(&placement, 16.0, 280.0).unwrap().x, 1920);
+        assert_eq!(bounds(&placement, 16.0, 280.0).unwrap().width, 24);
     }
 }

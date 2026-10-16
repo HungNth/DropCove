@@ -218,28 +218,8 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
             }
         }
         if self.window.label() == crate::edge_rail::LABEL {
-            let now = crate::resident::now_monotonic_ms();
-            match self
-                .window
-                .state::<crate::resident::ResidentState>()
-                .on_rail_pointer_leave(now)
-            {
-                Ok(rail) => {
-                    if let Some(due) = rail.collapse_due_ms {
-                        let remaining = (due.saturating_sub(now)).max(1) as u32;
-                        if let Err(error) =
-                            crate::edge_rail::arm_rail_timer(self.window.app_handle(), remaining)
-                        {
-                            let _ =
-                                crate::resident::publish_warning(self.window.app_handle(), &error);
-                        }
-                    } else {
-                        crate::edge_rail::cancel_rail_timer(self.window.app_handle());
-                    }
-                }
-                Err(error) => {
-                    let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
-                }
+            if let Err(error) = crate::resident::reconcile_rail_pointer_after_drag(self.window.app_handle()) {
+                let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
             }
         }
         let _ = self.window.emit("shelf-drag-over", false);
@@ -274,6 +254,11 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         *effect = DROPEFFECT_NONE;
         self.can_copy.set(false);
         let _ = self.window.emit("shelf-drag-over", false);
+        if self.window.label() == crate::edge_rail::LABEL {
+            if let Err(error) = crate::resident::reconcile_rail_pointer_after_drag(self.window.app_handle()) {
+                let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
+            }
+        }
         if resolved_effect != DROPEFFECT_COPY {
             let _ = crate::resident::complete_shake_drop(self.window.app_handle(), shake_id, false);
             return Ok(());

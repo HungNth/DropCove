@@ -13,6 +13,7 @@ import {
 
 defineProps<{
   name: "pin" | "list" | "remove" | "close" | "trash" | "left" | "right" | "down";
+  size?: 10 | 14;
   filled?: boolean;
   mixed?: boolean;
 }>();
@@ -33,8 +34,8 @@ defineProps<{
   <CircleMinus v-else-if="name === 'remove'" :size="14" class="block size-[14px] flex-none" />
   <X v-else-if="name === 'close'" :size="14" class="block size-[14px] flex-none" />
   <Trash2 v-else-if="name === 'trash'" :size="14" class="block size-[14px] flex-none" />
-  <ArrowLeft v-else-if="name === 'left'" :size="14" class="block size-[14px] flex-none" />
-  <ArrowRight v-else-if="name === 'right'" :size="14" class="block size-[14px] flex-none" />
-  <ArrowDown v-else :size="14" class="block size-[14px] flex-none" />
+  <ArrowLeft v-else-if="name === 'left'" :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
+  <ArrowRight v-else-if="name === 'right'" :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
+  <ArrowDown v-else :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
 </template>
 

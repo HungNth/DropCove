@@ -75,9 +75,17 @@ async function runAction(command: string, args: Record<string, unknown> = {}) {
   }
 }
 
-async function onPointerEnter() {
+async function onBodyPointerEnter() {
   try {
-    await invoke("on_rail_pointer_enter");
+    await invoke("on_rail_body_pointer_enter");
+  } catch (error) {
+    if (!disposed) status.value = String(error);
+  }
+}
+
+async function onButtonPointerEnter() {
+  try {
+    await invoke("on_rail_button_pointer_enter");
   } catch (error) {
     if (!disposed) status.value = String(error);
   }
@@ -246,21 +254,38 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
   <div
     class="rail-surface size-full box-border overflow-hidden select-none transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
     :class="{ left: edge === 'Left', expanded }"
-    @pointerenter="onPointerEnter"
     @pointerleave="onPointerLeave"
   >
-    <button
+    <div
       v-if="!expanded"
-      class="handle flex items-center justify-center size-full box-border p-0 border border-dc-border-default bg-dc-surface text-dc-text-primary font-['Segoe_UI',sans-serif] cursor-pointer hover:bg-dc-surface-hover hover:border-dc-border-hover focus-visible:outline-2 focus-visible:outline-dc-focus focus-visible:-outline-offset-2 forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[Highlight]"
+      class="handle flex flex-col size-full box-border p-0 border border-dc-border-default bg-dc-surface text-dc-text-primary font-['Segoe_UI',sans-serif] select-none forced-colors:border-[ButtonText] forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]"
       :class="edge === 'Left' ? 'rounded-r-[8px] rounded-l-none' : 'rounded-l-[8px] rounded-r-none'"
-      type="button"
-      aria-label="Open Shelf"
-      :title="status || 'Open Shelf'"
-      @click="openShelf"
     >
-      <span class="label [writing-mode:vertical-rl] text-[11px] leading-[14px]">Open Shelf</span>
-      <span v-if="status" class="error absolute bottom-[8px] font-bold text-dc-danger" role="alert" aria-live="assertive">!</span>
-    </button>
+      <!-- 15px button height + 1px top handle border forms the exact 16px outer hit region -->
+      <button
+        class="open-shelf-btn relative flex items-center justify-center w-full h-[15px] flex-none box-border p-0 border-none bg-transparent text-dc-text-secondary cursor-pointer hover:bg-dc-surface-hover hover:text-dc-text-primary focus-visible:outline-2 focus-visible:outline-dc-focus focus-visible:-outline-offset-2 forced-colors:bg-transparent forced-colors:text-[ButtonText] forced-colors:hover:bg-[Highlight] forced-colors:hover:text-[HighlightText] forced-colors:focus-visible:outline-[Highlight]"
+        :class="edge === 'Left' ? 'rounded-tr-[7px]' : 'rounded-tl-[7px]'"
+        aria-label="Open Shelf"
+        :title="status || 'Open Shelf'"
+        @pointerenter="onButtonPointerEnter"
+        @click="openShelf"
+      >
+        <ActionIcon :name="edge === 'Left' ? 'right' : 'left'" :size="10" />
+        <span v-if="status" class="error absolute bottom-0 font-bold text-[10px] leading-none text-dc-danger" role="alert" aria-live="assertive">!</span>
+      </button>
+      <div
+        class="expansion-body flex flex-1 flex-col items-center justify-center w-full min-h-0 box-border cursor-default hover:bg-dc-surface-hover forced-colors:hover:bg-[Highlight]"
+        :class="edge === 'Left' ? 'rounded-br-[7px]' : 'rounded-bl-[7px]'"
+        @pointerenter="onBodyPointerEnter"
+      >
+        <div
+          class="grip flex flex-col items-center justify-center gap-[4px] pointer-events-none select-none"
+          aria-hidden="true"
+        >
+          <span class="w-[2px] h-[32px] rounded-full bg-dc-border-default forced-colors:bg-[ButtonText]" />
+        </div>
+      </div>
+    </div>
     <section
       v-else
       class="expanded-container flex flex-col size-full box-border border border-dc-border-default bg-dc-surface text-dc-text-primary font-['Segoe_UI',sans-serif] overflow-hidden forced-colors:border-[ButtonText] forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]"
@@ -268,6 +293,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
       role="region"
       aria-label="Expanded Edge Rail"
       :aria-busy="busy"
+      @pointerenter="onBodyPointerEnter"
     >
       <header
         class="rail-header flex flex-none items-start h-[28px] box-border pt-[4px] pb-0 px-[6px] forced-colors:border-b-[ButtonText] forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]"
@@ -275,9 +301,9 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
       >
         <button
           class="open-shelf-btn inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-transparent rounded-[4px] bg-transparent text-dc-text-secondary cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
-          type="button"
           aria-label="Open Shelf"
           title="Open Shelf"
+          @pointerenter="onButtonPointerEnter"
           @click="openShelf"
         ><ActionIcon :name="edge === 'Left' ? 'right' : 'left'" /></button>
       </header>
