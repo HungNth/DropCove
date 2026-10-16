@@ -271,6 +271,8 @@ pub(crate) fn initialize(app: &AppHandle) -> Result<(), String> {
         .focused(false)
         .decorations(false)
         .transparent(true)
+        // Keep transparent CSS corners composited without a native backing bitmap.
+        .no_redirection_bitmap(true)
         .shadow(false)
         .focusable(false)
         .resizable(false)

@@ -389,6 +389,7 @@ This favors continued application availability while preserving evidence for man
 - Display and DPI changes trigger reflow through window/display events.
 
 The Drop Shelf is borderless but retains native resize behavior on all edges and corners. The Edge Rail is a separate no-activate window so hover, drop-in, drag-out, and management do not steal foreground focus.
+The Edge Rail disables the Windows redirection bitmap when its transparent window is created. CSS retains ownership of the antialiased 8-logical-pixel outer corners and square docked edge; no binary native window region clips their fractional-alpha pixels. This avoids white native backing paint without turning the rounded desktop-facing corners into jagged edges.
 
 ## 12. Foreground, topmost, and fullscreen behavior
 
