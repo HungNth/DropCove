@@ -83,66 +83,72 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
 
 <template>
   <main
-    class="settings flex flex-col h-full box-border border border-dc-border-default rounded-[9px] text-dc-text-primary bg-dc-surface font-['Segoe_UI',sans-serif] forced-colors:border-[ButtonText]"
+    class="settings flex flex-col w-full h-full box-border text-dc-text-primary bg-dc-surface font-['Segoe_UI',sans-serif]"
     :aria-busy="busy"
     aria-label="Settings"
   >
-    <header class="header flex items-center justify-between pt-[12px] px-[14px] pb-[10px] border-b border-b-dc-border-subtle forced-colors:border-[ButtonText] forced-colors:bg-[Canvas]">
+    <header class="header flex items-center justify-between px-4 py-3 border-b border-dc-border-subtle bg-dc-surface forced-colors:border-[ButtonText] forced-colors:bg-[Canvas]">
       <h1 class="title m-0 text-[14px] font-semibold text-dc-text-primary">Settings</h1>
     </header>
 
-    <div class="content flex flex-col flex-1 min-h-0 overflow-y-auto p-[14px] gap-[16px]">
-      <section class="section flex flex-col gap-[8px]" aria-labelledby="hotkey-section-title">
-        <h2 id="hotkey-section-title" class="section-title m-0 text-[12px] font-semibold text-dc-text-secondary uppercase tracking-[0.05em]">Global Hotkey</h2>
-        <p class="description m-0 text-[12px] text-dc-text-muted">
-          Toggle Drop Shelf visibility from anywhere.
-        </p>
-
-        <div class="field flex flex-col gap-[6px] mt-[4px]">
-          <label id="hotkey-label" class="field-label text-[12px] text-dc-text-secondary">Shortcut</label>
-          <div class="recorder-row flex items-center">
-            <button
-              type="button"
-              ref="recorder"
-              class="recorder-button inline-flex items-center justify-center min-w-[140px] py-[6px] px-[12px] border rounded-[5px] text-[12px] font-medium [font-family:inherit] cursor-pointer transition-[border-color,background-color] duration-[150ms,150ms] ease-[ease] [&:hover:not(:disabled)]:border-dc-accent [&:hover:not(:disabled)]:bg-dc-surface-hover focus-visible:outline-2 focus-visible:outline-dc-focus focus-visible:outline-offset-[1px] disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!"
-              :class="snapshot?.listening ? 'listening border-dc-accent bg-dc-accent-subtle text-dc-accent [box-shadow:0_0_0_1px_var(--dc-accent)] forced-colors:border-[Highlight] forced-colors:bg-[ButtonFace] forced-colors:text-[Highlight]' : 'border-dc-border-default bg-dc-surface-elevated text-dc-text-primary'"
-              :disabled="busy && !snapshot?.listening"
-              aria-labelledby="hotkey-label"
-              :aria-pressed="Boolean(snapshot?.listening)"
-              @click="beginRecording"
-              @keydown="onRecorderKeydown"
-              @blur="onRecorderBlur"
-            >
-              <span v-if="snapshot?.listening" class="recorder-prompt animate-[dc-recorder-pulse_1.5s_infinite] motion-reduce:animate-none">Press shortcut...</span>
-              <span v-else class="recorder-value">{{ snapshot?.label || "None" }}</span>
-            </button>
+    <div class="content flex flex-col flex-1 min-h-0 overflow-y-auto p-3.5 gap-2.5">
+      <section class="section flex flex-col gap-2 p-3.5 rounded-lg border border-dc-border-subtle bg-dc-surface-subtle/50" aria-labelledby="hotkey-section-title">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex flex-col gap-0.5">
+            <h2 id="hotkey-section-title" class="section-title m-0 text-[13px] font-medium text-dc-text-primary">Global shortcut</h2>
+            <p class="description m-0 text-[11.5px] text-dc-text-muted leading-relaxed">
+              Toggle Drop Shelf visibility from anywhere
+            </p>
           </div>
-          <p class="field-help m-0 text-[11px] text-dc-text-muted leading-[1.4]">
-            <span v-if="snapshot?.listening">
-              Press key combination with modifier (Ctrl, Alt, Shift, or Win). Bare Tab or Esc cancels.
+          <button
+            type="button"
+            ref="recorder"
+            class="recorder-button inline-flex items-center justify-center shrink-0 min-w-[130px] py-1.5 px-3 border rounded-md text-[12px] font-mono cursor-pointer transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus forced-colors:focus-visible:outline-[2px]! forced-colors:focus-visible:outline-[Highlight]! disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText]"
+            :class="snapshot?.listening ? 'listening border-dc-accent bg-dc-accent-subtle text-dc-accent shadow-[0_0_0_1px_var(--dc-accent)] forced-colors:border-[Highlight] forced-colors:bg-[ButtonFace] forced-colors:text-[Highlight]' : 'border-dc-border-default bg-dc-surface-elevated hover:bg-dc-surface-hover hover:border-dc-border-hover text-dc-text-primary shadow-xs'"
+            :disabled="busy && !snapshot?.listening"
+            aria-labelledby="hotkey-section-title"
+            :aria-pressed="Boolean(snapshot?.listening)"
+            @click="beginRecording"
+            @keydown="onRecorderKeydown"
+            @blur="onRecorderBlur"
+          >
+            <span v-if="snapshot?.listening" class="recorder-prompt inline-flex items-center gap-1.5 animate-[dc-recorder-pulse_1.5s_infinite] motion-reduce:animate-none font-medium text-dc-accent">
+              <span class="size-1.5 rounded-full bg-dc-accent"></span>
+              Press shortcut...
             </span>
-            <span v-else>
-              Click or press Enter / Space to record a new shortcut.
-            </span>
+            <span v-else class="recorder-value font-medium tracking-tight">{{ snapshot?.label || "None" }}</span>
+          </button>
+        </div>
+        <p class="field-help m-0 text-[11px] text-dc-text-muted leading-normal">
+          <span v-if="snapshot?.listening" class="text-dc-accent">
+            Press key combination with modifier (Ctrl, Alt, Shift, or Win). Bare Tab or Esc cancels.
+          </span>
+          <span v-else>
+            Click or press Enter / Space to record a new shortcut.
+          </span>
+        </p>
+      </section>
+
+      <section class="section flex items-center justify-between p-3.5 rounded-lg border border-dc-border-subtle bg-dc-surface-subtle/50" aria-labelledby="startup-section-title">
+        <div class="flex flex-col gap-0.5">
+          <h2 id="startup-section-title" class="section-title m-0 text-[13px] font-medium text-dc-text-primary">System startup</h2>
+          <p class="description m-0 text-[11.5px] text-dc-text-muted leading-relaxed">
+            Automatically launch DropCove in the background when signing in
           </p>
         </div>
-      </section>
-      <section class="section flex flex-col gap-[8px]" aria-labelledby="startup-section-title">
-        <h2 id="startup-section-title" class="section-title m-0 text-[12px] font-semibold text-dc-text-secondary uppercase tracking-[0.05em]">System Startup</h2>
-        <label class="checkbox-row inline-flex items-center gap-[8px] cursor-pointer select-none w-fit has-[:disabled]:cursor-default has-[:disabled]:opacity-[var(--dc-disabled-opacity)]">
+        <label class="relative inline-flex items-center cursor-pointer select-none shrink-0 has-[:disabled]:cursor-default has-[:disabled]:opacity-[var(--dc-disabled-opacity)]">
           <input
             type="checkbox"
-            class="checkbox-input m-0 w-[15px] h-[15px] accent-dc-accent cursor-pointer disabled:cursor-default disabled:opacity-[var(--dc-disabled-opacity)]"
+            class="sr-only peer"
+            aria-labelledby="startup-section-title"
             :checked="Boolean(snapshot?.startWithWindows)"
             :disabled="busy || !snapshot"
             @change="onStartupChange"
           />
-          <span class="checkbox-label text-[13px] font-medium text-dc-text-primary">Start with Windows</span>
+          <div class="w-8 h-[18px] bg-dc-surface-elevated border border-dc-border-default rounded-full peer-focus-visible:ring-2 peer-focus-visible:ring-dc-focus forced-colors:peer-focus-visible:outline-[2px]! forced-colors:peer-focus-visible:outline-[Highlight]! forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:peer-checked:bg-[Highlight] peer-checked:bg-dc-accent peer-checked:border-dc-accent transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-dc-text-muted forced-colors:after:bg-[ButtonText] peer-checked:after:bg-white forced-colors:peer-checked:after:bg-[HighlightText] after:rounded-full after:size-[14px] after:transition-transform peer-checked:after:translate-x-[14px] peer-hover:border-dc-border-hover"></div>
         </label>
-        <p class="description m-0 text-[12px] text-dc-text-muted">
-          Automatically launch DropCove in the background when signing in.
-        </p>
       </section>
+
       <RailPlacementFields v-if="snapshot" :edge="snapshot.railEdge" :monitor-id="snapshot.railMonitorId"
         :show-over-fullscreen="Boolean(snapshot.showRailOverFullscreen)"
         :monitors="monitors" :disabled="busy" @change="onPlacementChange" @fullscreen-change="onFullscreenChange" />
@@ -150,15 +156,20 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
         :sensitivity="snapshot.shakeSensitivity" :disabled="busy" @change="onShakeChange" />
     </div>
 
-    <div v-if="status" class="status flex items-start gap-[6px] mx-[14px] mb-[10px] p-[8px_10px] border border-dc-warning-border rounded-[6px] bg-dc-warning-surface text-dc-warning-text text-[11px] [overflow-wrap:anywhere]" role="alert" aria-live="assertive">
-      <span>{{ status }}</span>
-      <button class="dismiss ml-auto border-0 border-none text-inherit bg-transparent text-[14px] leading-none cursor-pointer py-0 px-[2px] focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!" type="button" aria-label="Dismiss status" @click="dismissStatus">×</button>
+    <div v-if="status" class="status mx-3.5 mb-2.5 p-2.5 border border-dc-warning-border rounded-lg bg-dc-warning-surface text-dc-warning-text text-[11.5px] flex items-start gap-2 shadow-xs [overflow-wrap:anywhere]" role="alert" aria-live="assertive">
+      <svg class="size-4 shrink-0 mt-0.5 text-dc-warning" viewBox="0 0 16 16" fill="currentColor">
+        <path fill-rule="evenodd" d="M6.701 2.25c.577-1 2.02-1 2.598 0l5.196 9a1.5 1.5 0 0 1-1.299 2.25H2.794A1.5 1.5 0 0 1 1.495 11.25l5.206-9ZM8 4c.414 0 .75.336.75.75v3.5a.75.75 0 0 1-1.5 0v-3.5c0-.414.336-.75.75-.75Zm0 7a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z" clip-rule="evenodd"/>
+      </svg>
+      <span class="flex-1 leading-snug">{{ status }}</span>
+      <button class="dismiss shrink-0 p-0.5 text-dc-warning-text hover:text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus forced-colors:focus-visible:outline-[2px]! forced-colors:focus-visible:outline-[Highlight]! transition-colors cursor-pointer" type="button" aria-label="Dismiss status" @click="dismissStatus">
+        <svg class="size-3.5" viewBox="0 0 16 16" fill="currentColor"><path d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 1 0 1.06 1.06L8 9.06l2.72 2.72a.75.75 0 1 0 1.06-1.06L9.06 8l2.72-2.72a.75.75 0 0 0-1.06-1.06L8 6.94 5.28 4.22Z"/></svg>
+      </button>
     </div>
 
-    <footer class="footer flex items-center justify-end gap-[8px] py-[10px] px-[14px] border-t border-t-dc-border-subtle bg-dc-surface-subtle rounded-b-[8px] forced-colors:border-[ButtonText] forced-colors:bg-[Canvas]">
+    <footer class="footer flex items-center justify-end gap-2.5 py-2.5 px-4 border-t border-dc-border-subtle bg-dc-surface-subtle/80 forced-colors:border-[ButtonText] forced-colors:bg-[Canvas]">
       <button
         type="button"
-        class="action-button cancel py-[5px] px-[12px] rounded-[4px] [font-family:inherit] text-[12px] font-medium cursor-pointer transition-[background-color,border-color,opacity] duration-[150ms,150ms,150ms] ease-[ease] focus-visible:outline-2 focus-visible:outline-dc-focus focus-visible:outline-offset-[1px] disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default border border-dc-border-default bg-transparent text-dc-text-secondary [&:hover:not(:disabled)]:bg-dc-surface-elevated [&:hover:not(:disabled)]:border-dc-border-hover forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!"
+        class="action-button cancel py-1.5 px-3.5 rounded-md [font-family:inherit] text-[12px] font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus forced-colors:focus-visible:outline-[2px]! forced-colors:focus-visible:outline-[Highlight]! disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default border border-dc-border-default bg-transparent text-dc-text-secondary hover:bg-dc-surface-elevated hover:text-dc-text-primary forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText]"
         :disabled="busy"
         aria-label="Cancel and discard changes"
         @click="cancel"
@@ -167,7 +178,7 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
       </button>
       <button
         type="button"
-        class="action-button save py-[5px] px-[12px] rounded-[4px] [font-family:inherit] text-[12px] font-medium cursor-pointer transition-[background-color,border-color,opacity] duration-[150ms,150ms,150ms] ease-[ease] focus-visible:outline-2 focus-visible:outline-dc-focus focus-visible:outline-offset-[1px] disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default border border-dc-accent bg-dc-accent text-dc-accent-text [&:hover:not(:disabled)]:bg-dc-accent-hover [&:hover:not(:disabled)]:border-dc-accent-hover forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!"
+        class="action-button save py-1.5 px-4 rounded-md [font-family:inherit] text-[12px] font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus forced-colors:focus-visible:outline-[2px]! forced-colors:focus-visible:outline-[Highlight]! disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default border border-dc-accent bg-dc-accent text-dc-accent-text hover:bg-dc-accent-hover shadow-xs forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]"
         :disabled="busy || Boolean(snapshot?.listening)"
         aria-label="Save settings"
         @click="save"

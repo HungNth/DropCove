@@ -39,8 +39,15 @@ html, body, #app {
 }
 body { background: transparent; color: var(--dc-text-primary); }
 
+html:has(.settings),
+body:has(.settings),
+html.surface-settings,
+html.surface-settings body {
+  background-color: var(--dc-surface);
+}
 
 :root {
+  color-scheme: dark;
   /* Surface and Canvas */
   --dc-canvas: #0b111e;
   --dc-surface: #141c2b;
@@ -90,6 +97,7 @@ body { background: transparent; color: var(--dc-text-primary); }
 
 @media (prefers-color-scheme: light) {
   :root {
+    color-scheme: light;
     --dc-canvas: #f1f5f9;
     --dc-surface: #ffffff;
     --dc-surface-subtle: #f8fafc;
