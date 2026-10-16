@@ -8,11 +8,12 @@ import {
   Trash2,
   ArrowLeft,
   ArrowRight,
-  ArrowDown
+  ArrowDown,
+  GripHorizontal
 } from "@lucide/vue";
 
 defineProps<{
-  name: "pin" | "list" | "remove" | "close" | "trash" | "left" | "right" | "down";
+  name: "pin" | "list" | "remove" | "close" | "trash" | "left" | "right" | "down" | "grip";
   size?: 10 | 14;
   filled?: boolean;
   mixed?: boolean;
@@ -36,6 +37,7 @@ defineProps<{
   <Trash2 v-else-if="name === 'trash'" :size="14" class="block size-[14px] flex-none" />
   <ArrowLeft v-else-if="name === 'left'" :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
   <ArrowRight v-else-if="name === 'right'" :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
-  <ArrowDown v-else :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
+  <ArrowDown v-else-if="name === 'down'" :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
+  <GripHorizontal v-else :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
 </template>
 

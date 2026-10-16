@@ -62,6 +62,7 @@ export function useShelf() {
   const draggingOver = shallowRef(false);
   const resizing = shallowRef(false);
   const resizeHover = shallowRef(false);
+  const moving = shallowRef(false);
   const pendingConfirmation = shallowRef<PendingDragConfirmation | null>(null);
   const confirmingClearTemporary = shallowRef(false);
   let readyConfirmation: PendingDragConfirmation | null = null;
@@ -87,7 +88,7 @@ export function useShelf() {
     ]);
     if (disposed || request !== refreshRequest) return;
     batches.value = snapshot.batches;
-    if (resizing.value || await invoke<boolean>("get_shelf_resizing")) return;
+    if (resizing.value || moving.value || await invoke<boolean>("get_shelf_resizing")) return;
     if (disposed || request !== refreshRequest) return;
     const borderWidth = outer.width - current.width;
     const borderHeight = outer.height - current.height;
@@ -198,13 +199,37 @@ export function useShelf() {
       if (!disposed) busy.value = false;
     }
   }
+  async function onKeydown(event: KeyboardEvent) {
+    if (event.key !== "Escape" || event.defaultPrevented || event.repeat) return;
+    if (
+      pendingConfirmation.value ||
+      confirmingClearTemporary.value ||
+      busy.value ||
+      resizing.value ||
+      moving.value
+    ) {
+      return;
+    }
+    try {
+      const active = await invoke<ShelfBatch | null>("get_manage_items");
+      if (active) {
+        await invoke("close_manage_items");
+        return;
+      }
+      await invoke("dismiss_drop_shelf");
+    } catch (error) {
+      if (!disposed) status.value = String(error);
+    }
+  }
 
   onMounted(async () => {
+    document.addEventListener("keydown", onKeydown);
     try {
       await retainListener(window.listen<boolean>("shelf-resize-state", async ({ payload }) => {
         if (disposed) return;
         resizing.value = payload;
         if (!payload) {
+          moving.value = false;
           try { await refresh(); }
           catch (error) { if (!disposed) status.value = String(error); }
         }
@@ -213,6 +238,7 @@ export function useShelf() {
         if (!disposed) resizeHover.value = payload;
       }));
       await retainListener(window.listen("shelf-changed", async () => {
+        moving.value = false;
         try { await refresh(); }
         catch (error) { if (!disposed) status.value = String(error); }
       }));
@@ -244,6 +270,7 @@ export function useShelf() {
 
   onUnmounted(() => {
     disposed = true;
+    document.removeEventListener("keydown", onKeydown);
     for (const unlisten of unlisteners) unlisten();
   });
 
@@ -254,10 +281,33 @@ export function useShelf() {
     draggingOver,
     resizing,
     resizeHover,
+    moving,
     startResize: async (edge: ResizeEdge) => {
-      if (busy.value || resizing.value) return;
+      if (busy.value || resizing.value || moving.value) return;
       try { await invoke("start_shelf_resize", { edge }); }
       catch (error) { if (!disposed) status.value = String(error); }
+    },
+    startMove: async (event: PointerEvent) => {
+      if (
+        event.button !== 0 ||
+        busy.value ||
+        resizing.value ||
+        moving.value ||
+        pendingConfirmation.value ||
+        confirmingClearTemporary.value ||
+        draggingOver.value
+      ) {
+        return;
+      }
+      moving.value = true;
+      try {
+        await invoke("prepare_shelf_move");
+        await window.startDragging();
+      } catch (error) {
+        if (!disposed) status.value = String(error);
+      } finally {
+        if (!disposed) moving.value = false;
+      }
     },
     pendingConfirmation,
     hasTemporaryItems,
@@ -287,6 +337,14 @@ export function useShelf() {
     },
     startItemDrag: (itemId: string) => perform("start_item_drag", { itemId }),
     startBatchDrag,
+    dismissDropShelf: async () => {
+      if (busy.value) return;
+      try {
+        await invoke("dismiss_drop_shelf");
+      } catch (error) {
+        if (!disposed) status.value = String(error);
+      }
+    },
     dismissStatus: () => {
       const current = status.value;
       if (pendingRecoveryWarning && current === pendingRecoveryWarning) {

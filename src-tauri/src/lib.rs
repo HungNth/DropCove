@@ -62,6 +62,28 @@ fn get_shelf_resizing(app: tauri::AppHandle) -> Result<bool, String> {
 }
 
 #[tauri::command]
+async fn dismiss_drop_shelf(
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("dismiss_drop_shelf is only permitted from the main Drop Shelf window".to_owned());
+    }
+    run_blocking(move || resident::dismiss_shelf(&app)).await
+}
+
+#[tauri::command]
+async fn prepare_shelf_move(
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("prepare_shelf_move is only permitted from the main Drop Shelf window".to_owned());
+    }
+    run_blocking(move || shelf_resize::prepare_move(&app)).await
+}
+
+#[tauri::command]
 async fn open_manage_items(
     batch_id: String,
     anchor: manage_items::AnchorRect,
@@ -692,6 +714,8 @@ pub fn run() {
             start_shelf_resize,
             get_shelf_resizing,
             remove_batch,
+            dismiss_drop_shelf,
+            prepare_shelf_move,
             set_item_pinned,
             set_batch_pinned,
             remove_item,

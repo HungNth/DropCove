@@ -262,6 +262,9 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 - Resize hover displays the appropriate pointer and an accent outline.
 - The rounded surface background and border align flush with the transparent window frame at all four corners.
 - No persistent title/subtitle header is shown.
+- A titleless `28`-logical-pixel control strip contains a top-right `24 × 24` close action named **Hide Drop Shelf**. The action uses Dismiss Drop Shelf: empty content becomes `Hidden`, retained content becomes `EdgeDocked`, Manage Items closes, and the Resident Instance remains running without discarding references.
+- The remainder of the control strip serves as the exclusive window-drag region. Movement uses platform-native dragging and is session-only; it closes Manage Items before movement begins, is blocked during native resize, modal confirmations, or transactional Shelf state, and preserves existing card Copy drag-out, scrolling, controls, and eight-direction resize behavior.
+- Reopening the Drop Shelf uses canonical cursor-monitor or Edge Rail placement; dragged coordinates are not persisted.
 - The empty Drop Shelf shows only a downward icon and `Drop here`.
 - A bottom-left trash icon exposes **Clear Temporary Items** only while temporary content exists.
 - Status messages can be dismissed independently.

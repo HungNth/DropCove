@@ -17,7 +17,8 @@ use windows::Win32::{
             HTBOTTOMRIGHT, HTLEFT, HTRIGHT, HTTOP, HTTOPLEFT, HTTOPRIGHT, WMSZ_BOTTOM,
             WMSZ_BOTTOMLEFT, WMSZ_BOTTOMRIGHT, WMSZ_LEFT, WMSZ_RIGHT, WMSZ_TOP, WMSZ_TOPLEFT,
             WMSZ_TOPRIGHT, WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE, WM_MOUSEMOVE, WM_NCDESTROY,
-            WM_NCLBUTTONDOWN, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_SIZING,
+            WM_NCLBUTTONDOWN, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_SIZING, SWP_NOACTIVATE,
+            SWP_NOSIZE, SWP_NOZORDER, SetWindowPos,
         },
     },
 };
@@ -166,6 +167,13 @@ pub(crate) fn start(app: &AppHandle, edge: ResizeEdge) -> Result<(), String> {
     .map_err(|error| error.to_string())
 }
 
+pub(crate) fn prepare_move(app: &AppHandle) -> Result<(), String> {
+    if app.state::<DragSession>().is_active() || is_resizing(app)? {
+        return Err("another native interaction is already active".to_owned());
+    }
+    crate::manage_items::close_explicit(app)
+}
+
 fn clamp_rect(hwnd: HWND, edge: ResizeEdge, rect: &mut RECT) -> Result<(), String> {
     let mut monitor = MONITORINFO {
         cbSize: std::mem::size_of::<MONITORINFO>() as u32,
@@ -215,11 +223,85 @@ fn clamp_rect(hwnd: HWND, edge: ResizeEdge, rect: &mut RECT) -> Result<(), Strin
     Ok(())
 }
 
+fn calculate_work_area_clamp(
+    outer_left: i32,
+    outer_top: i32,
+    width: i32,
+    height: i32,
+    work_left: i32,
+    work_top: i32,
+    work_right: i32,
+    work_bottom: i32,
+) -> (i32, i32) {
+    let mut new_x = outer_left;
+    let mut new_y = outer_top;
+    if outer_left + width > work_right {
+        new_x = (work_right - width).max(work_left);
+    }
+    if outer_left < work_left {
+        new_x = work_left;
+    }
+    if outer_top + height > work_bottom {
+        new_y = (work_bottom - height).max(work_top);
+    }
+    if outer_top < work_top {
+        new_y = work_top;
+    }
+    (new_x, new_y)
+}
+
+fn clamp_window_to_work_area(hwnd: HWND) -> Result<(), String> {
+    let mut monitor = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    let mut outer = RECT::default();
+    // SAFETY: Output structs are valid stack allocations synchronously read for the live HWND.
+    unsafe {
+        let handle = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        if !GetMonitorInfoW(handle, &mut monitor).as_bool() {
+            return Err("could not read window monitor work area".to_owned());
+        }
+        GetWindowRect(hwnd, &mut outer).map_err(|error| error.to_string())?;
+    }
+    let work = monitor.rcWork;
+    let (new_x, new_y) = calculate_work_area_clamp(
+        outer.left,
+        outer.top,
+        outer.right - outer.left,
+        outer.bottom - outer.top,
+        work.left,
+        work.top,
+        work.right,
+        work.bottom,
+    );
+    if new_x != outer.left || new_y != outer.top {
+        // SAFETY: SetWindowPos with SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE moves the window
+        // inside the work area without altering z-order, focus, or size.
+        unsafe {
+            SetWindowPos(
+                hwnd,
+                None,
+                new_x,
+                new_y,
+                0,
+                0,
+                SWP_NOACTIVATE | SWP_NOSIZE | SWP_NOZORDER,
+            )
+            .map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 fn manual_height(initial: f64, height: f64, edge: ResizeEdge) -> Option<f64> {
     (edge.changes_height() && (height - initial).abs() > 0.5).then_some(height.max(180.0))
 }
 
 fn complete(app: &AppHandle, hwnd: HWND) -> Result<(), String> {
+    if let Err(error) = clamp_window_to_work_area(hwnd) {
+        let _ = app.emit("shelf-error", error);
+    }
     let session = app.state::<ResizeState>().lock()?.session.take();
     let dimensions = client_size(hwnd);
     let app = app.clone();
@@ -361,6 +443,27 @@ mod tests {
         assert_eq!(
             manual_height(236.0, 300.0, ResizeEdge::SouthEast),
             Some(300.0)
+        );
+    }
+
+    #[test]
+    fn work_area_clamping_keeps_rect_inside_boundaries() {
+        use super::calculate_work_area_clamp;
+        assert_eq!(
+            calculate_work_area_clamp(100, 100, 200, 200, 0, 0, 1920, 1080),
+            (100, 100)
+        );
+        assert_eq!(
+            calculate_work_area_clamp(1800, 100, 200, 200, 0, 0, 1920, 1080),
+            (1720, 100)
+        );
+        assert_eq!(
+            calculate_work_area_clamp(100, 1000, 200, 200, 0, 0, 1920, 1080),
+            (100, 880)
+        );
+        assert_eq!(
+            calculate_work_area_clamp(-50, -50, 200, 200, 0, 0, 1920, 1080),
+            (0, 0)
         );
     }
 }

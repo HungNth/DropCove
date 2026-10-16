@@ -1,6 +1,6 @@
 [package]
 name = "dropcove"
-version = "0.0.13"
+version = "0.0.14"
 description = "DropCove Resident Workspace"
 authors = ["DropCove Contributors"]
 edition = "2021"

@@ -16,6 +16,7 @@ const {
   draggingOver,
   resizing,
   resizeHover,
+  moving,
   startResize,
   pendingConfirmation,
   hasTemporaryItems,
@@ -32,6 +33,8 @@ const {
   openManageItems,
   startItemDrag,
   startBatchDrag,
+  dismissDropShelf,
+  startMove,
   dismissStatus,
 } = useShelf();
 const { announcement, announce } = useAnnouncer();
@@ -52,9 +55,29 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
       'bg-dc-drag-hover-bg': draggingOver,
       'border-dc-drag-hover-border [box-shadow:inset_0_0_0_1px_var(--dc-drag-hover-border)]': draggingOver || resizeHover,
     }"
-    :aria-busy="busy || resizing"
+    :aria-busy="busy || resizing || moving"
   >
-    <div v-if="batches.length" class="flex flex-col flex-1 min-h-0 pt-[8px]">
+    <div class="control-strip relative flex flex-none items-center justify-center h-[28px] box-border select-none pointer-events-auto" role="toolbar" aria-label="Drop Shelf controls">
+      <div
+        class="drag-region flex w-full h-full items-center justify-center pt-[4px] box-border cursor-default"
+        aria-hidden="true"
+        @pointerdown="startMove"
+      >
+        <ActionIcon name="grip" class="text-dc-text-muted/60 pointer-events-none forced-colors:text-[ButtonText]" />
+      </div>
+      <button
+        type="button"
+        class="dismiss-action absolute top-[4px] right-[4px] z-[3] inline-flex items-center justify-center size-[24px] box-border p-0 border border-transparent rounded-[4px] bg-transparent text-dc-text-secondary cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary focus-visible:outline-2 focus-visible:outline-dc-focus disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText]"
+        :disabled="busy || resizing || moving"
+        aria-label="Hide Drop Shelf"
+        title="Hide Drop Shelf"
+        @pointerdown.stop
+        @click="() => { dismissDropShelf(); announce('Hide Drop Shelf requested'); }"
+      >
+        <ActionIcon name="close" />
+      </button>
+    </div>
+    <div v-if="batches.length" class="flex flex-col flex-1 min-h-0 pt-[4px]">
       <section
         ref="gridRef"
         class="grid grid-cols-[repeat(auto-fill,minmax(164px,1fr))] [align-content:start] gap-[4px] pt-0 px-[7px] pb-[8px] min-h-0 overflow-x-hidden overflow-y-auto"
@@ -109,7 +132,7 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
     <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
       {{ announcement }}
     </div>
-    <ShelfResizeHandles :disabled="busy || resizing" @resize="startResize" />
+    <ShelfResizeHandles :disabled="busy || resizing || moving" @resize="startResize" />
   </main>
 </template>
 

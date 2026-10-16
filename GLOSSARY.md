@@ -24,6 +24,10 @@ _Avoid_: Clipboard, storage bin, drop bucket
 The floating window surface that presents the Shelf for direct interaction and management.
 _Avoid_: Shelf, main window
 
+**Dismiss Drop Shelf**:
+The user-facing dismissal of the floating Drop Shelf without ending the Resident Instance or discarding Shelf references. An empty Shelf leaves every Shelf surface hidden; a non-empty Shelf remains available through the Edge Rail.
+_Avoid_: Exit DropCove, close the application, hide all Shelf surfaces
+
 **Shelf Batch**:
 A grouping of filesystem items that were dragged into DropCove together in a single drop operation.
 _Avoid_: Drop group, file list, collection

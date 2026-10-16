@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-movement",
+  "description": "Movement capability scoped strictly to the main Drop Shelf window",
+  "windows": ["main"],
+  "permissions": [
+    "core:window:allow-start-dragging"
+  ]
+}

@@ -509,7 +509,7 @@ Official candidate and acceptance on 2026-10-15:
 
 ## 0.0.13 — Surface spacing consistency
 
-**Status:** In progress — tickets 01–03 ready-for-human; candidate 0.0.13 built and exercised; final on-screen/theme acceptance pending.
+**Status:** Completed — user confirmed final human acceptance of candidate 0.0.13 on 2026-10-16.
 
 **Plan:** [Surface Spacing Consistency specification](../.scratch/surface-spacing-consistency/spec.md).
 
@@ -562,4 +562,66 @@ Official candidate and acceptance on 2026-10-15:
   - Temporary smoke files cleaned; registry baseline DisplayVersion 0.0.12 restored.
 - **Unobserved limits:** fractional DPI scaling, mixed-DPI multi-monitor environments, Windows Light Theme, actual Windows Contrast Theme, and live on-screen work-area boundary clamp remain unobserved in this release run.
 
-Final release gate requires user human acceptance. The user separately authorized committing the changes; this does not close the release acceptance gate.
+Final release gate completed: the user confirmed `0.0.13 đã nghiệm thu` on 2026-10-16. This is user-reported human acceptance, not additional agent-observed coverage. Git commit authorization remains separate.
+
+## 0.0.14 — Drop Shelf window controls
+
+**Status:** In progress — candidate built and exercised; final human acceptance pending.
+
+**Plan:** [Drop Shelf Window Controls specification](../.scratch/drop-shelf-window-controls/spec.md).
+
+### Scope
+
+- Add a compact titleless `28`-logical-pixel Drop Shelf control strip with an existing-style `24 × 24` top-right `X` action named `Hide Drop Shelf`.
+- Route the `X` action through the existing Dismiss Drop Shelf behavior: an empty Shelf transitions to `Hidden`, a non-empty Shelf transitions to `EdgeDocked`, Manage Items closes, Shelf references remain intact, and the Resident Instance continues running.
+- Allow native Windows movement from the remaining control-strip drag region while excluding the close action, Shelf Batches, action controls, scrollbars, dialogs, and eight-direction resize handles.
+- Close Manage Items before movement, block movement during resize or modal/transactional interaction, and preserve existing item/batch drag-out, scrolling, confirmation, and resize behavior.
+- Keep movement session-only. Hotkey, activation, Open Shelf, and restart continue to use the established cursor-monitor or Edge Rail monitor placement rules; no position setting or persistence schema is added.
+- Preserve Dark, Light, and Windows Contrast presentation, keyboard access to the close action, accessible name and tooltip behavior, focus visibility, resident lifecycle, and source-file safety.
+
+### Implemented
+
+- Added titleless 28px control strip in `src/components/shelf/DropShelf.vue` with 24×24 top-right `X` action (`ActionIcon name="close"`) and centered decorative movement affordance (`ActionIcon name="grip"`).
+- Added backend command `dismiss_drop_shelf` in `src-tauri/src/lib.rs` validating caller window (`main` only) and delegating to `resident::dismiss_shelf`.
+- Added backend command `prepare_shelf_move` in `src-tauri/src/lib.rs` and `shelf_resize.rs` validating caller window, rejecting active resize/content drag, and closing Manage Items before native drag begins.
+- Scoped `core:window:allow-start-dragging` exclusively to `"main"` in `src-tauri/capabilities/main-movement.json`.
+- Added `startMove` in `src/composables/useShelf.ts` with primary-pointer, modal/busy/resizing guards, and `finally` reset, calling native `window.startDragging()`.
+- Implemented two-stage Escape in `useShelf.ts`: first Escape closes open Manage Items; second Escape docks non-empty Shelf.
+- Synchronized canonical version metadata across `VERSION`, `package.json`, `Cargo.toml`, and `tauri.conf.json` to `0.0.14`.
+
+### Verification
+
+- Complete frontend build (`vue-tsc && vite build`) and complete cargo-xwin Windows native regression suite passed (**106/106 tests passed**, including new work-area clamp unit test).
+- Real Windows Resident WebView2 surfaces measured:
+  - Drop Shelf control strip: exactly 28 logical px high.
+  - Close button: 24×24 target at x=158/y=3, elementFromPoint hit tested true.
+  - Four-row automatic growth: measured 28px strip, 48px cards, clientHeight 212px, scrollHeight 212px (0 premature overflow).
+- Real Windows interaction smoke proved:
+  - Empty Shelf X dismisses to `Hidden`, retaining Resident; secondary activation returns 0.
+  - Non-empty Shelf X dismisses to `EdgeDocked` Rail Handle, closes open Manage Items, and preserves references after Open Shelf.
+  - Non-main callers (`edge-rail`, `manage-items`) attempting `dismiss_drop_shelf` or `prepare_shelf_move` rejected with error; dragging capability denied by ACL on non-main surfaces.
+  - Keyboard Enter and Space activate X with visible focus; two-stage Escape closes Manage Items first, then docks Shelf on second press.
+  - Native drag from control strip moved window within monitor 1 and across monitor boundary to `DISPLAY2` (`x=2373`); release cleanly restored controls via `finally` handler.
+  - Modal Clear Temporary dialog blocked window movement; Escape canceled dialog and preserved all references.
+  - Physical Windows OLE Copy drag-out transferred Temporary item to real Forms target, consumed only the transferred Temporary reference, copied all Pinned batch items, and retained Pinned references. Escape cancellation retained all references. Source fixture files remained byte-for-byte unchanged.
+  - All eight resize directions functional; held resize disabled X and marked `aria-busy=true`.
+  - Manual position preserved across content mutation/unpin; reopen via secondary launch repositioned to cursor monitor.
+- Exact candidate artifacts:
+  - Installer `build/DropCove-Setup-0.0.14.exe`: **3,244,674 bytes**, SHA-256 `66d7df7efbc4c2abc42abc017ccb12ef7c511a5ad19798732d9e4d4fd7b55d5a`.
+  - Installed binary: `dropcove.exe`: **13,457,408 bytes**, SHA-256 `181962e9245c449641aa4bb0bf0349f8131b90288d19080f8a88c86fe5ea37b4`.
+  - Unbundled target release binary: `src-tauri/target/x86_64-pc-windows-msvc/release/dropcove.exe`: **13,457,408 bytes**, SHA-256 `d88df95cb88c288c6ee96b22524739aefc4783bf0cd5f4ad95a3881c14c395aa`.
+  - Silent installation into isolated path registered DisplayVersion `0.0.14`.
+  - Same-candidate reinstall/update and Start Menu shortcut creation verified.
+  - Embedded production loading with Vite stopped verified; control strip and 24×24 X rendered at `http://tauri.localhost/`.
+  - Installed X dismissal, secondary activation, and native movement verified.
+  - Cooperative Shutdown (`--shutdown`) returned 0 with process exit 0.
+  - Uninstaller cleanly removed installed directory and binary while preserving Profile Data `shelf.db` byte-for-byte (`32,768 bytes`, identical SHA-256).
+  - Ambient HKCU Run registry value restored to pre-smoke baseline.
+  - All temporary smoke and fixture directories removed.
+- **Unobserved limits:** physical high-DPI scaling factors (exercises performed at scale 1), physical hardware keyboard chord detection (Windows-injected hotkey chords skipped in favor of native message dispatch), and actual physical Windows Contrast Theme monitor presentation (covered via media feature emulation) remain unobserved in this release run.
+
+Final release gate requires user human acceptance. Git commit authorization remains separate.
+
+### Deferred
+
+- Durable Drop Shelf position, placement settings, custom snapping, moving Manage Items with the Drop Shelf, drag movement for other surfaces, and using the `X` action to exit DropCove.
