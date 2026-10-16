@@ -157,7 +157,12 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
             .as_ref()
             .and_then(|data| storage_paths(data).ok())
             .is_some_and(|paths| paths.iter().any(Option::is_some));
-        let resolved_effect = evaluate_storage_drop(own_drag, *effect, supported);
+        let modal_active = self.window.label() == "main" && crate::clear_confirmation::is_modal_active(self.window.app_handle());
+        let resolved_effect = if modal_active {
+            DROPEFFECT_NONE
+        } else {
+            evaluate_storage_drop(own_drag, *effect, supported)
+        };
         let can_copy = resolved_effect == DROPEFFECT_COPY;
         self.can_copy.set(can_copy);
         *effect = resolved_effect;
@@ -234,6 +239,14 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
     ) -> Result<()> {
         // SAFETY: OLE provides this output pointer for this callback only.
         let effect = unsafe { requested_effect(effect)? };
+        if self.window.label() == "main"
+            && crate::clear_confirmation::is_modal_active(self.window.app_handle())
+        {
+            *effect = DROPEFFECT_NONE;
+            self.can_copy.set(false);
+            let _ = self.window.emit("shelf-drag-over", false);
+            return Ok(());
+        }
         let own_drag = self.window.state::<DragSession>().is_active();
         let shake_id = if self.window.label() == "main" {
             crate::resident::shake_drop_started(self.window.app_handle())

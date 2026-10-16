@@ -1121,6 +1121,8 @@ pub(crate) fn exit(app: &AppHandle) -> Result<(), String> {
         || crate::shelf_resize::is_resizing(app)?
         || app.state::<ShelfState>().has_pending_operations();
     coordinate_exit(state.inner(), busy, || {
+        crate::clear_confirmation::shutdown(app)?;
+        crate::about::shutdown(app)?;
         manage_items::close(app)?;
         edge_rail::hide(app)?;
         crate::windows_foreground::shutdown(app)?;
@@ -1145,6 +1147,10 @@ fn show_shelf_at(
     app: &AppHandle,
     monitor: Option<&edge_rail::DisplayMonitor>,
 ) -> Result<(), String> {
+    if crate::clear_confirmation::is_modal_active(app) {
+        crate::clear_confirmation::request(app, "main")?;
+        return Ok(());
+    }
     let window = app
         .get_webview_window(SHELF_WINDOW_LABEL)
         .ok_or("Drop Shelf window is missing")?;
@@ -1555,6 +1561,7 @@ pub(crate) fn dismiss_shelf(app: &AppHandle) -> Result<(), String> {
     if state.visibility()? != Visibility::Visible {
         return Ok(());
     }
+    crate::clear_confirmation::guard_interaction(app)?;
     let window = app
         .get_webview_window(SHELF_WINDOW_LABEL)
         .ok_or("Drop Shelf window is missing")?;

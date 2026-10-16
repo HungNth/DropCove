@@ -24,6 +24,18 @@ _Avoid_: Clipboard, storage bin, drop bucket
 The floating window surface that presents the Shelf for direct interaction and management.
 _Avoid_: Shelf, main window
 
+**Drop Shelf Utility Menu**:
+A transient menu on the Drop Shelf that exposes resident-level surfaces without changing Shelf state.
+_Avoid_: Settings menu, notification-area menu
+
+**Settings**:
+The DropCove surface for reviewing and changing durable preferences through its Save and Cancel lifecycle.
+_Avoid_: Preferences page, configuration window
+
+**About Surface**:
+The single informational surface that presents DropCove's product identity and release metadata.
+_Avoid_: About page, About popup, About modal
+
 **Dismiss Drop Shelf**:
 The user-facing dismissal of the floating Drop Shelf without ending the Resident Instance or discarding Shelf references. An empty Shelf leaves every Shelf surface hidden; a non-empty Shelf remains available through the Edge Rail.
 _Avoid_: Exit DropCove, close the application, hide all Shelf surfaces
@@ -35,6 +47,10 @@ _Avoid_: Drop group, file list, collection
 **Shelf Item**:
 An individual filesystem path reference stored within a shelf batch.
 _Avoid_: File copy, attachment, payload
+
+**Temporary Item**:
+A Shelf Item with a temporary lifecycle whose reference can leave the Shelf without deleting its source filesystem object.
+_Avoid_: Temporary file, cached copy
 
 **Shell Visual**:
 A transient file/folder icon or image thumbnail that represents a Shelf Item without becoming part of Shelf state.

@@ -9,11 +9,12 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowDown,
-  GripHorizontal
+  GripHorizontal,
+  Ellipsis
 } from "@lucide/vue";
 
 defineProps<{
-  name: "pin" | "list" | "remove" | "close" | "trash" | "left" | "right" | "down" | "grip";
+  name: "pin" | "list" | "remove" | "close" | "trash" | "left" | "right" | "down" | "grip" | "more";
   size?: 10 | 14;
   filled?: boolean;
   mixed?: boolean;
@@ -38,6 +39,7 @@ defineProps<{
   <ArrowLeft v-else-if="name === 'left'" :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
   <ArrowRight v-else-if="name === 'right'" :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
   <ArrowDown v-else-if="name === 'down'" :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
-  <GripHorizontal v-else :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
+  <GripHorizontal v-else-if="name === 'grip'" :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
+  <Ellipsis v-else :size="size ?? 14" class="block flex-none" :class="size === 10 ? 'size-[10px]' : 'size-[14px]'" />
 </template>
 

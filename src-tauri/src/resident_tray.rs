@@ -12,6 +12,8 @@ use tauri::{
 pub(crate) const TRAY_ID: &str = "resident";
 pub(crate) const MENU_SETTINGS_ID: &str = "settings";
 pub(crate) const MENU_SETTINGS_LABEL: &str = "Settings";
+pub(crate) const MENU_ABOUT_ID: &str = "about";
+pub(crate) const MENU_ABOUT_LABEL: &str = "About";
 pub(crate) const MENU_EXIT_ID: &str = "exit-dropcove";
 pub(crate) const MENU_EXIT_LABEL: &str = "Exit DropCove";
 pub(crate) const WARNING_TITLE: &str = "DropCove warning";
@@ -30,6 +32,7 @@ pub(crate) fn register(app: &AppHandle) -> Result<(), String> {
         .ok_or("resident tray icon is missing")?;
     let menu = tauri::menu::MenuBuilder::new(app)
         .text(MENU_SETTINGS_ID, MENU_SETTINGS_LABEL)
+        .text(MENU_ABOUT_ID, MENU_ABOUT_LABEL)
         .text(MENU_EXIT_ID, MENU_EXIT_LABEL)
         .build()
         .map_err(|e| format!("failed to build resident tray menu: {e}"))?;
@@ -64,6 +67,12 @@ pub(crate) fn register(app: &AppHandle) -> Result<(), String> {
     builder = builder.on_menu_event(move |_app, event| {
         if event.id().as_ref() == MENU_SETTINGS_ID {
             if let Err(e) = crate::settings::open(&app_handle) {
+                if let Err(warning) = crate::resident::publish_warning(&app_handle, &e) {
+                    eprintln!("{e}; warning delivery failed: {warning}");
+                }
+            }
+        } else if event.id().as_ref() == MENU_ABOUT_ID {
+            if let Err(e) = crate::about::open(&app_handle, crate::about::AboutInvocationContext::NotificationArea) {
                 if let Err(warning) = crate::resident::publish_warning(&app_handle, &e) {
                     eprintln!("{e}; warning delivery failed: {warning}");
                 }

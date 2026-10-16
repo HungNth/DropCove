@@ -1,8 +1,9 @@
 [package]
 name = "dropcove"
-version = "0.0.14"
+version = "0.0.15"
 description = "DropCove Resident Workspace"
 authors = ["DropCove Contributors"]
+repository = "https://github.com/HungNth/DropCove"
 edition = "2021"
 
 [lib]

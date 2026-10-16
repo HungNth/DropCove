@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "about-capability",
+  "description": "About Surface close and canonical Source link access",
+  "windows": ["about"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://github.com/HungNth/DropCove" }]
+    }
+  ]
+}

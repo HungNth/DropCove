@@ -63,7 +63,7 @@ Owns application lifetime:
 - distinguishes normal launch from sign-in startup;
 - exits only through the notification-area **Exit DropCove** command, installer shutdown request, or a fatal startup error.
 
-Its interface is small: initialize, show the shelf, open Settings, and exit.
+Its interface is small: initialize, show the shelf, open Settings or About, and exit. The notification-area menu and Drop Shelf utilities reuse the same singleton openers rather than constructing independent windows.
 
 ### 2.2 Presentation Module
 
@@ -73,9 +73,14 @@ Owns transient Windows surfaces:
 - docked **Edge Rail** and its **Rail Handle**;
 - **Manage Items** popup or flyout;
 - Settings window;
+- About Surface;
 - confirmations, status messages, and drag feedback.
 
 Presentation surfaces render projections of core state. They request mutations through the Core Shelf State Module and refresh only after an operation succeeds or a documented rollback completes.
+
+The dedicated Drop Shelf Clear confirmation is a resident-owned native window, not a WebView overlay. It disables native interaction with its owner and guards resident dismissal, movement, resize, OLE drop, and frontend mutation requests until cancellation or confirmation. Its request/confirm lifecycle rechecks authoritative Shelf state and delegates to the existing Core Shelf State mutation. Cancellation, close, setup failure, and shutdown release modal ownership; Edge Rail confirmation ownership remains unchanged.
+
+The About Surface has a separate, non-modal singleton lifecycle and a read-only metadata projection. Product name and version come from the running Tauri package; author and Source come from Cargo package metadata. Homepage remains absent until there is a product site. Its window is denied unrelated custom commands, while capabilities allow only its required window lifecycle and canonical external Source link. The Clear window similarly receives only its confirmation interface and core window/event access.
 
 ### 2.3 Core Shelf State Module
 

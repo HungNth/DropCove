@@ -6,9 +6,10 @@ import { useVirtualCollection } from "../../composables/useVirtualCollection";
 import { useShelf } from "../../composables/useShelf";
 import ShelfBatchCard from "./ShelfBatchCard.vue";
 import BatchDragConfirmation from "./BatchDragConfirmation.vue";
-import ClearTemporaryConfirmation from "./ClearTemporaryConfirmation.vue";
 import ShelfResizeHandles from "./ShelfResizeHandles.vue";
 import ActionIcon from "./ActionIcon.vue";
+import UtilityMenu from "./UtilityMenu.vue";
+import { invoke } from "@tauri-apps/api/core";
 const {
   batches,
   status,
@@ -22,8 +23,6 @@ const {
   hasTemporaryItems,
   confirmingClearTemporary,
   requestClearTemporary,
-  cancelClearTemporary,
-  confirmClearTemporary,
   confirmBatchDrag,
   dragConfirmedBatch,
   cancelBatchDrag,
@@ -37,6 +36,24 @@ const {
   startMove,
   dismissStatus,
 } = useShelf();
+
+async function openSettingsFromMenu() {
+  try {
+    await invoke("open_settings");
+  } catch (error) {
+    status.value = String(error);
+    document.querySelector<HTMLButtonElement>(".more-action")?.focus();
+  }
+}
+
+async function openAboutFromMenu() {
+  try {
+    await invoke("open_about");
+  } catch (error) {
+    status.value = String(error);
+    document.querySelector<HTMLButtonElement>(".more-action")?.focus();
+  }
+}
 const { announcement, announce } = useAnnouncer();
 const gridRef = useTemplateRef<HTMLElement>("gridRef");
 const columns = shallowRef(1);
@@ -112,18 +129,24 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
       <p class="mt-[8px] mb-0 text-[13px] text-dc-text-primary">Drop here</p>
     </section>
     <BatchDragConfirmation :pending="pendingConfirmation" @confirm="confirmBatchDrag" @cancel="cancelBatchDrag" @drag="dragConfirmedBatch" />
-    <ClearTemporaryConfirmation :open="confirmingClearTemporary" :focus-on-open="true" @confirm="confirmClearTemporary" @cancel="cancelClearTemporary" />
-    <footer v-if="hasTemporaryItems" class="flex justify-start mt-auto pt-[4px] px-[8px] pb-[8px]">
+    <footer class="flex items-center justify-between mt-auto pt-[4px] px-[8px] pb-[8px]">
       <button
+        v-if="hasTemporaryItems"
         type="button"
         class="clear-temporary-action inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-transparent rounded-[4px] bg-transparent text-dc-danger cursor-pointer [&:hover:not(:disabled)]:border-dc-danger-border [&:hover:not(:disabled)]:bg-dc-danger-surface [&:hover:not(:disabled)]:text-dc-danger aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:border-[ButtonText] forced-colors:text-dc-danger forced-colors:[&:hover:not(:disabled)]:border-dc-danger-border forced-colors:[&:hover:not(:disabled)]:bg-dc-danger-surface forced-colors:[&:hover:not(:disabled)]:text-dc-danger forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
-        :disabled="busy || resizing || pendingConfirmation !== null"
+        :disabled="busy || resizing || pendingConfirmation !== null || confirmingClearTemporary"
         aria-label="Clear Temporary Items"
         title="Clear Temporary Items; pinned references remain and source files are not deleted"
         @click="() => { requestClearTemporary(); announce('Clear temporary items requested'); }"
       >
         <ActionIcon name="trash" />
       </button>
+      <div v-else class="size-[24px] flex-none" aria-hidden="true" />
+      <UtilityMenu
+        :disabled="busy || resizing || pendingConfirmation !== null || confirmingClearTemporary"
+        @open-settings="openSettingsFromMenu"
+        @open-about="openAboutFromMenu"
+      />
     </footer>
     <div v-if="status" class="flex [align-items:start] gap-[4px] mt-auto mx-[8px] mb-[8px] p-[8px] border border-dc-warning-border bg-dc-warning-surface text-dc-warning-text rounded-[6px] text-[11px] [overflow-wrap:anywhere]" role="alert">
       <span>{{ status }}</span>

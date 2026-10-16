@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 use tauri::{Manager, State};
 
+mod about;
+mod clear_confirmation;
 mod edge_rail;
 mod manage_items;
 mod resident;
@@ -40,12 +42,63 @@ where
 }
 
 fn publish_shelf(app: &tauri::AppHandle, snapshot: ShelfSnapshot) -> Result<ShelfSnapshot, String> {
+    clear_confirmation::synchronize(app)?;
     manage_items::synchronize(app)?;
     resident::synchronize(app, !snapshot.batches.is_empty())?;
     let _ = resident::update_rail_content(app, snapshot.batches.len());
     use tauri::Emitter;
     let _ = app.emit("shelf-changed", ());
     Ok(snapshot)
+}
+
+#[tauri::command]
+async fn request_drop_shelf_clear_temporary(window: tauri::WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    let caller = window.label().to_owned();
+    run_blocking(move || clear_confirmation::request(&app, &caller)).await
+}
+
+#[tauri::command]
+async fn confirm_drop_shelf_clear_temporary(window: tauri::WebviewWindow, app: tauri::AppHandle) -> Result<ShelfSnapshot, String> {
+    clear_confirmation::validate_confirmation_action_caller(window.label())?;
+    run_blocking(move || clear_confirmation::confirm(&app)).await
+}
+
+#[tauri::command]
+async fn cancel_drop_shelf_clear_temporary(window: tauri::WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    clear_confirmation::validate_confirmation_action_caller(window.label())?;
+    run_blocking(move || clear_confirmation::cancel(&app)).await
+}
+
+#[tauri::command]
+fn get_drop_shelf_clear_temporary_state(app: tauri::AppHandle) -> bool {
+    clear_confirmation::is_modal_active(&app)
+}
+
+#[tauri::command]
+fn get_about_metadata(
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+) -> Result<about::AboutMetadata, String> {
+    if window.label() != about::ABOUT_WINDOW_LABEL {
+        return Err("About metadata is only available in About".to_owned());
+    }
+    Ok(about::get_metadata(&app))
+}
+
+#[tauri::command]
+async fn open_about(window: tauri::WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("About can only be requested from the Drop Shelf".to_owned());
+    }
+    run_blocking(move || about::open(&app, about::AboutInvocationContext::DropShelf)).await
+}
+
+#[tauri::command]
+async fn open_settings(window: tauri::WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("Settings can only be requested from the Drop Shelf".to_owned());
+    }
+    run_blocking(move || settings::open(&app)).await
 }
 
 #[tauri::command]
@@ -638,6 +691,7 @@ pub fn run() {
             app.manage(manage_items::ManageItemsState::default());
             app.manage(shelf_resize::ResizeState::default());
             app.manage(resident::ResidentState::default());
+            app.manage(clear_confirmation::ClearConfirmationState::default());
             app.manage(windows_shake::ShakeRuntimeState::default());
             app.manage(windows_visuals::ShellVisualState::new());
             let window = app.get_webview_window("main").ok_or_else(|| {
@@ -664,6 +718,7 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             manage_items::on_window_event(window, event);
+            clear_confirmation::on_window_event(window, event);
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
@@ -698,7 +753,38 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(|invoke| {
+            let webview = invoke.message.webview_ref();
+            let label = webview.label();
+            let command = invoke.message.command();
+            let allowed = match label {
+                "about" => command == "get_about_metadata",
+                "clear-temporary" => matches!(command,
+                    "confirm_drop_shelf_clear_temporary" | "cancel_drop_shelf_clear_temporary"),
+                "main" => command != "clear_temporary",
+                _ => true,
+            };
+            if !allowed {
+                invoke.resolver.reject("command is not permitted from this window");
+                return true;
+            }
+            if label == "main" && clear_confirmation::is_modal_active(webview.app_handle())
+                && matches!(command, "dismiss_drop_shelf" | "prepare_shelf_move" | "start_shelf_resize"
+                    | "start_item_drag" | "prepare_batch_drag" | "start_batch_drag" | "accept_drop"
+                    | "remove_item" | "remove_batch" | "set_item_pinned" | "set_batch_pinned"
+                    | "open_manage_items" | "open_about" | "open_settings" | "save_size")
+            {
+                invoke.resolver.reject("Drop Shelf interaction is blocked while Clear confirmation is open");
+                return true;
+            }
+            let handler: fn(tauri::ipc::Invoke) -> bool = tauri::generate_handler![
+            request_drop_shelf_clear_temporary,
+            get_drop_shelf_clear_temporary_state,
+            confirm_drop_shelf_clear_temporary,
+            cancel_drop_shelf_clear_temporary,
+            get_about_metadata,
+            open_about,
+            open_settings,
             get_rail,
             open_shelf_from_rail,
             set_rail_transient_hold,
@@ -741,7 +827,9 @@ pub fn run() {
             invalidate_surface_visuals,
             cancel_shelf_visual,
             acknowledge_shelf_warning,
-        ])
+            ];
+            handler(invoke)
+        })
         .run(tauri::generate_context!());
 
     if let Err(error) = result {

@@ -157,7 +157,7 @@ A second normal launch:
 The notification-area icon remains available while DropCove is resident.
 
 - Left click or double-click: show the Drop Shelf.
-- Right click: open a menu containing **Settings** and **Exit DropCove**.
+- Right click: open a menu containing **Settings**, **About**, and **Exit DropCove**, in that order.
 - **Exit DropCove**: terminate the resident process.
 - Recoverable startup or integration failures may appear as warning notifications.
 
@@ -175,6 +175,17 @@ At Windows sign-in, DropCove starts with a hidden-start option:
 - neither the Drop Shelf nor Edge Rail is shown automatically.
 
 The user can later show the shelf through the hotkey, tray icon, or another launch.
+
+### 5.4 About Surface
+
+The notification-area **About** action and the Drop Shelf Utility Menu open the same non-modal, single-instance About Surface. Repeated requests show and focus the existing window without moving it; `Escape` or the window close action destroys it so a later request can recreate it.
+
+The decorated, fixed-size `400 × 460`-logical-pixel surface appears on the Drop Shelf monitor when opened there, or the pointer monitor when opened from the notification area. Opening About from the notification area does not show or change any Shelf surface.
+
+About shows the canonical logo, product name, synchronized running version, Author, and a **Source** link that opens the repository in the default browser. Author and repository come from Cargo package metadata. The repository is not called a Website; homepage remains unset until a public product site exists.
+
+**Check for updates** is disabled and accompanied by **Coming soon**. It performs no check or network activity; installer-based updates remain the supported workflow.
+
 
 ## 6. Display states
 
@@ -267,6 +278,7 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 - Reopening the Drop Shelf uses canonical cursor-monitor or Edge Rail placement; dragged coordinates are not persisted.
 - The empty Drop Shelf shows only a downward icon and `Drop here`.
 - A bottom-left trash icon exposes **Clear Temporary Items** only while temporary content exists.
+- An always-visible bottom-right `24 × 24` **More** action opens the Drop Shelf Utility Menu above it. The menu contains **Settings** then **About**, supports standard keyboard navigation, and closes on outside click or `Escape`. Dismissal restores focus unless an opened utility surface receives it. Settings reuses its existing singleton window and Save/Cancel lifecycle.
 - Status messages can be dismissed independently.
 - Foreground application changes reassert topmost z-order without activating the shelf.
 - `Esc` closes Manage Items first; a later `Esc` dismisses the shelf.
@@ -551,6 +563,12 @@ Bulk Pinning includes Available, Missing, and Unavailable references still prese
 - No removal action deletes a source filesystem object.
 
 If persistence fails, the visible and durable state remain unchanged and DropCove reports the failure.
+
+The Drop Shelf Clear confirmation opens in its own decorated, fixed-size `360 × 200`-logical-pixel, taskbar-hidden, always-on-top window centered within the Drop Shelf monitor work area. Its heading is **Clear temporary items?**, its explanation is **Pinned items stay. Source files and folders aren’t deleted.**, and its actions are **Cancel** and **Clear**. Cancel is focused initially; `Escape` and the window close action cancel without mutation.
+
+While this confirmation is open, the Drop Shelf cannot be dismissed, moved, resized, dragged from, or used for competing mutations or utility actions. Repeated requests focus the existing confirmation. Confirmation rechecks authoritative Temporary Item availability and invokes the existing atomic Clear operation; stale empty requests make no removal. Exit DropCove and Cooperative Shutdown retain normal teardown authority.
+
+The Edge Rail continues to use its existing local confirmation, transient hold, and Edge Rail fullscreen-cancellation lifecycle. It does not open the dedicated Drop Shelf confirmation.
 
 ## 14. Drag-out behavior
 

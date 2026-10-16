@@ -132,7 +132,7 @@ pub(crate) fn register_owner(window: &WebviewWindow) -> Result<(), String> {
 }
 
 pub(crate) fn start(app: &AppHandle, edge: ResizeEdge) -> Result<(), String> {
-    if app.state::<DragSession>().is_active() || is_resizing(app)? {
+    if app.state::<DragSession>().is_active() || is_resizing(app)? || crate::clear_confirmation::is_modal_active(app) {
         return Err("another native interaction is already active".to_owned());
     }
     crate::manage_items::close(app)?;
@@ -168,7 +168,7 @@ pub(crate) fn start(app: &AppHandle, edge: ResizeEdge) -> Result<(), String> {
 }
 
 pub(crate) fn prepare_move(app: &AppHandle) -> Result<(), String> {
-    if app.state::<DragSession>().is_active() || is_resizing(app)? {
+    if app.state::<DragSession>().is_active() || is_resizing(app)? || crate::clear_confirmation::is_modal_active(app) {
         return Err("another native interaction is already active".to_owned());
     }
     crate::manage_items::close_explicit(app)

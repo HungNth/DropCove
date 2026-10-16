@@ -566,7 +566,7 @@ Final release gate completed: the user confirmed `0.0.13 đã nghiệm thu` on 2
 
 ## 0.0.14 — Drop Shelf window controls
 
-**Status:** In progress — candidate built and exercised; final human acceptance pending.
+**Status:** Completed — user confirmed final human acceptance on 2026-10-16. Git commit authorization remains separate.
 
 **Plan:** [Drop Shelf Window Controls specification](../.scratch/drop-shelf-window-controls/spec.md).
 
@@ -620,8 +620,44 @@ Final release gate completed: the user confirmed `0.0.13 đã nghiệm thu` on 2
   - All temporary smoke and fixture directories removed.
 - **Unobserved limits:** physical high-DPI scaling factors (exercises performed at scale 1), physical hardware keyboard chord detection (Windows-injected hotkey chords skipped in favor of native message dispatch), and actual physical Windows Contrast Theme monitor presentation (covered via media feature emulation) remain unobserved in this release run.
 
-Final release gate requires user human acceptance. Git commit authorization remains separate.
+The user confirmed `0.0.14 đã nghiệm thu` on 2026-10-16. This is user-reported final acceptance, not additional agent-observed coverage. Git commit authorization remains separate.
 
 ### Deferred
 
 - Durable Drop Shelf position, placement settings, custom snapping, moving Manage Items with the Drop Shelf, drag movement for other surfaces, and using the `X` action to exit DropCove.
+
+## 0.0.15 — Drop Shelf utility menu and About surface
+
+**Status:** Completed — user confirmed all acceptance checks passed and explicitly authorized committing the changes on 2026-10-16. All four tickets are resolved.
+
+**Plan:** [Drop Shelf Utility Menu and About Surface specification](../.scratch/drop-shelf-utility-menu-about/spec.md), with four approved slices: [01 Clear confirmation](../.scratch/drop-shelf-utility-menu-about/issues/01-drop-shelf-clear-confirmation.md), [02 notification-area About](../.scratch/drop-shelf-utility-menu-about/issues/02-about-surface-notification-area.md), [03 Drop Shelf Utility Menu](../.scratch/drop-shelf-utility-menu-about/issues/03-drop-shelf-utility-menu.md), and [04 release](../.scratch/drop-shelf-utility-menu-about/issues/04-release-0.0.15.md).
+
+### Scope
+
+- Move the Drop Shelf's Clear Temporary Items confirmation into a dedicated decorated Tauri window sized for the complete message and actions. Keep it fixed-size, taskbar-hidden, always-on-top, centered on the Drop Shelf monitor, modal to Drop Shelf interaction, and reusable through focus while already open. `X` and `Escape` cancel. Use the shorter copy `Clear temporary items?` and `Pinned items stay. Source files and folders aren’t deleted.`
+- Preserve the existing confirmed Clear Temporary Items lifecycle: remove Temporary references, preserve Pinned references, never delete source filesystem objects, retain atomic persistence rollback, and close stale confirmation state safely. The Edge Rail confirmation remains unchanged in this version.
+- Add an always-visible `24 × 24` More action at the Drop Shelf's bottom-right. Open an in-shelf popover above it with `Settings` followed by `About`; outside click or `Escape` closes the popover and returns focus. Reuse the existing Settings surface and singleton opener.
+- Add one decorated, fixed-size, taskbar-visible About Surface centered on the invoking monitor. Repeated requests focus the existing surface; `X` and `Escape` close it. Show the existing DropCove logo, product name, synchronized runtime/build version, author `DropCove Contributors` sourced from `Cargo.toml.package.authors`, and a `Source` link sourced from `Cargo.toml.package.repository` that opens in the default browser.
+- Include a disabled `Check for updates` action with `Coming soon`. Do not add updater dependencies, configuration, permissions, background checks, or a clickable no-op.
+- Add `About` to the Windows notification-area menu between `Settings` and `Exit DropCove`, opening or focusing the same About Surface without changing Drop Shelf visibility or Resident Instance lifetime.
+- Follow the existing Segoe UI typography and DropCove surface, accent, text, border, focus, and danger tokens. Preserve Dark, Light, Windows Contrast, keyboard, focus-return, and reduced-motion behavior.
+- Read the About version from synchronized runtime metadata. Actual pre-bump builds displayed `0.0.14`; the synchronized exact candidate displays `0.0.15` without a hard-coded frontend milestone.
+- Keep `Cargo.toml.package.homepage` unset until DropCove has a public product site. Do not present the repository as `Website`, and do not duplicate author or repository values in frontend or Tauri configuration; project the Cargo metadata to the About Surface through one Rust command.
+
+### Deferred
+
+- Implementing update checks or adding a Tauri updater integration.
+- Moving the Edge Rail Clear Temporary Items confirmation or adding the Drop Shelf Utility Menu to the Edge Rail.
+- Additional About metadata such as description, license, copyright, or release notes.
+- A public product homepage and `Website` field until a canonical product-site URL exists.
+
+### Delivery evidence and final acceptance gate
+
+- Frontend production build and cargo-xwin Windows release/NSIS packaging passed. The full native Windows suite passed **111/111**; focused new geometry/caller coverage passed **5/5**. Standards and Spec reviews have no remaining actionable findings. External xwin library missing-PDB `LNK4099` warnings remain.
+- Exact installer: `build/DropCove-Setup-0.0.15.exe`, **3,289,290 bytes**, SHA-256 `5ddf9b2676576d8e25ebb79918d9f9fa3de243f51f3fee5586ce9b16bdec0a78`. Exact installed executable: **13,870,592 bytes**, SHA-256 `909b2b4f651c815985cd866fd49df2820a8e436c5bb63d936ff2aecbe6f66bc5`. Earlier provisional 0.0.15 bytes are superseded.
+- Real Windows/WebView2 smoke covered native Clear visibility/cancel/confirm/stale-state/rollback, modal guards, More navigation and outside-focus repair, outside Pin All activation, Settings/About singleton reuse, tray About without revealing Shelf, runtime metadata, Source browser opening, two-monitor placement at scale 1, and Dark/Light/forced-color/reduced-motion rendering. Final installed assets loaded from `http://tauri.localhost/` while localhost/Vite access was blocked in the owned WebView; the existing user Vite process was not stopped.
+- Silent install, same-candidate reinstall, secondary activation, Cooperative Shutdown with Clear open, restart reference retention, and completed uninstall passed. Owned Profile Data hashes survived uninstall; ambient profile bytes matched the safety snapshot; captured installer registry/shortcut state was restored and owned smoke resources were removed.
+- **Startup baseline limitation:** the first baseline launch reconciled HKCU Run before its original bytes were captured. Cleanup restored the subsequently captured installed 0.0.14/default-profile registration; exact original pre-baseline Run restoration cannot be claimed.
+- **Historical agent coverage limits:** injected OLE Escape did not establish cancellation and Temporary references were consumed in those attempts, although accepted Copy/Pinned retention and native cancellation-state regressions passed. The user subsequently confirmed all acceptance checks passed. Physical high/mixed-DPI, actual Windows Contrast Theme, screen-reader output, browser-launch failure injection, physical fullscreen/Edge Rail combinations, and literal dev-server-stopped coverage remain unobserved. [Ticket 04](../.scratch/drop-shelf-utility-menu-about/issues/04-release-0.0.15.md) records the now-closed user acceptance gates and preserves these agent-observation limits.
+
+The user confirmed `tất cả đã đạt, hãy commit các thay đổi` on 2026-10-16, closing final human acceptance and explicitly authorizing the commit. This is user-reported acceptance, not additional agent-observed verification.

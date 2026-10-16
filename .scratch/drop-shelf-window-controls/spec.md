@@ -1,6 +1,6 @@
 # DropCove 0.0.14 — Drop Shelf Window Controls
 
-Status: implementation exercised; awaiting user acceptance
+Status: resolved
 Version: 0.0.14
 Design confirmation: approved by user on 2026-10-16
 Testing seam: actual Windows Resident Instance, WebView2 Drop Shelf, and native window behavior, supported by the existing native regression suite; approved by user on 2026-10-16
@@ -167,3 +167,4 @@ The primary acceptance seam is the actual Windows Resident Instance with the rea
   - Same-candidate reinstall/update and Start Menu shortcut creation verified.
   - Ambient registry baseline restored.
   - Unobserved limits: physical high-DPI scaling, physical hardware hotkey chord detection, and physical Windows Contrast Theme monitor presentation.
+- User confirmed final 0.0.14 human acceptance on 2026-10-16 and authorized the 0.0.15 ticket implementation. This records user-reported acceptance, not additional agent-observed verification. Git commit authorization remains separate.

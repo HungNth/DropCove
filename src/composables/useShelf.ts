@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, shallowRef, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -76,11 +76,6 @@ export function useShelf() {
     batches.value.some((batch) => batch.items.some((item) => !item.isPinned))
   );
 
-  watch(hasTemporaryItems, (hasTemp) => {
-    if (!hasTemp && confirmingClearTemporary.value) {
-      confirmingClearTemporary.value = false;
-    }
-  });
   async function apply(snapshot: ShelfSnapshot, request: number) {
     if (disposed) return;
     const [monitor, scale, current, outer, position] = await Promise.all([
@@ -105,19 +100,13 @@ export function useShelf() {
     }
   }
 
-  function cancelClearTemporary() {
-    confirmingClearTemporary.value = false;
-  }
-
-  function requestClearTemporary() {
+  async function requestClearTemporary() {
     if (busy.value || pendingConfirmation.value || !hasTemporaryItems.value) return;
-    confirmingClearTemporary.value = true;
-  }
-
-  async function confirmClearTemporary() {
-    if (!confirmingClearTemporary.value) return;
-    confirmingClearTemporary.value = false;
-    await perform("clear_temporary");
+    try {
+      await invoke("request_drop_shelf_clear_temporary");
+    } catch (error) {
+      if (!disposed) status.value = String(error);
+    }
   }
 
   async function refresh() {
@@ -262,6 +251,18 @@ export function useShelf() {
         const manageButton = document.querySelector<HTMLElement>(selector);
         manageButton?.focus();
       }));
+      await retainListener(window.listen<boolean>("shelf-clear-confirmation-state", ({ payload }) => {
+        if (disposed) return;
+        confirmingClearTemporary.value = payload;
+      }));
+      await retainListener(window.listen("shelf-clear-confirmation-closed", async () => {
+        if (disposed) return;
+        confirmingClearTemporary.value = false;
+        await nextTick();
+        const clearButton = document.querySelector<HTMLElement>(".clear-temporary-action");
+        clearButton?.focus();
+      }));
+      confirmingClearTemporary.value = await invoke<boolean>("get_drop_shelf_clear_temporary_state");
       await refresh();
     } catch (error) {
       if (!disposed) status.value = String(error);
@@ -313,8 +314,6 @@ export function useShelf() {
     hasTemporaryItems,
     confirmingClearTemporary,
     requestClearTemporary,
-    cancelClearTemporary,
-    confirmClearTemporary,
     confirmBatchDrag: () => {
       const pending = pendingConfirmation.value;
       if (!pending) return;

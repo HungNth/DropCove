@@ -45,4 +45,4 @@
   - All temporary smoke and fixture directories completely removed.
 - Unobserved limits: physical high-DPI scaling factors (exercises performed at scale 1), physical hardware keyboard chord detection (Windows-injected hotkey chords skipped in favor of native message dispatch), and actual physical Windows Contrast Theme monitor presentation (covered via media feature emulation) remain unobserved in this release run.
 
-Final release gate requires user human acceptance. Git commit authorization remains separate.
+The user confirmed final 0.0.14 human acceptance on 2026-10-16. This is user-reported acceptance; Git commit authorization remains separate.
