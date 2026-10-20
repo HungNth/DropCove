@@ -42,27 +42,34 @@ onUnmounted(() => {
 <template>
   <dialog
     ref="dialog"
-    class="confirmation max-w-[calc(100%-20px)] max-h-[calc(100%-20px)] box-border p-[10px] border border-dc-danger-border rounded-[8px] text-dc-text-primary bg-dc-surface text-[11px] leading-[1.4] font-['Segoe_UI',sans-serif] forced-colors:border-[ButtonText]"
-    aria-label="Clear temporary items confirmation"
+    class="confirmation max-w-[calc(100%-20px)] max-h-[calc(100%-20px)] box-border p-[18px] border border-dc-border-subtle rounded-[8px] text-dc-text-primary bg-dc-surface text-[12px] leading-[1.4] select-none font-['Segoe_UI',sans-serif] forced-colors:bg-[Canvas] forced-colors:border-[ButtonText] forced-colors:text-[CanvasText]"
+    aria-labelledby="rail-clear-heading"
+    aria-describedby="rail-clear-body"
     @cancel.prevent="emit('cancel')"
   >
-    <p class="m-0 mb-[6px] font-semibold text-dc-text-primary">Clear all temporary items from the shelf?</p>
-    <p class="m-0 mb-[8px] text-dc-text-muted">Pinned items remain on the shelf. Source files and folders on your computer are never deleted.</p>
-    <div class="flex flex-wrap justify-end gap-[6px]">
+    <div class="flex flex-col gap-[8px]">
+      <h1 id="rail-clear-heading" class="m-0 text-[14px] font-semibold leading-[1.3] text-dc-text-primary forced-colors:text-[CanvasText]">
+        Clear temporary items?
+      </h1>
+      <p id="rail-clear-body" class="m-0 text-[12px] leading-[1.4] text-dc-text-secondary forced-colors:text-[CanvasText]">
+        Pinned items stay. Source files and folders aren’t deleted.
+      </p>
+    </div>
+    <div class="flex justify-end gap-[8px] mt-[16px]">
       <button
         ref="cancelButton"
         type="button"
-        class="action border border-dc-border-default rounded-[4px] py-[4px] px-[8px] text-inherit bg-dc-surface-elevated cursor-pointer touch-none select-none hover:border-dc-border-hover hover:bg-dc-surface-hover focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]!"
+        class="action min-w-[72px] h-[28px] px-[12px] text-[12px] font-normal border border-dc-border-default rounded-[4px] bg-dc-surface-elevated text-dc-text-primary cursor-pointer hover:border-dc-border-hover hover:bg-dc-surface-hover focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:focus-visible:outline-[Highlight]"
         @click="emit('cancel')"
       >
         Cancel
       </button>
       <button
         type="button"
-        class="action danger border border-dc-danger-border rounded-[4px] py-[4px] px-[8px] text-dc-accent-text bg-dc-danger cursor-pointer touch-none select-none hover:border-dc-border-hover hover:bg-dc-danger-hover focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]! forced-colors:hover:border-dc-border-hover"
+        class="action danger min-w-[72px] h-[28px] px-[12px] text-[12px] font-normal border border-dc-danger-border rounded-[4px] bg-dc-danger text-dc-accent-text cursor-pointer hover:bg-dc-danger-hover focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:focus-visible:outline-[Highlight]"
         @click="emit('confirm')"
       >
-        Clear Temporary Items
+        Clear
       </button>
     </div>
   </dialog>
