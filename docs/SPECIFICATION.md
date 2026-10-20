@@ -279,6 +279,7 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 - The empty Drop Shelf shows only a downward icon and `Drop here`.
 - A bottom-left trash icon exposes **Clear Temporary Items** only while temporary content exists.
 - An always-visible bottom-right `24 × 24` **More** action opens the Drop Shelf Utility Menu above it. The menu contains **Settings** then **About**, supports standard keyboard navigation, and closes on outside click or `Escape`. Dismissal restores focus unless an opened utility surface receives it. Settings reuses its existing singleton window and Save/Cancel lifecycle.
+- The Utility Menu uses a stronger border token than Shelf batch cards and an elevated shadow to remain distinct from the Drop Shelf in Dark and Light themes. Windows Contrast retains a system-color border even when shadows are suppressed.
 - Status messages can be dismissed independently.
 - Foreground application changes reassert topmost z-order without activating the shelf.
 - `Esc` closes Manage Items first; a later `Esc` dismisses the shelf.
