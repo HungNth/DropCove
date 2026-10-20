@@ -211,7 +211,15 @@ async function openShelf() {
   }
 }
 
+function onPointerDownOutside(event: PointerEvent) {
+  const target = event.target as HTMLElement | null;
+  if (target?.closest(".manage")) return;
+  event.preventDefault();
+  void invoke("close_manage_items");
+}
+
 onMounted(async () => {
+  window.addEventListener("pointerdown", onPointerDownOutside);
   document.title = "DropCove Edge Rail";
   try {
     unlistenDragOver = await getCurrentWindow().listen<boolean>("shelf-drag-over", ({ payload }) => {
@@ -247,12 +255,12 @@ onMounted(async () => {
 
 onUnmounted(() => {
   disposed = true;
+  window.removeEventListener("pointerdown", onPointerDownOutside);
   unlistenRail?.();
   unlistenShelf?.();
   unlistenTransientsClosed?.();
   unlistenDragOver?.();
 });
-
 const railListRef = useTemplateRef<HTMLElement>("railListRef");
 const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => Number(draggingOver.value));
 </script>

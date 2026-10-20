@@ -148,6 +148,9 @@ async fn open_manage_items(
     let origin = window.label().to_owned();
     let state = state.inner().clone();
     run_blocking(move || {
+        if manage_items::active_batch(&app)?.as_deref() == Some(&batch_id) {
+            return manage_items::close_explicit(&app);
+        }
         let batch = state
             .management_batch(&batch_id)
             .map_err(|error| error.to_string())?;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { shallowRef, useTemplateRef } from "vue";
+import { onMounted, onUnmounted, shallowRef, useTemplateRef } from "vue";
 import { useResizeObserver } from "@vueuse/core";
 import { useAnnouncer } from "../../composables/useAnnouncer";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
@@ -55,6 +55,22 @@ async function openAboutFromMenu() {
     document.querySelector<HTMLButtonElement>(".more-action")?.focus();
   }
 }
+
+function onPointerDownOutside(event: PointerEvent) {
+  const target = event.target as HTMLElement | null;
+  if (target?.closest(".manage")) return;
+  event.preventDefault();
+  void invoke("close_manage_items");
+}
+
+onMounted(() => {
+  window.addEventListener("pointerdown", onPointerDownOutside);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("pointerdown", onPointerDownOutside);
+});
+
 const { announcement, announce } = useAnnouncer();
 const gridRef = useTemplateRef<HTMLElement>("gridRef");
 const columns = shallowRef(1);
