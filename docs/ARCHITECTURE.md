@@ -158,7 +158,7 @@ The instance identity is profile-specific. A normal profile and an explicit test
 | **Shelf Item** | Identifier, batch identifier, position, path, display name, folder flag, pinned flag | Represents one path occurrence inside one batch. |
 | **Display State** | Not persisted as a standalone value | `Hidden`, `Visible`, or `EdgeDocked`. |
 | **Rail Placement** | Settings: target monitor identifier and `Left` or `Right` edge; shelf state: remembered monitor identifier | A configured target monitor takes precedence over remembered placement; temporary fallback does not rewrite the configured preference. |
-| **Sizing State** | Preferred logical width, nullable manual logical height | Automatic height applies when manual height is absent. |
+| **Sizing State** | Preferred logical width, nullable Manual Height Override | Automatic Shelf Sizing derives the exact current height from preferred width and responsive batch rows when manual height is absent. |
 | **Availability** | Not persisted | Recomputed as `Available`, `Missing`, or `Unavailable` at restore and drag boundaries. |
 
 ### 4.2 Relationships

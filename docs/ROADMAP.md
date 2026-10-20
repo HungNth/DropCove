@@ -58,7 +58,7 @@ Status values: `Completed`, `In progress`, `Planned`, or `Blocked`.
 - Single-item Drop Shelf intake, restart restore, Remove Batch, and copy-only OLE item drag-out.
 - Windows OLE drag executes on the owning window thread; database operations remain outside presentation input handling.
 - Multi-item Windows Shell/CF_HDROP intake, skipped-entry feedback, source-order retention, and ordinal case-insensitive exact-batch duplicate suppression.
-- Responsive grid, Automatic Shelf Growth, pending empty-shelf width intent, and persisted non-empty shelf width.
+- Responsive grid, Automatic Shelf Sizing, pending empty-shelf width intent, and persisted non-empty shelf width.
 - Availability classification at restore/drag boundaries, durable Missing cleanup, retained Unavailable references, and token-scoped whole-batch Copy completion.
 - Accessible mixed-availability modal with cancellation and native drag from the available-items control.
 
@@ -95,7 +95,7 @@ Plan: [Specification](../.scratch/shelf-lifecycle-management/spec.md) · [Delive
 - Add Pin/Unpin, tri-state Bulk Pinning, Remove Item, and confirmed Clear Temporary Items behavior; preserve existing Remove Batch as regression coverage.
 - Add Manage Items for multi-item batches, including direct item drag-out, availability labels, bounded placement, lifecycle closure rules, and focus restoration.
 - Complete single-item and multi-item card actions and the pinned-versus-temporary drag completion behavior.
-- Complete responsive sizing: preferred width, Automatic Shelf Growth, Manual Height Override, resize hit testing, live-growth rules, and final-item reset.
+- Complete responsive sizing: preferred width, Automatic Shelf Sizing, Manual Height Override, resize hit testing, live sizing rules, and final-item reset.
 - Add keyboard traversal, accessible names, tooltips for full paths, and `Esc` ordering for the controls introduced by this version.
 
 ### Implemented
@@ -661,3 +661,46 @@ The user confirmed `0.0.14 đã nghiệm thu` on 2026-10-16. This is user-report
 - **Historical agent coverage limits:** injected OLE Escape did not establish cancellation and Temporary references were consumed in those attempts, although accepted Copy/Pinned retention and native cancellation-state regressions passed. The user subsequently confirmed all acceptance checks passed. Physical high/mixed-DPI, actual Windows Contrast Theme, screen-reader output, browser-launch failure injection, physical fullscreen/Edge Rail combinations, and literal dev-server-stopped coverage remain unobserved. [Ticket 04](../.scratch/drop-shelf-utility-menu-about/issues/04-release-0.0.15.md) records the now-closed user acceptance gates and preserves these agent-observation limits.
 
 The user confirmed `tất cả đã đạt, hãy commit các thay đổi` on 2026-10-16, closing final human acceptance and explicitly authorizing the commit. This is user-reported acceptance, not additional agent-observed verification.
+
+## 0.0.16 — Drag placement feedback and Drop Shelf fit
+
+**Status:** Implemented — tickets 01–03 resolved; exact `0.0.16` Windows x64 candidate built and installed lifecycle verified on 2026-10-20. Ticket 04 is `ready-for-human`; final user acceptance and separate Git commit authorization remain pending.
+
+**Plan:** [Drag Placement Feedback and Drop Shelf Fit](../.scratch/drag-placement-shelf-fit/spec.md), with [01 Automatic Shelf Sizing](../.scratch/drag-placement-shelf-fit/issues/01-exact-automatic-shelf-sizing.md), [02 Drop Shelf placeholder](../.scratch/drag-placement-shelf-fit/issues/02-drop-shelf-drop-placeholder-feedback.md), [03 Edge Rail placeholder](../.scratch/drag-placement-shelf-fit/issues/03-edge-rail-drop-placeholder-feedback.md), and [04 release](../.scratch/drag-placement-shelf-fit/issues/04-release-dropcove-0.0.16.md).
+
+### Scope
+
+- Add one `48`-logical-pixel Drop Placeholder for each supported external storage drag over the Drop Shelf or expanded Edge Rail. The placeholder represents one prospective Shelf Batch, occupies the newest-first insertion position, uses a dashed drag-hover border and distinct semantic background, and does not preview filenames, thumbnails, or item counts.
+- Remove the Drop Shelf's surface-wide drag glow while preserving native Copy cursor feedback and the independent resize-hover accent outline. Keep the Edge Rail free of any additional surface-wide drag highlight.
+- Keep drag-hover geometry stable: the Drop Shelf does not preview-resize, the Edge Rail retains its `200 ms` drag-entry expansion delay, and accepted content alone triggers the established surface sizing updates.
+- Apply Automatic Shelf Sizing with Drop Shelf height tiers `180` px for 0–2 responsive rows, `230` px for 3 rows, `282` px for 4 rows, and `334` px for 5 or more rows; six or more rows scroll.
+- Without a Manual Height Override, recalculate height in both directions after accepted content, width-only resize, Remove Item, Remove Batch, Clear Temporary Items, Successful Drag-Out consumption, and confirmed-Missing cleanup. Automatic shrink keeps the top-left origin fixed.
+- Preserve Manual Height Override for height-changing vertical or corner resize while content remains. Width-only resize stays automatic, and final-item removal resets the next opening to `191 × 180`.
+- Preserve newest-first Shelf ordering, one-batch-per-drop intake, duplicate and unsupported-input behavior, source-file safety, Edge Rail height tiers, Light/Dark/Windows Contrast presentation, and existing drag-entry/collapse timing.
+
+### Planned verification
+
+- Replace regression expectations for `236/292/348` and no-live-shrink behavior with exact Automatic Shelf Sizing coverage, including `save_size(width, None)` growing and shrinking after responsive column changes while a Manual Height Override continues to win.
+- Exercise every row tier and overflow boundary at representative one-, two-, and three-column widths; verify exact window heights, top-left anchoring, final-item reset, and no premature scrollbar.
+- Exercise Remove Item, Remove Batch, Clear Temporary Items, Successful Drag-Out consumption, and confirmed-Missing cleanup with and without a Manual Height Override.
+- Exercise real Windows OLE drag enter, leave, unsupported payload, application-owned drag, accepted drop, and duplicate-only drop on both Drop Shelf and Edge Rail; verify placeholder position, stable hover geometry, Copy cursor, 200 ms Rail expansion, and absence of surface-wide glow.
+- Verify Dark, Light, Windows Contrast, reduced-motion, native frontend build, complete cargo-xwin-produced Windows regression executable, Windows x64 packaging, and exact installed candidate only after implementation acceptance.
+
+### Deferred
+
+- Showing incoming filenames, thumbnails, or item counts before drop acceptance.
+- Preview-resizing either surface during drag hover or changing Edge Rail expansion/collapse timing.
+- Arbitrary insertion positions, batch reordering, or more than one Drop Placeholder for a single drag operation.
+
+### Observed implementation and release evidence — 2026-10-20
+
+- Exact Automatic Shelf Sizing is derived in the shared Shelf State projection. Pending empty-shelf manual intent remains transient; populated automatic snapshots no longer retain a larger prior height. Removed the obsolete two-batch column-height assertions and added operation-level tier/width/pruning regressions, including non-final item retention and manual-height precedence.
+- Real WebView2 measured one-column row counts 1–6 at `180/180/230/282/334/334` pixels. Rows 3–5 had equal scroll content and viewport heights of `160/212/264`; row 6 overflowed at the `334` cap. Six batches at widths `348/516/347` yielded heights `230/180/334`. Kept the canonical 8-pixel collection boundary and reclaimed the redundant 4-pixel footer top padding to eliminate premature overflow.
+- Shared 48-pixel dashed Drop Placeholder, transient virtual leading slot, unchanged authoritative collection size, no Drop Shelf-wide glow, and no hover-time native resize were exercised. Real OLE covered supported multi-file input, unsupported text, leave, duplicate-only drops, application-owned self-drop rejection, and exact-byte Pinned Copy retention. Virtualized 66-batch Shelf content retained bounded mounting, three-column layout at width 524, and a reachable final index 65 with 8-pixel bottom clearance.
+- Real Left/Right Rail drag entry displayed the placeholder after native expansion without foreground-focus theft. Minimum and maximum expanded sizes remained `280 × 280` and `280 × 642`; leave cleared the marker and returned to the `16 × 280` handle. Accepted and duplicate-only drops preserved the separate Rail sizing/timer contract.
+- Complete frontend typecheck/production build and cargo-xwin Windows release/NSIS packaging passed. Final versioned Windows regression executable `dropcove_lib-1ae260f7822f63f3.exe` passed **113/113** directly. External SDK missing-PDB `LNK4099` linker warnings remain nonfatal and unsuppressed.
+- Exact installer: `build/DropCove-Setup-0.0.16.exe`, **3,287,614 bytes**, SHA-256 `5002330c008cdde3978857355e9f86f331b968a614d87442303747d4c3605a29`. Exact installed executable: **13,869,568 bytes**, SHA-256 `eeccf4037e0c547aac3cd3181096703ec8315a6b93741e7bea1e6fc3479f77a3`. PE FileVersion was `0.0.16.0`; runtime and uninstall metadata reported `0.0.16`.
+- Exact installed assets loaded from `http://tauri.localhost/assets/index-oUXleKGu.js` with the owned Vite service stopped and port 1420 refusing connections. Installed OLE proved Shelf/Rail placeholders, both docking edges, no preview resize, and immediate Shelf shrink `282 → 230 → 180` with unchanged top-left origin. Dark/Light visuals and installed forced-colors/reduced-motion emulation were inspected.
+- Silent installation, same-candidate reinstall, secondary activation, restart retention, Cooperative Shutdown, and uninstall all succeeded. Reinstall preserved installed executable identity and owned Profile Data hashes. Uninstall removed the installed directory while preserving owned Profile Data byte-for-byte. Ambient profile and fixture bytes were unchanged; installer registry, shortcut bytes, and the originally captured HKCU Run value were restored exactly. Owned processes, attachments, profiles, fixtures, copies, Vite service, and temporary scaffolding were removed. No owned fixture outputs were present on the Desktop at cleanup.
+- **Unobserved/final human gate:** physical high/mixed-DPI, actual Windows Contrast Theme, screen-reader output, physical keyboard/resize gestures, tray/hotkey/Shake and fullscreen combinations were not all re-exercised. Native regressions and media emulation are not physical coverage. The retained installer is ready for user acceptance, not yet accepted; no Git commit was created.
+- **Final two-axis review:** independent Standards and Spec reviews of the scoped uncommitted implementation and new `DropPlaceholder.vue` module returned **0 actionable findings per axis**. No source changes were required after the exact candidate was packaged; final human acceptance remains pending.

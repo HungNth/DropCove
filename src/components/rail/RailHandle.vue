@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import type { ShelfAnchor, ShelfBatch } from "../../composables/useShelf";
 import ShelfBatchCard from "../shelf/ShelfBatchCard.vue";
+import DropPlaceholder from "../shelf/DropPlaceholder.vue";
 import BatchDragConfirmation from "../shelf/BatchDragConfirmation.vue";
 import ClearTemporaryConfirmation from "../shelf/ClearTemporaryConfirmation.vue";
 import ActionIcon from "../shelf/ActionIcon.vue";
@@ -34,6 +35,7 @@ const expanded = shallowRef(false);
 const batches = shallowRef<ShelfBatch[]>([]);
 const status = shallowRef("");
 const busy = shallowRef(false);
+const draggingOver = shallowRef(false);
 const confirmingClearTemporary = shallowRef(false);
 const pendingConfirmation = shallowRef<{
   batchId: string;
@@ -45,6 +47,7 @@ let readyConfirmation: { batchId: string; token: string } | null = null;
 let unlistenRail: UnlistenFn | undefined;
 let unlistenShelf: UnlistenFn | undefined;
 let unlistenTransientsClosed: UnlistenFn | undefined;
+let unlistenDragOver: UnlistenFn | undefined;
 let disposed = false;
 const hasTemporaryItems = computed(() =>
   batches.value.some((batch) => batch.items.some((item) => !item.isPinned)),
@@ -211,6 +214,9 @@ async function openShelf() {
 onMounted(async () => {
   document.title = "DropCove Edge Rail";
   try {
+    unlistenDragOver = await getCurrentWindow().listen<boolean>("shelf-drag-over", ({ payload }) => {
+      if (!disposed) draggingOver.value = payload;
+    });
     unlistenRail = await getCurrentWindow().listen<Projection>("rail-changed", async ({ payload }) => {
       if (!disposed) {
         edge.value = payload.edge;
@@ -244,10 +250,11 @@ onUnmounted(() => {
   unlistenRail?.();
   unlistenShelf?.();
   unlistenTransientsClosed?.();
+  unlistenDragOver?.();
 });
 
 const railListRef = useTemplateRef<HTMLElement>("railListRef");
-const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
+const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => Number(draggingOver.value));
 </script>
 
 <template>
@@ -314,6 +321,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4);
           :style="railVirtual.enabled.value ? { position: 'relative' } : {}"
         >
         <div v-if="railVirtual.enabled.value" :style="{ height: `${railVirtual.totalHeight.value}px`, flex: 'none', width: '100%', pointerEvents: 'none' }" />
+        <DropPlaceholder v-if="draggingOver" class="rounded-[6px]" :style="railVirtual.leadingPosition.value" />
         <ShelfBatchCard
           v-for="entry in railVirtual.entries.value"
           :key="entry.item.id"

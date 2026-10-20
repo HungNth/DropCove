@@ -8,6 +8,7 @@ export function useVirtualCollection<T extends { id: string }>(
   columns: MaybeRefOrGetter<number> = 1,
   initialHeight = 80,
   gap = 4,
+  leadingItems: MaybeRefOrGetter<number> = 0,
 ) {
   const width = shallowRef(0);
   const contentLeft = shallowRef(0);
@@ -18,9 +19,10 @@ export function useVirtualCollection<T extends { id: string }>(
   const enabled = computed(() => toValue(items).length > 50);
   const columnCount = computed(() => Math.max(1, Math.floor(toValue(columns))));
   const stride = computed(() => itemHeight.value + gap);
-  const totalHeight = computed(() => Math.max(0, Math.ceil(toValue(items).length / columnCount.value) * stride.value - gap));
-  const start = computed(() => Math.max(0, Math.floor(scrollTop.value / stride.value) - 2) * columnCount.value);
-  const end = computed(() => Math.min(toValue(items).length, (Math.ceil((scrollTop.value + height.value) / stride.value) + 2) * columnCount.value));
+  const leadingCount = computed(() => toValue(leadingItems));
+  const totalHeight = computed(() => Math.max(0, Math.ceil((toValue(items).length + leadingCount.value) / columnCount.value) * stride.value - gap));
+  const start = computed(() => Math.max(0, Math.max(0, Math.floor(scrollTop.value / stride.value) - 2) * columnCount.value - leadingCount.value));
+  const end = computed(() => Math.min(toValue(items).length, (Math.ceil((scrollTop.value + height.value) / stride.value) + 2) * columnCount.value - leadingCount.value));
   const entries = computed(() => {
     const source = toValue(items);
     if (!enabled.value) return source.map((item, index) => ({ item, index }));
@@ -33,7 +35,7 @@ export function useVirtualCollection<T extends { id: string }>(
     return result;
   });
   const itemWidth = computed(() => Math.max(0, (width.value - gap * (columnCount.value - 1)) / columnCount.value));
-  function position(index: number) {
+  function positionAt(index: number) {
     if (!enabled.value) return undefined;
     return {
       position: "absolute" as const,
@@ -43,6 +45,10 @@ export function useVirtualCollection<T extends { id: string }>(
       boxSizing: "border-box" as const,
     };
   }
+  function position(index: number) {
+    return positionAt(index + leadingCount.value);
+  }
+  const leadingPosition = computed(() => positionAt(0));
   function measure() {
     const element = container.value;
     if (!element) return;
@@ -75,7 +81,7 @@ export function useVirtualCollection<T extends { id: string }>(
     if (index < 0 || index >= source.length || !container.value) return;
     focusedId.value = source[index].id;
     if (enabled.value) {
-      const top = Math.floor(index / columnCount.value) * stride.value;
+      const top = Math.floor((index + leadingCount.value) / columnCount.value) * stride.value;
       if (top < container.value.scrollTop) container.value.scrollTop = top;
       else if (top + itemHeight.value > container.value.scrollTop + container.value.clientHeight) {
         container.value.scrollTop = top + itemHeight.value - container.value.clientHeight;
@@ -103,5 +109,5 @@ export function useVirtualCollection<T extends { id: string }>(
     event.preventDefault();
     await focus(nextIndex, event.shiftKey ? -1 : 0);
   }
-  return { enabled, entries, totalHeight, width, position, focus, onTab, measure };
+  return { enabled, entries, totalHeight, width, position, leadingPosition, focus, onTab, measure };
 }

@@ -5,6 +5,7 @@ import { useAnnouncer } from "../../composables/useAnnouncer";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
 import { useShelf } from "../../composables/useShelf";
 import ShelfBatchCard from "./ShelfBatchCard.vue";
+import DropPlaceholder from "./DropPlaceholder.vue";
 import BatchDragConfirmation from "./BatchDragConfirmation.vue";
 import ShelfResizeHandles from "./ShelfResizeHandles.vue";
 import ActionIcon from "./ActionIcon.vue";
@@ -60,17 +61,15 @@ const columns = shallowRef(1);
 useResizeObserver(gridRef, () => {
   if (gridRef.value) columns.value = getComputedStyle(gridRef.value).gridTemplateColumns.split(" ").length;
 });
-const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
+const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4, () => Number(draggingOver.value));
 </script>
 
 <template>
   <main
-    class="shelf relative flex flex-col h-full box-border border rounded-[12px] text-dc-text-primary font-['Segoe_UI',sans-serif] transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
+    class="shelf relative flex flex-col h-full box-border border rounded-[12px] bg-dc-surface text-dc-text-primary font-['Segoe_UI',sans-serif] transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
     :class="{
-      'border-dc-border-default': !draggingOver && !resizeHover,
-      'bg-dc-surface': !draggingOver,
-      'bg-dc-drag-hover-bg': draggingOver,
-      'border-dc-drag-hover-border [box-shadow:inset_0_0_0_1px_var(--dc-drag-hover-border)]': draggingOver || resizeHover,
+      'border-dc-border-default': !resizeHover,
+      'border-dc-drag-hover-border [box-shadow:inset_0_0_0_1px_var(--dc-drag-hover-border)]': resizeHover,
     }"
     :aria-busy="busy || resizing || moving"
   >
@@ -94,7 +93,7 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
         <ActionIcon name="close" />
       </button>
     </div>
-    <div v-if="batches.length" class="flex flex-col flex-1 min-h-0 pt-[4px]">
+    <div v-if="batches.length || draggingOver" class="flex flex-col flex-1 min-h-0 pt-[8px]">
       <section
         ref="gridRef"
         class="grid grid-cols-[repeat(auto-fill,minmax(164px,1fr))] [align-content:start] gap-[4px] pt-0 px-[7px] pb-[8px] min-h-0 overflow-x-hidden overflow-y-auto"
@@ -104,6 +103,7 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
         @keydown="virtual.onTab"
       >
       <div v-if="virtual.enabled.value" :style="{ height: `${virtual.totalHeight.value}px`, width: '100%', pointerEvents: 'none' }" />
+      <DropPlaceholder v-if="draggingOver" :style="virtual.leadingPosition.value" />
       <ShelfBatchCard
         v-for="entry in virtual.entries.value"
         :key="entry.item.id"
@@ -129,7 +129,7 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4);
       <p class="mt-[8px] mb-0 text-[13px] text-dc-text-primary">Drop here</p>
     </section>
     <BatchDragConfirmation :pending="pendingConfirmation" @confirm="confirmBatchDrag" @cancel="cancelBatchDrag" @drag="dragConfirmedBatch" />
-    <footer class="flex items-center justify-between mt-auto pt-[4px] px-[8px] pb-[8px]">
+    <footer class="flex flex-none items-center justify-between mt-auto pt-0 px-[8px] pb-[8px]">
       <button
         v-if="hasTemporaryItems"
         type="button"

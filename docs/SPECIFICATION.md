@@ -128,6 +128,7 @@ Therefore `shelf.db`, `settings.json`, and recovery data remain available to a l
 | **Edge Rail**              | Screen-edge form of the shelf, directly usable while content remains.                                                             |
 | **Rail Handle**            | Narrow resting form of the Edge Rail.                                                                                             |
 | **Shelf Batch**            | Ordered group of unique paths accepted from one drop operation.                                                                   |
+| **Drop Placeholder**       | Transient card-shaped marker for the newest position of one incoming Shelf Batch.                                                 |
 | **Shelf Item**             | One file or folder path occurrence inside a Shelf Batch.                                                                          |
 | **Temporary Item**         | Shelf Item removed after Successful Drag-Out unless removed earlier by the user or Missing cleanup.                               |
 | **Pinned Item**            | Shelf Item retained after Successful Drag-Out.                                                                                    |
@@ -135,7 +136,7 @@ Therefore `shelf.db`, `settings.json`, and recovery data remain available to a l
 | **Successful Drag-Out**    | Destination reports acceptance with the Windows `Copy` result.                                                                    |
 | **Missing Item**           | Path is confirmed not to exist.                                                                                                   |
 | **Unavailable Item**       | Existence cannot currently be decided because access to the root, volume, network, cloud provider, or permissions is unavailable. |
-| **Automatic Shelf Growth** | Height growth based on responsive rows when no Manual Height Override exists.                                                     |
+| **Automatic Shelf Sizing** | Height derived from responsive rows and updated in both directions when no Manual Height Override exists.                         |
 | **Manual Height Override** | Height explicitly chosen by vertical or corner resizing.                                                                          |
 
 A path reference identifies whatever filesystem entry exists at that path when it is used. If the original object is replaced by another object at the same path, DropCove resolves the replacement.
@@ -276,7 +277,9 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 - A titleless `28`-logical-pixel control strip contains a top-right `24 × 24` close action named **Hide Drop Shelf**. The action uses Dismiss Drop Shelf: empty content becomes `Hidden`, retained content becomes `EdgeDocked`, Manage Items closes, and the Resident Instance remains running without discarding references.
 - The remainder of the control strip serves as the exclusive window-drag region. Movement uses platform-native dragging and is session-only; it closes Manage Items before movement begins, is blocked during native resize, modal confirmations, or transactional Shelf state, and preserves existing card Copy drag-out, scrolling, controls, and eight-direction resize behavior.
 - Reopening the Drop Shelf uses canonical cursor-monitor or Edge Rail placement; dragged coordinates are not persisted.
-- The empty Drop Shelf shows only a downward icon and `Drop here`.
+- When no supported external storage drag is over the surface, an empty Drop Shelf shows only a downward icon and `Drop here`.
+- During a supported external storage drag, the Drop Shelf shows one `48`-logical-pixel Drop Placeholder at the prospective newest Shelf Batch position. It replaces the empty prompt or precedes retained batches, uses a dashed drag-hover border and a background distinct from the Shelf surface, and does not show a filename, thumbnail, or item count before acceptance.
+- Drag entry does not apply a surface-wide background, border, outline, or glow and does not temporarily resize the Drop Shelf. The resize-hover accent outline remains independent. Leaving or completing the drag removes the placeholder; an accepted new Shelf Batch then applies Automatic Shelf Sizing.
 - A bottom-left trash icon exposes **Clear Temporary Items** only while temporary content exists.
 - An always-visible bottom-right `24 × 24` **More** action opens the Drop Shelf Utility Menu above it. The menu contains **Settings** then **About**, supports standard keyboard navigation, and closes on outside click or `Escape`. Dismissal restores focus unless an opened utility surface receives it. Settings reuses its existing singleton window and Save/Cancel lifecycle.
 - The Utility Menu uses a stronger border token than Shelf batch cards and an elevated shadow to remain distinct from the Drop Shelf in Dark and Light themes. Windows Contrast retains a system-color border even when shadows are suppressed.
@@ -311,29 +314,40 @@ Examples without vertical overflow (subtract another 8 px of available width whe
 
 Both horizontal insets stay at 7 px with and without overflow. On the Drop Shelf, the 4-pixel painted scrollbar thumb starts at the content-side edge of its 8-pixel hit channel, so left-border-to-card and rightmost-card-to-visible-thumb clearances are both 7 px. The thumb stays rounded and keeps existing idle, hover, active, and Windows Contrast colors. A fixed 8-pixel collection boundary sits outside the top of the real scrollport; 8 pixels of bottom padding remain inside the scroll range. Short collections remain top-aligned. Ordinary and virtualized collections share these boundaries, and the final Shelf Batch remains fully reachable at maximum scroll. The approved 191-pixel minimum window width remains a conservative floor.
 
-### 8.3 Automatic Shelf Growth
+### 8.3 Automatic Shelf Sizing
 
-When no Manual Height Override exists, opening or accepting a new batch derives height from responsive row count:
+When no Manual Height Override exists, opening, width-only resize, accepted content, or content removal derives height from responsive row count:
 
 | Responsive rows | Automatic height |
 | --------------: | ---------------: |
-|             0–1 |           180 px |
-|               2 |           236 px |
-|               3 |           292 px |
-|       4 or more |           348 px |
+|             0–2 |           180 px |
+|               3 |           230 px |
+|               4 |           282 px |
+|       5 or more |           334 px |
+
+Equivalent formula:
+
+```text
+max(180, min(334, 52 × responsive row count + 74))
+```
+
+Six or more responsive rows use `334` px and vertical scrolling.
+
+The compact fit budget retains the 28-pixel control strip, 8-pixel fixed collection top boundary, 8-pixel scroll-range bottom clearance, 24-pixel footer controls with 8 pixels below them, and the surface borders. The footer adds no separate top padding.
 
 Rules:
 
 - width determines column capacity; batch count determines row count;
-- a visible accepted batch can grow height but never shrinks it live;
-- removing content does not shrink the currently visible shelf while other items remain;
-- reopening or restarting recalculates automatic height and may reclaim unused space;
-- duplicate-only and unsupported drops do not grow the shelf;
+- an accepted Shelf Batch can grow the visible Drop Shelf to the applicable tier;
+- when no Manual Height Override exists, every mutation that reduces responsive rows immediately shrinks the visible Drop Shelf to the applicable tier, including Remove Item, Remove Batch, Clear Temporary Items, Successful Drag-Out consumption, and confirmed-Missing cleanup;
+- a width-only resize preserves automatic sizing and recalculates in both directions, including shrinking when the wider grid uses fewer responsive rows;
+- automatic resizing keeps the top-left window origin fixed and retains existing work-area clamping;
+- reopening or restarting recalculates the applicable automatic height;
+- duplicate-only and unsupported drops do not resize the shelf;
 - automatic height is not persisted as manual user intent;
-- a width-only resize preserves automatic-height eligibility;
 - a resize that changes height through a top, bottom, or corner edge creates a Manual Height Override;
-- the Manual Height Override remains until the final Shelf Item is removed;
-- removing the final item resets the next opening to `191 × 180`.
+- while content remains, content mutations do not change a Manual Height Override;
+- removing the final item clears the Manual Height Override and resets the next opening to `191 × 180`.
 
 ## 9. Shelf Batch presentation
 
@@ -452,6 +466,9 @@ Behavior:
 - one through four batches remain at 280 px height;
 - five through eleven batches grow through bounded tiers;
 - twelve or more batches use 642 px and vertical scrolling;
+- a supported storage drag keeps the existing 200 ms drag-entry expansion delay; after expansion, one 48-pixel Drop Placeholder appears before the newest retained Shelf Batch;
+- the placeholder uses a dashed drag-hover border and distinct background without applying a surface-wide Rail highlight;
+- drag hover does not temporarily change Rail height; an accepted new Shelf Batch updates height from the retained batch count through the existing Rail formula;
 - new batches can grow an already expanded rail;
 - removal does not live-shrink the expanded rail; the next expansion recalculates it;
 - removing the final Shelf Item hides the rail immediately;
@@ -771,6 +788,7 @@ Top and bottom Edge Rail docking are not supported.
 - Keyboard users can open and close Manage Items, traverse actions, activate buttons with standard Enter/Space behavior, and restore focus to the originating control.
 - Full paths and drag instructions remain available through tooltips and accessibility text when visual text is shortened or omitted.
 - Theme-aware resources support Light, Dark, and High Contrast presentation.
+- Drop Placeholders use the existing drag-hover semantic colors in Dark and Light themes and Windows system colors in Contrast Themes.
 - Entrance, insertion, removal, and rail transitions are short opacity/scale effects.
 - Non-essential motion is skipped when Windows disables client-area animations.
 - Drag-and-drop and state changes remain functional when animations are disabled.

@@ -44,6 +44,18 @@ _Avoid_: Exit DropCove, close the application, hide all Shelf surfaces
 A grouping of filesystem items that were dragged into DropCove together in a single drop operation.
 _Avoid_: Drop group, file list, collection
 
+**Drop Placeholder**:
+A transient card-shaped marker showing where one incoming Shelf Batch would be inserted while a supported storage drag is over the Drop Shelf or expanded Edge Rail.
+_Avoid_: File placeholder, hover card, ghost batch
+
+**Automatic Shelf Sizing**:
+The Drop Shelf height policy that derives height from responsive rows while no Manual Height Override exists.
+_Avoid_: Automatic Shelf Growth, auto-grow
+
+**Manual Height Override**:
+A user-chosen Drop Shelf height that remains fixed while Shelf content exists.
+_Avoid_: Fixed Shelf size, manual Shelf sizing
+
 **Shelf Item**:
 An individual filesystem path reference stored within a shelf batch.
 _Avoid_: File copy, attachment, payload

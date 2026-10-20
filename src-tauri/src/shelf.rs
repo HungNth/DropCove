@@ -1058,8 +1058,13 @@ impl ShelfStore {
             )
             .optional()?
             .flatten();
-        snapshot.height = manual_height
-            .unwrap_or_else(|| height.max(automatic_height(width, snapshot.batches.len())));
+        snapshot.height = manual_height.unwrap_or_else(|| {
+            if snapshot.batches.is_empty() {
+                height
+            } else {
+                automatic_height(width, snapshot.batches.len())
+            }
+        });
 
         Ok(snapshot)
     }
@@ -1490,7 +1495,7 @@ fn clear_sizing_when_empty(transaction: &Transaction<'_>) -> Result<(), rusqlite
 fn automatic_height(width: f64, batches: usize) -> f64 {
     let columns = ((width - 12.0) / 168.0).floor().max(1.0) as usize;
     let rows = batches.div_ceil(columns);
-    180.0 + rows.saturating_sub(1).min(3) as f64 * 56.0
+    (52.0 * rows.min(5) as f64 + 74.0).max(180.0)
 }
 
 #[cfg(test)]
@@ -1781,32 +1786,70 @@ mod tests {
     }
 
     #[test]
-    fn sizing_grows_live_then_recalculates_on_restore_and_resets_when_empty() {
+    fn automatic_sizing_fits_rows_and_shrinks_after_removal_and_width_changes() {
         let directory = TestDirectory::new("sizing");
         let database = directory.path().join("shelf.db");
         let state = ShelfState::open(&database).unwrap();
-        for index in 0..4 {
-            state
-                .accept_drop(vec![Some(format!("C:\\{index}.txt"))])
-                .unwrap();
+        for (index, expected) in [180.0, 180.0, 230.0, 282.0, 334.0, 334.0].into_iter().enumerate() {
+            let snapshot = state.accept_drop(vec![Some(format!("C:\\{index}.txt"))]).unwrap().snapshot.unwrap();
+            assert_eq!(snapshot.height, expected, "accepted batch {}", index + 1);
         }
-        let grown = state.snapshot().unwrap();
-        assert_eq!(grown.height, 348.0);
-        for batch in &grown.batches[..3] {
-            state.remove_batch(&batch.id).unwrap();
+        for (width, expected) in [(348.0, 230.0), (516.0, 180.0), (347.0, 334.0)] {
+            assert_eq!(state.save_size(width, None).unwrap().height, expected);
         }
-        assert_eq!(state.snapshot().unwrap().height, 348.0);
-        state.save_size(348.0, None).unwrap();
+        for expected in [334.0, 282.0, 230.0, 180.0, 180.0] {
+            let id = state.snapshot().unwrap().batches[0].id.clone();
+            assert_eq!(state.remove_batch(&id).unwrap().height, expected);
+        }
         drop(state);
         let restored = ShelfState::open(database).unwrap();
         let snapshot = restored.snapshot().unwrap();
-        assert_eq!((snapshot.preferred_width, snapshot.height), (348.0, 180.0));
+        assert_eq!((snapshot.preferred_width, snapshot.height), (347.0, 180.0));
         let empty = restored.remove_batch(&snapshot.batches[0].id).unwrap();
         assert_eq!((empty.preferred_width, empty.height), (191.0, 180.0));
     }
 
     #[test]
-    fn restored_width_respects_minimum_and_grid_column_boundary() {
+    fn batch_pruning_reclaims_automatic_height_but_preserves_manual_height() {
+        for manual in [None, Some(400.0)] {
+            for operation in ["remove-batch", "remove-item", "clear", "item-copy", "batch-copy", "missing"] {
+                let directory = TestDirectory::new(operation);
+                let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+                for index in 0..4 {
+                    let snapshot = state.accept_drop(vec![Some(format!("C:\\keep-{index}.txt"))]).unwrap().snapshot.unwrap();
+                    state.set_batch_pinned(&snapshot.batches[0].id, true).unwrap();
+                }
+                let incoming = if operation == "remove-item" {
+                    vec![Some("C:\\remove-a.txt".into()), Some("C:\\remove-b.txt".into())]
+                } else { vec![Some("C:\\remove-a.txt".into())] };
+                let snapshot = state.accept_drop(incoming).unwrap().snapshot.unwrap();
+                let batch = &snapshot.batches[0];
+                state.save_size(191.0, manual).unwrap();
+                let result = match operation {
+                    "remove-batch" => state.remove_batch(&batch.id).unwrap(),
+                    "remove-item" => {
+                        let unchanged = state.remove_item(&batch.items[0].id).unwrap();
+                        assert_eq!(unchanged.height, manual.unwrap_or(334.0));
+                        state.remove_item(&batch.items[1].id).unwrap()
+                    }
+                    "clear" => state.clear_temporary().unwrap(),
+                    "item-copy" => state.complete_item_drag(&batch.items[0].id, DragOutcome::Copy).unwrap(),
+                    "batch-copy" => {
+                        let prepared = state.prepare_batch_drag_with(&batch.id, |_| super::Availability::Available).unwrap();
+                        state.complete_batch_drag(prepared.token.as_deref().unwrap(), DragOutcome::Copy).unwrap()
+                    }
+                    "missing" => state.prepare_batch_drag_with(&batch.id, |_| super::Availability::Missing).unwrap().snapshot,
+                    _ => unreachable!(),
+                };
+                assert_eq!(result.batches.len(), 4, "{operation}");
+                assert_eq!(result.height, manual.unwrap_or(282.0), "{operation}");
+                assert_eq!(state.snapshot().unwrap().height, result.height, "{operation}");
+            }
+        }
+    }
+
+    #[test]
+    fn restored_width_respects_minimum() {
         let directory = TestDirectory::new("minimum-width");
         let database = directory.path().join("shelf.db");
         let state = ShelfState::open(&database).unwrap();
@@ -1821,14 +1864,6 @@ mod tests {
         let snapshot = restored.snapshot().unwrap();
         assert_eq!(snapshot.preferred_width, 191.0);
         assert_eq!(snapshot.batches.len(), 2);
-        restored.save_size(347.0, None).unwrap();
-        drop(restored);
-        let restored = ShelfState::open(&database).unwrap();
-        assert_eq!(restored.snapshot().unwrap().height, 236.0);
-        restored.save_size(348.0, None).unwrap();
-        drop(restored);
-        let restored = ShelfState::open(&database).unwrap();
-        assert_eq!(restored.snapshot().unwrap().height, 180.0);
     }
 
     #[test]
@@ -2685,7 +2720,7 @@ mod tests {
                 .unwrap();
         }
         let grown = state.snapshot().unwrap();
-        assert_eq!(grown.height, 348.0);
+        assert_eq!(grown.height, 282.0);
 
         // Now set manual override
         let manual_snap = state.save_size(250.0, Some(220.0)).unwrap();
@@ -2800,15 +2835,15 @@ mod tests {
                     .accept_drop(vec![Some(format!("C:\\file{i}.txt"))])
                     .unwrap();
             }
-            assert_eq!(state.snapshot().unwrap().height, 348.0);
+            assert_eq!(state.snapshot().unwrap().height, 282.0);
             // Set preferred width only (None for manual height)
             state.save_size(300.0, None).unwrap();
-            // Remove 3 batches: live height does NOT shrink
+            // Removing complete batches reclaims unused automatic height immediately.
             let snap = state.snapshot().unwrap();
             for batch in &snap.batches[..3] {
                 state.remove_batch(&batch.id).unwrap();
             }
-            assert_eq!(state.snapshot().unwrap().height, 348.0);
+            assert_eq!(state.snapshot().unwrap().height, 180.0);
         }
         {
             // On restart, automatic height recalculates to 180.0 for 1 batch
