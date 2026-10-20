@@ -54,14 +54,31 @@ fn encode_bitmap(bitmap: HBITMAP, bound:u32) -> Option<Vec<u8>> {
     if width==0 || height==0 || width>bound || height>bound { return None; }
     let bytes=width.checked_mul(height)?.checked_mul(4)?;
     let mut info=BITMAPINFO{bmiHeader:BITMAPINFOHEADER{biSize:std::mem::size_of::<BITMAPINFOHEADER>() as u32,biWidth:width as i32,biHeight:height as i32,biPlanes:1,biBitCount:32,biCompression:BI_RGB.0,biSizeImage:bytes,..Default::default()},..Default::default()};
-    let mut output=Vec::with_capacity(54+bytes as usize);
-    output.extend_from_slice(b"BM"); output.extend_from_slice(&(54+bytes).to_le_bytes());output.extend_from_slice(&[0;4]);output.extend_from_slice(&54u32.to_le_bytes());
-    output.extend_from_slice(&40u32.to_le_bytes());output.extend_from_slice(&width.to_le_bytes());output.extend_from_slice(&height.to_le_bytes());output.extend_from_slice(&1u16.to_le_bytes());output.extend_from_slice(&32u16.to_le_bytes());output.extend_from_slice(&0u32.to_le_bytes());output.extend_from_slice(&bytes.to_le_bytes());output.extend_from_slice(&[0;16]);
-    output.resize(54+bytes as usize,0);
+    let header_size = 124u32; // BITMAPV5HEADER
+    let offset = 14u32 + header_size;
+    let total_size = offset.checked_add(bytes)?;
+    let mut output = vec![0u8; total_size as usize];
+    output[0..2].copy_from_slice(b"BM");
+    output[2..6].copy_from_slice(&total_size.to_le_bytes());
+    output[10..14].copy_from_slice(&offset.to_le_bytes());
+    // BITMAPV5HEADER layout:
+    output[14..18].copy_from_slice(&header_size.to_le_bytes());
+    output[18..22].copy_from_slice(&width.to_le_bytes());
+    output[22..26].copy_from_slice(&height.to_le_bytes());
+    output[26..28].copy_from_slice(&1u16.to_le_bytes()); // bV5Planes
+    output[28..30].copy_from_slice(&32u16.to_le_bytes()); // bV5BitCount
+    output[30..34].copy_from_slice(&3u32.to_le_bytes()); // bV5Compression = BI_BITFIELDS
+    output[34..38].copy_from_slice(&bytes.to_le_bytes());
+    output[54..58].copy_from_slice(&0x00FF0000u32.to_le_bytes()); // RedMask
+    output[58..62].copy_from_slice(&0x0000FF00u32.to_le_bytes()); // GreenMask
+    output[62..66].copy_from_slice(&0x000000FFu32.to_le_bytes()); // BlueMask
+    output[66..70].copy_from_slice(&0xFF000000u32.to_le_bytes()); // AlphaMask
+    output[70..74].copy_from_slice(&0x73524742u32.to_le_bytes()); // CSType = 'sRGB'
+    output[110..114].copy_from_slice(&4u32.to_le_bytes()); // Intent = LCS_GM_IMAGES
     // SAFETY: DC is paired with ReleaseDC; buffer fits the checked 32-bit DIB dimensions.
     let dc=unsafe{GetDC(None)};
     if dc.is_invalid(){return None;}
-    let lines=unsafe{GetDIBits(dc,bitmap,0,height,Some(output[54..].as_mut_ptr().cast()),&mut info,DIB_RGB_COLORS)};
+    let lines=unsafe{GetDIBits(dc,bitmap,0,height,Some(output[offset as usize..].as_mut_ptr().cast()),&mut info,DIB_RGB_COLORS)};
     unsafe{let _=ReleaseDC(None,dc);}
     if lines!=height as i32{return None;}
     Some(output)
@@ -192,5 +209,33 @@ mod tests {
         service.cancel(&key);assert_eq!(receiver.recv().unwrap(),VisualOutcome::Fallback);
         release.send(()).unwrap();release.send(()).unwrap();for request in requests{let _=request.join().unwrap();}
         assert_eq!(source.calls.load(std::sync::atomic::Ordering::SeqCst),2);
+    }
+
+    #[test]
+    fn encode_bitmap_writes_v5_header_with_alpha_bitfield_masks() {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
+        let temp = std::env::temp_dir().join(format!("dropcove-icon-test-{}.txt", std::process::id()));
+        let _ = std::fs::write(&temp, "test icon file");
+        let name = HSTRING::from(temp.as_os_str());
+        let factory: IShellItemImageFactory = unsafe { SHCreateItemFromParsingName(&name, None) }
+            .expect("SHCreateItemFromParsingName should succeed");
+        let bitmap = unsafe { factory.GetImage(SIZE { cx: 32, cy: 32 }, SIIGBF_ICONONLY | SIIGBF_RESIZETOFIT) }
+            .expect("GetImage should succeed");
+        let encoded = encode_bitmap(bitmap, 32).expect("bitmap encoding should succeed");
+        assert!(encoded.starts_with(b"BM"));
+        assert_eq!(&encoded[14..18], &124u32.to_le_bytes()); // bV5Size
+        assert_eq!(&encoded[30..34], &3u32.to_le_bytes()); // BI_BITFIELDS
+        assert_eq!(&encoded[66..70], &0xFF000000u32.to_le_bytes()); // AlphaMask
+        let offset = u32::from_le_bytes(encoded[10..14].try_into().unwrap()) as usize;
+        assert_eq!(offset, 138); // 14 + 124
+        let pixel_data = &encoded[offset..];
+        let has_alpha = pixel_data.chunks_exact(4).any(|p| p[3] > 0);
+        let has_transparent = pixel_data.chunks_exact(4).any(|p| p[3] == 0);
+        assert!(has_alpha, "Encoded icon must have non-zero alpha pixels for icon content");
+        assert!(has_transparent, "Encoded icon must have transparent pixels for background");
+        unsafe { let _ = DeleteObject(HGDIOBJ(bitmap.0)); }
+        let _ = std::fs::remove_file(temp);
     }
 }
