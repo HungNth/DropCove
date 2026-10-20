@@ -664,7 +664,7 @@ The user confirmed `tất cả đã đạt, hãy commit các thay đổi` on 202
 
 ## 0.0.16 — Drag placement feedback and Drop Shelf fit
 
-**Status:** Implemented — tickets 01–03 resolved; exact `0.0.16` Windows x64 candidate built and installed lifecycle verified on 2026-10-20. Ticket 04 is `ready-for-human`; final user acceptance and separate Git commit authorization remain pending.
+**Status:** Completed — the user reported final acceptance and commit of `0.0.16` on 2026-10-20. Historical agent-observation limits below remain unchanged.
 
 **Plan:** [Drag Placement Feedback and Drop Shelf Fit](../.scratch/drag-placement-shelf-fit/spec.md), with [01 Automatic Shelf Sizing](../.scratch/drag-placement-shelf-fit/issues/01-exact-automatic-shelf-sizing.md), [02 Drop Shelf placeholder](../.scratch/drag-placement-shelf-fit/issues/02-drop-shelf-drop-placeholder-feedback.md), [03 Edge Rail placeholder](../.scratch/drag-placement-shelf-fit/issues/03-edge-rail-drop-placeholder-feedback.md), and [04 release](../.scratch/drag-placement-shelf-fit/issues/04-release-dropcove-0.0.16.md).
 
@@ -704,3 +704,50 @@ The user confirmed `tất cả đã đạt, hãy commit các thay đổi` on 202
 - Silent installation, same-candidate reinstall, secondary activation, restart retention, Cooperative Shutdown, and uninstall all succeeded. Reinstall preserved installed executable identity and owned Profile Data hashes. Uninstall removed the installed directory while preserving owned Profile Data byte-for-byte. Ambient profile and fixture bytes were unchanged; installer registry, shortcut bytes, and the originally captured HKCU Run value were restored exactly. Owned processes, attachments, profiles, fixtures, copies, Vite service, and temporary scaffolding were removed. No owned fixture outputs were present on the Desktop at cleanup.
 - **Unobserved/final human gate:** physical high/mixed-DPI, actual Windows Contrast Theme, screen-reader output, physical keyboard/resize gestures, tray/hotkey/Shake and fullscreen combinations were not all re-exercised. Native regressions and media emulation are not physical coverage. The retained installer is ready for user acceptance, not yet accepted; no Git commit was created.
 - **Final two-axis review:** independent Standards and Spec reviews of the scoped uncommitted implementation and new `DropPlaceholder.vue` module returned **0 actionable findings per axis**. No source changes were required after the exact candidate was packaged; final human acceptance remains pending.
+
+The user subsequently reported `0.0.16 Ticket 04 đã đạt và đã được commit` on 2026-10-20, closing the human gate and unblocking `0.0.17`. This is user-reported acceptance and commit state, not additional agent-observed verification.
+
+## 0.0.17 — Settings window and About metadata polish
+
+**Status:** Completed — all three tickets resolved; the user confirmed final `0.0.17` acceptance and explicitly authorized committing the changes.
+
+**Plan:** [Settings Window and About Metadata Polish](../.scratch/settings-window-about-metadata/spec.md), with [01 Taskbar-visible, invocation-centered Settings](../.scratch/settings-window-about-metadata/issues/01-taskbar-visible-invocation-centered-settings.md), [02 Cargo-owned About author and description](../.scratch/settings-window-about-metadata/issues/02-cargo-owned-about-author-description.md), and [03 release](../.scratch/settings-window-about-metadata/issues/03-release-dropcove-0.0.17.md). All three tickets are resolved.
+
+### Scope
+
+- Create Settings as a singleton decorated top-level window that is visible on the Windows taskbar and remains independent of Drop Shelf visibility. The Resident Instance continues to own application shutdown and Settings cleanup.
+- Center Settings within the invoking monitor's work area on first creation: use the Drop Shelf monitor for a Drop Shelf request and the pointer monitor for a notification-area request, with primary-monitor fallback. Repeated requests show and focus the existing window without repositioning it.
+- Change `Cargo.toml` package metadata to `authors = ["HungNth"]` and `description = "A resident Windows utility providing a temporary drag-and-drop workspace for file and folder references."`.
+- Project the Cargo package description through the existing authoritative About metadata command and display it directly below the runtime version in the About Surface. Do not duplicate the description in Vue or Tauri configuration.
+- Preserve Settings Save/Cancel, shortcut recording, startup, Edge Rail, Shake-to-open, singleton, and Resident Instance lifecycle behavior.
+
+### Planned delivery slices
+
+1. Settings presentation: invocation-aware initial centering, taskbar visibility, singleton reuse, and Resident Instance cleanup.
+2. Package and About metadata: Cargo author/description projection and About Surface presentation.
+3. Release gate: synchronized `0.0.17` manifests, Windows x64 regression checks, cargo-xwin/NSIS packaging, installed-app smoke, and human acceptance.
+
+### Planned verification
+
+- Exercise first opening from both Drop Shelf and notification-area entry points, including available secondary-monitor placement, complete outer-frame work-area bounds, taskbar presence, repeated-request focus without movement, and independent Drop Shelf hide/show behavior.
+- Exercise Settings Save, Cancel, shortcut recording, close, singleton reuse, and Exit DropCove cleanup after the ownership change.
+- Verify runtime About metadata reports author `HungNth` and the exact Cargo description, with the description rendered immediately below the synchronized runtime version without a frontend copy.
+- Complete version synchronization, the native Windows regression suite, frontend production build, cargo-xwin Windows release/NSIS packaging, installed-candidate lifecycle smoke, and final human acceptance before marking `0.0.17` complete.
+
+### Deferred
+
+- Remembering or restoring a user-moved Settings position.
+- User-configurable Settings placement or centering policy.
+- Changing taskbar behavior for Drop Shelf, Edge Rail, Manage Items, or confirmation surfaces.
+
+### Observed implementation and release evidence — 2026-10-20
+
+- Shared invocation-context placement now serves Settings and About. Settings is a decorated top-level singleton, taskbar-visible with hidden/EdgeDocked Shelf, initially centered from the complete native outer frame. Actual primary/secondary Drop Shelf invocation, native tray routing, moved-position reuse, minimized restore, Save/Cancel/native close, recorder focus-loss cancellation, startup/Shake/fullscreen controls, share-denied Save rollback, and Cooperative Shutdown were exercised.
+- Cargo authors are `HungNth`; the package description is projected through the existing About metadata command and rendered directly below the runtime version. Exact installed About reports `0.0.17`; its complete two-line description fits the fixed `400 × 460` surface without scrolling. Dark/Light and emulated forced-colors/reduced-motion rendering were inspected.
+- Frontend production typecheck/build, cargo-xwin release/NSIS packaging, and the fresh Windows native test executable passed. Complete suite: **114/114**. External SDK missing-PDB `LNK4099` warnings remain nonfatal and unsuppressed.
+- Installer: [DropCove-Setup-0.0.17.exe](../build/DropCove-Setup-0.0.17.exe), **3,291,898 bytes**, SHA-256 `9488308f7c441a235a79eff9e0eeef739e28360ab0b658248eaa975d523f4973`. Installed executable: **13,877,760 bytes**, SHA-256 `e4a485be4cce67a3b029201bfa361b43908a8cab8bcebc023c4a70a66a93228b`. Runtime/uninstall version and synchronized manifests report `0.0.17`. Installed assets loaded from `http://tauri.localhost/` while port 1420 refused connections.
+- Silent install, same-candidate reinstall, secondary activation, exact Pinned-reference restart retention, Cooperative Shutdown, and uninstall passed. An initial isolated `/NS` reinstall was rejected because the ambient shortcut targeted the original installation; temporarily protecting/restoring its exact bytes allowed the same candidate to reinstall successfully. Uninstall preserved owned Profile Data and source bytes and removed the executable. Owned smoke resources were removed; ambient executable/profile and shortcut hashes remained unchanged, and captured uninstall registry values plus HKCU Run were restored.
+- **Registry capture limitation:** the actual manufacturer key `Software\dropcove\DropCove` was identified after installation. Its default path was restored from captured pre-install uninstall metadata, retaining observed language `1033`; exact original bytes for this key were not independently captured. See [Ticket 03](../.scratch/settings-window-about-metadata/issues/03-release-dropcove-0.0.17.md) for the complete evidence and final human gate.
+- **Historical agent-observation limits:** physical high/mixed-DPI, tray invocation on the secondary display (host pointer constrained to primary), actual Windows Contrast Theme, screen-reader output, and complete physical shortcut/monitor-selector/Source-browser handoff were not all re-exercised. The user subsequently accepted all checks; this does not reclassify those limits as agent-observed coverage.
+- Independent two-axis review of the final scoped implementation against baseline `a1f677cbb1941c28c27d6506d38d8467c2ba6781` returned **0 Standards findings** and **0 Spec findings**; no source changes were required after packaging the exact candidate.
+- The user confirmed `tất cả đã đạt, hãy commit các thay đổi`, closing final human acceptance and explicitly authorizing the commit. The disclosed registry capture limitation remains preserved.

@@ -1,12 +1,12 @@
 # DropCove 0.0.16 — Drag Placement Feedback and Drop Shelf Fit
 
-Status: ready-for-human
+Status: resolved
 Version: 0.0.16
 Design confirmation: approved by user on 2026-10-20 through `grill-with-docs`
 Testing seam: actual Windows Resident Instance with the real WebView2 Drop Shelf and Edge Rail, supported by the existing Shelf State sizing, native storage-drop eligibility, and Edge Rail timing regressions; approved by user on 2026-10-20
 Delivery prerequisite: completed — the roadmap records 0.0.15 as accepted and completed
-Ticket decomposition: four slices approved by user on 2026-10-20; tickets 01–03 resolved and ticket 04 ready for final human acceptance
-Implementation approval: all four tickets authorized by the user on 2026-10-20; final release acceptance and Git commit authorization remain separate
+Ticket decomposition: all four approved slices are resolved; final user acceptance and commit of 0.0.16 were reported on 2026-10-20
+Implementation approval: all four tickets authorized by the user on 2026-10-20; final acceptance and commit are complete by user report
 Parent roadmap: [DropCove Roadmap](../../docs/ROADMAP.md), version 0.0.16
 Canonical behavior: [Product Specification](../../docs/SPECIFICATION.md), sections 4, 8, 11, 12, and 19
 Canonical architecture: [Architecture](../../docs/ARCHITECTURE.md), especially Sizing State and the existing presentation/storage-drop ownership
@@ -194,5 +194,5 @@ The primary acceptance seam is the running Windows Resident Instance with the re
 - The preferred implementation shape is one deep Shelf State sizing invariant behind the existing state interface, plus presentation-only placeholder state behind the existing native drag-over event. Avoid mutation-specific formulas and duplicate native drag state.
 - ADR-0002 remains authoritative for Edge Rail placement ownership. Automatic Drop Shelf height changes create no new placement owner and do not alter configured or remembered Rail monitor state.
 - No new ADR is warranted because the decisions are reversible and fit established state, presentation, native adapter, and placement ownership.
-- Implementation and installed-candidate verification are complete. Ticket 04 retains the final human acceptance gate; the retained 0.0.16 installer and observation limits are recorded in the roadmap and release ticket.
+- Implementation and installed-candidate verification are complete. The user subsequently reported that Ticket 04 passed and `0.0.16` was committed, closing the human gate; historical observation limits remain preserved in the roadmap and release ticket.
 - Git commit authorization remains separate from specification, ticket, implementation, test, acceptance, and release approval.

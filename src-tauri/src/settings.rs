@@ -5,6 +5,7 @@ use crate::{
     settings_store::{HotKey, RailEdge, Settings, SettingsStore, ShakeSensitivity},
     settings_transaction::{self, Integrations},
     windows_hotkey,
+    windows_auxiliary::{self, InvocationContext},
     windows_startup::{RegistryValue, StartupRegistration},
 };
 use serde::Serialize;
@@ -154,17 +155,16 @@ fn emit_snapshot(app: &AppHandle) -> Result<SettingsSnapshot, String> {
         .map_err(|error| error.to_string())?;
     Ok(snapshot)
 }
-pub(crate) fn open(app: &AppHandle) -> Result<(), String> {
+pub(crate) fn open(app: &AppHandle, context: InvocationContext) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(SETTINGS_WINDOW_LABEL) {
         window.show().map_err(|error| error.to_string())?;
+        window.unminimize().map_err(|error| error.to_string())?;
         window.set_focus().map_err(|error| error.to_string())?;
         emit_snapshot(app)?;
         return Ok(());
     }
-    let owner = app
-        .get_webview_window("main")
-        .ok_or("Drop Shelf window is missing")?;
-    WebviewWindowBuilder::new(
+    let monitor = windows_auxiliary::target_monitor(app, context)?;
+    let window = WebviewWindowBuilder::new(
         app,
         SETTINGS_WINDOW_LABEL,
         WebviewUrl::App("index.html".into()),
@@ -175,12 +175,21 @@ pub(crate) fn open(app: &AppHandle) -> Result<(), String> {
     .resizable(false)
     .decorations(true)
     .skip_taskbar(false)
-    .owner(&owner)
-    .map_err(|error| error.to_string())?
+    .always_on_top(false)
+    .visible(false)
     .build()
     .map_err(|error| error.to_string())?;
-    emit_snapshot(app)?;
-    Ok(())
+    let setup = (|| {
+        windows_auxiliary::center_in_work_area(&window, &monitor)?;
+        window.show().map_err(|error| error.to_string())?;
+        window.set_focus().map_err(|error| error.to_string())?;
+        emit_snapshot(app)?;
+        Ok(())
+    })();
+    if setup.is_err() {
+        let _ = window.close();
+    }
+    setup
 }
 pub(crate) fn start_recording(app: &AppHandle) -> Result<SettingsSnapshot, String> {
     if app.get_webview_window(SETTINGS_WINDOW_LABEL).is_none() {

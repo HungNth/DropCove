@@ -66,13 +66,13 @@ pub(crate) fn register(app: &AppHandle) -> Result<(), String> {
     let app_handle = app.clone();
     builder = builder.on_menu_event(move |_app, event| {
         if event.id().as_ref() == MENU_SETTINGS_ID {
-            if let Err(e) = crate::settings::open(&app_handle) {
+            if let Err(e) = crate::settings::open(&app_handle, crate::windows_auxiliary::InvocationContext::NotificationArea) {
                 if let Err(warning) = crate::resident::publish_warning(&app_handle, &e) {
                     eprintln!("{e}; warning delivery failed: {warning}");
                 }
             }
         } else if event.id().as_ref() == MENU_ABOUT_ID {
-            if let Err(e) = crate::about::open(&app_handle, crate::about::AboutInvocationContext::NotificationArea) {
+            if let Err(e) = crate::about::open(&app_handle, crate::windows_auxiliary::InvocationContext::NotificationArea) {
                 if let Err(warning) = crate::resident::publish_warning(&app_handle, &e) {
                     eprintln!("{e}; warning delivery failed: {warning}");
                 }

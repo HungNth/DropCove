@@ -183,7 +183,7 @@ The notification-area **About** action and the Drop Shelf Utility Menu open the 
 
 The decorated, fixed-size `400 × 460`-logical-pixel surface appears on the Drop Shelf monitor when opened there, or the pointer monitor when opened from the notification area. Opening About from the notification area does not show or change any Shelf surface.
 
-About shows the canonical logo, product name, synchronized running version, Author, and a **Source** link that opens the repository in the default browser. Author and repository come from Cargo package metadata. The repository is not called a Website; homepage remains unset until a public product site exists.
+About shows the canonical logo, product name, synchronized running version, the product description directly below that version, Author, and a **Source** link that opens the repository in the default browser. Author is `HungNth`; the description is **A resident Windows utility providing a temporary drag-and-drop workspace for file and folder references.** Author, description, and repository come from Cargo package metadata rather than frontend copies. The repository is not called a Website; homepage remains unset until a public product site exists.
 
 **Check for updates** is disabled and accompanied by **Coming soon**. It performs no check or network activity; installer-based updates remain the supported workflow.
 
@@ -644,6 +644,12 @@ If a destination accepts `Copy` and DropCove terminates before its removal is pe
 Availability is refreshed at restore and drag boundaries. DropCove does not continuously watch every path for changes.
 
 ## 16. Settings
+
+Settings is one decorated, fixed-size `420 × 520`-logical-pixel, non-modal, non-topmost top-level window with a Windows taskbar button. It is not owned by the hidden Drop Shelf. The Resident Instance owns its draft lifecycle and closes it during Exit DropCove or Cooperative Shutdown.
+
+A new Settings window is centered within the invoking monitor's work area: the Drop Shelf monitor for a Drop Shelf Utility Menu request, or the pointer monitor for a notification-area request, with Windows primary-monitor fallback. Placement measures the complete decorated outer frame in physical pixels before showing the window. A repeated request restores, shows, and focuses the singleton without moving it or replacing its draft. Closing Settings permits a later request to recreate and recenter it; user-moved positions are not persisted.
+
+Opening Settings from the notification area does not show, move, or change the Drop Shelf or Edge Rail. Hiding the Drop Shelf does not hide Settings.
 
 ### 16.1 Available settings and defaults
 

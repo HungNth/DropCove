@@ -13,6 +13,7 @@ mod settings_store;
 mod settings_transaction;
 mod shelf;
 mod shelf_resize;
+mod windows_auxiliary;
 #[cfg(windows)]
 mod windows_drag;
 #[cfg(windows)]
@@ -90,7 +91,7 @@ async fn open_about(window: tauri::WebviewWindow, app: tauri::AppHandle) -> Resu
     if window.label() != "main" {
         return Err("About can only be requested from the Drop Shelf".to_owned());
     }
-    run_blocking(move || about::open(&app, about::AboutInvocationContext::DropShelf)).await
+    run_blocking(move || about::open(&app, windows_auxiliary::InvocationContext::DropShelf)).await
 }
 
 #[tauri::command]
@@ -98,7 +99,7 @@ async fn open_settings(window: tauri::WebviewWindow, app: tauri::AppHandle) -> R
     if window.label() != "main" {
         return Err("Settings can only be requested from the Drop Shelf".to_owned());
     }
-    run_blocking(move || settings::open(&app)).await
+    run_blocking(move || settings::open(&app, windows_auxiliary::InvocationContext::DropShelf)).await
 }
 
 #[tauri::command]

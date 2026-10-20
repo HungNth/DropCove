@@ -80,7 +80,9 @@ Presentation surfaces render projections of core state. They request mutations t
 
 The dedicated Drop Shelf Clear confirmation is a resident-owned native window, not a WebView overlay. It disables native interaction with its owner and guards resident dismissal, movement, resize, OLE drop, and frontend mutation requests until cancellation or confirmation. Its request/confirm lifecycle rechecks authoritative Shelf state and delegates to the existing Core Shelf State mutation. Cancellation, close, setup failure, and shutdown release modal ownership; Edge Rail confirmation ownership remains unchanged.
 
-The About Surface has a separate, non-modal singleton lifecycle and a read-only metadata projection. Product name and version come from the running Tauri package; author and Source come from Cargo package metadata. Homepage remains absent until there is a product site. Its window is denied unrelated custom commands, while capabilities allow only its required window lifecycle and canonical external Source link. The Clear window similarly receives only its confirmation interface and core window/event access.
+The About Surface has a separate, non-modal singleton lifecycle and a read-only metadata projection. Product name and version come from the running Tauri package; author, description, and Source come from Cargo package metadata. The frontend renders the description immediately below the version without another metadata owner. Homepage remains absent until there is a product site. Its window is denied unrelated custom commands, while capabilities allow only its required window lifecycle and canonical external Source link. The Clear window similarly receives only its confirmation interface and core window/event access.
+
+Settings is a resident-managed top-level singleton rather than a native owned Drop Shelf window, so it remains reachable through the Windows taskbar while the Drop Shelf is hidden. Its existing draft, Save/Cancel, focus-loss recorder cancellation, and shutdown coordinator remain authoritative. Settings and About share the narrow native invocation-context placement adapter, not a generalized window manager.
 
 ### 2.3 Core Shelf State Module
 
@@ -385,6 +387,7 @@ This favors continued application availability while preserving evidence for man
 - Shelf and rail bounds are clamped to the selected monitor's work area.
 - Hotkey, notification-area activation, and ordinary launch use the monitor containing the cursor.
 - Shake-to-open places the shelf near the current cursor.
+- Newly created Settings and About windows use the Drop Shelf monitor for Drop Shelf invocation and the pointer monitor for notification-area invocation, falling back to the primary monitor. The shared adapter measures the complete decorated outer frame and centers/clamps it in physical work-area coordinates before show. Repeated requests restore/show/focus the existing window without repositioning or persisting coordinates.
 - Edge Rail uses `RailEdge` from settings for its left/right side.
 - A connected non-empty `RailMonitorId` is the target monitor. If it is unavailable, the rail temporarily uses the Windows primary display without rewriting that setting.
 - An empty `RailMonitorId` uses the remembered `shelf_ui_state.rail_monitor` when connected. An unavailable remembered monitor temporarily falls back to the Windows primary display.

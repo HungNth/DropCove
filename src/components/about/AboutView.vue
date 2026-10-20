@@ -8,6 +8,7 @@ import logoUrl from "../../../app-icon.svg";
 interface AboutMetadata {
   productName: string;
   version: string;
+  description: string;
   author: string;
   sourceUrl: string;
 }
@@ -78,6 +79,9 @@ onUnmounted(() => {
         <template v-if="metadata?.version">
           Version {{ metadata.version }}
         </template>
+      </p>
+      <p class="m-0 mt-2 max-w-[320px] text-[12px] leading-relaxed text-dc-text-secondary">
+        {{ metadata?.description }}
       </p>
     </div>
 

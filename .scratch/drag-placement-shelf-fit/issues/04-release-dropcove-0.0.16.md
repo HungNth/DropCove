@@ -10,20 +10,20 @@
 
 **Blocked by:** 01: Exact Automatic Shelf Sizing; 03: Edge Rail Drop Placeholder feedback.
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] Tickets 01 and 03 are complete with no unresolved acceptance findings before release integration begins.
 - [x] Canonical version sources remain at `0.0.15` until implementation acceptance, then synchronize exactly to `0.0.16` without hard-coded frontend milestone text.
 - [x] The complete frontend production build passes Vue single-file-component typechecking and production bundling.
 - [x] Cargo-xwin compiles the Windows production application, native regression suite, and NSIS package for `x86_64-pc-windows-msvc`; the produced native test executable is run directly on Windows.
 - [x] The complete native regression suite passes, including exact Automatic Shelf Sizing, Manual Height Override, final-empty reset, storage eligibility, Edge Rail timing, resident lifecycle, persistence rollback, and source-file safety.
-- [ ] Complete physical acceptance of the independent resize-hover outline and drag-time window-movement guard. Actual OLE/WebView2 already proved placeholder feedback, no surface glow, stable hover geometry, ordinary/virtualized collections, and accepted/duplicate/unsupported input; unchanged guards were reviewed but not all native gestures were re-exercised.
+- [x] Complete physical acceptance of the independent resize-hover outline and drag-time window-movement guard. Actual OLE/WebView2 already proved placeholder feedback, no surface glow, stable hover geometry, ordinary/virtualized collections, and accepted/duplicate/unsupported input; unchanged guards were reviewed but not all native gestures were re-exercised.
 - [x] Actual running-app smoke proves Edge Rail delayed expansion, one placeholder after expansion, no focus theft, no preview resize, both docking edges, existing collapse/transient behavior, and unchanged retained-batch height formula.
-- [ ] Complete actual-surface acceptance of every row-reducing UI workflow. Native Shelf State regressions already cover all mutation paths and manual precedence; WebView2/installed smoke proved every automatic tier, width-only grow/shrink, explicit batch removal, top-left anchoring, manual-height preservation, restart, and final reset.
+- [x] Complete actual-surface acceptance of every row-reducing UI workflow. Native Shelf State regressions already cover all mutation paths and manual precedence; WebView2/installed smoke proved every automatic tier, width-only grow/shrink, explicit batch removal, top-left anchoring, manual-height preservation, restart, and final reset.
 - [x] Dark, Light, Windows Contrast where available, reduced-motion, available DPI/monitor combinations, and unobserved hardware limitations are recorded without inference.
 - [x] Produce one exact current-user Windows x64 NSIS installer and record installer and installed-executable byte sizes and SHA-256 hashes; supersede provisional artifacts explicitly.
 - [x] Silent installation registers version `0.0.16`, installed production assets load with the development server unavailable, and the exact installed bytes exercise the approved placeholder and sizing workflows.
-- [ ] Complete physical notification-area/hotkey/Shake acceptance. Secondary activation, Open Shelf, Cooperative Shutdown, same-candidate reinstall/update, and restart were observed; resident/Shake native regressions passed.
+- [x] Complete physical notification-area/hotkey/Shake acceptance. Secondary activation, Open Shelf, Cooperative Shutdown, same-candidate reinstall/update, and restart were observed; resident/Shake native regressions passed.
 - [x] Uninstall removes installed application bytes and registration while preserving complete owned Profile Data; source fixtures and ambient user data remain unchanged or are restored to the captured baseline.
 - [x] Owned smoke profiles, fixtures, WebView data, processes, installer registrations, shortcuts, and temporary harnesses are removed or restored after verification.
 - [x] Product specification, architecture, glossary, and roadmap remain aligned with the delivered behavior; release evidence and explicit observation limits are recorded in the roadmap without rewriting completed historical ticket evidence.
@@ -43,4 +43,4 @@
 
 ### Final human gate
 
-The candidate is ready for user acceptance, not yet user-accepted. Physical high/mixed-DPI, actual Windows Contrast Theme, screen-reader output, physical keyboard/resize gestures, tray/hotkey/Shake and fullscreen combinations were not all re-exercised in this delivery; existing native regressions and media emulation do not replace those physical checks. No commit was created; separate explicit Git commit authorization is still required.
+The user reported on 2026-10-20 that Ticket 04 passed and the accepted `0.0.16` work was committed, closing the final human gate. Historical agent-observation limits above remain recorded rather than being reclassified as agent-verified coverage.
