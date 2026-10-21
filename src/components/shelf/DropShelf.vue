@@ -17,7 +17,6 @@ const {
   busy,
   draggingOver,
   resizing,
-  resizeHover,
   moving,
   startResize,
   pendingConfirmation,
@@ -82,11 +81,7 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4, () => Num
 
 <template>
   <main
-    class="shelf relative flex flex-col h-full box-border border rounded-[12px] bg-dc-surface text-dc-text-primary font-['Segoe_UI',sans-serif] transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
-    :class="{
-      'border-dc-border-default': !resizeHover,
-      'border-dc-drag-hover-border [box-shadow:inset_0_0_0_1px_var(--dc-drag-hover-border)]': resizeHover,
-    }"
+    class="shelf relative flex flex-col h-full box-border border border-dc-border-default rounded-[12px] bg-dc-surface text-dc-text-primary font-['Segoe_UI',sans-serif] transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
     :aria-busy="busy || resizing || moving"
   >
     <div class="control-strip relative flex flex-none items-center justify-center h-[28px] box-border select-none pointer-events-auto" role="toolbar" aria-label="Drop Shelf controls">

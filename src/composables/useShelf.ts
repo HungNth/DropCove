@@ -61,7 +61,6 @@ export function useShelf() {
   const busy = shallowRef(false);
   const draggingOver = shallowRef(false);
   const resizing = shallowRef(false);
-  const resizeHover = shallowRef(false);
   const moving = shallowRef(false);
   const pendingConfirmation = shallowRef<PendingDragConfirmation | null>(null);
   const confirmingClearTemporary = shallowRef(false);
@@ -223,9 +222,6 @@ export function useShelf() {
           catch (error) { if (!disposed) status.value = String(error); }
         }
       }));
-      await retainListener(window.listen<boolean>("shelf-resize-hover", ({ payload }) => {
-        if (!disposed) resizeHover.value = payload;
-      }));
       await retainListener(window.listen("shelf-changed", async () => {
         moving.value = false;
         try { await refresh(); }
@@ -281,7 +277,6 @@ export function useShelf() {
     busy,
     draggingOver,
     resizing,
-    resizeHover,
     moving,
     startResize: async (edge: ResizeEdge) => {
       if (busy.value || resizing.value || moving.value) return;

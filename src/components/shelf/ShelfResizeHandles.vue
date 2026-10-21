@@ -11,7 +11,7 @@ function begin(event: PointerEvent, edge: ResizeEdge) {
 </script>
 
 <template>
-  <div class="resize-handles absolute inset-0 z-[2] pointer-events-none has-[.resize-handle:hover]:rounded-[11px] has-[.resize-handle:hover]:[box-shadow:inset_0_0_0_2px_var(--dc-focus)] forced-colors:has-[.resize-handle:hover]:[box-shadow:inset_0_0_0_2px_Highlight]" aria-hidden="true">
+  <div class="resize-handles absolute inset-0 z-[2] pointer-events-none" aria-hidden="true">
     <div class="resize-handle absolute pointer-events-auto touch-none top-0 left-[8px] right-[8px] h-[8px] cursor-ns-resize" data-resize-edge="North" @pointerdown.prevent="begin($event, 'North')" />
     <div class="resize-handle absolute pointer-events-auto touch-none top-[8px] bottom-[8px] right-0 w-[8px] cursor-ew-resize" data-resize-edge="East" @pointerdown.prevent="begin($event, 'East')" />
     <div class="resize-handle absolute pointer-events-auto touch-none bottom-0 left-[8px] right-[8px] h-[8px] cursor-ns-resize" data-resize-edge="South" @pointerdown.prevent="begin($event, 'South')" />

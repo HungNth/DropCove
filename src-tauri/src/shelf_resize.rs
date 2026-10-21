@@ -16,9 +16,8 @@ use windows::Win32::{
             GetClientRect, GetCursorPos, GetWindowRect, PostMessageW, HTBOTTOM, HTBOTTOMLEFT,
             HTBOTTOMRIGHT, HTLEFT, HTRIGHT, HTTOP, HTTOPLEFT, HTTOPRIGHT, WMSZ_BOTTOM,
             WMSZ_BOTTOMLEFT, WMSZ_BOTTOMRIGHT, WMSZ_LEFT, WMSZ_RIGHT, WMSZ_TOP, WMSZ_TOPLEFT,
-            WMSZ_TOPRIGHT, WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE, WM_MOUSEMOVE, WM_NCDESTROY,
-            WM_NCLBUTTONDOWN, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_SIZING, SWP_NOACTIVATE,
-            SWP_NOSIZE, SWP_NOZORDER, SetWindowPos,
+            WMSZ_TOPRIGHT, WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE, WM_NCDESTROY,
+            WM_NCLBUTTONDOWN, WM_SIZING, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos,
         },
     },
 };
@@ -77,7 +76,6 @@ struct Session {
 #[derive(Default)]
 struct Tracking {
     session: Option<Session>,
-    hovered: bool,
 }
 #[derive(Default)]
 pub(crate) struct ResizeState {
@@ -368,31 +366,6 @@ fn handle(
             }
         }
         WM_EXITSIZEMOVE => complete(app, hwnd)?,
-        WM_NCMOUSEMOVE | WM_NCMOUSELEAVE | WM_MOUSEMOVE => {
-            let hovered = message == WM_NCMOUSEMOVE
-                && matches!(
-                    wparam.0 as u32,
-                    HTTOP
-                        | HTTOPRIGHT
-                        | HTRIGHT
-                        | HTBOTTOMRIGHT
-                        | HTBOTTOM
-                        | HTBOTTOMLEFT
-                        | HTLEFT
-                        | HTTOPLEFT
-                );
-            let state = app.state::<ResizeState>();
-            let changed = {
-                let mut tracking = state.lock()?;
-                let changed = tracking.hovered != hovered;
-                tracking.hovered = hovered;
-                changed
-            };
-            if changed {
-                app.emit("shelf-resize-hover", hovered)
-                    .map_err(|error| error.to_string())?;
-            }
-        }
         _ => {}
     }
     Ok(())
