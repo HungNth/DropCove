@@ -48,25 +48,25 @@ onUnmounted(() => {
 
 <template>
   <main
-    class="clear-confirmation flex flex-col justify-between w-full h-full box-border p-[18px] bg-dc-surface text-dc-text-primary select-none font-['Segoe_UI',sans-serif] forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]"
+    class="clear-confirmation flex flex-col justify-between w-full h-full box-border p-[16px] overflow-y-auto bg-dc-surface text-dc-text-primary select-none font-['Segoe_UI',sans-serif] forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]"
     role="dialog"
     aria-labelledby="clear-heading"
     aria-describedby="clear-body"
     :aria-busy="busy"
   >
-    <div class="flex flex-col gap-[8px]">
+    <div class="flex flex-col gap-[6px]">
       <h1 id="clear-heading" class="m-0 text-[14px] font-semibold leading-[1.3] text-dc-text-primary forced-colors:text-[CanvasText]">
         Clear temporary items?
       </h1>
       <p id="clear-body" class="m-0 text-[12px] leading-[1.4] text-dc-text-secondary forced-colors:text-[CanvasText]">
         Pinned items stay. Source files and folders aren’t deleted.
       </p>
-      <div v-if="error" class="p-[6px] border border-dc-danger-border bg-dc-danger-surface text-dc-danger-text rounded-[4px] text-[11px]" role="alert">
+      <div v-if="error" class="max-h-[38px] overflow-y-auto p-[6px] border border-dc-danger-border bg-dc-danger-surface text-dc-danger-text rounded-[4px] text-[11px]" role="alert">
         {{ error }}
       </div>
     </div>
 
-    <div class="flex justify-end gap-[8px] mt-[16px]">
+    <div class="flex justify-end gap-[8px] mt-[12px]">
       <button
         ref="cancelButton"
         type="button"

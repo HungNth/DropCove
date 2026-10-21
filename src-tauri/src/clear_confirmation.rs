@@ -20,7 +20,7 @@ use crate::shelf::ShelfState;
 pub(crate) const LABEL: &str = "clear-temporary";
 pub(crate) const DROP_SHELF_LABEL: &str = "main";
 const WIDTH: f64 = 360.0;
-const HEIGHT: f64 = 200.0;
+const HEIGHT: f64 = 130.0;
 
 #[derive(Default)]
 pub(crate) struct ClearConfirmationState {

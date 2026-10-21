@@ -582,7 +582,7 @@ Bulk Pinning includes Available, Missing, and Unavailable references still prese
 
 If persistence fails, the visible and durable state remain unchanged and DropCove reports the failure.
 
-The Drop Shelf Clear confirmation opens in its own decorated, fixed-size `360 × 200`-logical-pixel, taskbar-hidden, always-on-top window centered within the Drop Shelf monitor work area. Its heading is **Clear temporary items?**, its explanation is **Pinned items stay. Source files and folders aren’t deleted.**, and its actions are **Cancel** and **Clear**. Cancel is focused initially; `Escape` and the window close action cancel without mutation.
+The Drop Shelf Clear confirmation opens in its own decorated, fixed-size `360 × 130`-logical-pixel, taskbar-hidden, always-on-top window centered within the Drop Shelf monitor work area. Its heading is **Clear temporary items?**, its explanation is **Pinned items stay. Source files and folders aren’t deleted.**, and its actions are **Cancel** and **Clear**. Cancel is focused initially; `Escape` and the window close action cancel without mutation.
 
 While this confirmation is open, the Drop Shelf cannot be dismissed, moved, resized, dragged from, or used for competing mutations or utility actions. Repeated requests focus the existing confirmation. Confirmation rechecks authoritative Temporary Item availability and invokes the existing atomic Clear operation; stale empty requests make no removal. Exit DropCove and Cooperative Shutdown retain normal teardown authority.
 
