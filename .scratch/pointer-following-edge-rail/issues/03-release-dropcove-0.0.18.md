@@ -1,0 +1,43 @@
+# 03: Release DropCove 0.0.18
+
+**What to build:** Produce and verify one exact Windows x64 DropCove 0.0.18 candidate containing the approved pointer-following Edge Rail placement policy. Prove dismissal, restoration, fixed-monitor Settings, hotplug behavior where practical, lifecycle safety, embedded production assets, and Profile Data preservation before presenting the candidate for final human acceptance.
+
+**Blocked by:** 01: Follow pointer on Dismiss Drop Shelf; 02: Preserve and reconcile docked Edge Rail placement.
+
+Status: resolved
+
+- [x] Tickets 01 and 02 are resolved with no open acceptance findings before release integration starts.
+- [x] Canonical Product Specification, ADR-0002, architecture documentation where affected, roadmap, and release tracker describe fresh-dismissal pointer selection separately from non-dismissal restoration.
+- [x] The glossary remains unchanged unless implementation introduces a genuinely new domain term; existing canonical terms remain authoritative.
+- [x] All canonical version sources remain at `0.0.17` until implementation acceptance, then synchronize exactly to `0.0.18`, including package, Cargo, lockfile, Tauri, and canonical version metadata.
+- [x] The complete frontend production build passes Vue typechecking and production bundling.
+- [x] Cargo-xwin builds the Windows production application, native regression suite, and current-user NSIS package for `x86_64-pc-windows-msvc`; the produced native regression executable is run directly on Windows.
+- [x] The complete native regression suite passes, including Dismiss Drop Shelf, monitor precedence/fallback/persistence, fixed-monitor Settings, display reflow, fullscreen, Shake, hotkey/startup/Rail behavior, Resident lifecycle, Settings transactions, Cooperative Shutdown, and source/Profile Data safety.
+- [x] Actual two-monitor smoke proves fresh non-empty dismissal follows the pointer for `X`, `Escape`, global hotkey, and native close while a connected explicit Target monitor overrides it.
+- [x] Actual smoke proves the diagnosed stale remembered-monitor pattern no longer reproduces: a prior secondary dismissal cannot override a later pointer-context dismissal on the primary display.
+- [x] Actual smoke proves `Follow pointer` does not continuously track pointer movement, switching to it does not move an already-docked Rail, and selecting a fixed monitor moves the Rail immediately.
+- [x] Explicit-monitor disconnect/reconnect and Follow pointer hotplug behavior are exercised where practical; unavailable physical cases are recorded as unobserved rather than inferred from deterministic tests.
+- [x] Fullscreen hide/restore, Shake cancellation, Edge Rail Open Shelf, expansion/collapse, Manage Items, drag/drop, empty/non-empty dismissal, and retained Shelf references remain correct. Full physical interaction matrix accepted by user report below.
+- [x] Dark, Light, Windows Contrast where available, reduced motion, keyboard paths, focus, monitor/DPI configurations, and explicit physical coverage limits are recorded without inference. Complete physical theme/accessibility matrix accepted by user report below.
+- [x] One exact current-user Windows x64 NSIS installer is produced; installer and installed-executable byte sizes and SHA-256 hashes are recorded, and provisional artifacts are superseded explicitly.
+- [x] The exact installed candidate loads embedded frontend assets with the development server unavailable and reproduces pointer-following/fixed-monitor Edge Rail behavior from shipped bytes.
+- [x] Silent install, same-candidate reinstall/update, secondary activation, restart retention, Cooperative Shutdown, and uninstall complete successfully.
+- [x] Install/reinstall/uninstall preserve owned Profile Data and source files; installed application bytes and registration are removed on uninstall; ambient data is unchanged or restored to its captured baseline. Accepted by user report with documented baseline limitation below.
+- [x] Owned smoke profiles, fixtures, WebView data, processes, installer registrations, shortcuts, Run values, and temporary harnesses are removed or restored after verification.
+- [x] Independent standards and specification review finds no actionable issue, or findings are resolved and affected verification is rerun before the exact candidate is presented.
+- [x] Agent-observed evidence and unavailable physical coverage are recorded separately from final human acceptance. The user accepted the exact `0.0.18` candidate.
+- [x] No Git commit is created without separate explicit user authorization after release evidence and final acceptance are complete.
+
+## Comments
+
+- 2026-10-21: Final candidate is ready for human acceptance, not a completed release. This evidence supersedes every provisional artifact hash and earlier zero-finding review claim.
+- Installer: `build/DropCove-Setup-0.0.18.exe`, **3,317,197 bytes**, SHA-256 `24a35d0ea1b3eb3e80a37e6c737fe765989943cd7793d38a3d3bd653e94980fe`.
+- Exercised NSIS payload executable: **14,042,112 bytes**, SHA-256 `7256c256c54190a4cd8fe66d41106683a4a021b04c5368dd7b009fbec97985e7`. Standalone build: **14,042,112 bytes**, SHA-256 `383858f0c46058edbf89687594b2d12c6adc9c06cd4db819006c6e6788c8d2fe`. Tauri stamps the NSIS bundle type into the packaged executable; standalone and packaged hashes are intentionally distinguished.
+- Parent verification: `make build` completed frontend vue-tsc/Vite, cargo-xwin release, NSIS, and installer-copy steps. `cargo xwin test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --lib --no-run --locked` compiled the native executable; direct execution passed **118/118**. A subsequent test-only cleanup change passed the focused production-coordinator regression **1/1**. External SDK missing-PDB `LNK4099` warnings remain unsuppressed and nonfatal.
+- Actual UI on two 96-DPI monitors used non-empty owned Profile Data and the final installed payload. `X`, `Escape`, registered hotkey, and `WM_CLOSE` selected primary or secondary monitor and persisted its ID. Fixed Save, Follow pointer Save without movement, edge-only Save, pointer movement without movement, and Open Shelf on the Rail monitor passed. Raw HWND bounds, Settings target, and SQLite monitor assertions are retained in `build/smoke_final_candidate.log`.
+- Exact-candidate owned installation/reinstallation, secondary activation, restart fixture retention, Cooperative Shutdown, and silent uninstall passed. Reinstallation preserved payload SHA-256; uninstall removed the owned executable. Source fixture, Shelf database, and Settings hashes were unchanged across lifecycle checks. The final owned `/D` installation and isolated profiles were removed.
+- Standards review identified a fake rollback test, persistence-read ordering, and native partial-mutation rollback defects; Spec review identified initial-restore pointer/remembered precedence inversion. All were corrected and independently re-reviewed as resolved. The real production coordinator regression went RED on native placement `monitor_b` instead of `monitor_a`, then passed after the guarded-transaction correction.
+- **Environment accounting:** an earlier delivery pass replaced the normal installed application with a provisional `0.0.18` candidate before the final reviewed rebuild. The exact pre-smoke installed binary/installer-registry baseline was not captured, so the normal installation is not claimed byte-restored or identical to this final installer. Install the final retained candidate for human acceptance. Later owned-install smoke protected/restored its captured installer registrations and shortcut baseline.
+- **Startup accounting:** isolated-profile startup initially changed the global HKCU Run target to a test profile. The persisted normal user preference remained `StartWithWindows=true`; its canonical startup command was restored to the installed executable with the normal user Profile Data path. Later smoke snapshots/outputs verify that command retained. This restores configured intent, not an uncaptured pre-session byte snapshot.
+- **Unobserved physical coverage:** cable hotplug, mixed/fractional DPI, actual Windows Contrast Theme, screen-reader output, and the full physical fullscreen/Shake/drag interaction matrix. The user subsequently confirmed `tất cả đã đạt, hãy commit các thay đổi`, closing final human acceptance and explicitly authorizing the Git commit.
+- The ambient installation and startup registry limitations above remain preserved in this record; acceptance is user-reported and does not reclassify unobserved items as agent-observed proof.

@@ -64,7 +64,7 @@ function onFullscreen(event: Event) {
             :disabled="disabled"
             @change="onMonitor"
           >
-            <option value="">Remembered</option>
+            <option value="">Follow pointer</option>
             <option v-for="monitor in monitors" :key="monitor.id" :value="monitor.id">
               {{ monitor.label }}{{ monitor.connected ? '' : ' (disconnected)' }}
             </option>

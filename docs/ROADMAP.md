@@ -751,3 +751,37 @@ The user subsequently reported `0.0.16 Ticket 04 đã đạt và đã được c
 - **Historical agent-observation limits:** physical high/mixed-DPI, tray invocation on the secondary display (host pointer constrained to primary), actual Windows Contrast Theme, screen-reader output, and complete physical shortcut/monitor-selector/Source-browser handoff were not all re-exercised. The user subsequently accepted all checks; this does not reclassify those limits as agent-observed coverage.
 - Independent two-axis review of the final scoped implementation against baseline `a1f677cbb1941c28c27d6506d38d8467c2ba6781` returned **0 Standards findings** and **0 Spec findings**; no source changes were required after packaging the exact candidate.
 - The user confirmed `tất cả đã đạt, hãy commit các thay đổi`, closing final human acceptance and explicitly authorizing the commit. The disclosed registry capture limitation remains preserved.
+
+## 0.0.18 — Pointer-following Edge Rail placement
+
+**Status:** Completed — all three tickets resolved; user accepted the candidate and authorized the Git commit.
+
+**Plan:** [Pointer-following Edge Rail placement](../.scratch/pointer-following-edge-rail/spec.md), with [01 Follow pointer on Dismiss Drop Shelf](../.scratch/pointer-following-edge-rail/issues/01-follow-pointer-on-dismiss-drop-shelf.md), [02 Preserve and reconcile docked Edge Rail placement](../.scratch/pointer-following-edge-rail/issues/02-preserve-and-reconcile-docked-edge-rail-placement.md), and [03 Release DropCove 0.0.18](../.scratch/pointer-following-edge-rail/issues/03-release-dropcove-0.0.18.md). All three tickets are resolved.
+
+### Scope
+
+- Rename the automatic Target monitor option from `Remembered` to `Follow pointer` without changing the Settings schema.
+- On a fresh non-empty Dismiss Drop Shelf action, use a connected explicit Target monitor first; otherwise select the pointer monitor, then fall back through the Drop Shelf monitor, latest dismissal monitor, and Windows primary display.
+- Persist the actual selected dismissal monitor for restore/restart while ensuring a later dismissal resamples the pointer instead of being overridden by stale placement.
+- Keep an already-docked Edge Rail stationary through ordinary pointer movement and non-dismissal restore. Apply connected fixed-monitor Settings immediately; reconcile fixed-monitor reconnect and disconnected-monitor fallback predictably.
+- Preserve empty dismissal, Edge Rail geometry, docking edge, fullscreen policy, Shake-to-open, Drop Shelf behavior, Shelf references, Profile Data, source files, and Resident lifecycle.
+
+### Planned delivery slices
+
+1. Fresh dismissal placement: `Follow pointer` Settings copy, explicit/pointer/fallback precedence, actual-monitor persistence, dismissal-path parity, regression coverage, and two-monitor proof.
+2. Docked placement reconciliation: Settings transitions, explicit disconnect/reconnect, Follow pointer hotplug, restore stability, Open Shelf placement, and rollback coverage.
+3. Release gate: synchronized `0.0.18` manifests, complete Windows regressions, frontend and cargo-xwin/NSIS builds, installed two-monitor smoke, lifecycle safety, review, and final human acceptance.
+
+### Deferred
+
+- Continuously moving the Edge Rail whenever the pointer crosses between displays.
+- Persisting pointer or Drop Shelf coordinates.
+- New monitor settings, schemas, migrations, dependencies, telemetry, generalized window management, or placement configuration.
+
+### Final candidate evidence — 2026-10-21
+
+- Frontend production build, cargo-xwin release/NSIS, and native Windows suite passed: **118/118**. Parent observed the partial-native-move rollback regression fail before the guarded-transaction fix and pass afterward; a test-only teardown correction subsequently passed its focused check.
+- Final installer: `build/DropCove-Setup-0.0.18.exe`, **3,317,197 bytes**, SHA-256 `24a35d0ea1b3eb3e80a37e6c737fe765989943cd7793d38a3d3bd653e94980fe`. Exercised NSIS payload: **14,042,112 bytes**, SHA-256 `7256c256c54190a4cd8fe66d41106683a4a021b04c5368dd7b009fbec97985e7`. These supersede provisional candidates.
+- Actual two-monitor 96-DPI smoke proved X/Escape/hotkey/native-close pointer placement, persisted monitor replacement, fixed monitor Save, Follow pointer Save without movement, edge-only Save, stationary dock after pointer movement, and Open Shelf on the dock monitor. Raw evidence: `build/smoke_final_candidate.log`. Exact-candidate owned reinstall, secondary activation, restart retention, Cooperative Shutdown, uninstall, and owned Profile Data/source hashes passed.
+- Independent Standards and Spec reviews found rollback/test and initial-restore precedence defects; all were corrected and re-reviewed as resolved. No new dependencies or schemas were introduced.
+- **Human gate and environment limitation:** physical hotplug, mixed/fractional DPI, actual Contrast Theme/screen reader, and the full physical fullscreen/Shake/drag matrix were not observed on physical hardware. The user confirmed `tất cả đã đạt, hãy commit các thay đổi` on 2026-10-21, closing the final human gate and authorizing the commit. Ambient installation and startup registry accounting remain preserved in Ticket 03.

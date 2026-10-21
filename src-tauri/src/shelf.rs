@@ -850,7 +850,7 @@ impl ShelfState {
         Ok(())
     }
     #[cfg(test)]
-    fn install_test_rail_monitor_failure(&self) -> Result<(), ShelfError> {
+    pub(crate) fn install_test_rail_monitor_failure(&self) -> Result<(), ShelfError> {
         self.store()?.connection.execute_batch(
             "CREATE TEMP TRIGGER fail_rail_monitor_update
              BEFORE UPDATE ON shelf_ui_state

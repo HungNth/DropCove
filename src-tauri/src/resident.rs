@@ -1367,14 +1367,97 @@ pub(crate) fn restore_rail(
     }
     set_rail_placement(app, placement.cloned())
 }
+pub(crate) fn coordinate_apply_rail_settings(
+    state: &ResidentState,
+    shelf: &ShelfState,
+    placement: &edge_rail::Placement,
+    rail_monitor_id_setting: &str,
+    show_native: impl FnOnce(&edge_rail::Placement) -> Result<(), String>,
+    restore_native: impl FnOnce(Option<&edge_rail::Placement>) -> Result<(), String>,
+) -> Result<(), String> {
+    let prior_placement = state.placement()?;
+    let prior_remembered = shelf.rail_monitor().map_err(|e| e.to_string())?;
+    let should_persist = rail_monitor_id_setting.is_empty()
+        && (prior_placement
+            .as_ref()
+            .map(|prev| prev.monitor.id != placement.monitor.id)
+            .unwrap_or(true)
+            || prior_remembered.as_deref() != Some(&placement.monitor.id));
+
+    let mut persisted_changed = false;
+    let result = (|| {
+        show_native(placement)?;
+        if should_persist {
+            shelf
+                .remember_rail_monitor(Some(&placement.monitor.id))
+                .map_err(|e| e.to_string())?;
+            persisted_changed = true;
+        }
+        let mut presentation = state
+            .presentation
+            .lock()
+            .map_err(|_| "resident presentation lock is poisoned")?;
+        presentation.rail_placement = Some(placement.clone());
+        Ok::<(), String>(())
+    })();
+
+    if let Err(error) = result {
+        let rollback_native = restore_native(prior_placement.as_ref());
+        let rollback_persist = if persisted_changed {
+            shelf
+                .remember_rail_monitor(prior_remembered.as_deref())
+                .map_err(|e| e.to_string())
+        } else {
+            Ok(())
+        };
+        let rollback_live = {
+            match state.presentation.lock() {
+                Ok(mut pres) => {
+                    pres.rail_placement = prior_placement.clone();
+                    Ok(())
+                }
+                Err(_) => Err("resident presentation lock is poisoned".to_string()),
+            }
+        };
+        let mut rollback_errors = Vec::new();
+        if let Err(e) = rollback_native {
+            rollback_errors.push(format!("native restore failed: {e}"));
+        }
+        if let Err(e) = rollback_persist {
+            rollback_errors.push(format!("persistence restore failed: {e}"));
+        }
+        if let Err(e) = rollback_live {
+            rollback_errors.push(format!("placement restore failed: {e}"));
+        }
+        if !rollback_errors.is_empty() {
+            return Err(format!(
+                "{error}; rollback incomplete: {}",
+                rollback_errors.join(", ")
+            ));
+        }
+        return Err(error);
+    }
+    Ok(())
+}
 pub(crate) fn apply_rail_settings(app: &AppHandle, settings: &Settings) -> Result<(), String> {
-    if app.state::<ResidentState>().visibility()? != Visibility::EdgeDocked {
+    let state = app.state::<ResidentState>();
+    if state.visibility()? != Visibility::EdgeDocked {
         return Ok(());
     }
     let placement = edge_rail::placement(app, settings)?;
-    let rail = app.state::<ResidentState>().rail_presentation()?;
-    edge_rail::show(app, &placement, rail.width, rail.height, rail.expanded)?;
-    set_rail_placement(app, Some(placement))
+    let shelf = app.state::<ShelfState>();
+    let rail = state.rail_presentation()?;
+    coordinate_apply_rail_settings(
+        &state,
+        &shelf,
+        &placement,
+        &settings.rail_monitor_id,
+        |p| edge_rail::show(app, p, rail.width, rail.height, rail.expanded),
+        |prev| match prev {
+            Some(prev_p) => edge_rail::show(app, prev_p, rail.width, rail.height, rail.expanded),
+            None => edge_rail::hide(app),
+        },
+    )
 }
 pub(crate) fn update_rail_content(app: &AppHandle, batch_count: usize) -> Result<(), String> {
     let state = app.state::<ResidentState>();
@@ -1587,7 +1670,7 @@ pub(crate) fn dismiss_shelf(app: &AppHandle) -> Result<(), String> {
         edge_rail::hide(app)?;
         return coordinate_hide(&NativeWindowOps::new(&window), &state, || Ok(()));
     }
-    let placement = edge_rail::placement(app, &crate::settings::active(app)?)?;
+    let placement = edge_rail::placement_for_dismissal(app, &crate::settings::active(app)?)?;
     let rail = state.rail_presentation()?;
     coordinate_dock(
         &NativeWindowOps::new(&window),
@@ -1728,6 +1811,117 @@ mod tests {
         assert_eq!(state.visibility().unwrap(), Visibility::Hidden);
         assert!(state.placement().unwrap().is_none());
         coordinate_content(&state, false, || panic!("empty no-op hid an intake window")).unwrap();
+        shelf.close().unwrap();
+        fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn rail_settings_failures_restore_native_and_persisted_placement() {
+        use std::{
+            fs,
+            time::{SystemTime, UNIX_EPOCH},
+        };
+        let path = std::env::temp_dir().join(format!(
+            "dc-dock-fail-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let shelf = ShelfState::open(path.join("shelf.db")).unwrap();
+        shelf.remember_rail_monitor(Some("monitor_a")).unwrap();
+        let state = ResidentState::default();
+        let work = WorkArea {
+            left: 0,
+            top: 0,
+            right: 1920,
+            bottom: 1032,
+        };
+        let placement_a = edge_rail::Placement {
+            monitor: edge_rail::DisplayMonitor {
+                id: "monitor_a".into(),
+                label: "monitor_a".into(),
+                device: "display_a".into(),
+                monitor_rect: work,
+                work,
+                dpi: 96,
+                primary: true,
+            },
+            edge: crate::settings_store::RailEdge::Right,
+        };
+        let placement_b = edge_rail::Placement {
+            monitor: edge_rail::DisplayMonitor {
+                id: "monitor_b".into(),
+                label: "monitor_b".into(),
+                device: "display_b".into(),
+                monitor_rect: work,
+                work,
+                dpi: 96,
+                primary: false,
+            },
+            edge: crate::settings_store::RailEdge::Left,
+        };
+
+        // Setup docked state with placement_a
+        let mut presentation = state.presentation.lock().unwrap();
+        presentation.visibility = Visibility::EdgeDocked;
+        presentation.rail_placement = Some(placement_a.clone());
+        drop(presentation);
+
+        let prev_placement = state.placement().unwrap();
+        assert_eq!(prev_placement.as_ref(), Some(&placement_a));
+        let prev_remembered = shelf.rail_monitor().unwrap();
+        assert_eq!(prev_remembered.as_deref(), Some("monitor_a"));
+
+        // Install trigger causing actual ShelfState write to fail during persistence
+        shelf.install_test_rail_monitor_failure().unwrap();
+        let shown = RefCell::new(Vec::new());
+        let restored = RefCell::new(Vec::new());
+        let err = coordinate_apply_rail_settings(
+            &state,
+            &shelf,
+            &placement_b,
+            "",
+            |p| {
+                shown.borrow_mut().push(p.monitor.id.clone());
+                Ok(())
+            },
+            |prev| {
+                restored.borrow_mut().push(prev.map(|p| p.monitor.id.clone()));
+                Ok(())
+            },
+        );
+
+        assert!(err.is_err(), "SQL trigger must reject monitor persistence");
+        assert_eq!(shown.into_inner(), vec!["monitor_b"]);
+        assert_eq!(restored.into_inner(), vec![Some("monitor_a".to_string())]);
+        assert_eq!(state.placement().unwrap().as_ref(), Some(&placement_a));
+
+        let native_monitor = RefCell::new(Some("monitor_a".to_owned()));
+        let error = coordinate_apply_rail_settings(
+            &state,
+            &shelf,
+            &placement_b,
+            "",
+            |p| {
+                *native_monitor.borrow_mut() = Some(p.monitor.id.clone());
+                Err("projection failed after native move".to_owned())
+            },
+            |previous| {
+                *native_monitor.borrow_mut() = previous.map(|p| p.monitor.id.clone());
+                Ok(())
+            },
+        )
+        .unwrap_err();
+        assert!(error.contains("projection failed after native move"));
+        assert_eq!(native_monitor.into_inner().as_deref(), Some("monitor_a"));
+        assert_eq!(state.placement().unwrap().as_ref(), Some(&placement_a));
+
+        // Reopen database to verify durable persistence retention
+        let reopened = ShelfState::open(path.join("shelf.db")).unwrap();
+        assert_eq!(reopened.rail_monitor().unwrap().as_deref(), Some("monitor_a"));
+        reopened.close().unwrap();
         shelf.close().unwrap();
         fs::remove_dir_all(path).unwrap();
     }

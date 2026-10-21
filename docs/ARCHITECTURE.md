@@ -159,7 +159,7 @@ The instance identity is profile-specific. A normal profile and an explicit test
 | **Shelf Batch** | Identifier, creation time, position | Represents one accepted drop; ordered newest-first. |
 | **Shelf Item** | Identifier, batch identifier, position, path, display name, folder flag, pinned flag | Represents one path occurrence inside one batch. |
 | **Display State** | Not persisted as a standalone value | `Hidden`, `Visible`, or `EdgeDocked`. |
-| **Rail Placement** | Settings: target monitor identifier and `Left` or `Right` edge; shelf state: remembered monitor identifier | A configured target monitor takes precedence over remembered placement; temporary fallback does not rewrite the configured preference. |
+| **Rail Placement** | Settings: target monitor identifier and `Left` or `Right` edge; shelf state: actual latest dock monitor identifier | A connected explicit target wins; fresh automatic dismissal follows the pointer, while restoration reuses docked placement. Fallback never rewrites the explicit preference. |
 | **Sizing State** | Preferred logical width, nullable Manual Height Override | Automatic Shelf Sizing derives the exact current height from preferred width and responsive batch rows when manual height is absent. |
 | **Availability** | Not persisted | Recomputed as `Available`, `Missing`, or `Unavailable` at restore and drag boundaries. |
 
@@ -361,7 +361,7 @@ Default path:
 
 Settings are written to a temporary file, flushed, and atomically moved over the active file. Missing, unreadable, or malformed settings load the defaults.
 
-`RailEdge` and `RailMonitorId` are settings-owned. A non-empty `RailMonitorId` is an explicit target-monitor preference; an empty value requests the remembered `shelf_ui_state.rail_monitor`.
+`RailEdge` and `RailMonitorId` are settings-owned. A non-empty `RailMonitorId` is an explicit target-monitor preference; an empty value selects `Follow pointer` for fresh dismissal. `shelf_ui_state.rail_monitor` retains actual dock placement for restoration rather than overriding a fresh automatic dismissal.
 
 ### 10.3 Sign-in startup registration
 
@@ -389,11 +389,11 @@ This favors continued application availability while preserving evidence for man
 - Shake-to-open places the shelf near the current cursor.
 - Newly created Settings and About windows use the Drop Shelf monitor for Drop Shelf invocation and the pointer monitor for notification-area invocation, falling back to the primary monitor. The shared adapter measures the complete decorated outer frame and centers/clamps it in physical work-area coordinates before show. Repeated requests restore/show/focus the existing window without repositioning or persisting coordinates.
 - Edge Rail uses `RailEdge` from settings for its left/right side.
-- A connected non-empty `RailMonitorId` is the target monitor. If it is unavailable, the rail temporarily uses the Windows primary display without rewriting that setting.
-- An empty `RailMonitorId` uses the remembered `shelf_ui_state.rail_monitor` when connected. An unavailable remembered monitor temporarily falls back to the Windows primary display.
-- If no remembered monitor exists during non-empty shelf dismissal, the monitor containing the Drop Shelf is used.
-- Every non-empty shelf dismissal stores the actual selected monitor. A display-change fallback while already docked does not by itself rewrite remembered placement.
-- Open Shelf resolves to the monitor where the rail is currently docked, including any configured-monitor selection or temporary primary-display fallback; it does not jump to a stale remembered monitor.
+- A connected non-empty `RailMonitorId` is authoritative. An unavailable explicit monitor remains configured while the Rail temporarily uses pointer-first fallback; reconnecting restores the fixed monitor.
+- A fresh non-empty dismissal in `Follow pointer` samples the pointer monitor once, then falls back through the Drop Shelf monitor, latest persisted dock monitor, and Windows primary display.
+- Ordinary pointer movement, fullscreen restoration, Shake cancellation, and content/size changes retain the current dock monitor. Saving `Follow pointer` preserves that monitor; saving a connected fixed monitor moves the Rail immediately.
+- Every successful non-empty dismissal stores the actual selected monitor. When the current automatic monitor disappears, display reflow chooses a pointer-first fallback and retains the actual fallback placement without rewriting Settings.
+- Open Shelf uses the monitor where the Rail is currently docked, including a temporary fallback; it does not jump to stale remembered placement.
 - Display and DPI changes trigger reflow through window/display events.
 
 The Drop Shelf is borderless but retains native resize behavior on all edges and corners. The Edge Rail is a separate no-activate window so hover, drop-in, drag-out, and management do not steal foreground focus.

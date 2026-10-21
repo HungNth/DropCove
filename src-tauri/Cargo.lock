@@ -822,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "dropcove"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "rusqlite",
  "serde",

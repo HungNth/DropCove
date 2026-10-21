@@ -8,7 +8,7 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use windows::{
     core::{BOOL, PCWSTR},
     Win32::{
-        Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
+        Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
         Graphics::Gdi::{
             EnumDisplayDevicesW, EnumDisplayMonitors, GetMonitorInfoW, DISPLAY_DEVICEW, HDC,
             HMONITOR, MONITORINFOEXW,
@@ -17,7 +17,7 @@ use windows::{
             HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI},
             Shell::{DefSubclassProc, SetWindowSubclass},
             WindowsAndMessaging::{
-                GetWindowLongPtrW, GetWindowRect, IsWindowVisible, SetWindowLongPtrW, SetWindowPos,
+                GetCursorPos, GetWindowLongPtrW, GetWindowRect, IsWindowVisible, SetWindowLongPtrW, SetWindowPos,
                 EDD_GET_DEVICE_INTERFACE_NAME, GWL_EXSTYLE, GWL_STYLE, HWND_TOPMOST, MA_NOACTIVATE,
                 SWP_FRAMECHANGED, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
                 SWP_NOZORDER, SWP_SHOWWINDOW, WM_MOUSEACTIVATE, WS_CAPTION, WS_EX_NOACTIVATE,
@@ -157,49 +157,179 @@ pub(crate) fn choices() -> Result<Vec<MonitorChoice>, String> {
         .collect())
 }
 
-pub(crate) fn select<'a>(
+pub(crate) fn select_for_dismissal<'a>(
     monitors: &'a [DisplayMonitor],
     target: &str,
-    remembered: Option<&str>,
+    pointer: Option<(i32, i32)>,
     shelf_device: Option<&str>,
+    remembered: Option<&str>,
 ) -> Result<&'a DisplayMonitor, String> {
-    let preferred = if !target.is_empty() {
-        monitors.iter().find(|m| m.id.eq_ignore_ascii_case(target))
-    } else if let Some(remembered) = remembered {
-        monitors
-            .iter()
-            .find(|m| m.id.eq_ignore_ascii_case(remembered))
-    } else {
-        shelf_device.and_then(|name| monitors.iter().find(|m| m.device == name))
-    };
-    preferred
-        .or_else(|| monitors.iter().find(|m| m.primary))
+    let selected = (!target.is_empty())
+        .then(|| monitors.iter().find(|monitor| monitor.id.eq_ignore_ascii_case(target)))
+        .flatten()
+        .or_else(|| {
+            pointer.and_then(|(x, y)| {
+                monitors.iter().find(|monitor| {
+                    let area = monitor.monitor_rect;
+                    x >= area.left && x < area.right && y >= area.top && y < area.bottom
+                })
+            })
+        })
+        .or_else(|| {
+            shelf_device.and_then(|device| monitors.iter().find(|monitor| monitor.device == device))
+        })
+        .or_else(|| {
+            remembered.and_then(|id| {
+                monitors
+                    .iter()
+                    .find(|monitor| monitor.id.eq_ignore_ascii_case(id))
+            })
+        });
+    selected
+        .or_else(|| monitors.iter().find(|monitor| monitor.primary))
         .ok_or_else(|| "no selected or primary rail monitor is connected".into())
 }
-pub(crate) fn placement(app: &AppHandle, settings: &Settings) -> Result<Placement, String> {
+pub(crate) fn placement_for_dismissal(app: &AppHandle, settings: &Settings) -> Result<Placement, String> {
+    let mut point = POINT::default();
+    // SAFETY: GetCursorPos writes to a valid local POINT struct.
+    let pointer = unsafe { GetCursorPos(&mut point) }
+        .ok()
+        .map(|()| (point.x, point.y));
     let monitors = monitors()?;
     let remembered = app
         .state::<crate::shelf::ShelfState>()
         .rail_monitor()
-        .map_err(|e| e.to_string())?;
-    let shelf = app
+        .ok()
+        .flatten();
+    let shelf_monitor = app
         .get_webview_window("main")
-        .ok_or("Drop Shelf window is missing")?;
-    let shelf_monitor = shelf.current_monitor().map_err(|e| e.to_string())?;
-    let device = shelf_monitor
-        .as_ref()
-        .and_then(|m| m.name())
-        .map(String::as_str);
+        .and_then(|shelf| shelf.current_monitor().ok().flatten());
+    let device = shelf_monitor.as_ref().and_then(|m| m.name()).map(String::as_str);
     Ok(Placement {
-        monitor: select(
+        monitor: select_for_dismissal(
             &monitors,
             &settings.rail_monitor_id,
-            remembered.as_deref(),
+            pointer,
             device,
+            remembered.as_deref(),
         )?
         .clone(),
         edge: settings.rail_edge,
     })
+}
+pub(crate) fn reconcile(
+    monitors: &[DisplayMonitor],
+    settings: &Settings,
+    current: Option<&Placement>,
+    pointer: Option<(i32, i32)>,
+    shelf_device: Option<&str>,
+    remembered: Option<&str>,
+) -> Result<Placement, String> {
+    if let Some(current) = current {
+        if !settings.rail_monitor_id.is_empty() {
+            if let Some(target_mon) = monitors
+                .iter()
+                .find(|m| m.id.eq_ignore_ascii_case(&settings.rail_monitor_id))
+            {
+                return Ok(Placement {
+                    monitor: target_mon.clone(),
+                    edge: settings.rail_edge,
+                });
+            }
+            if let Some(curr_mon) = monitors
+                .iter()
+                .find(|m| m.id.eq_ignore_ascii_case(&current.monitor.id))
+            {
+                return Ok(Placement {
+                    monitor: curr_mon.clone(),
+                    edge: settings.rail_edge,
+                });
+            }
+            let fallback_mon = select_for_dismissal(
+                monitors,
+                "",
+                pointer,
+                shelf_device,
+                remembered,
+            )?;
+            return Ok(Placement {
+                monitor: fallback_mon.clone(),
+                edge: settings.rail_edge,
+            });
+        }
+
+        if let Some(curr_mon) = monitors
+            .iter()
+            .find(|m| m.id.eq_ignore_ascii_case(&current.monitor.id))
+        {
+            return Ok(Placement {
+                monitor: curr_mon.clone(),
+                edge: settings.rail_edge,
+            });
+        }
+
+        let fallback_mon = select_for_dismissal(
+            monitors,
+            "",
+            pointer,
+            shelf_device,
+            remembered,
+        )?;
+        return Ok(Placement {
+            monitor: fallback_mon.clone(),
+            edge: settings.rail_edge,
+        });
+    }
+
+    if settings.rail_monitor_id.is_empty() {
+        let mon = remembered
+            .and_then(|id| monitors.iter().find(|m| m.id.eq_ignore_ascii_case(id)))
+            .or_else(|| {
+                select_for_dismissal(monitors, "", pointer, shelf_device, None).ok()
+            })
+            .ok_or_else(|| String::from("no selected or primary rail monitor is connected"))?;
+        return Ok(Placement {
+            monitor: mon.clone(),
+            edge: settings.rail_edge,
+        });
+    }
+
+    let mon = select_for_dismissal(
+        monitors,
+        &settings.rail_monitor_id,
+        pointer,
+        shelf_device,
+        remembered,
+    )?;
+    Ok(Placement {
+        monitor: mon.clone(),
+        edge: settings.rail_edge,
+    })
+}
+pub(crate) fn placement(app: &AppHandle, settings: &Settings) -> Result<Placement, String> {
+    let mut point = POINT::default();
+    let pointer = unsafe { GetCursorPos(&mut point) }
+        .ok()
+        .map(|()| (point.x, point.y));
+    let monitors = monitors()?;
+    let remembered = app
+        .state::<crate::shelf::ShelfState>()
+        .rail_monitor()
+        .ok()
+        .flatten();
+    let shelf_monitor = app
+        .get_webview_window("main")
+        .and_then(|shelf| shelf.current_monitor().ok().flatten());
+    let device = shelf_monitor.as_ref().and_then(|m| m.name()).map(String::as_str);
+    let current = crate::resident::rail_placement(app)?;
+    reconcile(
+        &monitors,
+        settings,
+        current.as_ref(),
+        pointer,
+        device,
+        remembered.as_deref(),
+    )
 }
 pub(crate) fn bounds(
     placement: &Placement,
@@ -447,27 +577,213 @@ mod tests {
     fn selected_and_remembered_display_precedence_preserves_unavailable_intent() {
         let screens = [monitor("primary", 0, 96), monitor("other", 1920, 144)];
         assert_eq!(
-            select(&screens, "other", Some("primary"), None).unwrap().id,
+            select_for_dismissal(&screens, "other", None, None, Some("primary")).unwrap().id,
+            "other"
+        );
+        // Disconnected explicit target falls back pointer-first: pointer on other -> other
+        assert_eq!(
+            select_for_dismissal(&screens, "missing", Some((2500, 500)), None, Some("primary")).unwrap().id,
+            "other"
+        );
+        // Disconnected explicit target with no pointer falls back to remembered
+        assert_eq!(
+            select_for_dismissal(&screens, "missing", None, None, Some("other")).unwrap().id,
             "other"
         );
         assert_eq!(
-            select(&screens, "missing", Some("other"), None).unwrap().id,
-            "primary"
-        );
-        assert_eq!(
-            select(&screens, "", Some("other"), None).unwrap().id,
+            select_for_dismissal(&screens, "", None, None, Some("other")).unwrap().id,
             "other"
         );
         assert_eq!(
-            select(&screens, "", Some("missing"), Some("other"))
+            select_for_dismissal(&screens, "", None, Some("other"), Some("missing"))
                 .unwrap()
                 .id,
-            "primary"
-        );
-        assert_eq!(
-            select(&screens, "", None, Some("other")).unwrap().id,
             "other"
         );
+        assert_eq!(
+            select_for_dismissal(&screens, "", None, None, None).unwrap().id,
+            "primary"
+        );
+    }
+    #[test]
+    fn fresh_dismissal_follows_pointer_before_remembered_monitor() {
+        let screens = [monitor("primary", 0, 96), monitor("other", 1920, 144)];
+
+        let selected = select_for_dismissal(
+            &screens,
+            "",
+            Some((960, 500)),
+            Some("other"),
+            Some("other"),
+        )
+        .unwrap();
+
+        assert_eq!(selected.id, "primary");
+    }
+    #[test]
+    fn fresh_dismissal_precedence_and_fallback_ladder() {
+        let screens = [monitor("primary", 0, 96), monitor("other", 1920, 144)];
+
+        // 1. Connected explicit target wins over everything
+        let s1 = select_for_dismissal(
+            &screens,
+            "other",
+            Some((500, 500)),
+            Some("primary"),
+            Some("primary"),
+        )
+        .unwrap();
+        assert_eq!(s1.id, "other");
+
+        // 2. Disconnected explicit target falls back to pointer monitor without error
+        let s2 = select_for_dismissal(
+            &screens,
+            "disconnected_mon",
+            Some((2500, 500)),
+            Some("primary"),
+            Some("primary"),
+        )
+        .unwrap();
+        assert_eq!(s2.id, "other");
+
+        // 3. Pointer resolution failure falls back to shelf device
+        let s3 = select_for_dismissal(
+            &screens,
+            "",
+            Some((-500, -500)),
+            Some("other"),
+            Some("primary"),
+        )
+        .unwrap();
+        assert_eq!(s3.id, "other");
+
+        // 4. Shelf device failure falls back to remembered monitor
+        let s4 = select_for_dismissal(
+            &screens,
+            "",
+            None,
+            Some("missing_shelf"),
+            Some("other"),
+        )
+        .unwrap();
+        assert_eq!(s4.id, "other");
+
+        // 5. Remembered failure falls back to primary display
+        let s5 = select_for_dismissal(
+            &screens,
+            "",
+            None,
+            Some("missing_shelf"),
+            Some("missing_remembered"),
+        )
+        .unwrap();
+        assert_eq!(s5.id, "primary");
+    }
+    #[test]
+    fn docked_rail_reconciliation_preserves_placement_or_moves_predictably() {
+        let screens = [monitor("primary", 0, 96), monitor("other", 1920, 144)];
+        let docked_other = Placement {
+            monitor: monitor("other", 1920, 144),
+            edge: RailEdge::Right,
+        };
+
+        // 1. Follow pointer Save preserves currently docked monitor, applying new edge
+        let mut settings = Settings::default();
+        settings.rail_monitor_id = String::new();
+        settings.rail_edge = RailEdge::Left;
+        let r1 = reconcile(
+            &screens,
+            &settings,
+            Some(&docked_other),
+            Some((500, 500)), // pointer on primary
+            Some("primary"),
+            Some("primary"),
+        )
+        .unwrap();
+        assert_eq!(r1.monitor.id, "other");
+        assert_eq!(r1.edge, RailEdge::Left);
+
+        // 2. Explicit Save moves immediately to configured monitor
+        settings.rail_monitor_id = "primary".into();
+        settings.rail_edge = RailEdge::Right;
+        let r2 = reconcile(
+            &screens,
+            &settings,
+            Some(&docked_other),
+            Some((2500, 500)), // pointer on other
+            Some("other"),
+            Some("other"),
+        )
+        .unwrap();
+        assert_eq!(r2.monitor.id, "primary");
+        assert_eq!(r2.edge, RailEdge::Right);
+
+        // 3. Explicit monitor disconnected while current docked monitor is still connected:
+        // preserves current docked placement without jumping to pointer
+        settings.rail_monitor_id = "disconnected".into();
+        let r3 = reconcile(
+            &screens,
+            &settings,
+            Some(&docked_other),
+            Some((500, 500)), // pointer on primary
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(r3.monitor.id, "other");
+
+        // 3b. Explicit monitor disconnected AND current docked monitor is gone:
+        // falls back to pointer monitor
+        let single_screen = [monitor("primary", 0, 96)];
+        let r3b = reconcile(
+            &single_screen, // only "primary" is connected, "other" (docked) and "disconnected" are gone
+            &settings,
+            Some(&docked_other),
+            Some((500, 500)), // pointer on primary
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(r3b.monitor.id, "primary");
+
+        // 4. Follow pointer hotplug: current monitor disappears -> moves to pointer monitor
+        let single_screen = [monitor("primary", 0, 96)];
+        settings.rail_monitor_id = String::new();
+        let r4 = reconcile(
+            &single_screen,
+            &settings,
+            Some(&docked_other), // "other" is now gone
+            Some((500, 500)),
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(r4.monitor.id, "primary");
+
+        // 5. Non-docked startup/initial placement in automatic mode restores remembered connected monitor ahead of pointer
+        let r5 = reconcile(
+            &screens,
+            &settings,
+            None,
+            Some((500, 500)), // pointer on primary
+            None,
+            Some("other"),    // remembered connected monitor is other
+        )
+        .unwrap();
+        assert_eq!(r5.monitor.id, "other");
+
+        // 6. Disconnected explicit target still falls back pointer-first
+        settings.rail_monitor_id = "missing".into();
+        let r6 = reconcile(
+            &screens,
+            &settings,
+            None,
+            Some((500, 500)), // pointer on primary
+            None,
+            Some("other"),    // remembered is other
+        )
+        .unwrap();
+        assert_eq!(r6.monitor.id, "primary");
     }
     #[test]
     fn rail_geometry_is_centered_scaled_and_edge_aligned() {

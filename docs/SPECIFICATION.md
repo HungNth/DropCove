@@ -432,9 +432,9 @@ The Edge Rail appears when a non-empty Drop Shelf is dismissed.
 ### 11.1 Placement
 
 - Dock edge comes from `RailEdge` in settings; the default is `Right`.
-- A non-empty `RailMonitorId` is the explicit target monitor. When connected, it takes precedence over remembered placement. When unavailable, DropCove temporarily uses the Windows primary display without changing the setting.
-- An empty `RailMonitorId` requests the remembered dismissal monitor from shelf state. If that monitor is unavailable, DropCove temporarily uses the Windows primary display. If no remembered monitor exists, dismissal uses the monitor containing the Drop Shelf.
-- Every non-empty Drop Shelf dismissal stores the actual selected monitor. A display-change fallback while the rail is already docked does not by itself replace the remembered monitor.
+- Target monitor `Follow pointer` is represented by an empty `RailMonitorId`. On every fresh non-empty Drop Shelf dismissal, DropCove selects the monitor containing the pointer. If pointer-monitor resolution fails, it falls back to the Drop Shelf monitor, the latest persisted dismissal monitor, then the Windows primary display.
+- A non-empty `RailMonitorId` is an explicit target monitor. When connected, it takes precedence over the pointer. When unavailable, DropCove preserves the setting and temporarily applies the same pointer-first fallback; a docked Edge Rail returns to the explicit monitor when it reconnects.
+- Every successful non-empty Drop Shelf dismissal stores the actual selected monitor. Fullscreen restore, Shake cancellation, expansion/collapse, content updates, and switching Settings to `Follow pointer` reuse the current docked placement rather than resampling the pointer. Selecting a connected fixed monitor moves a docked Edge Rail immediately; if a Follow pointer monitor disconnects, the Rail moves to the available pointer monitor and retains that actual fallback placement.
 - The rail remains centered vertically in the selected monitor work area.
 - The rail is an overlay and does not reserve desktop work area.
 - Screen-edge corners remain square and both desktop-facing corners are symmetrically rounded with a continuous border. Left docking rounds the right corners; Right docking rounds the left corners.
@@ -658,7 +658,7 @@ Opening Settings from the notification area does not show, move, or change the D
 | Global hotkey                     | `Ctrl + Shift + Space` | At least one modifier plus a supported primary key                  | `0.0.4`    |
 | Start with Windows                | On                     | Adds/removes current-user sign-in registration                      | `0.0.4`    |
 | Docking edge                      | Right                  | Left or Right                                                       | `0.0.5`    |
-| Target monitor                    | Use remembered monitor | A display identifier or remembered placement; unavailable saved displays remain selectable | `0.0.5`    |
+| Target monitor                    | Follow pointer         | Follow the pointer on fresh dismissal, or use a connected explicit display identifier | `0.0.5`    |
 | Show over fullscreen applications | Off                    | Controls Edge Rail fullscreen hiding                                | `0.0.5`    |
 | Enable shake gesture              | On                     | Installs/removes global pointer hook                                | `0.0.6`    |
 | Shake sensitivity                 | Normal                 | Low, Normal, High                                                   | `0.0.6`    |
