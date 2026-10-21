@@ -68,7 +68,7 @@ function pointerMove(event: PointerEvent) {
       @pointercancel="pointerStart = undefined"
       @dragstart.prevent
     >
-      <span class="card-icon flex flex-none items-center leading-none [&_.shell-visual+.shell-visual]:-ml-[14px]" aria-hidden="true">
+      <span class="card-icon relative isolate flex flex-none items-center leading-none pointer-events-none" :class="{ 'size-[30px]': !singleItem }" aria-hidden="true">
         <ShellVisual
           v-if="singleItem"
           :item-id="singleItem.id"
@@ -78,8 +78,10 @@ function pointerMove(event: PointerEvent) {
         />
         <template v-else>
           <ShellVisual
-            v-for="item in previews"
+            v-for="(item, index) in previews"
             :key="item.id"
+            class="absolute"
+            :style="{ left: `${index * 3}px`, bottom: `${index * 3}px`, zIndex: previews.length - index }"
             :item-id="item.id"
             :is-folder="item.isFolder"
             :name="item.name"

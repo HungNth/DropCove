@@ -374,6 +374,8 @@ A multi-item card displays:
 - compact Manage Items icon action;
 - compact Remove Batch icon action.
 
+On both the Drop Shelf and expanded Edge Rail, each multi-item preview occupies a `24 × 24` logical-pixel box. The first Shelf Item is the front layer at the lower-left; each following layer sits behind it, offset `3` logical pixels up and right. The preview region is `30 × 30` logical pixels, bounded to three layers. Each visual retains its natural transparency with no opaque per-layer backing; later layers or the card surface may show through transparent artwork and aspect-fit margins. The stack remains decorative and non-interactive; the existing item-count title, batch drag region, trailing controls, and `48`-pixel card height are unchanged.
+
 Visible drag-hint subtitles are not shown on either card type. Full paths and drag instructions remain available through tooltips and accessibility text. Multi-item actions occupy one trailing icon-control row.
 
 ## 10. Manage Items
