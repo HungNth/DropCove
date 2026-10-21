@@ -884,6 +884,18 @@ pub(crate) fn coordinate_show(
     ops.reassert_topmost()
 }
 
+/// Coordinator transition when showing shelf from a previous visibility state.
+/// If transitioning from EdgeDocked, closes rail transients and manages popup.
+pub(crate) fn coordinate_docked_to_shelf(
+    previous: Visibility,
+    mut close_rail_transients: impl FnMut() -> Result<(), String>,
+) -> Result<(), String> {
+    if previous == Visibility::EdgeDocked {
+        close_rail_transients()?;
+    }
+    Ok(())
+}
+
 fn coordinate_shake_begin(
     ops: &dyn WindowOps,
     state: &ResidentState,
@@ -1164,6 +1176,11 @@ fn show_shelf_at(
     state
         .had_content
         .store(!snapshot.batches.is_empty(), Ordering::Release);
+    coordinate_docked_to_shelf(previous, || {
+        manage_items::close(app)?;
+        let _ = app.emit("rail-transients-closed", ());
+        Ok(())
+    })?;
     if previous != Visibility::Visible {
         let visual_state = app.state::<crate::windows_visuals::ShellVisualState>();
         let new_gen = visual_state.0.advance_generation(crate::windows_visuals::SurfaceId::Shelf);
@@ -1521,9 +1538,21 @@ pub(crate) fn open_shelf_from_rail(app: &AppHandle) -> Result<(), String> {
     if app.state::<ResidentState>().visibility()? != Visibility::EdgeDocked {
         return Err("Rail Handle is not docked".into());
     }
-    manage_items::close(app)?;
-    let _ = app.emit("rail-transients-closed", ());
-    let placement = rail_placement(app)?.ok_or("docked rail has no placement")?;
+    let placement = match rail_placement(app) {
+        Ok(Some(placement)) => placement,
+        other => {
+            coordinate_docked_to_shelf(Visibility::EdgeDocked, || {
+                manage_items::close(app)?;
+                let _ = app.emit("rail-transients-closed", ());
+                Ok(())
+            })?;
+            return match other {
+                Ok(None) => Err("docked rail has no placement".into()),
+                Err(err) => Err(err),
+                Ok(Some(_)) => unreachable!(),
+            };
+        }
+    };
     show_shelf_at(app, Some(&placement.monitor))
 }
 
@@ -2246,6 +2275,24 @@ mod tests {
     }
 
     #[test]
+    fn docked_to_shelf_closes_rail_transients_only_when_edge_docked() {
+        let closed = RefCell::new(0);
+        let mut on_close = || {
+            *closed.borrow_mut() += 1;
+            Ok(())
+        };
+
+        coordinate_docked_to_shelf(Visibility::Visible, &mut on_close).unwrap();
+        assert_eq!(*closed.borrow(), 0, "visible shelf must not close rail transients");
+
+        coordinate_docked_to_shelf(Visibility::Hidden, &mut on_close).unwrap();
+        assert_eq!(*closed.borrow(), 0, "hidden shelf must not close rail transients");
+
+        coordinate_docked_to_shelf(Visibility::EdgeDocked, &mut on_close).unwrap();
+        assert_eq!(*closed.borrow(), 1, "edge docked shelf must close rail transients");
+    }
+
+    #[test]
     fn failed_window_placement_returns_error_and_does_not_mark_visible() {
         let state = ResidentState::default();
         let mut ops = MockWindowOps::new(
@@ -2680,7 +2727,6 @@ mod tests {
         let tick = state.tick_rail(now, 2).unwrap();
         assert!(tick.is_some());
         assert!(!state.rail_presentation().unwrap().expanded);
-
         shelf.close().unwrap();
         std::fs::remove_dir_all(path).unwrap();
     }
