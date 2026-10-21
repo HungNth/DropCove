@@ -444,7 +444,9 @@ The Resident coordinator assigns each transient Shake session an ID. Native OLE 
 - Batch collections and Manage Items lists use virtualized presentation controls.
 - Full item projections are created when management UI opens and cleared when it closes or its owner disappears.
 - Icon and thumbnail loading is asynchronous. File/folder icons provide fallback when image thumbnails are unavailable.
-- Each surface owns cancellation and release of its active image resources even when visual loading is coordinated centrally.
+- Each surface owns cancellation and release of its active image resources even when visual loading is coordinated centrally. Leaving the Edge Rail closes its expanded subtree and invalidates its visual generation; ordinary hover expansion retains the native timing and existing virtualization policy.
+- Shell Visual watchers compare item ID, size, and the owning surface's numeric generation independently. Repeated generation snapshots and events from another surface must not clear loaded Blob URLs or cancel/restart extraction. `pnpm test` exercises concurrent visual mounts, unrelated-generation retention, genuine invalidation, and stale-URL release through the real Vue composable.
+- Drop Shelf refresh is emitted after successful native show. A generation-only refresh keeps the mounted image until a replacement is ready; item/size changes and unmount still release it. `get_shelf_visual` returns binary bytes for success, empty binary for a genuine unavailable visual, and JSON `null` for hidden, collapsed, or cancelled/stale work. Cancellation therefore cannot replace a good image with a fallback; a genuine failure still does. No durable or cross-component image cache is introduced. The Node regression uses native TypeScript import support (verified on Node 24.18.0).
 - Animations are short state-change effects. Non-essential transitions are skipped when Windows disables client-area animations.
 
 ## 15. Concurrency and error handling

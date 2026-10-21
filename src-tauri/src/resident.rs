@@ -1181,18 +1181,6 @@ fn show_shelf_at(
         let _ = app.emit("rail-transients-closed", ());
         Ok(())
     })?;
-    if previous != Visibility::Visible {
-        let visual_state = app.state::<crate::windows_visuals::ShellVisualState>();
-        let new_gen = visual_state.0.advance_generation(crate::windows_visuals::SurfaceId::Shelf);
-        use tauri::Emitter;
-        let _ = app.emit(
-            "visual-generation-changed",
-            crate::windows_visuals::GenerationChangedPayload {
-                surface: crate::windows_visuals::SurfaceId::Shelf,
-                generation: new_gen,
-            },
-        );
-    }
     edge_rail::hide(app)?;
     let ops = match monitor {
         Some(monitor) => NativeWindowOps::on_monitor(&window, monitor),
@@ -1205,6 +1193,18 @@ fn show_shelf_at(
             restore_rail(app, previous_rail.as_ref())?;
         }
         return Err(error);
+    }
+    if previous != Visibility::Visible {
+        let visual_state = app.state::<crate::windows_visuals::ShellVisualState>();
+        let new_gen = visual_state.0.advance_generation(crate::windows_visuals::SurfaceId::Shelf);
+        use tauri::Emitter;
+        let _ = app.emit(
+            "visual-generation-changed",
+            crate::windows_visuals::GenerationChangedPayload {
+                surface: crate::windows_visuals::SurfaceId::Shelf,
+                generation: new_gen,
+            },
+        );
     }
     Ok(())
 }

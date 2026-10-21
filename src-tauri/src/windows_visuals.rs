@@ -15,7 +15,7 @@ impl SurfaceId {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum VisualRole { ImageThumbnail, ShellIcon }
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum VisualOutcome { Success(Vec<u8>), Fallback }
+pub(crate) enum VisualOutcome { Success(Vec<u8>), Fallback, Cancelled }
 #[derive(Clone, Serialize)]
 pub(crate) struct GenerationChangedPayload { pub(crate) surface: SurfaceId, pub(crate) generation: u64 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -106,7 +106,7 @@ impl ShellVisualService {
                     let mut queue=lock(&state.queue);
                     if let Some(responders)=queue.active.remove(&job.key){
                         let valid=queue.generations.get(&job.key.surface).copied().unwrap_or(0)==job.key.generation;
-                        let result=if valid{outcome}else{VisualOutcome::Fallback};
+                        let result=if valid{outcome}else{VisualOutcome::Cancelled};
                         for responder in responders{let _=responder.send(result.clone());}
                     }
                 }
@@ -118,19 +118,20 @@ impl ShellVisualService {
     pub(crate) fn current_generation(&self,surface:SurfaceId)->u64{lock(&self.shared.queue).generations.get(&surface).copied().unwrap_or(0)}
     pub(crate) fn advance_generation(&self,surface:SurfaceId)->u64{
         let mut queue=lock(&self.shared.queue);let generation=queue.generations.entry(surface).or_insert(0);*generation=generation.wrapping_add(1);let next=*generation;
-        queue.pending.retain(|job|{if job.key.surface==surface{for responder in &job.responders{let _=responder.send(VisualOutcome::Fallback);}false}else{true}});
-        queue.active.retain(|key,responders|{if key.surface==surface{for responder in responders{let _=responder.send(VisualOutcome::Fallback);}false}else{true}});
+        queue.pending.retain(|job|{if job.key.surface==surface{for responder in &job.responders{let _=responder.send(VisualOutcome::Cancelled);}false}else{true}});
+        queue.active.retain(|key,responders|{if key.surface==surface{for responder in responders{let _=responder.send(VisualOutcome::Cancelled);}false}else{true}});
         next
     }
     fn cancel(&self,key:&Key){
         let mut queue=lock(&self.shared.queue);
-        queue.pending.retain(|job|{if &job.key==key{for responder in &job.responders{let _=responder.send(VisualOutcome::Fallback);}false}else{true}});
-        if let Some(responders)=queue.active.remove(key){for responder in responders{let _=responder.send(VisualOutcome::Fallback);}}
+        queue.pending.retain(|job|{if &job.key==key{for responder in &job.responders{let _=responder.send(VisualOutcome::Cancelled);}false}else{true}});
+        if let Some(responders)=queue.active.remove(key){for responder in responders{let _=responder.send(VisualOutcome::Cancelled);}}
     }
     fn request(&self,key:Key,path:PathBuf,role:VisualRole,overscan:bool)->VisualOutcome{
         let (sender,receiver)=mpsc::channel();
         {let mut queue=lock(&self.shared.queue);
-            if queue.stopping || self.workers.iter().all(JoinHandle::is_finished) || queue.generations.get(&key.surface).copied().unwrap_or(0)!=key.generation{return VisualOutcome::Fallback;}
+            if queue.stopping || self.workers.iter().all(JoinHandle::is_finished){return VisualOutcome::Fallback;}
+            if queue.generations.get(&key.surface).copied().unwrap_or(0)!=key.generation{return VisualOutcome::Cancelled;}
             if let Some(job)=queue.pending.iter_mut().find(|job|job.key==key){job.responders.push(sender);}
             else if let Some(responders)=queue.active.get_mut(&key){responders.push(sender);}
             else {
@@ -140,7 +141,7 @@ impl ShellVisualService {
                 self.shared.available.notify_one();
             }
         }
-        receiver.recv().unwrap_or(VisualOutcome::Fallback)
+        receiver.recv().unwrap_or(VisualOutcome::Cancelled)
     }
 }
 impl Drop for ShellVisualService {fn drop(&mut self){
@@ -153,12 +154,13 @@ fn visual_size(size:Option<u32>,scale:Option<f64>)->Option<u32>{let size=size.un
 #[tauri::command]
 pub(crate) async fn get_shelf_visual(window:tauri::WebviewWindow,app:tauri::AppHandle,shelf_state:tauri::State<'_,crate::shelf::ShelfState>,visual_state:tauri::State<'_,ShellVisualState>,item_id:String,generation:u64,size:Option<u32>,scale_factor:Option<f64>,overscan:Option<bool>)->Result<tauri::ipc::Response,String>{
     let empty=||tauri::ipc::Response::new(Vec::new());
+    let cancelled=||tauri::ipc::Response::new("null".to_owned());
     let Some(surface)=SurfaceId::from_window_label(window.label()) else{return Ok(empty());};
     let Some(size)=visual_size(size,scale_factor) else{return Ok(empty());};
     let hwnd=window.hwnd().map_err(|error|error.to_string())?;
     // SAFETY: Tauri owns the caller HWND for the command's lifetime.
-    if !unsafe{IsWindowVisible(hwnd)}.as_bool(){return Ok(empty());}
-    if surface==SurfaceId::EdgeRail && !app.state::<crate::resident::ResidentState>().rail_presentation()?.expanded{return Ok(empty());}
+    if !unsafe{IsWindowVisible(hwnd)}.as_bool(){return Ok(cancelled());}
+    if surface==SurfaceId::EdgeRail && !app.state::<crate::resident::ResidentState>().rail_presentation()?.expanded{return Ok(cancelled());}
     let service=Arc::clone(&visual_state.0);let state=shelf_state.inner().clone();
     let outcome=tauri::async_runtime::spawn_blocking(move||{
         let target=state.item_visual_target(&item_id).ok().flatten();
@@ -172,7 +174,8 @@ pub(crate) async fn get_shelf_visual(window:tauri::WebviewWindow,app:tauri::AppH
         let image=!folder && path.extension().and_then(|ext|ext.to_str()).is_some_and(|ext|["png","jpg","jpeg","bmp","gif","webp","ico","tiff","tif","avif"].iter().any(|format|ext.eq_ignore_ascii_case(format)));
         service.request(Key{surface,generation,item:item_id,size},path,if image{VisualRole::ImageThumbnail}else{VisualRole::ShellIcon},overscan.unwrap_or(false))
     }).await.map_err(|error|error.to_string())?;
-    Ok(match outcome{VisualOutcome::Success(bytes)=>tauri::ipc::Response::new(bytes),VisualOutcome::Fallback=>empty()})
+    if visual_state.0.current_generation(surface)!=generation{return Ok(cancelled());}
+    Ok(match outcome{VisualOutcome::Success(bytes)=>tauri::ipc::Response::new(bytes),VisualOutcome::Fallback=>empty(),VisualOutcome::Cancelled=>cancelled()})
 }
 #[tauri::command]
 pub(crate) fn get_surface_generation(window:tauri::WebviewWindow,visual_state:tauri::State<'_,ShellVisualState>)->Result<u64,String>{let surface=SurfaceId::from_window_label(window.label()).ok_or("unauthorized visual caller")?;Ok(visual_state.0.current_generation(surface))}
@@ -194,7 +197,7 @@ mod tests {
         let request=std::thread::spawn(move||worker.request(Key{surface:SurfaceId::Shelf,generation:0,item:"a".into(),size:32},PathBuf::from("a"),VisualRole::ShellIcon,false));
         entered.recv_timeout(std::time::Duration::from_secs(3)).unwrap();
         service.advance_generation(SurfaceId::Shelf);
-        assert_eq!(request.join().unwrap(),VisualOutcome::Fallback);
+        assert_eq!(request.join().unwrap(),VisualOutcome::Cancelled);
         release.send(()).unwrap();
     }
     #[test]
@@ -206,7 +209,7 @@ mod tests {
         for item in ["a","b"]{let clone=Arc::clone(&service);let item=item.to_string();requests.push(std::thread::spawn(move||clone.request(Key{surface:SurfaceId::Shelf,generation:0,item:item.clone(),size:32},PathBuf::from(item),VisualRole::ShellIcon,false)));entered.recv_timeout(std::time::Duration::from_secs(3)).unwrap();}
         let key=Key{surface:SurfaceId::Shelf,generation:0,item:"queued".into(),size:32};
         let (sender,receiver)=mpsc::channel();lock(&service.shared.queue).pending.push_back(Job{key:key.clone(),path:PathBuf::from("queued"),role:VisualRole::ShellIcon,responders:vec![sender],overscan:true});
-        service.cancel(&key);assert_eq!(receiver.recv().unwrap(),VisualOutcome::Fallback);
+        service.cancel(&key);assert_eq!(receiver.recv().unwrap(),VisualOutcome::Cancelled);
         release.send(()).unwrap();release.send(()).unwrap();for request in requests{let _=request.join().unwrap();}
         assert_eq!(source.calls.load(std::sync::atomic::Ordering::SeqCst),2);
     }

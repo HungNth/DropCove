@@ -18,7 +18,8 @@ async function initialize(surface: SurfaceId) {
   })();
   await listening;
   const generation = await invoke<number>("get_surface_generation");
-  generations.value = { ...generations.value, [surface]: Math.max(generations.value[surface], generation) };
+  const next = Math.max(generations.value[surface], generation);
+  if (next !== generations.value[surface]) generations.value = { ...generations.value, [surface]: next };
 }
 export async function invalidateSurface(surface: SurfaceId = callerSurface) {
   const generation = await invoke<number>("invalidate_surface_visuals");
@@ -37,33 +38,40 @@ export function useShellVisual(
   let ready = false;
   let sequence = 0;
   let active: { itemId: string; generation: number; size: number; scaleFactor: number } | undefined;
-  function clear() {
-    ++sequence;
+  function releaseVisual() {
     if (visualUrl.value) URL.revokeObjectURL(visualUrl.value);
     visualUrl.value = null;
+  }
+  function clear(release = true) {
+    ++sequence;
+    if (release) releaseVisual();
     if (active) {
       void invoke("cancel_shelf_visual", active).catch(() => {});
       active = undefined;
     }
   }
-  async function load() {
+  async function load(preserveVisual = false) {
     if (!ready || disposed) return;
-    clear();
+    clear(!preserveVisual);
     const request = ++sequence;
     const args = { itemId: toValue(itemId), generation: generations.value[surface], size: toValue(size), scaleFactor: window.devicePixelRatio };
     active = args;
     loading.value = true;
     try {
-      const bytes = await invoke<ArrayBuffer>("get_shelf_visual", args);
-      if (disposed || request !== sequence || args.generation !== generations.value[surface]) return;
-      if (bytes.byteLength) visualUrl.value = URL.createObjectURL(new Blob([bytes], { type: "image/bmp" }));
+      const bytes = await invoke<ArrayBuffer | null>("get_shelf_visual", args);
+      if (disposed || request !== sequence || args.generation !== generations.value[surface] || bytes === null) return;
+      const nextUrl = bytes.byteLength ? URL.createObjectURL(new Blob([bytes], { type: "image/bmp" })) : null;
+      releaseVisual();
+      visualUrl.value = nextUrl;
     } catch {
-      // Shell visuals are optional; the existing generic icon remains visible.
+      if (!disposed && request === sequence && args.generation === generations.value[surface]) releaseVisual();
     } finally {
       if (request === sequence) { loading.value = false; active = undefined; }
     }
   }
-  watch(() => [toValue(itemId), toValue(size), generations.value[surface]], () => { void load(); });
+  watch([() => toValue(itemId), () => toValue(size), () => generations.value[surface]], (next, previous) => {
+    void load(next[0] === previous[0] && next[1] === previous[1]);
+  });
   onMounted(async () => {
     ++users;
     try { await initialize(surface); if (!disposed) { ready = true; await load(); } }

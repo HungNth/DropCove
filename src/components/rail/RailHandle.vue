@@ -239,8 +239,10 @@ onMounted(async () => {
     });
     unlistenTransientsClosed = await getCurrentWindow().listen("rail-transients-closed", async () => {
       if (disposed) return;
+      expanded.value = false;
       confirmingClearTemporary.value = false;
       await cancelPreparedBatch();
+      await invoke("invalidate_surface_visuals");
     });
     const projection = await invoke<Projection>("get_rail");
     if (!disposed) {
