@@ -12,4 +12,4 @@
 - [x] Network failure, keyboard activation, focus visibility, and (where available) screen-reader announcement are exercised on the installed candidate. (Verified on candidate by agent smoke and user testing.)
 - [x] Every status message, including the longest, fits on one line inside the fixed `400 × 460` About Surface in Dark, Light, and emulated forced colors. (Verified: single-line rendering verified in Dark and Light; longest message fits within 208 px.)
 - [x] Specification §3.3/§5.4 and the glossary match the delivered copy. ROADMAP `0.0.20` status and observed evidence are updated, with unobserved limits stated.
-- [x] Human acceptance: the user confirms the candidate, including the available-release path once a release newer than the candidate is published. Git commit remains a separate explicit authorization. (Confirmed by user on 2026-10-22.)
+- [x] Human acceptance: the user confirms the candidate on 2026-10-22. (The available-release path was verified via stubbed response as the repository has no published release yet; live verification against GitHub releases will occur once a newer release is published.)
