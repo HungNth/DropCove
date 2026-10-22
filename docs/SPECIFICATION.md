@@ -402,15 +402,15 @@ Manage Items provides item-level control for a multi-item Shelf Batch.
 
 ### 10.1 Placement and size
 
-- Width: `280` logical pixels.
-- Maximum height: `480` logical pixels on the Drop Shelf.
+- Width: `240` logical pixels.
+- Maximum height: `480` logical pixels.
 - Placement preference: right, left, below, then above the originating card, with a preferred `8`-logical-pixel gap along the placement axis.
 - A preferred candidate is eligible only when the complete popup and gap fit inside the monitor work area with the preferred `16`-pixel margin.
 - Fallback: when no preferred candidate fits, clamp inside the permitted work area; containment takes precedence and the gap may shrink, disappear, or become unavoidable overlap.
 - The same separation and fallback contract applies when Manage Items is opened from the Drop Shelf or expanded Edge Rail.
 - Only one Manage Items popup is open at a time.
 
-The Edge Rail uses a matching management flyout constrained to the rail width and a bounded vertical scroller.
+The same `240`-logical-pixel management popup opens from the Edge Rail without inheriting the Rail's `280`-pixel width. Its vertical scroller remains bounded.
 
 ### 10.2 Content and actions
 
@@ -421,12 +421,12 @@ Header:
 - compact tri-state Bulk Pinning icon control;
 - compact Close icon control.
 
-Each row exposes:
+Each `54`-logical-pixel row, separated by a `5`-pixel gap, exposes:
 
 - icon or thumbnail;
-- item name;
-- shortened path with full path available through tooltip and accessibility text;
-- availability label;
+- item name on the first text line;
+- availability on the second text line as `Available`, `Unavailable`, or `Missing`, without a duplicate `Pinned ·` prefix;
+- full path through the drag-region tooltip and accessibility text, but not as visible row content;
 - compact Pin/Unpin icon action;
 - compact Remove Item icon action;
 - direct item drag-out.

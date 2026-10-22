@@ -29,7 +29,7 @@ function pointerMove(event: PointerEvent) {
 
 <template>
   <li
-    class="item-row flex items-center gap-[5px] min-w-0 h-[54px] box-border border border-dc-border-default rounded-[7px] p-[5px] bg-dc-surface-elevated text-dc-text-primary transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
+    class="item-row flex flex-none items-center gap-[5px] min-w-0 h-[54px] box-border border border-dc-border-default rounded-[7px] p-[5px] bg-dc-surface-elevated text-dc-text-primary transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
     :data-item-id="item.id"
     :aria-label="`${item.name}, ${item.path}, ${item.availability}`"
   >
@@ -52,11 +52,10 @@ function pointerMove(event: PointerEvent) {
       />
       <span class="item-info flex min-w-0 flex-col gap-[2px]">
         <span class="item-name overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-dc-text-primary">{{ item.name }}</span>
-        <span class="item-path overflow-hidden text-ellipsis whitespace-nowrap text-dc-text-muted text-[10px]">{{ item.path }}</span>
+        <span class="availability whitespace-nowrap text-dc-text-muted text-[10px]">{{ item.availability }}</span>
       </span>
     </div>
     <div class="item-actions flex flex-none items-center gap-[3px]">
-      <span class="availability max-w-[60px] text-dc-text-muted text-[10px] [overflow-wrap:anywhere]">{{ item.isPinned ? "Pinned · " : "" }}{{ item.availability }}</span>
       <button
         class="action pin inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-transparent rounded-[4px] bg-transparent text-dc-text-secondary cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
         type="button"

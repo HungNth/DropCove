@@ -945,3 +945,61 @@ The latest build produced `build/DropCove-Setup-0.0.21.exe` (3,296,914 bytes, SH
 
 - Standards and Spec reviews reported no actionable findings. No permanent test was added for two packaging configuration fields; the artifact assertions and installed smoke cover the changed behavior.
 - The user confirmed testing and accepted the release candidate on 2026-10-22 (`tất cả đã đạt`, `tôi đã test và tất cả đã đạt`), closing human acceptance and authorizing the release commit.
+
+## 0.0.22 — Compact Manage Items popup
+
+**Status:** Completed — tickets 01–02 resolved; candidate 0.0.22 packaged, verified, accepted by the user on 2026-10-22, and committed after explicit authorization.
+
+Plan: [Specification](../.scratch/compact-manage-items-popup/spec.md).
+
+### Scope
+
+- Reduce the shared Manage Items popup width from `280` to `240` logical pixels when opened from either the Drop Shelf or Edge Rail.
+- Remove the shortened path from visible row content and move `Available`, `Unavailable`, or `Missing` to the second text line without a duplicate `Pinned ·` prefix.
+- Preserve the exact full path in the existing tooltip and accessibility text.
+- Preserve `54`-logical-pixel rows, `5`-pixel gaps, the `480`-pixel maximum height, placement and work-area containment, scrolling, virtualization, Shell Visuals, actions, direct item drag-out, keyboard/focus behavior, lifecycle, themes, accessibility, Shelf state, and source-file safety.
+
+### Planned delivery slices
+
+1. Compact Manage Items presentation: update the shared native width and row content end to end, preserve established behavior, update placement regressions, and prove the actual Windows surface from both origins while version metadata remains `0.0.21`.
+2. Release gate: review the accepted implementation, synchronize `0.0.22`, run complete regressions, package and install one exact NSIS candidate, record evidence and limits, and obtain human acceptance.
+
+### Planned verification
+
+- Inspect the actual Windows Resident/WebView2 Manage Items surface from both the Drop Shelf and Edge Rail with short, long, identical-name, Available, Unavailable, Missing, Pinned, Temporary, ordinary, and virtualized item sets.
+- Measure the `240`-logical-pixel popup, verify name-plus-availability row presentation, and prove the full path remains available through hover and accessibility tooling.
+- Update existing native placement regressions for the new width and exercise directional candidates, monitor corners, constrained work areas, and clamp fallback.
+- Run the frontend production build and the complete cargo-xwin-built native Windows regression executable.
+- After implementation acceptance, synchronize version `0.0.22`, build one exact current-user Windows x64 NSIS candidate, and verify the installed bytes, embedded assets, resident lifecycle, reinstall, uninstall, and Profile Data preservation.
+
+### Deferred
+
+- Row-height, gap, maximum-height, header, action, icon, Shell Visual, scrollbar, virtualization, keyboard, drag, lifecycle, state, persistence, or availability-policy redesign.
+- Visible path toggles, copy-path actions, details views, resizable or adaptive popup width, per-origin geometry, density settings, or broader surface redesign.
+- New dependencies, telemetry, signing, automatic updates, or non-Windows platforms.
+
+### Observed implementation and release evidence — 2026-10-22
+
+- Shared native Manage Items width is `240` logical pixels. Availability occupies the second item-info line; visible path and duplicate `Pinned ·` text are removed. Existing tooltip and actual Chromium accessibility names retain the full path. The shared popup is unchanged by Drop Shelf versus Edge Rail origin.
+- Installed inspection found ordinary overflow rows shrinking to `47` pixels. Added only `flex-none` to enforce the approved `54`-pixel row contract. Final installed Drop Shelf and physically opened Edge Rail popups both measured `240 × 480` with 35 ordinary rows, each exactly `54` pixels high and `5`-pixel gaps. Three-row content measured `240 × 292`; virtualized 70-row content retained bounded mounting and `54`-pixel rows.
+- Final installed virtualized traversal reached row 69's Remove control with 10 mounted rows, then wrapped to Bulk Pinning. Real surfaces showed Available, Missing after deliberate owned-fixture removal, Unavailable for an offline root, long names, identical names with distinct full paths, Pinned/Temporary states, and Dark/Light presentation. Actual accessibility trees retained exact path identities. Physical item drag cancellation retained the reference.
+- Exact final installed bytes accepted native item and whole-batch Copy into an owned Windows Forms target. Temporary row Copy consumed only its reference; a 70-path batch Copy left exactly 35 Pinned survivors. Destination and source bytes were verified. Earlier provisional-candidate smoke separately proved Pinned row Copy retention, native external storage intake, exact-duplicate no-op, Clear cancellation/confirmation, Settings/About access, and source-file safety. Supplemental exact-final-candidate smoke verified Bulk Pinning Mixed → On → Off, keyboard Space, per-item Pin/Unpin, and Remove Batch without source deletion.
+- Frontend production typecheck/build and cargo-xwin Windows x64 NSIS build passed. Final frontend suite passed **13/13**; freshly cargo-xwin-compiled native Windows executable passed **124/124**, including **3/3** placement checks. The updated placement assertions were observed failing against width 280 before passing at 240; expected coordinates are independent literals.
+- Direct Standards review: **0 remaining actionable findings**. Direct Spec review: **0 remaining actionable implementation findings**. Parallel reviewer invocation was unavailable; independent-review evidence is not claimed. One stale native geometry comment was corrected. No dependency, framework, setting, command, persistence change, or compatibility path was added.
+- VERSION, package, crate/lock, Tauri, installed PE, runtime About, and uninstall registration reported `0.0.22`. Installed runtime loaded embedded assets with the development port refusing connections. Exact final-candidate reinstall, secondary activation, Cooperative Shutdown, and restart passed. Durable identities, order, paths, and Pin states survived restart; a deliberate Missing fixture correctly reclassified Available after its source was restored.
+- Standard uninstall exited `0`, removed the owned installation, and retained exact owned Profile Data bytes. The primary owned `settings.json` SHA-256 was `24414d8cd926d38a2baf1a503cbd172779c176cadafc88f9c7df60a1a85317ca`; `shelf.db` was `121892ddcff32f82587c8d87ca794cb6b5beab403a1795e9958f154e9bdb88f2`. Supplemental uninstall also preserved every owned profile/recovery file byte-for-byte.
+- Owned installations, profiles, fixtures, Copy targets, storage source, WebView data, scripts, images, logs, and browser attachments were removed. Captured uninstall/manufacturer registrations and shortcut bytes were restored exactly. Ambient installed executable and settings bytes were unchanged; the originally running ambient 0.0.21 Resident was restarted. Startup registration was reconciled to that installed executable and its actual configured profile; the initial Run value was not captured before the first default-settings smoke startup, so exact original Run-byte restoration is not claimed.
+
+| Final retained artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `build/DropCove-Setup-0.0.22.exe` | 3,297,216 | `d41259ad2a7824fdfecdf4eba022f560fda111884ea714a4b54fa2a96c683220` |
+| Exact installed `dropcove.exe` | 13,942,272 | `a5e07233bbe4612a341e12f76c98682a8b4335999239b56e57d3e2cfa0aafacc` |
+
+The final installer supersedes the provisional 3,297,256-byte candidate (`38ffd38b0552eef36e73f33b8311fa16b5c428f5d4e4148818156b6a709878d2`) and its installed executable (`1ef353653006a11f6c175ba727ead41c38e33597642a0d4992cde4c57be3aff6`). Only the final installer above is presented for human acceptance.
+
+### Verification corrections and remaining acceptance
+
+- Initial launches without an owned WebView2 data directory failed with `0x8007139F`; clean owned WebView data resolved the harness collision. A provisional batch-drag attempt hit overlapping windows; the corrected physical target received all paths. Same-candidate reinstall initially exited `2` because the untouched ambient Start Menu shortcut was not owned by the smoke installation; temporarily preserving and then restoring that shortcut allowed clean exact-candidate reinstall. These rejected attempts are not passing product evidence.
+- The supplemental action fixture initially provided only part of the required database schema and correctly triggered recovery. It was reseeded only after the actual application had created its complete schema; all final action assertions then passed. A later driver return expression referenced `document` outside its page context after Remove Batch succeeded; the authoritative remaining-batch projection confirmed the action, without repeating it.
+- Actual Windows Contrast Theme, mixed/fractional DPI, Narrator speech, and physical Windows reduced-motion configuration were not observed. Media emulation is not counted as actual Contrast acceptance. The complete physical interaction matrix remains part of human acceptance.
+- The user confirmed testing and accepted the release candidate on 2026-10-22 (`tất cả đã đạt, hãy commit các thay đổi`), closing human acceptance and authorizing the release commit.

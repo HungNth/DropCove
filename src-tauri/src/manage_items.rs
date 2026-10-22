@@ -24,7 +24,7 @@ use windows::Win32::{
 };
 
 const LABEL: &str = "manage-items";
-const WIDTH: f64 = 280.0;
+const WIDTH: f64 = 240.0;
 const MAX_HEIGHT: f64 = 480.0;
 const MARGIN: f64 = 16.0;
 const GAP: f64 = 8.0;
@@ -360,7 +360,7 @@ pub(crate) fn open(
             .to_logical::<f64>(scale);
         let (x, y) = placement(screen_anchor, (outer.width, outer.height), work);
         // SAFETY: The live owned HWND is moved/shown in physical screen coordinates without
-        // activation. Placement bounds include its native border, not just the 280-pixel client.
+        // activation. Placement bounds include the native border as well as the client area.
         unsafe {
             SetWindowPos(
                 hwnd,
@@ -526,7 +526,7 @@ pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) {
 
 #[cfg(test)]
 mod tests {
-    use super::{placement, Rect};
+    use super::{placement, Rect, WIDTH};
 
     #[test]
     fn management_placement_uses_complete_candidate_bounds_then_clamps() {
@@ -536,7 +536,7 @@ mod tests {
             width: 900.0,
             height: 700.0,
         };
-        let size = (280.0, 250.0);
+        let size = (WIDTH, 250.0);
         assert_eq!(
             placement(
                 Rect {
@@ -561,7 +561,7 @@ mod tests {
                 size,
                 work
             ),
-            (432.0, 100.0)
+            (472.0, 100.0)
         );
         let narrow = Rect {
             width: 500.0,
@@ -604,7 +604,7 @@ mod tests {
                 size,
                 work
             ),
-            (604.0, 434.0)
+            (644.0, 434.0)
         );
     }
 
@@ -613,12 +613,12 @@ mod tests {
         let work = Rect { x: -900.0, y: -700.0, width: 900.0, height: 700.0 };
         for (x, y, expected) in [
             (-884.0, -684.0, (-716.0, -684.0)),
-            (-176.0, -684.0, (-464.0, -684.0)),
+            (-176.0, -684.0, (-424.0, -684.0)),
             (-884.0, -96.0, (-884.0, -354.0)),
-            (-176.0, -96.0, (-296.0, -266.0)),
+            (-176.0, -96.0, (-256.0, -266.0)),
         ] {
             let anchor = Rect { x, y, width: 160.0, height: 80.0 };
-            assert_eq!(placement(anchor, (280.0, 250.0), work), expected);
+            assert_eq!(placement(anchor, (WIDTH, 250.0), work), expected);
         }
     }
 
@@ -626,6 +626,6 @@ mod tests {
     fn management_placement_clamps_when_gap_cannot_fit_in_narrow_work_area() {
         let work = Rect { x: 0.0, y: 0.0, width: 300.0, height: 260.0 };
         let anchor = Rect { x: 70.0, y: 90.0, width: 160.0, height: 80.0 };
-        assert_eq!(placement(anchor, (280.0, 250.0), work), (10.0, 5.0));
+        assert_eq!(placement(anchor, (WIDTH, 250.0), work), (44.0, 5.0));
     }
 }
