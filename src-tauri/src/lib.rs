@@ -490,6 +490,23 @@ fn get_settings(app: tauri::AppHandle) -> Result<settings::SettingsSnapshot, Str
 }
 
 #[tauri::command]
+fn get_appearance(app: tauri::AppHandle) -> Result<windows_theme::AppearanceSnapshot, String> {
+    windows_theme::snapshot(&app)
+}
+
+#[tauri::command]
+fn set_appearance_mode(
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    mode: settings_store::AppearanceMode,
+) -> Result<settings::SettingsSnapshot, String> {
+    if window.label() != settings::SETTINGS_WINDOW_LABEL {
+        return Err("Appearance configuration is only available in Settings".into());
+    }
+    settings::set_appearance_mode(&app, mode)
+}
+
+#[tauri::command]
 fn start_settings_recording(app: tauri::AppHandle) -> Result<settings::SettingsSnapshot, String> {
     settings::start_recording(&app)
 }
@@ -685,8 +702,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .on_page_load(|webview, _| {
-            if let Ok(hwnd) = webview.window().hwnd() {
-                if let Err(error) = windows_theme::register(hwnd) { eprintln!("{error}"); }
+            if let Some(window) = webview.app_handle().get_webview_window(webview.label()) {
+                if let Err(error) = windows_theme::register(&window) {
+                    if let Err(warning) = resident::publish_warning(webview.app_handle(), &error) {
+                        eprintln!("{error}; warning delivery failed: {warning}");
+                    }
+                }
             }
         })
         .setup(move |app| {
@@ -762,9 +783,9 @@ pub fn run() {
             let label = webview.label();
             let command = invoke.message.command();
             let allowed = match label {
-                "about" => command == "get_about_metadata",
+                "about" => matches!(command, "get_about_metadata" | "get_appearance"),
                 "clear-temporary" => matches!(command,
-                    "confirm_drop_shelf_clear_temporary" | "cancel_drop_shelf_clear_temporary"),
+                    "confirm_drop_shelf_clear_temporary" | "cancel_drop_shelf_clear_temporary" | "get_appearance"),
                 "main" => command != "clear_temporary",
                 _ => true,
             };
@@ -821,6 +842,8 @@ pub fn run() {
             set_start_with_windows,
             set_shake,
             get_settings,
+            get_appearance,
+            set_appearance_mode,
             start_settings_recording,
             cancel_settings_recording,
             record_settings_key,

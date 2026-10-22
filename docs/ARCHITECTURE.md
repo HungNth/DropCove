@@ -82,7 +82,7 @@ The dedicated Drop Shelf Clear confirmation is a resident-owned native window, n
 
 The About Surface has a separate, non-modal singleton lifecycle and a read-only metadata projection. Product name and version come from the running Tauri package; author, description, and Source come from Cargo package metadata. The frontend renders the description immediately below the version without another metadata owner. Homepage remains absent until there is a product site. Its window is denied unrelated custom commands, while capabilities allow only its required window lifecycle and canonical external Source link. The Clear window similarly receives only its confirmation interface and core window/event access.
 
-Settings is a resident-managed top-level singleton rather than a native owned Drop Shelf window, so it remains reachable through the Windows taskbar while the Drop Shelf is hidden. Its existing draft, Save/Cancel, focus-loss recorder cancellation, and shutdown coordinator remain authoritative. Settings and About share the narrow native invocation-context placement adapter, not a generalized window manager.
+Settings is a resident-managed top-level singleton rather than a native owned Drop Shelf window, so it remains reachable through the Windows taskbar while the Drop Shelf is hidden. General and Appearance share the existing resident-owned draft, Save/Cancel, focus-loss recorder cancellation, and shutdown coordinator. Appearance preview is a transient process-wide projection of that draft; it does not create a second state owner. Settings and About share the narrow native invocation-context placement adapter, not a generalized window manager.
 
 ### 2.3 Core Shelf State Module
 
@@ -107,7 +107,7 @@ Stores durable shelf state in a per-user SQLite database using write-ahead loggi
 
 ### 2.5 Settings and Startup Adapters
 
-- The Settings Adapter atomically reads and replaces a JSON settings file and owns the configured rail edge and target-monitor preference.
+- The Settings Adapter atomically reads and replaces a JSON settings file and owns the configured Rail preference, Shake preference, startup preference, hotkey, and `AppearanceMode`.
 - The Startup Adapter owns the current-user Windows sign-in registration and launches DropCove with the hidden-start option.
 
 ### 2.6 Windows Integration Adapters
@@ -120,6 +120,7 @@ Separate adapters own:
 - window styles, z-order, resize hit testing, DPI conversion, and monitor placement;
 - foreground-window tracking for topmost repair and Edge Rail fullscreen policy;
 - notification-area icon and menu;
+- application appearance resolution, live Windows theme observation for System mode, Contrast Theme precedence, and native-frame synchronization;
 - file/folder icons and thumbnails.
 
 ## 3. Process and activation lifecycle
@@ -359,9 +360,9 @@ Default path:
 %LOCALAPPDATA%\DropCove\settings.json
 ```
 
-Settings are written to a temporary file, flushed, and atomically moved over the active file. Missing, unreadable, or malformed settings load the defaults.
+Settings are written to a temporary file, flushed, and atomically moved over the active file. Missing settings load defaults silently. Unreadable, malformed, earlier-schema, or unknown-field settings remain untouched, load the complete active defaults, and warn; explicit successful Save is the only operation that replaces them.
 
-`RailEdge` and `RailMonitorId` are settings-owned. A non-empty `RailMonitorId` is an explicit target-monitor preference; an empty value selects `Follow pointer` for fresh dismissal. `shelf_ui_state.rail_monitor` retains actual dock placement for restoration rather than overriding a fresh automatic dismissal.
+`RailEdge`, `RailMonitorId`, and `AppearanceMode` are settings-owned. A non-empty `RailMonitorId` is an explicit target-monitor preference; an empty value selects `Follow pointer` for fresh dismissal. `shelf_ui_state.rail_monitor` retains actual dock placement for restoration rather than overriding a fresh automatic dismissal. `AppearanceMode` is one of `System`, `Dark`, or `Light` and defaults to `System`; adding it in `0.0.19` is a strict clean cutover rather than a migration.
 
 ### 10.3 Sign-in startup registration
 
@@ -398,6 +399,14 @@ This favors continued application availability while preserving evidence for man
 
 The Drop Shelf is borderless but retains native resize behavior on all edges and corners. The Edge Rail is a separate no-activate window so hover, drop-in, drag-out, and management do not steal foreground focus.
 The Edge Rail disables the Windows redirection bitmap when its transparent window is created. CSS retains ownership of the antialiased 8-logical-pixel outer corners and square docked edge; no binary native window region clips their fractional-alpha pixels. This avoids white native backing paint without turning the rounded desktop-facing corners into jagged edges.
+
+### 11.1 Appearance synchronization
+
+The Resident Instance owns one resolved application appearance for all WebView surfaces and native frames. Before a surface becomes visible, the appearance coordinator resolves the persisted or previewed `AppearanceMode`: System maps to the current Windows application theme, while Dark and Light remain fixed across ordinary Windows theme changes. One semantic token source maps the resolved Light or Dark appearance to presentation colors; native frames receive the matching Windows frame treatment.
+
+The Windows appearance adapter observes live application-theme and Contrast Theme changes. System mode updates every existing surface and native frame without restart. Windows Contrast Theme has higher precedence than every Appearance Mode: WebViews use forced system colors and native frames follow Windows, while the stored preference remains unchanged for restoration when Contrast Theme ends.
+
+Selecting an option in Settings publishes a transient process-wide preview from the resident-owned draft. Save makes that candidate durable; Cancel, native Settings close, or failed Save republishes the previously persisted mode to every surface and frame. Hidden surfaces resolve the current preview or persisted mode before their next show, preventing a stale visible frame without giving individual windows theme ownership.
 
 ## 12. Foreground, topmost, and fullscreen behavior
 

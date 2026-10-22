@@ -653,6 +653,8 @@ A new Settings window is centered within the invoking monitor's work area: the D
 
 Opening Settings from the notification area does not show, move, or change the Drop Shelf or Edge Rail. Hiding the Drop Shelf does not hide Settings.
 
+Settings presents two horizontal tabs below its title: **General** and **Appearance**. General contains every setting introduced before `0.0.19`; Appearance contains the application-wide appearance selector. A newly created or reopened Settings window starts on General, tab selection is not persisted, switching tabs retains the shared draft, and one Save/Cancel footer governs both tabs.
+
 ### 16.1 Available settings and defaults
 
 | Setting                           | Default                | Values / behavior                                                   | Introduced |
@@ -664,21 +666,36 @@ Opening Settings from the notification area does not show, move, or change the D
 | Show over fullscreen applications | Off                    | Controls Edge Rail fullscreen hiding                                | `0.0.5`    |
 | Enable shake gesture              | On                     | Installs/removes global pointer hook                                | `0.0.6`    |
 | Shake sensitivity                 | Normal                 | Low, Normal, High                                                   | `0.0.6`    |
+| Appearance mode                   | System                 | System, Dark, or Light; Windows Contrast Theme overrides rendering  | `0.0.19`   |
 
 There is no setting to disable the Edge Rail while retaining its standard non-empty dismissal behavior.
 
-Settings only expose controls whose owning runtime capability has shipped. `0.0.4` exposes Global hotkey and Start with Windows; later versions extend the persisted contract through a clean cutover when Edge Rail and Shake-to-open become active.
+Settings only exposes controls whose owning runtime capability has shipped. General contains the existing resident, Rail, and Shake controls; Appearance contains only the application-wide Appearance Mode selector. Persisted contract extensions use a clean cutover when their owning capability becomes active.
 
-### 16.2 Save and cancel behavior
+### 16.2 Appearance mode
+
+Appearance presents `System`, `Dark`, and `Light` as one three-option radio group. The options are compact horizontal preview tiles with Monitor, Moon, and Sun icons, a visible selected state, standard Tab entry/exit, and arrow-key movement within the group.
+
+- `System` follows the live Windows application Light or Dark theme and is the default.
+- `Dark` retains Dark presentation regardless of ordinary Windows application-theme changes.
+- `Light` retains Light presentation regardless of ordinary Windows application-theme changes.
+- Windows Contrast Theme always overrides the rendered WebView palette and native-frame appearance without changing the selected or persisted Appearance Mode.
+- While Contrast Theme is active, the selector remains operable and reports that Windows Contrast Theme currently overrides the chosen appearance.
+- Appearance Mode applies to Drop Shelf, Edge Rail, Manage Items, Settings, About, confirmation surfaces, menus, and native frames, including surfaces that become visible after the selection changes.
+
+DropCove does not expose custom accents, user-authored palettes, per-surface modes, or scheduled theme switching.
+
+### 16.3 Save and cancel behavior
 
 - Settings changes remain drafts until **Save** succeeds.
-- **Cancel** or closing Settings discards unsaved changes.
+- Selecting an Appearance Mode previews it immediately across every current DropCove WebView surface and native frame. A surface that becomes visible while Settings remains open uses the same preview.
+- **Save** atomically commits the complete Settings candidate, retains the preview as the active appearance, and persists `AppearanceMode` with the other settings.
+- **Cancel**, native Settings close, or a failed Save discards the Appearance draft and restores every surface and native frame to the previously persisted mode. Switching tabs does not discard the shared draft.
 - The current registered hotkey is retained while a new hotkey is tested; startup registration and atomic JSON persistence are then applied.
-- Only integrations owned by the active version participate. Edge Rail and Shake integration are added with their owning versions.
-- A failure attempts to restore the previous configuration.
-- If complete rollback is impossible, DropCove reports the retained safe state through a warning.
+- Only integrations owned by the active version participate. Edge Rail, Shake, and Appearance integration are included with their owning versions.
+- A failure attempts to restore the previous complete configuration. If complete rollback is impossible, DropCove reports the retained safe state through a warning.
 
-### 16.3 Persisted settings contract
+### 16.4 Persisted settings contract
 
 Default path:
 
@@ -741,9 +758,32 @@ Serialized content in `0.0.6`:
 }
 ```
 
-Each schema extension (`0.0.5` and `0.0.6`) is a clean cutover: all top-level fields for the active version are required and unknown fields remain rejected. Earlier-version settings files without the newer fields follow the normal malformed-settings path: preserve the original bytes, load active defaults in memory, warn, and replace the file only after a successful explicit Save.
+Serialized content in `0.0.19`:
 
-`RailEdge` and `RailMonitorId` are user preferences. An empty `RailMonitorId` selects the remembered dismissal monitor stored in shelf state; a non-empty value takes precedence whenever that display is connected.
+```json
+{
+    "HotKey": {
+        "Control": true,
+        "Alt": false,
+        "Shift": true,
+        "Windows": false,
+        "VirtualKey": 32
+    },
+    "StartWithWindows": true,
+    "RailEdge": "Right",
+    "RailMonitorId": "",
+    "ShowRailOverFullscreen": false,
+    "ShakeEnabled": true,
+    "ShakeSensitivity": "Normal",
+    "AppearanceMode": "System"
+}
+```
+
+Each schema extension (`0.0.5`, `0.0.6`, and `0.0.19`) is a clean cutover: all top-level fields for the active version are required and unknown fields remain rejected. Earlier-version settings files without the newer fields follow the normal malformed-settings path: preserve the original bytes, load active defaults in memory, warn, and replace the file only after a successful explicit Save.
+
+For the `0.0.19` cutover, a pre-feature file without `AppearanceMode` therefore resets every in-memory preference to the documented defaults, including the hotkey, startup, Rail, fullscreen, Shake, and `AppearanceMode: System` values. DropCove does not migrate that file, add compatibility fields, or create a second appearance store.
+
+`RailEdge` and `RailMonitorId` are user preferences. An empty `RailMonitorId` selects Follow pointer for each fresh non-empty dismissal; a non-empty value takes precedence whenever that display is connected. The actual monitor used by the docked Edge Rail remains Shelf state for restoration and does not rewrite the preference.
 
 The numeric virtual-key value is stable across keyboard layouts. Its displayed punctuation label follows the current Windows keyboard layout.
 
@@ -788,18 +828,36 @@ If the shelf database is corrupt or cannot be opened through a recoverable stora
 
 Top and bottom Edge Rail docking are not supported.
 
-## 19. Accessibility, theme, and motion
+## 19. Accessibility, appearance, and motion
 
-- Action controls expose accessible names and use inline SVG icons that inherit the current text/system color.
+- Action controls expose accessible names and use inline SVG icons that inherit the current semantic text or system color.
 - Icon actions expose native tooltips, hover treatment, and visible `focus-visible` indicators.
 - Binary Pin controls expose `aria-pressed`; tri-state Bulk Pinning exposes `role="checkbox"` with `aria-checked="false"`, `"true"`, or `"mixed"`.
-- Keyboard users can open and close Manage Items, traverse actions, activate buttons with standard Enter/Space behavior, and restore focus to the originating control.
+- Keyboard users can open and close Manage Items, traverse actions, activate buttons with standard Enter/Space behavior, operate the Appearance radio group with arrow keys, and restore focus to the originating control.
 - Full paths and drag instructions remain available through tooltips and accessibility text when visual text is shortened or omitted.
-- Theme-aware resources support Light, Dark, and High Contrast presentation.
-- Drop Placeholders use the existing drag-hover semantic colors in Dark and Light themes and Windows system colors in Contrast Themes.
+- The resolved Appearance Mode drives Light or Dark semantic resources and matching native frames. Windows Contrast Theme bypasses the application palette and uses Windows system colors, explicit borders, and visible focus indicators.
+- Drop Placeholders use the drag-hover semantic colors in Dark and Light appearances and Windows system colors in Contrast Themes.
 - Entrance, insertion, removal, and rail transitions are short opacity/scale effects.
 - Non-essential motion is skipped when Windows disables client-area animations.
 - Drag-and-drop and state changes remain functional when animations are disabled.
+
+### 19.1 Semantic appearance palette
+
+| Semantic role | Dark | Light |
+|---|---:|---:|
+| Application background | `#000000` | `#F3F3F3` |
+| Shelf Batch card | `#101010` | `#F8F8F8` |
+| Raised control or menu | `#181818` | `#FFFFFF` |
+| Hover surface | `#232323` | `#EAEAEA` |
+| Primary text | `#F5F5F5` | `#111111` |
+| Secondary text | `#C7C7C7` | `#3F3F3F` |
+| Muted text | `#929292` | `#686868` |
+| Default border | `#383838` | `#D0D0D0` |
+| Interactive border | `#5A5A5A` | `#858585` |
+| Primary action | `#2B63EB` | `#2B63EB` |
+| Focus and accent text | `#7AA2FF` | `#2B63EB` |
+
+Primary actions use `#2B63EB` with white text. Dark accent text and icons use `#7AA2FF`; Light accent text and icons use `#2B63EB`. Default and interactive borders are resting and hover resources, not substitutes for the dedicated focus indicator. Shelf Batch cards have no shadow in Dark appearance and only a slight one-pixel separation shadow in Light appearance; larger shadows are reserved for menus, dialogs, and other floating surfaces. Ordinary icons use the secondary text color, selected and action icons use the applicable cobalt, and destructive icons use the danger semantic color. Warning and danger retain distinct contrast-checked amber and red roles rather than inheriting cobalt. Contrast Themes ignore this table and use Windows system colors.
 
 ## 20. Current limitations and deliberate exclusions
 
@@ -811,6 +869,7 @@ Top and bottom Edge Rail docking are not supported.
 - Edge Rail supports only Left and Right docking.
 - No automatic updater.
 - No clipboard history, text snippets, URL items, accounts, cloud sync, plugins, named shelves, file synchronization, or application-owned file-copy storage.
+- No custom accent color, user-authored palette, independent per-surface appearance, or scheduled theme switching.
 
 ## 21. End-to-end example
 

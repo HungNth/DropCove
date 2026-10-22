@@ -72,6 +72,7 @@ pub(crate) fn open(app: &AppHandle, context: InvocationContext) -> Result<(), St
         WebviewUrl::App("index.html".into()),
     )
     .title("About DropCove")
+    .theme(crate::windows_theme::current_theme(app)?)
     .inner_size(ABOUT_WIDTH, ABOUT_HEIGHT)
     .min_inner_size(ABOUT_WIDTH, ABOUT_HEIGHT)
     .max_inner_size(ABOUT_WIDTH, ABOUT_HEIGHT)
@@ -84,6 +85,7 @@ pub(crate) fn open(app: &AppHandle, context: InvocationContext) -> Result<(), St
     .map_err(|e| format!("failed to build about window: {e}"))?;
 
     let setup_result = (|| {
+        crate::windows_theme::apply_to_window(&window)?;
         windows_auxiliary::center_in_work_area(&window, &mon)?;
         window
             .show()

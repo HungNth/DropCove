@@ -31,7 +31,7 @@ function onSensitivity(event: Event) {
           :disabled="disabled"
           @change="onEnabled"
         />
-        <div class="w-8 h-[18px] bg-dc-surface-elevated border border-dc-border-default rounded-full peer-focus-visible:ring-2 peer-focus-visible:ring-dc-focus forced-colors:peer-focus-visible:outline-[2px]! forced-colors:peer-focus-visible:outline-[Highlight]! forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:peer-checked:bg-[Highlight] peer-checked:bg-dc-accent peer-checked:border-dc-accent transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-dc-text-muted forced-colors:after:bg-[ButtonText] peer-checked:after:bg-white forced-colors:peer-checked:after:bg-[HighlightText] after:rounded-full after:size-[14px] after:transition-transform peer-checked:after:translate-x-[14px] peer-hover:border-dc-border-hover"></div>
+        <div class="w-8 h-[18px] bg-dc-surface-elevated border border-dc-border-default rounded-full peer-focus-visible:ring-2 peer-focus-visible:ring-dc-focus forced-colors:peer-focus-visible:outline-[2px]! forced-colors:peer-focus-visible:outline-[Highlight]! forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:peer-checked:bg-[Highlight] peer-checked:bg-dc-action peer-checked:border-dc-action transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-dc-text-muted forced-colors:after:bg-[ButtonText] peer-checked:after:bg-white forced-colors:peer-checked:after:bg-[HighlightText] after:rounded-full after:size-[14px] after:transition-transform peer-checked:after:translate-x-[14px] peer-hover:border-dc-border-hover"></div>
       </label>
     </div>
 

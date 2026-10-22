@@ -5,6 +5,7 @@
   --color-dc-surface: var(--dc-surface);
   --color-dc-surface-subtle: var(--dc-surface-subtle);
   --color-dc-surface-elevated: var(--dc-surface-elevated);
+  --color-dc-card: var(--dc-card);
   --color-dc-surface-hover: var(--dc-surface-hover);
   --color-dc-surface-active: var(--dc-surface-active);
   --color-dc-backdrop: var(--dc-backdrop);
@@ -15,6 +16,7 @@
   --color-dc-border-default: var(--dc-border-default);
   --color-dc-border-hover: var(--dc-border-hover);
   --color-dc-accent: var(--dc-accent);
+  --color-dc-action: var(--dc-action);
   --color-dc-accent-subtle: var(--dc-accent-subtle);
   --color-dc-accent-hover: var(--dc-accent-hover);
   --color-dc-accent-text: var(--dc-accent-text);
@@ -24,12 +26,15 @@
   --color-dc-warning-border: var(--dc-warning-border);
   --color-dc-warning-text: var(--dc-warning-text);
   --color-dc-danger: var(--dc-danger);
+  --color-dc-danger-action: var(--dc-danger-action);
   --color-dc-danger-surface: var(--dc-danger-surface);
   --color-dc-danger-hover: var(--dc-danger-hover);
   --color-dc-danger-border: var(--dc-danger-border);
   --color-dc-danger-text: var(--dc-danger-text);
   --color-dc-drag-hover-border: var(--dc-drag-hover-border);
   --color-dc-drag-hover-bg: var(--dc-drag-hover-bg);
+  --shadow-dc-card: var(--dc-card-shadow);
+  --shadow-dc-floating: var(--dc-floating-shadow);
 }
 
 html, body, #app {
@@ -46,102 +51,93 @@ html.surface-settings body {
   background-color: var(--dc-surface);
 }
 
-:root {
+:root, [data-appearance="dark"] {
   color-scheme: dark;
-  /* Surface and Canvas */
-  --dc-canvas: #0b111e;
-  --dc-surface: #141c2b;
-  --dc-surface-subtle: #1a2333;
-  --dc-surface-elevated: #202a3b;
-  --dc-surface-hover: #283556;
-  --dc-surface-active: #313f64;
-  --dc-backdrop: rgba(0, 0, 0, 0.45);
+  --dc-canvas: #000000;
+  --dc-surface: #000000;
+  --dc-card: #101010;
+  --dc-surface-subtle: #101010;
+  --dc-surface-elevated: #181818;
+  --dc-surface-hover: #232323;
+  --dc-surface-active: #2b2b2b;
+  --dc-backdrop: rgba(0, 0, 0, 0.6);
 
-  /* Typography */
-  --dc-text-primary: #edf2fc;
-  --dc-text-secondary: #cbd5e1;
-  --dc-text-muted: #a7b4cb;
+  --dc-text-primary: #f5f5f5;
+  --dc-text-secondary: #c7c7c7;
+  --dc-text-muted: #929292;
+  --dc-border-subtle: #242424;
+  --dc-border-default: #383838;
+  --dc-border-hover: #5a5a5a;
 
-  /* Borders */
-  --dc-border-subtle: #232d42;
-  --dc-border-default: #46536a;
-  --dc-border-hover: #64748b;
-
-  /* Accent & Interactive */
-  --dc-accent: #6366f1;
-  --dc-accent-subtle: rgba(99, 102, 241, 0.15);
-  --dc-accent-hover: #4f46e5;
+  --dc-action: #2b63eb;
+  --dc-accent: #7aa2ff;
+  --dc-accent-subtle: #101c35;
+  --dc-accent-hover: #2354cc;
   --dc-accent-text: #ffffff;
-  --dc-focus: #a5b4fc;
+  --dc-focus: #7aa2ff;
   --dc-focus-outline-width: 2px;
 
-  /* Feedback: Warning & Danger */
-  --dc-warning: #efad70;
-  --dc-warning-surface: rgba(239, 173, 112, 0.12);
-  --dc-warning-border: #efad70;
-  --dc-warning-text: #fbbf24;
+  --dc-warning: #f5be61;
+  --dc-warning-surface: #241a0a;
+  --dc-warning-border: #8a652b;
+  --dc-warning-text: #f6c56c;
+  --dc-danger: #ff8080;
+  --dc-danger-action: #c62828;
+  --dc-danger-surface: #2c1013;
+  --dc-danger-hover: #a21d24;
+  --dc-danger-border: #c75058;
+  --dc-danger-text: #ffb4b4;
 
-  --dc-danger: #f87171;
-  --dc-danger-surface: #2a1b24;
-  --dc-danger-hover: #b91c1c;
-  --dc-danger-border: #f87171;
-  --dc-danger-text: #fca5a5;
-
-  /* Drag & Drop Emphasis */
-  --dc-drag-hover-border: #a5b4fc;
-  --dc-drag-hover-bg: #202b44;
-
-  /* States */
+  --dc-drag-hover-border: #7aa2ff;
+  --dc-drag-hover-bg: #0d1933;
+  --dc-card-shadow: none;
+  --dc-floating-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
   --dc-disabled-opacity: 0.45;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color-scheme: light;
-    --dc-canvas: #f1f5f9;
-    --dc-surface: #ffffff;
-    --dc-surface-subtle: #f8fafc;
-    --dc-surface-elevated: #f1f5f9;
-    --dc-surface-hover: #e2e8f0;
-    --dc-surface-active: #e0e7ff;
-    --dc-backdrop: rgba(0, 0, 0, 0.35);
+[data-appearance="light"] {
+  color-scheme: light;
+  --dc-canvas: #f3f3f3;
+  --dc-surface: #f3f3f3;
+  --dc-card: #f8f8f8;
+  --dc-surface-subtle: #ececec;
+  --dc-surface-elevated: #ffffff;
+  --dc-surface-hover: #eaeaea;
+  --dc-surface-active: #dde6fb;
+  --dc-backdrop: rgba(0, 0, 0, 0.28);
 
-    --dc-text-primary: #0f172a;
-    --dc-text-secondary: #334155;
-    --dc-text-muted: #64748b;
+  --dc-text-primary: #111111;
+  --dc-text-secondary: #3f3f3f;
+  --dc-text-muted: #686868;
+  --dc-border-subtle: #dedede;
+  --dc-border-default: #d0d0d0;
+  --dc-border-hover: #858585;
 
-    --dc-border-subtle: #e2e8f0;
-    --dc-border-default: #cbd5e1;
-    --dc-border-hover: #94a3b8;
+  --dc-accent: #2b63eb;
+  --dc-accent-subtle: #e5ecff;
+  --dc-focus: #2b63eb;
+  --dc-warning: #8a5200;
+  --dc-warning-surface: #fff0d2;
+  --dc-warning-border: #b27b2b;
+  --dc-warning-text: #754500;
+  --dc-danger: #b4232a;
+  --dc-danger-surface: #ffeded;
+  --dc-danger-border: #c62828;
+  --dc-danger-text: #991b1b;
 
-    --dc-accent: #4f46e5;
-    --dc-accent-subtle: #e0e7ff;
-    --dc-accent-hover: #4338ca;
-    --dc-accent-text: #ffffff;
-    --dc-focus: #4f46e5;
-
-    --dc-warning: #b45309;
-    --dc-warning-surface: #fef3c7;
-    --dc-warning-border: #f59e0b;
-    --dc-warning-text: #92400e;
-
-    --dc-danger: #dc2626;
-    --dc-danger-surface: #fee2e2;
-    --dc-danger-hover: #fca5a5;
-    --dc-danger-border: #ef4444;
-    --dc-danger-text: #991b1b;
-
-    --dc-drag-hover-border: #4f46e5;
-    --dc-drag-hover-bg: #e0e7ff;
-  }
+  --dc-drag-hover-border: #2b63eb;
+  --dc-drag-hover-bg: #e5ecff;
+  --dc-card-shadow: 0 1px 1px rgba(0, 0, 0, 0.035);
+  --dc-floating-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
 }
 
 @media (forced-colors: active) {
-  :root {
+  :root, [data-appearance] {
     --dc-canvas: Canvas;
     --dc-surface: Canvas;
     --dc-surface-subtle: Canvas;
     --dc-surface-elevated: ButtonFace;
+    --dc-card: Canvas;
     --dc-surface-hover: Highlight;
     --dc-surface-active: Highlight;
     --dc-backdrop: rgba(0, 0, 0, 0.6);
@@ -155,6 +151,7 @@ html.surface-settings body {
     --dc-border-hover: Highlight;
 
     --dc-accent: Highlight;
+    --dc-action: Highlight;
     --dc-accent-subtle: Highlight;
     --dc-accent-hover: Highlight;
     --dc-accent-text: HighlightText;
@@ -166,6 +163,7 @@ html.surface-settings body {
     --dc-warning-text: CanvasText;
 
     --dc-danger: LinkText;
+    --dc-danger-action: Highlight;
     --dc-danger-surface: Canvas;
     --dc-danger-hover: Highlight;
     --dc-danger-border: ButtonText;
@@ -173,6 +171,8 @@ html.surface-settings body {
 
     --dc-drag-hover-border: Highlight;
     --dc-drag-hover-bg: Highlight;
+    --dc-card-shadow: none;
+    --dc-floating-shadow: none;
   }
 }
 

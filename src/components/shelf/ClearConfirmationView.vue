@@ -78,7 +78,7 @@ onUnmounted(() => {
       </button>
       <button
         type="button"
-        class="action danger min-w-[72px] h-[28px] px-[12px] text-[12px] font-normal border border-dc-danger-border rounded-[4px] bg-dc-danger text-dc-accent-text cursor-pointer hover:bg-dc-danger-hover focus-visible:outline-2 focus-visible:outline-dc-focus disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:focus-visible:outline-[Highlight]"
+        class="action danger min-w-[72px] h-[28px] px-[12px] text-[12px] font-normal border border-dc-danger-border rounded-[4px] bg-dc-danger-action text-dc-accent-text cursor-pointer hover:bg-dc-danger-hover focus-visible:outline-2 focus-visible:outline-dc-focus disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:focus-visible:outline-[Highlight]"
         :disabled="busy"
         @click="handleConfirm"
       >

@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { nextTick, onMounted, useTemplateRef } from "vue";
-import { useSettings, type RailEdge, type ShakeSensitivity } from "../../composables/useSettings";
+import { nextTick, onMounted, shallowRef, useTemplateRef } from "vue";
+import {
+  useSettings,
+  type AppearanceMode,
+  type RailEdge,
+  type ShakeSensitivity,
+} from "../../composables/useSettings";
 import RailPlacementFields from "./RailPlacementFields.vue";
 import ShakeSettingsFields from "./ShakeSettingsFields.vue";
+import AppearanceSettingsFields from "./AppearanceSettingsFields.vue";
 
 const {
   snapshot,
@@ -15,12 +21,32 @@ const {
   setRailPlacement,
   setShowRailOverFullscreen,
   setShake,
+  setAppearanceMode,
   monitors,
   save,
   cancel,
   dismissStatus,
 } = useSettings();
 onMounted(() => { document.title = "DropCove Settings"; });
+
+type SettingsTab = "General" | "Appearance";
+const activeTab = shallowRef<SettingsTab>("General");
+const generalTab = useTemplateRef<HTMLButtonElement>("generalTab");
+const appearanceTab = useTemplateRef<HTMLButtonElement>("appearanceTab");
+
+function selectTab(tab: SettingsTab) {
+  activeTab.value = tab;
+}
+
+async function onTabKeydown(event: KeyboardEvent, current: SettingsTab) {
+  if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+    event.preventDefault();
+    const next: SettingsTab = current === "General" ? "Appearance" : "General";
+    activeTab.value = next;
+    await nextTick();
+    (next === "General" ? generalTab.value : appearanceTab.value)?.focus();
+  }
+}
 
 const recorder = useTemplateRef<HTMLButtonElement>("recorder");
 async function beginRecording() {
@@ -79,6 +105,16 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
   if (input instanceof HTMLInputElement) input.checked = Boolean(snapshot.value?.shakeEnabled);
   if (input instanceof HTMLSelectElement) input.value = snapshot.value?.shakeSensitivity ?? "Normal";
 }
+
+async function onAppearanceChange(mode: AppearanceMode, event: Event) {
+  const input = event.currentTarget;
+  await setAppearanceMode(mode);
+  if (input instanceof HTMLInputElement) {
+    for (const radio of input.closest('[role="radiogroup"]')?.querySelectorAll<HTMLInputElement>('input[type="radio"]') ?? []) {
+      radio.checked = radio.value === snapshot.value?.appearanceMode;
+    }
+  }
+}
 </script>
 
 <template>
@@ -87,11 +123,60 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
     :aria-busy="busy"
     aria-label="Settings"
   >
-    <header class="header flex items-center justify-between px-4 py-3 border-b border-dc-border-subtle bg-dc-surface forced-colors:border-[ButtonText] forced-colors:bg-[Canvas]">
+    <header class="header flex flex-col px-4 pt-3 border-b border-dc-border-subtle bg-dc-surface forced-colors:border-[ButtonText] forced-colors:bg-[Canvas]">
       <h1 class="title m-0 text-[14px] font-semibold text-dc-text-primary">Settings</h1>
+
+      <!-- Horizontal Accessible Tabs -->
+      <div
+        role="tablist"
+        aria-label="Settings sections"
+        class="flex items-center gap-1 mt-2.5 -mb-px"
+      >
+        <button
+          id="tab-general"
+          ref="generalTab"
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === 'General'"
+          aria-controls="panel-general"
+          :tabindex="activeTab === 'General' ? 0 : -1"
+          class="px-3 py-1.5 text-[12.5px] font-medium border-b-2 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus forced-colors:focus-visible:outline-[2px]! forced-colors:focus-visible:outline-[Highlight]!"
+          :class="activeTab === 'General'
+            ? 'border-dc-accent text-dc-text-primary forced-colors:border-[Highlight] forced-colors:text-[Highlight]'
+            : 'border-transparent text-dc-text-muted hover:text-dc-text-primary forced-colors:text-[ButtonText]'"
+          @click="selectTab('General')"
+          @keydown="onTabKeydown($event, 'General')"
+        >
+          General
+        </button>
+        <button
+          id="tab-appearance"
+          ref="appearanceTab"
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === 'Appearance'"
+          aria-controls="panel-appearance"
+          :tabindex="activeTab === 'Appearance' ? 0 : -1"
+          class="px-3 py-1.5 text-[12.5px] font-medium border-b-2 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus forced-colors:focus-visible:outline-[2px]! forced-colors:focus-visible:outline-[Highlight]!"
+          :class="activeTab === 'Appearance'
+            ? 'border-dc-accent text-dc-text-primary forced-colors:border-[Highlight] forced-colors:text-[Highlight]'
+            : 'border-transparent text-dc-text-muted hover:text-dc-text-primary forced-colors:text-[ButtonText]'"
+          @click="selectTab('Appearance')"
+          @keydown="onTabKeydown($event, 'Appearance')"
+        >
+          Appearance
+        </button>
+      </div>
     </header>
 
-    <div class="content flex flex-col flex-1 min-h-0 overflow-y-auto p-3.5 gap-2.5">
+    <!-- General Tab Panel -->
+    <div
+      v-show="activeTab === 'General'"
+      id="panel-general"
+      role="tabpanel"
+      aria-labelledby="tab-general"
+      class="content flex flex-col flex-1 min-h-0 overflow-y-auto p-3.5 gap-2.5 focus:outline-none"
+    >
       <section class="section flex flex-col gap-2 p-3.5 rounded-lg border border-dc-border-subtle bg-dc-surface-subtle/50" aria-labelledby="hotkey-section-title">
         <div class="flex items-start justify-between gap-3">
           <div class="flex flex-col gap-0.5">
@@ -145,7 +230,7 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
             :disabled="busy || !snapshot"
             @change="onStartupChange"
           />
-          <div class="w-8 h-[18px] bg-dc-surface-elevated border border-dc-border-default rounded-full peer-focus-visible:ring-2 peer-focus-visible:ring-dc-focus forced-colors:peer-focus-visible:outline-[2px]! forced-colors:peer-focus-visible:outline-[Highlight]! forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:peer-checked:bg-[Highlight] peer-checked:bg-dc-accent peer-checked:border-dc-accent transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-dc-text-muted forced-colors:after:bg-[ButtonText] peer-checked:after:bg-white forced-colors:peer-checked:after:bg-[HighlightText] after:rounded-full after:size-[14px] after:transition-transform peer-checked:after:translate-x-[14px] peer-hover:border-dc-border-hover"></div>
+          <div class="w-8 h-[18px] bg-dc-surface-elevated border border-dc-border-default rounded-full peer-focus-visible:ring-2 peer-focus-visible:ring-dc-focus forced-colors:peer-focus-visible:outline-[2px]! forced-colors:peer-focus-visible:outline-[Highlight]! forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:peer-checked:bg-[Highlight] peer-checked:bg-dc-action peer-checked:border-dc-action transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-dc-text-muted forced-colors:after:bg-[ButtonText] peer-checked:after:bg-white forced-colors:peer-checked:after:bg-[HighlightText] after:rounded-full after:size-[14px] after:transition-transform peer-checked:after:translate-x-[14px] peer-hover:border-dc-border-hover" />
         </label>
       </section>
 
@@ -156,12 +241,28 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
         :sensitivity="snapshot.shakeSensitivity" :disabled="busy" @change="onShakeChange" />
     </div>
 
+    <!-- Appearance Tab Panel -->
+    <div
+      v-show="activeTab === 'Appearance'"
+      id="panel-appearance"
+      role="tabpanel"
+      aria-labelledby="tab-appearance"
+      class="content flex flex-col flex-1 min-h-0 overflow-y-auto p-3.5 gap-2.5 focus:outline-none"
+    >
+      <AppearanceSettingsFields
+        v-if="snapshot"
+        :mode="snapshot.appearanceMode"
+        :disabled="busy"
+        @change="onAppearanceChange"
+      />
+    </div>
+
     <div v-if="status" class="status mx-3.5 mb-2.5 p-2.5 border border-dc-warning-border rounded-lg bg-dc-warning-surface text-dc-warning-text text-[11.5px] flex items-start gap-2 shadow-xs [overflow-wrap:anywhere]" role="alert" aria-live="assertive">
       <svg class="size-4 shrink-0 mt-0.5 text-dc-warning" viewBox="0 0 16 16" fill="currentColor">
         <path fill-rule="evenodd" d="M6.701 2.25c.577-1 2.02-1 2.598 0l5.196 9a1.5 1.5 0 0 1-1.299 2.25H2.794A1.5 1.5 0 0 1 1.495 11.25l5.206-9ZM8 4c.414 0 .75.336.75.75v3.5a.75.75 0 0 1-1.5 0v-3.5c0-.414.336-.75.75-.75Zm0 7a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z" clip-rule="evenodd"/>
       </svg>
       <span class="flex-1 leading-snug">{{ status }}</span>
-      <button class="dismiss shrink-0 p-0.5 text-dc-warning-text hover:text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus forced-colors:focus-visible:outline-[2px]! forced-colors:focus-visible:outline-[Highlight]! transition-colors cursor-pointer" type="button" aria-label="Dismiss status" @click="dismissStatus">
+      <button class="dismiss shrink-0 p-0.5 text-dc-warning-text hover:text-dc-text-primary rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus forced-colors:focus-visible:outline-[2px]! forced-colors:focus-visible:outline-[Highlight]! transition-colors cursor-pointer" type="button" aria-label="Dismiss status" @click="dismissStatus">
         <svg class="size-3.5" viewBox="0 0 16 16" fill="currentColor"><path d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 1 0 1.06 1.06L8 9.06l2.72 2.72a.75.75 0 1 0 1.06-1.06L9.06 8l2.72-2.72a.75.75 0 0 0-1.06-1.06L8 6.94 5.28 4.22Z"/></svg>
       </button>
     </div>
@@ -178,7 +279,7 @@ async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, ev
       </button>
       <button
         type="button"
-        class="action-button save py-1.5 px-4 rounded-md [font-family:inherit] text-[12px] font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus forced-colors:focus-visible:outline-[2px]! forced-colors:focus-visible:outline-[Highlight]! disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default border border-dc-accent bg-dc-accent text-dc-accent-text hover:bg-dc-accent-hover shadow-xs forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]"
+        class="action-button save py-1.5 px-4 rounded-md [font-family:inherit] text-[12px] font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus forced-colors:focus-visible:outline-[2px]! forced-colors:focus-visible:outline-[Highlight]! disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default border border-dc-action bg-dc-action text-dc-accent-text hover:bg-dc-accent-hover shadow-xs forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]"
         :disabled="busy || Boolean(snapshot?.listening)"
         aria-label="Save settings"
         @click="save"

@@ -232,6 +232,7 @@ pub(crate) fn open(
     } else {
         let popup = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
             .title("Manage Items — DropCove")
+            .theme(crate::windows_theme::current_theme(app)?)
             .inner_size(WIDTH, height)
             .position(x, y)
             .resizable(false)
@@ -265,6 +266,7 @@ pub(crate) fn open(
         receiver.recv().map_err(|error| error.to_string())??;
         popup
     };
+    crate::windows_theme::apply_to_window(&popup)?;
     {
         let state = app.state::<ManageItemsState>();
         let mut state = state.lock()?;

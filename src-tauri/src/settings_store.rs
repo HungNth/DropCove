@@ -18,10 +18,13 @@ use std::{
 use windows::{
     core::PCWSTR,
     Win32::{
-        Foundation::{GetLastError, ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND},
+        Foundation::{
+            GetLastError, ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND,
+            ERROR_UNABLE_TO_REMOVE_REPLACED,
+        },
         Storage::FileSystem::{
             MoveFileExW, ReplaceFileW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
-            REPLACEFILE_WRITE_THROUGH,
+            REPLACEFILE_IGNORE_MERGE_ERRORS,
         },
         UI::Input::KeyboardAndMouse::{GetKeyNameTextW, MapVirtualKeyW, MAPVK_VK_TO_VSC},
     },
@@ -302,6 +305,14 @@ pub(crate) enum ShakeSensitivity {
     High,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum AppearanceMode {
+    #[default]
+    System,
+    Dark,
+    Light,
+}
+
 /// Active settings contract; missing or unknown fields are malformed, never migrated.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
@@ -313,6 +324,7 @@ pub struct Settings {
     pub(crate) show_rail_over_fullscreen: bool,
     pub(crate) shake_enabled: bool,
     pub(crate) shake_sensitivity: ShakeSensitivity,
+    pub(crate) appearance_mode: AppearanceMode,
 }
 
 impl Default for Settings {
@@ -325,6 +337,7 @@ impl Default for Settings {
             show_rail_over_fullscreen: false,
             shake_enabled: true,
             shake_sensitivity: ShakeSensitivity::Normal,
+            appearance_mode: AppearanceMode::System,
         }
     }
 }
@@ -629,12 +642,14 @@ fn atomic_replace_file(source: &Path, destination: &Path) -> Result<(), String> 
     // Destination exists: use ReplaceFileW for atomic replacement preserving attributes and backup safety.
     // SAFETY: ReplaceFileW requires lpReplacedFileName (dest), lpReplacementFileName (source),
     // and optionally lpBackupFileName (None here).
+    // MSDN explicitly specifies REPLACEFILE_WRITE_THROUGH (0x01) is not supported by ReplaceFileW.
+    // REPLACEFILE_IGNORE_MERGE_ERRORS ensures replacement succeeds when temporary ACL/merge streams differ.
     let ok = unsafe {
         ReplaceFileW(
             dest_pcwstr,
             source_pcwstr,
             PCWSTR::null(),
-            REPLACEFILE_WRITE_THROUGH,
+            REPLACEFILE_IGNORE_MERGE_ERRORS,
             None,
             None,
         )
@@ -644,8 +659,9 @@ fn atomic_replace_file(source: &Path, destination: &Path) -> Result<(), String> 
         Ok(())
     } else {
         let error = unsafe { GetLastError() };
-        // Fallback to MoveFileExW if ReplaceFileW fails because destination was removed or not accessible
-        if error == ERROR_FILE_NOT_FOUND {
+        // If the destination disappeared or ReplaceFileW cannot remove the existing file (e.g. transient
+        // filesystem pending-delete status), MoveFileExW with write-through replaces it atomically on the same volume.
+        if error == ERROR_FILE_NOT_FOUND || error == ERROR_UNABLE_TO_REMOVE_REPLACED {
             let move_ok = unsafe {
                 MoveFileExW(
                     source_pcwstr,
@@ -808,6 +824,7 @@ mod tests {
             "ShowRailOverFullscreen",
             "ShakeEnabled",
             "ShakeSensitivity",
+            "AppearanceMode",
         ] {
             let mut missing = value.clone();
             missing.as_object_mut().unwrap().remove(field);
@@ -819,6 +836,43 @@ mod tests {
         let mut unknown = value;
         unknown["Unexpected"] = true.into();
         assert!(serde_json::from_value::<Settings>(unknown).is_err());
+    }
+
+    #[test]
+    fn appearance_cutover_preserves_previous_configuration_until_explicit_save() {
+        let temp = TempDir::new("appearance-cutover");
+        let store = SettingsStore::new(&temp.path);
+        let previous = br#"{"HotKey":{"Control":true,"Alt":true,"Shift":false,"Windows":false,"VirtualKey":75},"StartWithWindows":false,"RailEdge":"Left","RailMonitorId":"display","ShowRailOverFullscreen":true,"ShakeEnabled":false,"ShakeSensitivity":"High"}"#;
+        fs::write(store.path(), previous).unwrap();
+
+        let (loaded, warning) = store.load();
+        assert_eq!(loaded, Settings::default());
+        assert!(warning.is_some());
+        assert_eq!(store.read_raw().unwrap().as_deref(), Some(previous.as_slice()));
+
+        store.write(&loaded).unwrap();
+        let saved: serde_json::Value = serde_json::from_slice(&store.read_raw().unwrap().unwrap()).unwrap();
+        assert_eq!(saved["AppearanceMode"], "System");
+        assert_eq!(store.load(), (loaded, None));
+    }
+
+    #[test]
+    fn appearance_values_round_trip_and_unknown_value_preserves_original_file() {
+        let temp = TempDir::new("appearance-values");
+        let store = SettingsStore::new(&temp.path);
+        for mode in [AppearanceMode::System, AppearanceMode::Dark, AppearanceMode::Light] {
+            let settings = Settings { appearance_mode: mode, ..Settings::default() };
+            store.write(&settings).unwrap();
+            assert_eq!(store.load(), (settings, None));
+        }
+        let mut invalid = serde_json::to_value(Settings::default()).unwrap();
+        invalid["AppearanceMode"] = "Automatic".into();
+        let original = serde_json::to_vec(&invalid).unwrap();
+        fs::write(store.path(), &original).unwrap();
+        let (loaded, warning) = store.load();
+        assert_eq!(loaded, Settings::default());
+        assert!(warning.is_some());
+        assert_eq!(store.read_raw().unwrap(), Some(original));
     }
 
     #[test]
@@ -863,7 +917,7 @@ mod tests {
         assert_eq!(fs::read_to_string(store.path()).unwrap(), old_format);
 
         // Write valid JSON with invalid HotKey (no modifiers)
-        let invalid_hk_json = r#"{"HotKey":{"Control":false,"Alt":false,"Shift":false,"Windows":false,"VirtualKey":65},"StartWithWindows":true,"RailEdge":"Right","RailMonitorId":"","ShowRailOverFullscreen":false,"ShakeEnabled":true,"ShakeSensitivity":"Normal"}"#;
+        let invalid_hk_json = r#"{"HotKey":{"Control":false,"Alt":false,"Shift":false,"Windows":false,"VirtualKey":65},"StartWithWindows":true,"RailEdge":"Right","RailMonitorId":"","ShowRailOverFullscreen":false,"ShakeEnabled":true,"ShakeSensitivity":"Normal","AppearanceMode":"System"}"#;
         fs::write(store.path(), invalid_hk_json).unwrap();
 
         let (settings2, warning2) = store.load();

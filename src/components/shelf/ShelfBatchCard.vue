@@ -55,7 +55,7 @@ function pointerMove(event: PointerEvent) {
 <template>
   <article
     ref="card"
-    class="card relative flex items-center min-w-0 h-[48px] box-border border border-dc-border-default rounded-[8px] bg-dc-surface-elevated text-dc-text-primary transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
+    class="card relative flex items-center min-w-0 h-[48px] box-border border border-dc-border-default rounded-[8px] bg-dc-card shadow-dc-card text-dc-text-primary transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
     :data-batch-id="batch.id"
   >
     <div

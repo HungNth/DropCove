@@ -396,6 +396,7 @@ unsafe extern "system" fn no_activate(
 pub(crate) fn initialize(app: &AppHandle) -> Result<(), String> {
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
         .title("DropCove Edge Rail")
+        .theme(crate::windows_theme::current_theme(app)?)
         .inner_size(16.0, 280.0)
         .visible(false)
         .focused(false)
@@ -410,6 +411,7 @@ pub(crate) fn initialize(app: &AppHandle) -> Result<(), String> {
         .always_on_top(true)
         .build()
         .map_err(|e| e.to_string())?;
+    crate::windows_theme::apply_to_window(&window)?;
     let hwnd = window.hwnd().map_err(|e| e.to_string())?;
     // SAFETY: Only our new hidden managed rail HWND is styled; FRAMECHANGED recalculates the border.
     unsafe {

@@ -1,7 +1,7 @@
 //! One settings application across native integrations and the real atomic JSON store.
 
 use crate::{
-    settings_store::{HotKey, Settings, SettingsStore},
+    settings_store::{AppearanceMode, HotKey, Settings, SettingsStore},
     windows_startup::RegistryValue,
 };
 
@@ -16,6 +16,9 @@ pub(crate) trait Integrations {
     fn shake_apply(&mut self, settings: &Settings) -> Result<(), String>;
     fn shake_restore(&mut self, previous: &Self::ShakeSnapshot) -> Result<(), String>;
     fn shake_description(&self) -> Result<String, String>;
+    fn committed_appearance(&self) -> Result<AppearanceMode, String>;
+    fn appearance_apply(&mut self, mode: AppearanceMode) -> Result<(), String>;
+    fn appearance_description(&self) -> Result<String, String>;
     fn register(&mut self, key: &HotKey) -> Result<i32, String>;
     fn unregister(&mut self, id: i32) -> Result<(), String>;
     fn registered(&self, id: i32) -> bool;
@@ -68,6 +71,9 @@ pub(crate) fn apply(
     let previous_shake = integrations
         .shake_snapshot()
         .map_err(|error| failure(error, active_key, active_token, true))?;
+    let previous_appearance = integrations
+        .committed_appearance()
+        .map_err(|error| failure(error, active_key, active_token, true))?;
     let changed = active_token.is_none() || active_key != candidate.hot_key;
     let token = if changed {
         integrations
@@ -81,12 +87,15 @@ pub(crate) fn apply(
     let mut file_attempted = false;
     let mut rail_attempted = false;
     let mut shake_attempted = false;
+    let mut appearance_attempted = false;
     let result = (|| {
         integrations.startup_apply(candidate.start_with_windows)?;
         rail_attempted = true;
         integrations.rail_apply(candidate)?;
         shake_attempted = true;
         integrations.shake_apply(candidate)?;
+        appearance_attempted = true;
+        integrations.appearance_apply(candidate.appearance_mode)?;
         file_attempted = true;
         store.write(candidate)?;
         if changed {
@@ -108,6 +117,11 @@ pub(crate) fn apply(
             if let Err(restore) = store.restore_raw(previous_file.as_deref()) {
                 rollback_errors.push(format!("settings restore: {restore}"));
             }
+        }
+    }
+    if appearance_attempted {
+        if let Err(restore) = integrations.appearance_apply(previous_appearance) {
+            rollback_errors.push(format!("appearance restore: {restore}"));
         }
     }
     if shake_attempted {
@@ -169,8 +183,11 @@ pub(crate) fn apply(
     let shake = integrations
         .shake_description()
         .unwrap_or_else(|query| format!("query failed: {query}"));
+    let appearance = integrations
+        .appearance_description()
+        .unwrap_or_else(|query| format!("query failed: {query}"));
     let message = format!(
-        "Settings failed: {error}; rollback incomplete: {}. Retained state: old shortcut registered={}; candidate registered={candidate_retained}; active shortcut={}; startup={startup}; rail={rail}; Shake={shake}; settings file={file}",
+        "Settings failed: {error}; rollback incomplete: {}. Retained state: old shortcut registered={}; candidate registered={candidate_retained}; active shortcut={}; startup={startup}; rail={rail}; Shake={shake}; appearance={appearance}; settings file={file}",
         rollback_errors.join("; "), old_retained.is_some(),
         retained_token.map(|_| retained_key.label()).unwrap_or_else(|| "none (tray/launch access remains)".into()),
     );
@@ -209,6 +226,9 @@ mod tests {
         startup: Option<RegistryValue>,
         rail: Settings,
         shake: Settings,
+        appearance: AppearanceMode,
+        committed_appearance: AppearanceMode,
+        fail_appearance_restore: bool,
         fail_shake: bool,
         fail_shake_restore: bool,
         fail_rail: bool,
@@ -279,6 +299,19 @@ mod tests {
                 self.shake.shake_enabled, self.shake.shake_sensitivity
             ))
         }
+        fn committed_appearance(&self) -> Result<AppearanceMode, String> {
+            Ok(self.committed_appearance)
+        }
+        fn appearance_apply(&mut self, mode: AppearanceMode) -> Result<(), String> {
+            if self.fail_appearance_restore && mode == self.committed_appearance {
+                return Err("native appearance restore rejected".into());
+            }
+            self.appearance = mode;
+            Ok(())
+        }
+        fn appearance_description(&self) -> Result<String, String> {
+            Ok(format!("{:?}", self.appearance))
+        }
         fn register(&mut self, key: &HotKey) -> Result<i32, String> {
             if self.conflict {
                 return Err("shortcut occupied".into());
@@ -348,6 +381,9 @@ mod tests {
             startup: Some(old_startup()),
             rail: old.clone(),
             shake: old.clone(),
+            appearance: old.appearance_mode,
+            committed_appearance: old.appearance_mode,
+            fail_appearance_restore: false,
             fail_shake: false,
             fail_shake_restore: false,
             fail_rail: false,
@@ -359,6 +395,45 @@ mod tests {
         };
         (store, native, old, candidate)
     }
+    #[test]
+    fn saved_appearance_and_settings_file_commit_together() {
+        let profile = Profile::new();
+        let (store, mut native, old, mut candidate) = fixture(&profile);
+        candidate.appearance_mode = AppearanceMode::Dark;
+        apply(&store, &mut native, &candidate, old.hot_key, Some(1)).map_err(|failure| failure.message).unwrap();
+        assert_eq!(native.appearance, AppearanceMode::Dark);
+        assert_eq!(store.load(), (candidate, None));
+    }
+
+    #[test]
+    fn failed_save_restores_committed_appearance_not_the_active_preview() {
+        let profile = Profile::new();
+        let (store, mut native, old, mut candidate) = fixture(&profile);
+        let original = store.read_raw().unwrap();
+        native.appearance = AppearanceMode::Dark;
+        candidate.appearance_mode = AppearanceMode::Light;
+        native.fail_retire = true;
+        assert!(apply(&store, &mut native, &candidate, old.hot_key, Some(1)).is_err());
+        assert_eq!(native.appearance, AppearanceMode::System);
+        assert_eq!(store.read_raw().unwrap(), original);
+    }
+
+    #[test]
+    fn failed_appearance_restore_reports_live_mode_and_preserves_previous_file() {
+        let profile = Profile::new();
+        let (store, mut native, old, mut candidate) = fixture(&profile);
+        let original = store.read_raw().unwrap();
+        native.appearance = AppearanceMode::Dark;
+        native.fail_appearance_restore = true;
+        native.fail_retire = true;
+        candidate.appearance_mode = AppearanceMode::Light;
+        let failure = apply(&store, &mut native, &candidate, old.hot_key, Some(1)).err().unwrap();
+        assert_eq!(native.appearance, AppearanceMode::Light);
+        assert!(failure.warning.unwrap().contains("appearance=Light"));
+        assert!(failure.message.contains("appearance restore: native appearance restore rejected"));
+        assert_eq!(store.read_raw().unwrap(), original);
+    }
+
     #[test]
     fn conflict_and_failed_startup_preserve_old_file_registration_and_exact_run_value() {
         for fail_startup in [false, true] {

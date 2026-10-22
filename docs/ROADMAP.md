@@ -785,3 +785,49 @@ The user subsequently reported `0.0.16 Ticket 04 đã đạt và đã được c
 - Actual two-monitor 96-DPI smoke proved X/Escape/hotkey/native-close pointer placement, persisted monitor replacement, fixed monitor Save, Follow pointer Save without movement, edge-only Save, stationary dock after pointer movement, and Open Shelf on the dock monitor. Raw evidence: `build/smoke_final_candidate.log`. Exact-candidate owned reinstall, secondary activation, restart retention, Cooperative Shutdown, uninstall, and owned Profile Data/source hashes passed.
 - Independent Standards and Spec reviews found rollback/test and initial-restore precedence defects; all were corrected and re-reviewed as resolved. No new dependencies or schemas were introduced.
 - **Human gate and environment limitation:** physical hotplug, mixed/fractional DPI, actual Contrast Theme/screen reader, and the full physical fullscreen/Shake/drag matrix were not observed on physical hardware. The user confirmed `tất cả đã đạt, hãy commit các thay đổi` on 2026-10-21, closing the final human gate and authorizing the commit. Ambient installation and startup registry accounting remain preserved in Ticket 03.
+
+## 0.0.19 — Appearance modes and palette refresh
+
+**Status:** Completed — Tickets 01–05 resolved; exact candidate 0.0.19 packaged, verified, accepted by the user on 2026-10-22, and committed after explicit authorization.
+
+### Scope
+
+- Split the fixed `420 × 520` Settings surface into horizontal **General** and **Appearance** tabs, keeping every existing setting under General and opening there by default.
+- Add the persisted `AppearanceMode` values `System`, `Dark`, and `Light`, defaulting to `System`. Apply the resolved appearance to every DropCove WebView surface and native frame while Windows Contrast Theme remains authoritative.
+- Preview Appearance changes process-wide as a Settings draft. Save commits the mode; Cancel, native close, or failed Save restores the previously persisted appearance.
+- Refresh the semantic palette around Dark `#000000` backgrounds and `#101010` Shelf Batch cards, Light `#F3F3F3` backgrounds and `#F8F8F8` cards, and accessible cobalt `#2B63EB` actions.
+- Extend the strict settings schema through a clean cutover. A pre-`0.0.19` settings file remains untouched, loads all active defaults with a warning, and is replaced only after explicit successful Save.
+- Preserve Shelf state, drag behavior, window geometry, keyboard operation, reduced motion, source-file safety, Resident Instance lifetime, and Windows system-color behavior in Contrast Themes.
+
+### Planned delivery slices
+
+1. Appearance ownership: persisted mode, process-wide resolution, live Windows observation for System mode, native-frame synchronization, draft preview, and rollback-safe Save/Cancel behavior.
+2. Settings and palette: General/Appearance tabs, accessible three-option preview selector, approved semantic colors, and Dark/Light/Contrast rendering across every surface.
+3. Release gate: synchronized `0.0.19` manifests, complete Windows regressions, frontend and cargo-xwin/NSIS builds, installed-candidate smoke, review, and human acceptance.
+
+### Planned verification
+
+- Exercise System, Dark, and Light modes across Drop Shelf, Edge Rail, Manage Items, Settings, About, confirmations, menus, native frames, and hidden-to-visible transitions.
+- Verify live System-mode response to Windows theme changes, Windows Contrast Theme precedence, selector keyboard behavior, focus visibility, and the active-Contrast explanatory message.
+- Verify process-wide preview, Save, Cancel, native close, Save failure rollback, Settings reopen, restart persistence, and no wrong-theme visible startup frame.
+- Verify the clean schema cutover preserves old bytes, warns, loads every documented default, and writes `AppearanceMode` only after explicit successful Save.
+- Complete the existing native suite, frontend production build, cargo-xwin Windows release/NSIS packaging, installed lifecycle smoke, and final human gate.
+
+### Deferred
+
+- Custom accent colors or user-authored palettes.
+- Independent themes per surface or per monitor.
+- Scheduled theme switching outside Windows System mode.
+- Settings migration, compatibility fields, or a second appearance store.
+
+### Observed implementation and release evidence — 2026-10-22
+
+- Added horizontal General and Appearance tabs to Settings, preserving fixed `420 × 520` geometry, taskbar visibility, and shared draft/Save/Cancel lifecycle. Appearance presents three accessible preview radio tiles with Monitor, Moon, and Sun icons, arrow navigation, and the exact Contrast override notice.
+- Persisted required `AppearanceMode: System | Dark | Light` in `settings.json`, defaulting to `System`. System mode follows live Windows application-theme changes; explicit Dark and Light remain fixed across ordinary Windows changes; Windows Contrast Theme always has higher rendering precedence without changing the stored mode.
+- Added live preview across all six WebViews (Drop Shelf, Edge Rail, Settings, About, Manage Items, native Clear confirmation) and their matching native frames. Cancel, native `WM_CLOSE`, teardown, or failed Save restores the last committed mode. A locked settings file produced visible Win32 error 32 and restored both native frames, radio selection, and committed bytes.
+- Replaced the navy/indigo palette with Dark `#000000` / `#101010` and Light `#F3F3F3` / `#F8F8F8`, primary action `#2B63EB` with white text, distinct danger `#C62828`, contrast-checked warnings, Dark zero-shadow cards, and Light one-pixel separation shadows. Contrast Themes use Windows system colors.
+- Clean schema cutover: pre-0.0.19 files without `AppearanceMode` are preserved byte-for-byte, load all active defaults with a warning, and are replaced only after explicit successful Save.
+- Re-reviewed diff returned **0 Standards findings** and **0 Spec findings**. Node suite passed **2/2**; full native Windows suite passed **124/124**.
+- Packaging: `build/DropCove-Setup-0.0.19.exe`, **3,313,605 bytes**, SHA-256 `9cc8a33558cc989b29c992fb4e86a3e97f5a9820b036ed138aa862a189ecff8c`. Installed executable payload: **13,965,824 bytes**, SHA-256 `83eee48ff8bebdab38eeb101419c63b221db87e094363ea508f82738087dd8c0`.
+- Exact installed candidate ran with dev server stopped; demonstrated all four modes, native frames, reinstall, and uninstallation. Ambient 0.0.18 installation, shortcuts, Run key, personalization/Contrast registry, colors, and running process were restored.
+- The user confirmed `tất cả đã đạt, hãy commit các thay đổi` on 2026-10-22, closing final human acceptance and authorizing the release commit.

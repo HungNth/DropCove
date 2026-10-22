@@ -15,6 +15,8 @@ export type RailEdge = "Left" | "Right";
 export type ShakeSensitivity = "Low" | "Normal" | "High";
 export interface MonitorChoice { id: string; label: string; connected: boolean }
 
+export type AppearanceMode = "System" | "Dark" | "Light";
+
 export interface SettingsSnapshot {
   hotKey: HotKey;
   label: string;
@@ -26,6 +28,7 @@ export interface SettingsSnapshot {
   shakeEnabled: boolean;
   shakeSensitivity: ShakeSensitivity;
   monitors: MonitorChoice[];
+  appearanceMode: AppearanceMode;
 }
 
 export function useSettings() {
@@ -138,6 +141,17 @@ export function useSettings() {
       if (!disposed) status.value = String(error);
     } finally { if (!disposed) busy.value = false; }
   }
+  async function setAppearanceMode(mode: AppearanceMode) {
+    if (busy.value || disposed) return;
+    const request = ++refreshRequest;
+    try {
+      const next = await invoke<SettingsSnapshot>("set_appearance_mode", { mode });
+      if (!disposed && request === refreshRequest) { snapshot.value = next; status.value = ""; }
+    } catch (error) {
+      if (!disposed && request === refreshRequest) status.value = String(error);
+    }
+  }
+
 
 
   async function save() {
@@ -212,6 +226,7 @@ export function useSettings() {
     setRailPlacement,
     setShowRailOverFullscreen,
     setShake,
+    setAppearanceMode,
     monitors,
     save,
     cancel,

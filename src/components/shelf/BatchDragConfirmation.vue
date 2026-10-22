@@ -43,7 +43,7 @@ function pointerMove(event: PointerEvent) {
     <div class="flex flex-wrap gap-[6px]">
       <button
         type="button"
-        class="border border-dc-accent rounded-[4px] py-[4px] px-[8px] text-dc-accent-text bg-dc-accent cursor-pointer touch-none select-none hover:border-dc-border-hover hover:bg-dc-accent-hover focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]! forced-colors:hover:border-dc-border-hover"
+        class="border border-dc-action rounded-[4px] py-[4px] px-[8px] text-dc-accent-text bg-dc-action cursor-pointer touch-none select-none hover:border-dc-border-hover hover:bg-dc-accent-hover focus-visible:outline-2 focus-visible:outline-dc-focus forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:focus-visible:outline-[2px] forced-colors:focus-visible:outline-[Highlight]! forced-colors:hover:border-dc-border-hover"
         @pointerdown="pointerDown"
         @pointermove="pointerMove"
         @pointerup="pointerStart = undefined"

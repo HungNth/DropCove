@@ -2,7 +2,7 @@
 
 use crate::{
     resident,
-    settings_store::{HotKey, RailEdge, Settings, SettingsStore, ShakeSensitivity},
+    settings_store::{AppearanceMode, HotKey, RailEdge, Settings, SettingsStore, ShakeSensitivity},
     settings_transaction::{self, Integrations},
     windows_hotkey,
     windows_auxiliary::{self, InvocationContext},
@@ -35,6 +35,7 @@ pub(crate) struct SettingsSnapshot {
     pub(crate) show_rail_over_fullscreen: bool,
     pub(crate) shake_enabled: bool,
     pub(crate) shake_sensitivity: ShakeSensitivity,
+    pub(crate) appearance_mode: AppearanceMode,
     pub(crate) monitors: Vec<crate::edge_rail::MonitorChoice>,
 }
 struct SettingsSession {
@@ -67,6 +68,7 @@ pub(crate) fn initialize(
 ) -> Result<(), String> {
     let store = SettingsStore::new(profile);
     let (desired, load_warning) = store.load();
+    crate::windows_theme::initialize(app, desired.appearance_mode)?;
     let mut warnings: Vec<String> = load_warning.into_iter().collect();
     let active_token = match windows_hotkey::initialize(window)
         .and_then(|()| windows_hotkey::register(app, &desired.hot_key))
@@ -146,6 +148,7 @@ pub(crate) fn get_snapshot(app: &AppHandle) -> Result<SettingsSnapshot, String> 
         show_rail_over_fullscreen: settings.show_rail_over_fullscreen,
         shake_enabled: settings.shake_enabled,
         shake_sensitivity: settings.shake_sensitivity,
+        appearance_mode: settings.appearance_mode,
         monitors: crate::edge_rail::choices()?,
     })
 }
@@ -170,6 +173,7 @@ pub(crate) fn open(app: &AppHandle, context: InvocationContext) -> Result<(), St
         WebviewUrl::App("index.html".into()),
     )
     .title("Settings — DropCove")
+    .theme(crate::windows_theme::current_theme(app)?)
     .inner_size(SETTINGS_WIDTH, SETTINGS_HEIGHT)
     .min_inner_size(SETTINGS_WIDTH, SETTINGS_HEIGHT)
     .resizable(false)
@@ -180,6 +184,7 @@ pub(crate) fn open(app: &AppHandle, context: InvocationContext) -> Result<(), St
     .build()
     .map_err(|error| error.to_string())?;
     let setup = (|| {
+        crate::windows_theme::apply_to_window(&window)?;
         windows_auxiliary::center_in_work_area(&window, &monitor)?;
         window.show().map_err(|error| error.to_string())?;
         window.set_focus().map_err(|error| error.to_string())?;
@@ -331,6 +336,23 @@ pub(crate) fn set_shake(
     }
     emit_snapshot(app)
 }
+pub(crate) fn set_appearance_mode(
+    app: &AppHandle,
+    mode: AppearanceMode,
+) -> Result<SettingsSnapshot, String> {
+    if app.get_webview_window(SETTINGS_WINDOW_LABEL).is_none() {
+        return Err("Settings window is not open".into());
+    }
+    crate::windows_theme::apply(app, mode)?;
+    {
+        let state = app.state::<SettingsState>();
+        let mut session = state.lock()?;
+        let session = session.as_mut().ok_or("settings coordinator is not initialized")?;
+        session.draft.get_or_insert_with(|| session.desired.clone()).appearance_mode = mode;
+    }
+    emit_snapshot(app)
+}
+
 
 pub(crate) fn handle_hotkey(app: &AppHandle, id: i32) -> Result<(), String> {
     let recording_key = {
@@ -390,6 +412,15 @@ impl Integrations for NativeIntegrations<'_> {
     fn shake_description(&self) -> Result<String, String> {
         crate::windows_shake::description(self.app)
     }
+    fn appearance_apply(&mut self, mode: AppearanceMode) -> Result<(), String> {
+        crate::windows_theme::apply(self.app, mode)
+    }
+    fn committed_appearance(&self) -> Result<AppearanceMode, String> {
+        Ok(active(self.app)?.appearance_mode)
+    }
+    fn appearance_description(&self) -> Result<String, String> {
+        Ok(format!("{:?}", crate::windows_theme::snapshot(self.app)?.mode))
+    }
     fn register(&mut self, key: &HotKey) -> Result<i32, String> {
         windows_hotkey::register(self.app, key)
     }
@@ -413,6 +444,19 @@ impl Integrations for NativeIntegrations<'_> {
     }
 }
 pub(crate) fn save(app: &AppHandle) -> Result<(), String> {
+    let result = save_candidate(app);
+    if let Err(error) = result {
+        if let Err(restore) = restore_appearance(app) {
+            let message = format!("{error}; appearance rollback incomplete: {restore}");
+            warn(app, &message);
+            return Err(message);
+        }
+        return Err(error);
+    }
+    Ok(())
+}
+
+fn save_candidate(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<SettingsState>();
     if state.busy.swap(true, Ordering::AcqRel) {
         return Err("a settings application is already active".into());
@@ -496,13 +540,29 @@ fn discard_draft(session: &mut SettingsSession) {
     session.draft = None;
     session.listening = false;
 }
+fn restore_appearance(app: &AppHandle) -> Result<(), String> {
+    let mode = {
+        let state = app.state::<SettingsState>();
+        let mut session = state.lock()?;
+        let session = session.as_mut().ok_or("settings coordinator is not initialized")?;
+        if let Some(draft) = session.draft.as_mut() {
+            draft.appearance_mode = session.desired.appearance_mode;
+        }
+        session.desired.appearance_mode
+    };
+    crate::windows_theme::apply(app, mode)?;
+    emit_snapshot(app).map(|_| ())
+}
+
 fn discard_session(app: &AppHandle) -> Result<(), String> {
-    let state = app.state::<SettingsState>();
-    let mut session = state.lock()?;
-    if let Some(session) = session.as_mut() {
-        discard_draft(session);
+    {
+        let state = app.state::<SettingsState>();
+        let mut session = state.lock()?;
+        if let Some(session) = session.as_mut() {
+            discard_draft(session);
+        }
     }
-    Ok(())
+    restore_appearance(app)
 }
 pub(crate) fn cancel(app: &AppHandle) -> Result<(), String> {
     discard_session(app)?;
@@ -524,6 +584,7 @@ pub(crate) fn on_settings_window_focus_changed(app: &AppHandle, focused: bool) {
     }
 }
 pub(crate) fn shutdown(app: &AppHandle) -> Result<(), String> {
+    discard_session(app)?;
     crate::windows_shake::shutdown(app)?;
     windows_hotkey::shutdown(app)?;
     if let Some(window) = app.get_webview_window(SETTINGS_WINDOW_LABEL) {

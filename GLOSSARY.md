@@ -32,6 +32,10 @@ _Avoid_: Settings menu, notification-area menu
 The DropCove surface for reviewing and changing durable preferences through its Save and Cancel lifecycle.
 _Avoid_: Preferences page, configuration window
 
+**Appearance Mode**:
+The durable Settings preference selecting System, Dark, or Light presentation for DropCove. Windows Contrast Theme overrides the rendered result without changing the preference.
+_Avoid_: Theme preference, color scheme, skin
+
 **About Surface**:
 The single informational surface that presents DropCove's product identity and release metadata.
 _Avoid_: About page, About popup, About modal

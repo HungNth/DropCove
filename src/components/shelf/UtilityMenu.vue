@@ -163,7 +163,7 @@ onUnmounted(() => {
       ref="menuRef"
       role="menu"
       aria-label="Drop Shelf Utility Menu"
-      class="absolute right-0 bottom-[calc(100%+4px)] w-[132px] p-1 rounded-md border border-dc-border-hover bg-dc-surface-elevated shadow-lg shadow-black/30 z-50 flex flex-col gap-0.5 select-none forced-colors:border-[ButtonText]"
+      class="absolute right-0 bottom-[calc(100%+4px)] w-[132px] p-1 rounded-md border border-dc-border-hover bg-dc-surface-elevated shadow-dc-floating z-50 flex flex-col gap-0.5 select-none forced-colors:border-[ButtonText]"
       @keydown="onMenuKeydown"
     >
       <button
