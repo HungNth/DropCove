@@ -108,6 +108,14 @@ _Avoid_: Force kill, terminate process
 A Start Menu or Desktop shortcut created and still controlled by the DropCove installer.
 _Avoid_: Any DropCove-named shortcut, user shortcut
 
+**Brand Visual**:
+The canonical visual mark representing DropCove, from which all application icons, tray representations, and installer visual identities derive.
+_Avoid_: Logo file, app picture, banner graphic
+
+**Installer Branding**:
+The visual presentation of DropCove within the setup wizard, uninstaller, and operating system application management derived from the Brand Visual.
+_Avoid_: Installer skin, setup theme, installer decoration
+
 **Profile Data**:
 The durable and recovery information owned by one DropCove profile and retained across update and uninstall.
 _Avoid_: Program files, installation directory

@@ -888,3 +888,60 @@ The user subsequently reported `0.0.16 Ticket 04 đã đạt và đã được c
 - The agent smoke ran against the packaged release executable with an isolated profile, not the installed `%LOCALAPPDATA%` copy. The user subsequently performed the local build and installation.
 - Actual Windows Contrast Theme, native reduced-motion interaction, and screen-reader announcement were not directly observed by the agent.
 - The repository has no published release, so the `available` state used a stubbed response rather than the real API.
+
+## 0.0.21 — Application branding and installer icon unification
+
+**Status:** Completed — tickets 01–03 resolved; candidate 0.0.21 built, packaged, verified, and accepted by the user on 2026-10-22. Changes committed with explicit authorization.
+
+### Scope
+
+- Preserve `app-icon.svg` and its existing colors as the canonical mark for application, resident, and distribution icons.
+- Synchronize all Windows/Tauri bundle raster and multi-resolution icon assets (`.ico`, `.png`) across `src-tauri/icons/` with the vector mark.
+- Configure NSIS packaging in `tauri.conf.json` with explicit `installerIcon` and `uninstallerIcon` referencing the unified icon asset, eliminating default Nullsoft/Windows fallback icons.
+- Verify Brand Visual presence across all key Windows surfaces:
+  1. Setup package (`DropCove-Setup-0.0.21.exe`) icon in Windows File Explorer.
+  2. Active NSIS Setup wizard window title bar and Taskbar icon.
+  3. Uninstaller executable (`uninstall.exe`) in the installed application directory.
+  4. Installed applications entry (*Add or Remove Programs* / Windows Settings) via `DisplayIcon`.
+  5. Desktop and Start Menu installer-owned shortcuts.
+  6. In-app resident surfaces: About Surface, Settings, Drop Shelf, and System Tray.
+
+### Planned delivery slices
+
+1. Icon asset generation and bundler configuration: synchronize multi-size Windows `.ico` and bundle `.png` assets from the vector source, configure `installerIcon` and `uninstallerIcon` in `tauri.conf.json`, and ensure clean build.
+2. Release gate: synchronized `0.0.21` manifests (`package.json`, `Cargo.toml`, `tauri.conf.json`), full Windows test suite, NSIS package build, installed candidate verification across all surfaces, and human acceptance.
+
+### Planned verification
+
+- Inspect generated `.ico` layers to ensure required Windows resolutions (16, 24, 32, 48, 64, 256) are present and valid.
+- Verify PE icon resources embedded in `DropCove-Setup-0.0.21.exe`, `DropCove.exe`, and `uninstall.exe`.
+- Verify Start Menu and Desktop shortcuts display the unified icon without Explorer icon cache corruption.
+- Verify Windows Settings *Installed apps* presents the unified icon for DropCove.
+- Exercise in-app About, Settings, Drop Shelf, and System Tray icon rendering in Dark, Light, and Contrast modes.
+
+### Deferred
+
+- Custom NSIS sidebar or header banner images (preserving minimal, high-DPI-friendly wizard layout).
+- Dynamic or theme-adaptive executable or installer icons.
+- User-customizable application icon variants.
+
+### Observed implementation and release evidence — 2026-10-22
+
+- Added explicit NSIS `installerIcon` and `uninstallerIcon` paths to the existing Windows ICO. Reused the custom template's MUI bindings and existing `DisplayIcon` registration; no Rust/Vue runtime changes, extra dependency, or new icon-loading path. VERSION, package, crate/lock, and Tauri metadata report 0.0.21.
+- Pinned CLI regeneration produced byte-identical Windows ICO and bundle PNG assets; no Windows image replacement was needed. Non-Windows generated changes were discarded. ICO inspection confirmed six 32-bit layers at 16, 24, 32, 48, 64, and 256 pixels. For each executable below, every icon-group entry was resolved to its image resource and the complete payload asserted equal to the matching source ICO layer.
+- Frontend typecheck/Vite production build passed; frontend suite passed **13/13**. `cargo xwin check` passed, the freshly cargo-xwin-compiled native executable passed **124/124**, and Tauri's cargo-xwin runner plus the existing copy script produced the candidate. External SDK missing-PDB LNK4099 warnings remain unsuppressed and nonfatal. Ordinary `cargo check` used an unsuitable `link.exe`; cargo-xwin was the successful verification path.
+- Interactive installation at an owned custom directory completed with both shortcuts and Launch unchecked. Real Explorer showed branded setup and installed app/uninstaller files; Programs and Features showed DropCove's icon. Shortcut targets inherited the installed executable's branded icon. Actual notification-area overflow, native Drop Shelf/Edge Rail/About/Settings small icons, and installed About Dark/Light rendering were observed. About reported 0.0.21 and loaded embedded production assets through `tauri.localhost`.
+- Standard uninstall after profile-scoped Cooperative Shutdown removed the complete owned installation, registry entry, and shortcuts without manual file deletion; isolated Profile Data survived. An early invalid smoke held an executable's PE memory map open; a separate reinstall attempted with the custom-profile candidate running hit a copy failure. Both harness conflicts were removed before the successful install/uninstall evidence. Existing ambient 0.0.20 executable bytes were preserved; its installer restored registration/Start Menu and its Resident Instance reconciled Run to the ambient executable/profile with saved StartWithWindows=true. Ambient settings bytes remained unchanged; smoke directories were removed and no DropCove process remained. Original pre-smoke registry/shortcut/Run bytes were not captured, so exact byte-for-byte restoration is not claimed.
+
+| Exercised artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `build/DropCove-Setup-0.0.21.exe` | 3,296,914 | `a22df0b6da9f2b0038821f65100f94f7e0e3391366c0b5adc9a1ceee01777d4e` |
+| Exact installed `dropcove.exe` | 13,941,248 | `e81bb152d12a50874709687289172007a46e14a1e77704b606f5140208d55889` |
+| Exact installed `uninstall.exe` | 58,851 | `0f78185ecae38c876fff9bb532cf5f8c493d7aea154418984ab31a70614194f9` |
+
+The latest build produced `build/DropCove-Setup-0.0.21.exe` (3,296,914 bytes, SHA-256 `a22df0b6da9f2b0038821f65100f94f7e0e3391366c0b5adc9a1ceee01777d4e`), superseding the initial candidate of 3,294,058 bytes. All six icon layers match byte-for-byte.
+
+### Remaining acceptance and observation limits
+
+- Standards and Spec reviews reported no actionable findings. No permanent test was added for two packaging configuration fields; the artifact assertions and installed smoke cover the changed behavior.
+- The user confirmed testing and accepted the release candidate on 2026-10-22 (`tất cả đã đạt`, `tôi đã test và tất cả đã đạt`), closing human acceptance and authorizing the release commit.

@@ -68,6 +68,8 @@ Welcome → Directory → Shortcut options → Installation progress → Finish
 
 The installer does not configure **Start with Windows**. DropCove owns that setting after launch.
 
+The Brand Visual is shared by the application executable, setup and uninstaller executables and their window icons, Windows application-management entry, Installer-Owned Shortcuts, About Surface, native application windows, and notification-area icon. Preserve the existing mark and colors; generate Windows bundle icon assets from the canonical vector source. Installer Branding uses that same multi-resolution icon without adding custom sidebar or header artwork. Appearance Mode does not replace or recolor the Brand Visual.
+
 ### 3.2 First launch
 
 A normal first launch:
