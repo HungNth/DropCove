@@ -231,7 +231,7 @@ pub(crate) fn open(
         popup
     } else {
         let popup = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
-            .title("Manage Items — DropCove")
+            .title("Manage Items - DropCove")
             .theme(crate::windows_theme::current_theme(app)?)
             .inner_size(WIDTH, height)
             .position(x, y)

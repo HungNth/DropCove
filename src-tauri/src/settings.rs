@@ -172,7 +172,7 @@ pub(crate) fn open(app: &AppHandle, context: InvocationContext) -> Result<(), St
         SETTINGS_WINDOW_LABEL,
         WebviewUrl::App("index.html".into()),
     )
-    .title("Settings — DropCove")
+    .title("Settings - DropCove")
     .theme(crate::windows_theme::current_theme(app)?)
     .inner_size(SETTINGS_WIDTH, SETTINGS_HEIGHT)
     .min_inner_size(SETTINGS_WIDTH, SETTINGS_HEIGHT)
