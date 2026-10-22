@@ -50,6 +50,8 @@ const updateStatus = computed(() => {
   }
 });
 
+const updateAvailable = computed(() => updateResult.value?.kind === "available");
+
 async function runUpdateAction() {
   if (!metadata.value || checking.value) return;
   const result = updateResult.value;
@@ -156,13 +158,41 @@ onUnmounted(() => {
       <button
         type="button"
         :aria-disabled="!metadata || checking"
-        class="px-4 py-1.5 rounded-md border border-dc-border-default bg-dc-surface-elevated text-dc-text-primary text-[12px] font-medium select-none cursor-pointer hover:bg-dc-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus aria-disabled:opacity-[var(--dc-disabled-opacity)] aria-disabled:cursor-not-allowed"
+        :class="[
+          'px-4 py-1.5 rounded-md border text-[12px] font-medium select-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus aria-disabled:opacity-[var(--dc-disabled-opacity)] aria-disabled:cursor-not-allowed',
+          updateAvailable
+            ? 'border-transparent bg-dc-action text-dc-accent-text hover:bg-dc-accent-hover forced-colors:border-dc-border-default'
+            : 'border-dc-border-default bg-dc-surface-elevated text-dc-text-primary hover:bg-dc-surface-hover',
+        ]"
         aria-describedby="update-status"
         @click="runUpdateAction"
       >
         {{ checking ? "Checking…" : updateResult?.kind === "available" ? `Download ${updateResult.version}` : "Check for updates" }}
       </button>
-      <span id="update-status" class="min-h-[16px] text-[11px] text-dc-text-muted" aria-live="polite">
+      <span
+        id="update-status"
+        aria-live="polite"
+        :class="[
+          'flex items-center gap-1.5 min-h-[16px]',
+          updateAvailable
+            ? 'px-3 py-1.5 rounded-md border border-dc-accent bg-dc-accent-subtle text-dc-text-primary text-[13px] font-semibold forced-colors:bg-transparent'
+            : 'text-[11px] text-dc-text-muted',
+        ]"
+      >
+        <svg
+          v-if="updateAvailable"
+          class="size-4 shrink-0 text-dc-accent"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="8" cy="8" r="6.25" />
+          <path d="M8 4.75v5.5M5.5 8l2.5 2.5L10.5 8" />
+        </svg>
         {{ updateStatus }}
       </span>
     </div>
