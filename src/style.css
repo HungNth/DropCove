@@ -53,20 +53,20 @@ html.surface-settings body {
 
 :root, [data-appearance="dark"] {
   color-scheme: dark;
-  --dc-canvas: #000000;
-  --dc-surface: #000000;
-  --dc-card: #101010;
-  --dc-surface-subtle: #101010;
-  --dc-surface-elevated: #181818;
-  --dc-surface-hover: #232323;
-  --dc-surface-active: #2b2b2b;
-  --dc-backdrop: rgba(0, 0, 0, 0.6);
+  --dc-canvas: #0c0c0c;
+  --dc-surface: #0c0c0c;
+  --dc-card: #161616;
+  --dc-surface-subtle: #161616;
+  --dc-surface-elevated: #1c1c1c;
+  --dc-surface-hover: #262626;
+  --dc-surface-active: #303030;
+  --dc-backdrop: rgba(0, 0, 0, 0.65);
 
   --dc-text-primary: #f5f5f5;
   --dc-text-secondary: #c7c7c7;
   --dc-text-muted: #929292;
-  --dc-border-subtle: #242424;
-  --dc-border-default: #383838;
+  --dc-border-subtle: #262626;
+  --dc-border-default: #3a3a3a;
   --dc-border-hover: #5a5a5a;
 
   --dc-action: #2b63eb;
@@ -81,12 +81,12 @@ html.surface-settings body {
   --dc-warning-surface: #241a0a;
   --dc-warning-border: #8a652b;
   --dc-warning-text: #f6c56c;
-  --dc-danger: #ff8080;
-  --dc-danger-action: #c62828;
-  --dc-danger-surface: #2c1013;
-  --dc-danger-hover: #a21d24;
-  --dc-danger-border: #c75058;
-  --dc-danger-text: #ffb4b4;
+  --dc-danger: #fb7185;
+  --dc-danger-action: #e11d48;
+  --dc-danger-surface: #260c13;
+  --dc-danger-hover: #be123c;
+  --dc-danger-border: #9f1239;
+  --dc-danger-text: #fda4af;
 
   --dc-drag-hover-border: #7aa2ff;
   --dc-drag-hover-bg: #0d1933;

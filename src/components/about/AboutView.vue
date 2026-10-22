@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import logoUrl from "../../../app-icon.svg";
+import { checkForUpdates, type UpdateCheckResult } from "../../updateCheck";
 
 interface AboutMetadata {
   productName: string;
@@ -32,6 +33,41 @@ async function openSource(event: Event) {
     await openUrl(metadata.value.sourceUrl);
   } catch (error) {
     errorMessage.value = `Could not open browser for Source: ${error}`;
+  }
+}
+
+const checking = ref(false);
+const updateResult = ref<UpdateCheckResult | null>(null);
+
+const updateStatus = computed(() => {
+  switch (updateResult.value?.kind) {
+    case "up-to-date": return "You're up to date.";
+    case "available": return `Version ${updateResult.value.version} is available.`;
+    case "no-release": return "No releases published yet.";
+    case "rate-limited": return "Update check limit reached. Try again later.";
+    case "failed": return "Couldn't check for updates. Try again later.";
+    default: return "";
+  }
+});
+
+async function runUpdateAction() {
+  if (!metadata.value || checking.value) return;
+  const result = updateResult.value;
+  if (result?.kind === "available") {
+    errorMessage.value = "";
+    try {
+      await openUrl(result.url);
+    } catch (error) {
+      errorMessage.value = `Could not open browser for Download: ${error}`;
+    }
+    return;
+  }
+  checking.value = true;
+  updateResult.value = null;
+  try {
+    updateResult.value = await checkForUpdates(metadata.value.version, metadata.value.sourceUrl);
+  } finally {
+    checking.value = false;
   }
 }
 
@@ -115,18 +151,19 @@ onUnmounted(() => {
       {{ errorMessage }}
     </div>
 
-    <!-- Bottom Section: Update Action Placeholder -->
+    <!-- Bottom Section: Update Check -->
     <div class="flex flex-col items-center gap-1.5 mb-2">
       <button
         type="button"
-        disabled
-        class="px-4 py-1.5 rounded-md border border-dc-border-default bg-dc-surface-elevated text-dc-text-muted text-[12px] font-medium opacity-[var(--dc-disabled-opacity)] cursor-not-allowed select-none"
+        :aria-disabled="!metadata || checking"
+        class="px-4 py-1.5 rounded-md border border-dc-border-default bg-dc-surface-elevated text-dc-text-primary text-[12px] font-medium select-none cursor-pointer hover:bg-dc-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus aria-disabled:opacity-[var(--dc-disabled-opacity)] aria-disabled:cursor-not-allowed"
         aria-describedby="update-status"
+        @click="runUpdateAction"
       >
-        Check for updates
+        {{ checking ? "Checking…" : updateResult?.kind === "available" ? `Download ${updateResult.version}` : "Check for updates" }}
       </button>
-      <span id="update-status" class="text-[11px] text-dc-text-muted">
-        Coming soon
+      <span id="update-status" class="min-h-[16px] text-[11px] text-dc-text-muted" aria-live="polite">
+        {{ updateStatus }}
       </span>
     </div>
   </main>

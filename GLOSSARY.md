@@ -40,6 +40,14 @@ _Avoid_: Theme preference, color scheme, skin
 The single informational surface that presents DropCove's product identity and release metadata.
 _Avoid_: About page, About popup, About modal
 
+**Update Check**:
+A user-requested comparison of the running DropCove version against the Latest Release. It never downloads or installs anything; the user updates by running the newer setup.
+_Avoid_: Auto-update, updater, background check
+
+**Latest Release**:
+The highest-versioned published DropCove release, excluding drafts and pre-releases.
+_Avoid_: Newest tag, latest build
+
 **Dismiss Drop Shelf**:
 The user-facing dismissal of the floating Drop Shelf without ending the Resident Instance or discarding Shelf references. An empty Shelf leaves every Shelf surface hidden; a non-empty Shelf remains available through the Edge Rail.
 _Avoid_: Exit DropCove, close the application, hide all Shelf surfaces

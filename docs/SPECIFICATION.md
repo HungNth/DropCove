@@ -88,7 +88,7 @@ Default profile directory:
 
 ### 3.3 Updating
 
-DropCove has no automatic updater or background release checker.
+DropCove has no automatic updater or background release checker. The About Surface offers a user-requested Update Check that reports the Latest Release and opens its release page; it never downloads or installs anything.
 
 To update:
 
@@ -185,7 +185,21 @@ The decorated, fixed-size `400 × 460`-logical-pixel surface appears on the Drop
 
 About shows the canonical logo, product name, synchronized running version, the product description directly below that version, Author, and a **Source** link that opens the repository in the default browser. Author is `HungNth`; the description is **A resident Windows utility providing a temporary drag-and-drop workspace for file and folder references.** Author, description, and repository come from Cargo package metadata rather than frontend copies. The repository is not called a Website; homepage remains unset until a public product site exists.
 
-**Check for updates** is disabled and accompanied by **Coming soon**. It performs no check or network activity; installer-based updates remain the supported workflow.
+**Check for updates** performs an Update Check only when activated. DropCove requests the repository's GitHub releases, ignores drafts, pre-releases, and tags not matching `v?MAJOR.MINOR.PATCH`, and compares the running version with the highest remaining version. The request aborts after `10 s` and its result is not retained after About closes.
+
+One status line below the action announces each result politely to assistive technology:
+
+| State                  | Action              | Status                                         |
+| ---------------------- | ------------------- | ---------------------------------------------- |
+| Idle                   | `Check for updates` | empty                                          |
+| Checking               | `Checking…`, `aria-disabled`, focus kept | empty                     |
+| Up to date             | `Check for updates` | `You're up to date.`                           |
+| Newer release          | `Download X.Y.Z`    | `Version X.Y.Z is available.`                  |
+| No release             | `Check for updates` | `No releases published yet.`                   |
+| Failure or invalid data | `Check for updates` | `Couldn't check for updates. Try again later.` |
+| HTTP 403 or 429        | `Check for updates` | `Update check limit reached. Try again later.` |
+
+`Download X.Y.Z` opens that release's GitHub page in the default browser; release pages outside the DropCove repository's `releases/` path are invalid data. Installer-based updates remain the supported workflow.
 
 
 ## 6. Display states

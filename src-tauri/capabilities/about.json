@@ -8,7 +8,7 @@
     "core:window:allow-close",
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "https://github.com/HungNth/DropCove" }]
+      "allow": [{ "url": "https://github.com/HungNth/DropCove" }, { "url": "https://github.com/HungNth/DropCove/releases/*" }]
     }
   ]
 }
