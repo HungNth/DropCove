@@ -123,14 +123,12 @@ async function onAppearanceChange(mode: AppearanceMode, event: Event) {
     :aria-busy="busy"
     aria-label="Settings"
   >
-    <header class="header flex flex-col px-4 pt-3 border-b border-dc-border-subtle bg-dc-surface forced-colors:border-[ButtonText] forced-colors:bg-[Canvas]">
-      <h1 class="title m-0 text-[14px] font-semibold text-dc-text-primary">Settings</h1>
-
+    <header class="header flex flex-col px-4 pt-2 border-b border-dc-border-subtle bg-dc-surface forced-colors:border-[ButtonText] forced-colors:bg-[Canvas]">
       <!-- Horizontal Accessible Tabs -->
       <div
         role="tablist"
         aria-label="Settings sections"
-        class="flex items-center gap-1 mt-2.5 -mb-px"
+        class="flex items-center gap-1 -mb-px"
       >
         <button
           id="tab-general"
