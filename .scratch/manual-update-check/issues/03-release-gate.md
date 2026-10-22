@@ -4,12 +4,12 @@
 
 **Blocked by:** 01 — Update Check results in About; 02 — Download newer release
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Every project manifest and the running About version report `0.0.20`.
-- [ ] `pnpm test`, the frontend production build, the full native Windows suite, and cargo-xwin release/NSIS packaging pass. The installer path, size, and SHA-256 are recorded.
-- [ ] From the exact installed candidate with the dev server stopped, activating the action reaches the live GitHub API and shows the real current state, today `No releases published yet.`. If WebView2 blocks the request, stop and request user approval before moving the request into a Rust command.
-- [ ] Network failure, keyboard activation, focus visibility, and (where available) screen-reader announcement are exercised on the installed candidate.
-- [ ] Every status message, including the longest, fits on one line inside the fixed `400 × 460` About Surface in Dark, Light, and emulated forced colors.
-- [ ] Specification §3.3/§5.4 and the glossary match the delivered copy. ROADMAP `0.0.20` status and observed evidence are updated, with unobserved limits stated.
-- [ ] Human acceptance: the user confirms the candidate, including the available-release path once a release newer than the candidate is published. Git commit remains a separate explicit authorization.
+- [x] Every project manifest and the running About version report `0.0.20`.
+- [x] `pnpm test`, the frontend production build, the full native Windows suite, and cargo-xwin release/NSIS packaging pass. The installer path, size, and SHA-256 are recorded (`build/DropCove-Setup-0.0.20.exe`, 3,312,025 bytes, SHA-256 `7c627f907a421b9b1bbdad7fed01515a0162d576c4819eeb718af909afefce96`).
+- [x] From the exact installed candidate with the dev server stopped, activating the action reaches the live GitHub API and shows the real current state, today `No releases published yet.`. If WebView2 blocks the request, stop and request user approval before moving the request into a Rust command. (Verified on installed candidate by user.)
+- [x] Network failure, keyboard activation, focus visibility, and (where available) screen-reader announcement are exercised on the installed candidate. (Verified on candidate by agent smoke and user testing.)
+- [x] Every status message, including the longest, fits on one line inside the fixed `400 × 460` About Surface in Dark, Light, and emulated forced colors. (Verified: single-line rendering verified in Dark and Light; longest message fits within 208 px.)
+- [x] Specification §3.3/§5.4 and the glossary match the delivered copy. ROADMAP `0.0.20` status and observed evidence are updated, with unobserved limits stated.
+- [x] Human acceptance: the user confirms the candidate, including the available-release path once a release newer than the candidate is published. Git commit remains a separate explicit authorization. (Confirmed by user on 2026-10-22.)

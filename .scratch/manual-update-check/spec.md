@@ -92,7 +92,7 @@ When a newer release exists, the action becomes **Download X.Y.Z**. It opens tha
   | Failure or invalid data | `Check for updates` | `Couldn't check for updates. Try again later.` |
   | HTTP 403 or 429 | `Check for updates` | `Update check limit reached. Try again later.` |
 
-  The action uses the existing About button styling in its enabled form and keeps the focus-ring tokens. Update results appear only in the status line. A browser-opening failure uses About's existing error area.
+  The action uses the existing About button styling in its enabled form and keeps the focus-ring tokens. When a newer release is available, the action renders as a primary button with accent fill and text, and the status line renders as an accent-subtle callout with an accent border, semibold text, and an inline download icon. Update results appear only in the status line. A browser-opening failure uses About's existing error area.
 - **Download action.** Activating **Download X.Y.Z** opens the validated release page through the existing opener plugin, the same way the **Source** link opens the repository. The available state remains until About closes.
 - **State lifetime.** Update Check state lives only in the About Surface component. Closing About destroys it. Nothing is persisted or cached by DropCove. Browser caching of the response follows GitHub's headers.
 - **Permissions.** The About capability's opener allow-list gains `https://github.com/HungNth/DropCove/releases/*` beside the existing repository URL. No new Tauri command, backend module, crate, npm package, updater plugin, Settings field, or CSP change is added.

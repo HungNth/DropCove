@@ -199,6 +199,8 @@ One status line below the action announces each result politely to assistive tec
 | Failure or invalid data | `Check for updates` | `Couldn't check for updates. Try again later.` |
 | HTTP 403 or 429        | `Check for updates` | `Update check limit reached. Try again later.` |
 
+When a newer release is available, the status is styled as an accent callout with subtle background, accent border, semibold text, and an inline download icon; the action is rendered as a primary accent button (`Download X.Y.Z`) to distinguish it from secondary checks.
+
 `Download X.Y.Z` opens that release's GitHub page in the default browser; release pages outside the DropCove repository's `releases/` path are invalid data. Installer-based updates remain the supported workflow.
 
 

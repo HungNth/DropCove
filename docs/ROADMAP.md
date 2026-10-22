@@ -834,14 +834,14 @@ The user subsequently reported `0.0.16 Ticket 04 đã đạt và đã được c
 
 ## 0.0.20 — Manual update check
 
-**Status:** Implemented — tickets 01–03 delivered; exact candidate 0.0.20 packaged and smoked in the real WebView2. Awaiting human acceptance; no Git commit authorized.
+**Status:** Completed — tickets 01–03 resolved; final candidate 0.0.20 built, packaged, installed, verified, and accepted by the user on 2026-10-22. Changes committed with explicit authorization.
 
 ### Scope
 
 - Replace the disabled About `Check for updates` placeholder with a user-requested Update Check. It never downloads or installs anything; installer-based updates remain the only update path.
 - Request `https://api.github.com/repos/{owner}/{repo}/releases` from the About Surface with `Accept: application/vnd.github+json`, deriving owner and repository from `Cargo.toml.package.repository` through the existing About metadata command. Abort after `10 s`; keep no cache beyond the About Surface lifetime; add no crate or updater plugin.
 - Select the Latest Release: exclude drafts and pre-releases, ignore tags not matching `v?MAJOR.MINOR.PATCH`, and choose the highest semantic version. A running version equal to or above it is up to date.
-- Present one `aria-live="polite"` status line below the action: idle (empty), `Checking…` with the action `aria-disabled` so keyboard focus is retained, `You're up to date.`, `Version X.Y.Z is available.` with the action renamed `Download X.Y.Z`, `No releases published yet.`, `Couldn't check for updates. Try again later.`, and `Update check limit reached. Try again later.` for HTTP 403/429.
+- Present one `aria-live="polite"` status line below the action: idle (empty), `Checking…` with the action `aria-disabled` so keyboard focus is retained, `You're up to date.`, `Version X.Y.Z is available.` with the action renamed `Download X.Y.Z`, `No releases published yet.`, `Couldn't check for updates. Try again later.`, and `Update check limit reached. Try again later.` for HTTP 403/429. When a newer release is available, the status appears as an accent callout with an inline download icon, and the action renders as a primary button.
 - `Download X.Y.Z` opens the release `html_url` in the default browser. Extend the About opener permission to `https://github.com/HungNth/DropCove/releases/*`; any other `html_url` is invalid data.
 - Preserve the fixed `400 × 460` About geometry, keyboard and focus behavior, Dark/Light/Contrast rendering, and reduced motion.
 
@@ -869,7 +869,9 @@ The user subsequently reported `0.0.16 Ticket 04 đã đạt và đã được c
 - About now shows `Check for updates`, `Checking…` (action `aria-disabled`, focus retained), and `Download X.Y.Z`. Starting a check clears the previous status so a stale result is never announced. The status line is `aria-live="polite"`. The disabled placeholder and `Coming soon` are removed.
 - The About opener allow-list adds `https://github.com/HungNth/DropCove/releases/*`. No crate, plugin, Settings field, or Rust command was added. Manifests and `VERSION` are synchronized to `0.0.20`.
 - Frontend `vue-tsc`/Vite build passed. Full native Windows suite passed **124/124**, run directly because `cargo xwin test` cannot use the Wine runner.
-- Packaging: `build/DropCove-Setup-0.0.20.exe`, **3,310,384 bytes**, SHA-256 `1da5f91c84f86d50de0035d771845fe5cb8ba52276ccbf3f7d506481ae3a16d4`. Earlier same-version builds during this cycle are superseded.
+- Packaging: `build/DropCove-Setup-0.0.20.exe`, **3,312,025 bytes**, SHA-256 `7c627f907a421b9b1bbdad7fed01515a0162d576c4819eeb718af909afefce96`, built and installed by the user on 2026-10-22 (superseding the pre-refinement binary of 3,310,384 bytes, SHA-256 `1da5f91c84f86d50de0035d771845fe5cb8ba52276ccbf3f7d506481ae3a16d4`).
+- Refined the `available` state presentation (commit `8fd69e7`): the status line renders as an accent callout with an accent border, subtle background, semibold text, and an inline download icon (fitting within 192 × 33.5 px in 400 × 460 About), and `Download X.Y.Z` renders as a primary accent button.
+- The user confirmed building, installing, and testing the candidate on 2026-10-22 (`tôi đã cài đặt và test, tất cả đã đạt`), closing human acceptance and authorizing the release documentation commit.
 - Real WebView2 smoke ran from the release executable with an isolated `--profile` and a CDP port, not an installed copy. It exercised:
   - the live GitHub API from About: `No releases published yet.`, so CORS from `http://tauri.localhost` works;
   - offline: `Couldn't check for updates. Try again later.`;
@@ -883,6 +885,6 @@ The user subsequently reported `0.0.16 Ticket 04 đã đạt và đã được c
 ### Unobserved limits
 
 - The `Download` click opened the default browser without error, but no browser window was inspected. Opening a DropCove release page was observed only as an absent error.
-- The installed-installer path was not run: no installation, upgrade, or uninstall was performed, and the existing `0.0.19` installation was left untouched.
-- Light, forced-colors, actual Windows Contrast Theme, and screen-reader announcement were not observed.
+- The agent smoke ran against the packaged release executable with an isolated profile, not the installed `%LOCALAPPDATA%` copy. The user subsequently performed the local build and installation.
+- Actual Windows Contrast Theme, native reduced-motion interaction, and screen-reader announcement were not directly observed by the agent.
 - The repository has no published release, so the `available` state used a stubbed response rather than the real API.

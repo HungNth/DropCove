@@ -4,11 +4,11 @@
 
 **Blocked by:** 01 — Update Check results in About
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] A Latest Release greater than the running version yields `available` with its normalized version and `html_url`, but only when `html_url` starts with `https://github.com/{owner}/{repo}/releases/`. Otherwise the result is `failed`.
-- [ ] About renders the `available` state with the exact spec copy. The status line announces it politely. The state remains until About closes.
-- [ ] `Download X.Y.Z` opens the validated page through the existing opener plugin, as the Source link does. A browser-opening failure appears in About's existing error area, not the update status line.
-- [ ] The About capability's opener allow-list adds `https://github.com/HungNth/DropCove/releases/*` beside the existing repository URL and grants nothing broader.
-- [ ] `node:test` coverage adds: a higher release yields `available` with the correct version and page; out-of-order releases offer the highest; an `html_url` outside the releases path yields `failed`.
-- [ ] Demo: with a stubbed or locally served release list containing a version newer than the running build, the action becomes `Download X.Y.Z` and opens the correct GitHub release page in the default browser.
+- [x] A Latest Release greater than the running version yields `available` with its normalized version and `html_url`, but only when `html_url` starts with `https://github.com/{owner}/{repo}/releases/`. Otherwise the result is `failed`.
+- [x] About renders the `available` state with the exact spec copy. The status line announces it politely. The state remains until About closes.
+- [x] `Download X.Y.Z` opens the validated page through the existing opener plugin, as the Source link does. A browser-opening failure appears in About's existing error area, not the update status line.
+- [x] The About capability's opener allow-list adds `https://github.com/HungNth/DropCove/releases/*` beside the existing repository URL and grants nothing broader.
+- [x] `node:test` coverage adds: a higher release yields `available` with the correct version and page; out-of-order releases offer the highest; an `html_url` outside the releases path yields `failed`.
+- [x] Demo: with a stubbed or locally served release list containing a version newer than the running build, the action becomes `Download X.Y.Z` and opens the correct GitHub release page in the default browser. (Verified by agent smoke and user testing.)
