@@ -23,9 +23,9 @@ export function useManageItems() {
     if (busy.value || disposed) return;
     busy.value = true;
     try {
-      await invoke(command, arguments_);
+      const result = await invoke<{ warning?: string | null } | null>(command, arguments_);
       await refresh();
-      if (!disposed) status.value = "";
+      if (!disposed) status.value = result?.warning ?? "";
     } catch (error) {
       if (!disposed) status.value = String(error);
     } finally {

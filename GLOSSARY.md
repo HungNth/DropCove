@@ -1,6 +1,6 @@
 # DropCove Domain Glossary
 
-DropCove is a resident Windows utility providing a temporary drag-and-drop workspace for file and folder path references.
+DropCove is a resident Windows utility providing a temporary drag-and-drop workspace for filesystem references and Managed Files.
 
 ## Core Language
 **Resident Instance**:
@@ -53,11 +53,15 @@ The user-facing dismissal of the floating Drop Shelf without ending the Resident
 _Avoid_: Exit DropCove, close the application, hide all Shelf surfaces
 
 **Shelf Batch**:
-A grouping of filesystem items that were dragged into DropCove together in a single drop operation.
+A grouping of Shelf Items accepted from one drop operation.
 _Avoid_: Drop group, file list, collection
 
+**Batch Selection**:
+The transient, surface-local set of Shelf Batches chosen for one multi-batch drag-out.
+_Avoid_: Selected Shelf, persistent selection, batch group
+
 **Drop Placeholder**:
-A transient card-shaped marker showing where one incoming Shelf Batch would be inserted while a supported storage drag is over the Drop Shelf or expanded Edge Rail.
+A transient card-shaped marker showing where one incoming Shelf Batch would be inserted while a supported incoming drag is over the Drop Shelf or expanded Edge Rail.
 _Avoid_: File placeholder, hover card, ghost batch
 
 **Automatic Shelf Sizing**:
@@ -69,11 +73,19 @@ A user-chosen Drop Shelf height that remains fixed while Shelf content exists.
 _Avoid_: Fixed Shelf size, manual Shelf sizing
 
 **Shelf Item**:
-An individual filesystem path reference stored within a shelf batch.
+An individual filesystem path reference stored within a Shelf Batch. Its path can reference either an external filesystem object or a Managed File.
 _Avoid_: File copy, attachment, payload
 
+**Managed File**:
+A filesystem file created and owned by DropCove to represent accepted content that did not arrive as a filesystem object.
+_Avoid_: Managed Item, temporary file, cached copy
+
+**Pending Managed File Deletion**:
+A Managed File whose Shelf Item lifecycle has ended but whose permanent deletion remains pending.
+_Avoid_: Orphan file, leaked temporary file, Recycle Bin item
+
 **Temporary Item**:
-A Shelf Item with a temporary lifecycle whose reference can leave the Shelf without deleting its source filesystem object.
+A Shelf Item with a consumable lifecycle. Its removal can delete a Managed File but never an external source filesystem object.
 _Avoid_: Temporary file, cached copy
 
 **Shell Visual**:

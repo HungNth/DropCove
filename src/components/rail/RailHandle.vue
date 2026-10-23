@@ -15,6 +15,7 @@ interface ShelfSnapshot {
   batches: ShelfBatch[];
   preferredWidth: number;
   height: number;
+  warning?: string | null;
 }
 
 interface Projection {
@@ -48,7 +49,9 @@ let unlistenRail: UnlistenFn | undefined;
 let unlistenShelf: UnlistenFn | undefined;
 let unlistenTransientsClosed: UnlistenFn | undefined;
 let unlistenDragOver: UnlistenFn | undefined;
+let unlistenError: UnlistenFn | undefined;
 let disposed = false;
+let pendingWarning = "";
 const hasTemporaryItems = computed(() =>
   batches.value.some((batch) => batch.items.some((item) => !item.isPinned)),
 );
@@ -58,6 +61,9 @@ async function refreshBatches() {
     const snapshot = await invoke<ShelfSnapshot>("get_shelf");
     if (!disposed) {
       batches.value = snapshot.batches;
+      const previousWarning = pendingWarning;
+      pendingWarning = snapshot.warning ?? "";
+      if (pendingWarning || status.value === previousWarning) status.value = pendingWarning;
     }
   } catch (error) {
     if (!disposed) status.value = String(error);
@@ -70,7 +76,7 @@ async function runAction(command: string, args: Record<string, unknown> = {}) {
   try {
     await invoke(command, args);
     await refreshBatches();
-    if (!disposed) status.value = "";
+    if (!disposed) status.value = pendingWarning;
   } catch (error) {
     if (!disposed) status.value = String(error);
   } finally {
@@ -225,6 +231,9 @@ onMounted(async () => {
     unlistenDragOver = await getCurrentWindow().listen<boolean>("shelf-drag-over", ({ payload }) => {
       if (!disposed) draggingOver.value = payload;
     });
+    unlistenError = await getCurrentWindow().listen<string>("shelf-error", ({ payload }) => {
+      if (!disposed) status.value = payload;
+    });
     unlistenRail = await getCurrentWindow().listen<Projection>("rail-changed", async ({ payload }) => {
       if (!disposed) {
         edge.value = payload.edge;
@@ -262,6 +271,7 @@ onUnmounted(() => {
   unlistenShelf?.();
   unlistenTransientsClosed?.();
   unlistenDragOver?.();
+  unlistenError?.();
 });
 const railListRef = useTemplateRef<HTMLElement>("railListRef");
 const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => Number(draggingOver.value));
@@ -358,7 +368,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => N
           class="clear-btn inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-transparent rounded-[4px] bg-transparent text-dc-danger cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:border-[ButtonText] forced-colors:text-dc-danger forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
           type="button"
           aria-label="Clear Temporary Items"
-          title="Clear Temporary Items; pinned references remain and source files are not deleted"
+          title="Clear temporary items and DropCove-created files; pinned items and external sources stay"
           :disabled="busy || pendingConfirmation !== null"
           @click="requestClearTemporary"
         ><ActionIcon name="trash" /></button>

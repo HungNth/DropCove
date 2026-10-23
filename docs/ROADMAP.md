@@ -1003,3 +1003,134 @@ The final installer supersedes the provisional 3,297,256-byte candidate (`38ffd3
 - The supplemental action fixture initially provided only part of the required database schema and correctly triggered recovery. It was reseeded only after the actual application had created its complete schema; all final action assertions then passed. A later driver return expression referenced `document` outside its page context after Remove Batch succeeded; the authoritative remaining-batch projection confirmed the action, without repeating it.
 - Actual Windows Contrast Theme, mixed/fractional DPI, Narrator speech, and physical Windows reduced-motion configuration were not observed. Media emulation is not counted as actual Contrast acceptance. The complete physical interaction matrix remains part of human acceptance.
 - The user confirmed testing and accepted the release candidate on 2026-10-22 (`tất cả đã đạt, hãy commit các thay đổi`), closing human acceptance and authorizing the release commit.
+
+## 0.0.23 — Managed File lifecycle and plain-text intake
+
+**Status:** Completed — tickets 01–04 resolved; release 0.0.23 tested and accepted by the user on 2026-10-23.
+
+Plan: [Specification](../.scratch/managed-file-text-intake/spec.md).
+
+Requirements: [Product Specification](SPECIFICATION.md#12-drop-in-behavior) · [Architecture](ARCHITECTURE.md#10-persistence-architecture) · [ADR-0006](adr/0006-managed-files-and-durable-cleanup.md) · [Windows payload research](../.scratch/content-intake-multi-batch/research/windows-non-path-drag-payloads.md).
+
+### Scope
+
+- Add Managed File ownership without changing ordinary file/folder drops: external items remain path references and DropCove never deletes their source objects.
+- Store retained Managed Files under Profile Data, distinguish ownership through the authoritative Shelf state, and add durable Pending Managed File Deletion records.
+- Permanently delete owned files after Successful Drag-Out consumption, Remove Item, Remove Batch, Clear Temporary Items, or confirmed-Missing cleanup; retry sharing or antivirus failures at later events and startup while warning with the pending count.
+- Accept non-empty Windows Unicode text on the Drop Shelf and expanded Edge Rail, write one bounded UTF-8 `.txt` Managed File with a timestamped filename, and reuse the existing Temporary/Pinned, Shell Visual, persistence, and Copy-only drag-out workflows.
+- Preserve retained and pending Managed Files through restart, update, and uninstall. Extend Recovery Backup preservation to include complete managed storage before restarting with an empty active Shelf.
+- Update Clear Temporary Items messaging to distinguish external source safety from permanent deletion of DropCove-created temporary files while retaining the `360 × 130` confirmation contract.
+
+### Approved delivery tickets
+
+1. [Managed-text Drop Shelf round trip](../.scratch/managed-file-text-intake/issues/01-managed-text-drop-shelf-round-trip.md) — no blockers; delivers the complete `Staged → Ready`, startup reconciliation, pending cleanup, and Drop Shelf text round trip.
+2. [Lifecycle actions and Edge Rail parity](../.scratch/managed-file-text-intake/issues/02-lifecycle-actions-edge-rail-parity.md) — blocked by Ticket 01; extends the working lifecycle through Clear, removal, Shake, and both surfaces.
+3. [Managed File recovery and profile preservation](../.scratch/managed-file-text-intake/issues/03-managed-file-recovery-profile-preservation.md) — blocked by Ticket 01; preserves managed storage with database evidence and keeps recovery all-or-fatal.
+4. [Release DropCove 0.0.23](../.scratch/managed-file-text-intake/issues/04-release-dropcove-0.0.23.md) — blocked by Tickets 02 and 03; owns integration, version synchronization, exact packaging, installed lifecycle proof, and human acceptance.
+
+Approved DAG: `01 → {02, 03} → 04`.
+
+
+### Observed implementation and release evidence — 2026-10-23
+
+| Final Retained Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `build/DropCove-Setup-0.0.23.exe` | 3,352,355 | `d0f724d9a58d153b4d40416ff21ac01164926b503cce241d6e1a2b0c4a3c946a` |
+| Exact installed `dropcove.exe` | 14,083,584 | (full text hover tooltip, text snippet badge icon, pure text dragout) |
+
+- Independent standards and spec reviews returned zero remaining actionable defects across all tickets.
+- Frontend suite passed **13/13**; freshly compiled native Windows regression executable passed **143/143**.
+- Packaged current-user NSIS installer with `cargo-xwin` targeting `x86_64-pc-windows-msvc`. VERSION, package, crate/lock, and Tauri metadata report `0.0.23`.
+- Real Windows OLE smoke verified:
+  1. Multiline non-ASCII plain-text intake (`Xin chào DropCove\r\n第二行 🚀\r\nhttps://example.test/not-downloaded`).
+  2. Materialized 71-byte UTF-8 file under `%LOCALAPPDATA%\DropCove\managed\<id>\Dropped text YYYY-MM-DD HH-mm-ss.txt`.
+  3. Resident restart restored exact file and Shelf Card.
+  4. Native Copy drag-out transferred exact bytes and filename into real Forms destination.
+  5. Temporary item consumed and Managed File permanently deleted on destination acceptance.
+  6. Pinned text item copied to destination while retaining Shelf Item and Managed File bytes.
+  7. Real delete-denying sharing violation queued durable pending deletion, reported count, and completed deletion on restart.
+  8. Silent NSIS installation, secondary activation, Cooperative Shutdown, silent uninstall, and Profile Data preservation verified.
+  9. Workstation ambient HKCU Run registry value restored to pre-smoke baseline.
+- Limits: physical high-DPI scaling factors (scale 1 observed) and actual hardware keyboard chords skipped in favor of Windows input automation.
+- On 2026-10-23, the user confirmed all acceptance checks passed and explicitly authorized committing the changes (`tôi đã test và tất cả đã đạt, hãy commit các thay đổi`).
+### Planned verification
+
+- Exercise real Unicode text drag-in on both Drop Shelf and expanded Edge Rail, including multiline/non-ASCII text, empty text, URL-shaped text, exact `10 MiB` boundary behavior, restart, and timestamp collision suffixing.
+- Verify exact UTF-8 destination bytes through native Copy; accepted Copy consumes Temporary text and permanently deletes its Managed File, while Pinned, canceled, rejected, and pre-acceptance-failed cases retain both reference and bytes.
+- Exercise Remove Item, Remove Batch, Clear Temporary Items, final-item sizing reset, and source safety with mixed external and Managed File batches.
+- Hold a Managed File open to force a sharing failure, prove the Shelf mutation and durable pending record commit together, observe the warning, release the handle, and prove later event/startup retry removes the file and record.
+- Force persistence, staging, deletion, and recovery-preservation failures plus process termination before Staged commit, after Staged commit, after promotion, and before Ready commit; prove startup reconciliation yields either a complete Ready item or no visible item, with no untracked staged/final file, no external-source deletion, and fatal startup when complete backup/recreation cannot be guaranteed.
+- Verify update, reinstall, standard uninstall, retained Profile Data, frontend/native regressions, cargo-xwin Windows build, exact NSIS packaging, and installed lifecycle.
+
+### Deferred
+
+- Website-image virtual files and Attachment Services to `0.0.24`.
+- Multi-batch selection and drag-out to `0.0.25`.
+- HTML/RTF preservation, URL download, clipboard history, editable text items, arbitrary file import, storage quotas, content hashing, shared backing files, and Recycle Bin deletion.
+
+## 0.0.24 — Website image virtual-file intake
+
+**Status:** Planned — depends on completed `0.0.23` Managed File ownership and cleanup.
+
+Requirements: [Product Specification](SPECIFICATION.md#122-website-image-virtual-files) · [Architecture](ARCHITECTURE.md#7-drag-in-flow) · [ADR-0006](adr/0006-managed-files-and-durable-cleanup.md) · [Windows payload research](../.scratch/content-intake-multi-batch/research/windows-non-path-drag-payloads.md).
+
+### Scope
+
+- Extend the native OLE drop adapter to choose exactly one representation family: existing filesystem paths, otherwise browser virtual-image files, otherwise Unicode text. Invalid higher-priority data never falls through to URL or text.
+- Accept browser `CFSTR_FILEDESCRIPTORW` plus indexed `CFSTR_FILECONTENTS` streams from Edge and Chrome on Windows; do not add HTTP URL fallback or generic virtual-file intake.
+- Validate PNG, JPEG, GIF, WebP, AVIF, SVG, BMP, and ICO content plus safe filenames. Preserve raw SVG bytes, never render SVG in a DropCove WebView, and allow Shell Visual fallback.
+- Enforce `100 MiB` per image, at most `20` images and `500 MiB` total per drop. Skip unsupported/invalid/over-limit entries, but reject and clean the complete drop on I/O, trust-service, or persistence failure.
+- Apply Windows Attachment Services to every staged website image, use an accompanying HTTP(S) URL as the zone source or Restricted Zone otherwise, and accept only a still-valid post-scan file.
+- Preserve descriptor order and sanitized browser filenames, create one Shelf Batch per accepted image drop, and intentionally avoid content hashing or shared Managed Files.
+
+### Planned delivery slices
+
+1. OLE virtual-file adapter: enumerate and read bounded file descriptors/streams on the registered window thread, preserve existing path intake, enforce representation precedence, and stage owned bytes without crossing borrowed COM media between threads.
+2. Image trust and lifecycle: add format/content validation, safe naming, limits, raw-SVG handling, Attachment Services, post-scan revalidation, partial unsupported-entry reporting, and atomic Managed File batch acceptance.
+3. Release gate: verify the accepted implementation against Edge and Chrome, synchronize `0.0.24`, run complete regressions, package/install one exact NSIS candidate, record evidence and limits, and obtain human acceptance.
+
+### Planned verification
+
+- Exercise real Edge and Chrome drags for every supported format on both surfaces, including raw SVG, animation-preserving formats, multiple image descriptors, same-name files, missing/unsafe names, corrupt bytes, extension/content mismatch, and URL/text companion formats.
+- Prove representation precedence: ordinary filesystem drops remain format-agnostic references; image bytes beat companion URL/text; URL-only, HTML-only, bitmap-only, generic virtual-file, and invalid higher-priority payloads create no Shelf state.
+- Exercise exact per-file, item-count, and total-byte boundaries; valid entries with unsupported neighbors create one ordered batch and report skips, while operational/security/persistence failure creates no partial batch or orphan staging.
+- Observe Windows Attachment Services zone evidence, source-URL and Restricted-Zone paths, antivirus/trust rejection, deletion or alteration followed by post-scan revalidation, and installed drag-out of the final accepted bytes.
+- Verify Temporary/Pinned lifecycle, permanent cleanup, retry, restart/update/uninstall/recovery retention, Shell Visual fallback, no WebView SVG rendering, Dark/Light/Contrast presentation, cargo-xwin build, and exact installed NSIS lifecycle.
+
+### Deferred
+
+- HTTP downloads, cookie/referrer forwarding, authenticated images, Firefox acceptance, arbitrary URLs, generic virtual files, HTML/RTF, bitmap clipboard capture, image editing/conversion/sanitization, content deduplication, and shared Managed Files.
+- Multi-batch selection and drag-out to `0.0.25`.
+
+## 0.0.25 — Multi-batch selection and drag-out
+
+**Status:** Planned — depends on completed `0.0.23` and `0.0.24` so selected drag-out handles both external references and Managed Files from its first release.
+
+Requirements: [Product Specification](SPECIFICATION.md#93-batch-selection) · [Architecture](ARCHITECTURE.md#8-drag-out-flow).
+
+### Scope
+
+- Add Explorer-style Batch Selection to the Drop Shelf and expanded Edge Rail: click selects one, `Ctrl+click` toggles, `Shift+click` selects a visible-order range, dragging a selected card drags the complete selection, and dragging an unselected card drags only it.
+- Keep selection surface-local and session-only. Rejected/canceled drag retains it; Successful Drag-Out, empty-space click, `Escape`, hide, surface switch, or restart clears it.
+- Add Drop Shelf keyboard and accessibility semantics: focusable batch regions, `Space`, `Ctrl+Space`, `Shift+Space`, `Ctrl+A`, `Escape`, multiselectable collection state, per-card `aria-selected`, and polite selected batch/item counts. Keep the no-activate Edge Rail pointer-only.
+- Prepare selected batches as one serialized operation: preserve displayed batch and source-item order, remove Missing references, retain Unavailable references, show one aggregate confirmation, and cancel when no Available participant remains.
+- Deduplicate outbound path strings ordinal case-insensitively while recording every selected occurrence. Accepted Copy consumes every represented Temporary occurrence and permanently cleans its Managed File when owned; Pinned occurrences remain.
+- Preserve existing single-item, single-batch, Manage Items, Pinning, Clear, virtualization, sizing, Rail no-focus, and Copy-only contracts.
+
+### Planned delivery slices
+
+1. Selection presentation: add surface-local identity state, pointer gestures, selected visuals/counts, virtualized collection stability, clear/retain transitions, and ordinary action-control isolation on both Shelf surfaces.
+2. Selected drag core: add batch-set preparation tokens, deterministic flattening/path deduplication, aggregate availability confirmation, occurrence-specific completion, Managed File cleanup, and rollback-safe persistence.
+3. Drop Shelf accessibility and release: add keyboard/ARIA/live announcements, preserve Edge Rail no-activate behavior, run the complete interaction matrix, synchronize `0.0.25`, and package/install one exact accepted NSIS candidate.
+
+### Planned verification
+
+- Exercise click, `Ctrl`, `Shift`, drag threshold, empty-space clear, `Escape` ordering, cancel/reject retention, Successful Copy clear, surface switch, hide/reopen, restart, action controls, and ordinary/virtualized collections above 50 batches.
+- Verify one selected drag containing single- and multi-item batches, external and Managed Files, Temporary and Pinned occurrences, repeated paths across batches, same filenames at different paths, Missing and Unavailable entries, empty-batch pruning, and final-item sizing/display transitions.
+- Prove emitted path order and case-insensitive deduplication, one aggregate unavailable confirmation, durable Missing cleanup, accepted-Copy occurrence consumption, Pinned retention, Managed File permanent deletion/retry, and persistence-failure rollback.
+- Verify Drop Shelf keyboard selection and accessibility tree/live announcements; confirm the Edge Rail remains pointer-only, no-activate, fullscreen-safe, and non-focus-stealing during selection and OLE drag.
+- Run frontend/native regressions, real destination Copy/cancel/reject smoke, cargo-xwin Windows build, exact NSIS packaging, installed restart/reinstall/uninstall, and Profile Data preservation.
+
+### Deferred
+
+- Persistent or cross-surface selection, named selections, batch reordering, selection toolbar/mode, always-visible checkboxes, keyboard activation of the Edge Rail, keyboard-only OLE destination drag, arbitrary item-level selection across batches, and non-Windows behavior.

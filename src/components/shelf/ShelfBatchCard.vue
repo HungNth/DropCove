@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, useTemplateRef } from "vue";
+import { computed, shallowRef, useTemplateRef } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import type { ShelfAnchor, ShelfBatch } from "../../composables/useShelf";
 import BulkPinning from "./BulkPinning.vue";
 import ShellVisual from "./ShellVisual.vue";
@@ -15,9 +16,32 @@ const emit = defineEmits<{
   manage: [batchId: string, anchor: ShelfAnchor, keyboard: boolean];
 }>();
 let pointerStart: { id: number; x: number; y: number } | undefined;
-const title = computed(() => props.batch.items.length === 1 ? props.batch.items[0].name : `${props.batch.items.length} items`);
-const previews = computed(() => props.batch.items.slice(0, 3));
 const singleItem = computed(() => props.batch.items.length === 1 ? props.batch.items[0] : undefined);
+const title = computed(() => props.batch.items.length === 1 ? props.batch.items[0].name : `${props.batch.items.length} items`);
+const fullText = shallowRef<string | null>(null);
+const hoverTitle = computed(() => {
+  if (props.batch.items.length !== 1) return title.value;
+  const item = props.batch.items[0];
+  const normalized = item.path.replace(/\\/g, "/").toLowerCase();
+  if (normalized.includes("/managed/") && normalized.endsWith(".txt")) {
+    return fullText.value ?? item.name;
+  }
+  return item.path;
+});
+async function loadFullText() {
+  if (props.batch.items.length !== 1 || fullText.value !== null) return;
+  const item = props.batch.items[0];
+  const normalized = item.path.replace(/\\/g, "/").toLowerCase();
+  if (normalized.includes("/managed/") && normalized.endsWith(".txt")) {
+    try {
+      const text = await invoke<string | null>("get_managed_text", { itemId: item.id });
+      if (text) {
+        fullText.value = text.length > 500 ? text.slice(0, 500) + "..." : text;
+      }
+    } catch {}
+  }
+}
+const previews = computed(() => props.batch.items.slice(0, 3));
 const card = useTemplateRef<HTMLElement>("card");
 
 function openManagement(keyboard: boolean) {
@@ -60,8 +84,9 @@ function pointerMove(event: PointerEvent) {
   >
     <div
       class="card-drag flex flex-1 min-w-0 items-center gap-[4px] h-full box-border p-[5px] cursor-grab select-none touch-none active:cursor-grabbing"
-      :title="batch.items.length === 1 ? batch.items[0].path : title"
+      :title="hoverTitle"
       :aria-label="batch.items.length === 1 ? `Drag ${title} to copy` : `Drag batch ${title} to copy`"
+      @pointerenter="loadFullText"
       @pointerdown.prevent="pointerDown"
       @pointermove="pointerMove"
       @pointerup="pointerStart = undefined"
@@ -125,7 +150,7 @@ function pointerMove(event: PointerEvent) {
       type="button"
       :disabled="busy"
       :aria-label="`Remove batch ${title}`"
-      title="Remove reference; the source is not deleted"
+      title="Remove batch and its DropCove-created files; external sources stay"
       @click="emit('remove', batch.id)"
     ><ActionIcon name="remove" /></button>
     </div>

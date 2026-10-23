@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed, shallowRef } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import type { ShelfItem } from "../../composables/useShelf";
 import ShellVisual from "./ShellVisual.vue";
 import ActionIcon from "./ActionIcon.vue";
@@ -25,6 +27,26 @@ function pointerMove(event: PointerEvent) {
   (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
   emit("drag", props.item.id);
 }
+const fullText = shallowRef<string | null>(null);
+const hoverTitle = computed(() => {
+  const normalized = props.item.path.replace(/\\/g, "/").toLowerCase();
+  if (normalized.includes("/managed/") && normalized.endsWith(".txt")) {
+    return fullText.value ?? props.item.name;
+  }
+  return props.item.path;
+});
+async function loadFullText() {
+  if (fullText.value !== null) return;
+  const normalized = props.item.path.replace(/\\/g, "/").toLowerCase();
+  if (normalized.includes("/managed/") && normalized.endsWith(".txt")) {
+    try {
+      const text = await invoke<string | null>("get_managed_text", { itemId: props.item.id });
+      if (text) {
+        fullText.value = text.length > 500 ? text.slice(0, 500) + "..." : text;
+      }
+    } catch {}
+  }
+}
 </script>
 
 <template>
@@ -35,8 +57,9 @@ function pointerMove(event: PointerEvent) {
   >
     <div
       class="item-drag flex flex-1 min-w-0 items-center gap-[5px] cursor-grab select-none touch-none active:cursor-grabbing"
-      :title="item.path"
+      :title="hoverTitle"
       :aria-label="`Drag ${item.path} to copy`"
+      @pointerenter="loadFullText"
       @pointerdown.prevent="pointerDown"
       @pointermove="pointerMove"
       @pointerup="pointerStart = undefined"
@@ -70,7 +93,7 @@ function pointerMove(event: PointerEvent) {
         type="button"
         :disabled="busy"
         :aria-label="`Remove ${item.name}`"
-        title="Remove reference; the source is not deleted"
+        title="Remove item and its DropCove-created file; external sources stay"
         @click="emit('remove', item.id)"
       ><ActionIcon name="remove" /></button>
     </div>

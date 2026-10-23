@@ -2,7 +2,7 @@
 
 > Canonical specification of target DropCove behavior.
 
-DropCove is a resident Windows utility that provides a temporary drag-and-drop workspace for files and folders. It holds path references between workflows, preserves which items arrived together, and lets users drag them into another application later.
+DropCove is a resident Windows utility that provides a temporary drag-and-drop workspace for external filesystem references and DropCove-owned Managed Files. It preserves which items arrived together and lets users drag them into another application later.
 
 This document defines product behavior, features, settings, installation, update, and removal. Architecture and internal state flows are defined in [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -10,7 +10,7 @@ This document defines product behavior, features, settings, installation, update
 
 DropCove is:
 
-- a temporary workspace for filesystem references;
+- a temporary workspace for external filesystem references and Managed Files created from supported non-filesystem drops;
 - optimized for drag-in, temporary holding, and drag-out;
 - resident in the Windows notification area;
 - available through a hotkey, Shake-to-open, the Edge Rail, or the tray icon;
@@ -21,11 +21,11 @@ DropCove is not:
 - a file manager;
 - a clipboard-history manager;
 - a file synchronization or backup tool;
-- a content store;
+- a general-purpose content store;
 - a cloud service;
-- a source-file deletion or move tool.
+- a move or deletion tool for external source objects.
 
-DropCove never intentionally moves, renames, overwrites, or deletes a referenced filesystem object.
+DropCove never intentionally moves, renames, overwrites, or deletes an external referenced filesystem object. It permanently deletes only Managed Files that it owns after their Shelf Item lifecycle ends.
 
 ## 2. System requirements
 
@@ -100,7 +100,7 @@ To update:
 4. if DropCove does not exit, setup aborts and asks the user to close it;
 5. otherwise, files are replaced in the remembered install directory.
 
-Shelf and settings data remain in the per-user profile directory during an update.
+Shelf state, settings, retained Managed Files, and pending Managed File deletion state remain in the per-user profile directory during an update.
 
 ### 3.4 Uninstalling
 
@@ -120,28 +120,31 @@ Uninstall preserves:
 %LOCALAPPDATA%\DropCove
 ```
 
-Therefore `shelf.db`, `settings.json`, and recovery data remain available to a later reinstall. Users who want a complete data removal must delete that profile directory separately after uninstalling.
+Therefore `shelf.db`, `settings.json`, retained Managed Files, pending deletion state, and recovery data remain available to a later reinstall. Users who want complete data removal must delete that profile directory separately after uninstalling.
 
 ## 4. Canonical terminology
 
-| Term                       | Meaning                                                                                                                           |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **Drop Shelf**             | Floating surface used to hold and manage references.                                                                              |
-| **Edge Rail**              | Screen-edge form of the shelf, directly usable while content remains.                                                             |
-| **Rail Handle**            | Narrow resting form of the Edge Rail.                                                                                             |
-| **Shelf Batch**            | Ordered group of unique paths accepted from one drop operation.                                                                   |
-| **Drop Placeholder**       | Transient card-shaped marker for the newest position of one incoming Shelf Batch.                                                 |
-| **Shelf Item**             | One file or folder path occurrence inside a Shelf Batch.                                                                          |
-| **Temporary Item**         | Shelf Item removed after Successful Drag-Out unless removed earlier by the user or Missing cleanup.                               |
-| **Pinned Item**            | Shelf Item retained after Successful Drag-Out.                                                                                    |
-| **Manage Items**           | Item-level inspection and management for a multi-item Shelf Batch.                                                                |
-| **Successful Drag-Out**    | Destination reports acceptance with the Windows `Copy` result.                                                                    |
-| **Missing Item**           | Path is confirmed not to exist.                                                                                                   |
-| **Unavailable Item**       | Existence cannot currently be decided because access to the root, volume, network, cloud provider, or permissions is unavailable. |
-| **Automatic Shelf Sizing** | Height derived from responsive rows and updated in both directions when no Manual Height Override exists.                         |
-| **Manual Height Override** | Height explicitly chosen by vertical or corner resizing.                                                                          |
+| Term                              | Meaning                                                                                                                           |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Drop Shelf**                    | Floating surface used to hold and manage Shelf Items.                                                                             |
+| **Edge Rail**                     | Screen-edge form of the shelf, directly usable while content remains.                                                             |
+| **Rail Handle**                   | Narrow resting form of the Edge Rail.                                                                                             |
+| **Shelf Batch**                   | Ordered group of Shelf Items accepted from one drop operation.                                                                    |
+| **Batch Selection**               | Transient, surface-local set of Shelf Batches chosen for one multi-batch drag-out.                                                 |
+| **Drop Placeholder**              | Transient card-shaped marker for the newest position of one incoming Shelf Batch.                                                 |
+| **Shelf Item**                    | One filesystem path occurrence inside a Shelf Batch, backed by an external object or a Managed File.                              |
+| **Managed File**                  | Filesystem file created and owned by DropCove for accepted content that did not arrive as a filesystem object.                    |
+| **Pending Managed File Deletion** | Managed File whose Shelf Item lifecycle ended but whose permanent deletion still awaits retry.                                   |
+| **Temporary Item**                | Shelf Item removed after Successful Drag-Out unless removed earlier by the user or Missing cleanup.                               |
+| **Pinned Item**                   | Shelf Item retained after Successful Drag-Out.                                                                                    |
+| **Manage Items**                  | Item-level inspection and management for a multi-item Shelf Batch.                                                                |
+| **Successful Drag-Out**           | Destination reports acceptance with the Windows `Copy` result.                                                                    |
+| **Missing Item**                  | Path is confirmed not to exist.                                                                                                   |
+| **Unavailable Item**              | Existence cannot currently be decided because access to the root, volume, network, cloud provider, or permissions is unavailable. |
+| **Automatic Shelf Sizing**        | Height derived from responsive rows and updated in both directions when no Manual Height Override exists.                         |
+| **Manual Height Override**        | Height explicitly chosen by vertical or corner resizing.                                                                          |
 
-A path reference identifies whatever filesystem entry exists at that path when it is used. If the original object is replaced by another object at the same path, DropCove resolves the replacement.
+An external path reference identifies whatever filesystem entry exists at that path when it is used. If the original object is replaced by another object at the same path, DropCove resolves the replacement. A Managed File instead has DropCove-owned storage and deletion semantics.
 
 ## 5. Resident process behavior
 
@@ -295,15 +298,15 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 - A titleless `28`-logical-pixel control strip contains a top-right `24 × 24` close action named **Hide Drop Shelf**. The action uses Dismiss Drop Shelf: empty content becomes `Hidden`, retained content becomes `EdgeDocked`, Manage Items closes, and the Resident Instance remains running without discarding references.
 - The remainder of the control strip serves as the exclusive window-drag region. Movement uses platform-native dragging and is session-only; it closes Manage Items before movement begins, is blocked during native resize, modal confirmations, or transactional Shelf state, and preserves existing card Copy drag-out, scrolling, controls, and eight-direction resize behavior.
 - Reopening the Drop Shelf uses canonical cursor-monitor or Edge Rail placement; dragged coordinates are not persisted.
-- When no supported external storage drag is over the surface, an empty Drop Shelf shows only a downward icon and `Drop here`.
-- During a supported external storage drag, the Drop Shelf shows one `48`-logical-pixel Drop Placeholder at the prospective newest Shelf Batch position. It replaces the empty prompt or precedes retained batches, uses a dashed drag-hover border and a background distinct from the Shelf surface, and does not show a filename, thumbnail, or item count before acceptance.
+- When no supported incoming drag is over the surface, an empty Drop Shelf shows only a downward icon and `Drop here`.
+- During a supported incoming drag, the Drop Shelf shows one `48`-logical-pixel Drop Placeholder at the prospective newest Shelf Batch position. It replaces the empty prompt or precedes retained batches, uses a dashed drag-hover border and a background distinct from the Shelf surface, and does not show a filename, thumbnail, or item count before acceptance.
 - Drag entry does not apply a surface-wide background, border, outline, or glow and does not temporarily resize the Drop Shelf. The resize-hover accent outline remains independent. Leaving or completing the drag removes the placeholder; an accepted new Shelf Batch then applies Automatic Shelf Sizing.
 - A bottom-left trash icon exposes **Clear Temporary Items** only while temporary content exists.
 - An always-visible bottom-right `24 × 24` **More** action opens the Drop Shelf Utility Menu above it. The menu contains **Settings** then **About**, supports standard keyboard navigation, and closes on outside click or `Escape`. Dismissal restores focus unless an opened utility surface receives it. Settings reuses its existing singleton window and Save/Cancel lifecycle.
 - The Utility Menu uses a stronger border token than Shelf batch cards and an elevated shadow to remain distinct from the Drop Shelf in Dark and Light themes. Windows Contrast retains a system-color border even when shadows are suppressed.
 - Status messages can be dismissed independently.
 - Foreground application changes reassert topmost z-order without activating the shelf.
-- `Esc` closes Manage Items first; a later `Esc` dismisses the shelf.
+- `Esc` closes Manage Items first, then clears a non-empty Batch Selection, then dismisses the shelf on a later press.
 
 ### 8.2 Responsive batch grid
 
@@ -396,6 +399,21 @@ On both the Drop Shelf and expanded Edge Rail, each multi-item preview occupies 
 
 Visible drag-hint subtitles are not shown on either card type. Full paths and drag instructions remain available through tooltips and accessibility text. Multi-item actions occupy one trailing icon-control row.
 
+### 9.3 Batch Selection
+
+Batch Selection is transient presentation state owned by the current surface. It is not persisted or shared when switching between the Drop Shelf and Edge Rail.
+
+- Click selects one Shelf Batch.
+- `Ctrl+click` toggles one batch without clearing the others.
+- `Shift+click` selects the visible-order range from the selection anchor.
+- Dragging a selected card drags the complete Batch Selection; dragging an unselected card drags only that batch.
+- Rejected or canceled drag-out retains the selection for retry. Successful Drag-Out clears it.
+- Clicking empty collection space, pressing `Escape`, hiding the surface, switching surfaces, or restarting clears the selection.
+- Selected cards expose a visible selected state and the surface reports the selected batch and Shelf Item counts.
+- Card action controls operate normally without implicitly changing selection.
+
+On the Drop Shelf, batch drag regions are keyboard-focusable: `Space` selects only the focused batch, `Ctrl+Space` toggles it, `Shift+Space` extends the range, `Ctrl+A` selects all batches, and `Escape` clears selection before shelf dismissal. The batch collection exposes multiselectable semantics, each card exposes `aria-selected`, and count changes use the existing polite announcement channel. The no-activate Edge Rail remains pointer-only; keyboard users open the Drop Shelf through the global hotkey.
+
 ## 10. Manage Items
 
 Manage Items provides item-level control for a multi-item Shelf Batch.
@@ -441,7 +459,7 @@ Each header or row action group uses a single trailing icon-control row.
 - Closing explicitly restores focus to the originating Manage Items control when it still exists.
 - `Esc` closes Manage Items before it can dismiss the Drop Shelf.
 - Opening another batch replaces the existing popup.
-- The popup closes when its batch is removed, the shelf hides, shelf resizing begins, or whole-batch drag starts.
+- The popup closes when its batch is removed, the shelf hides, shelf resizing begins, or whole-batch or Batch Selection drag starts.
 - Individual item drag keeps Manage Items open while the batch remains.
 - During an active item drag, dismissal is guarded; `Esc` cancels the drag before a later `Esc` can close the popup.
 
@@ -486,7 +504,7 @@ Behavior:
 - one through four batches remain at 280 px height;
 - five through eleven batches grow through bounded tiers;
 - twelve or more batches use 642 px and vertical scrolling;
-- a supported storage drag keeps the existing 200 ms drag-entry expansion delay; after expansion, one 48-pixel Drop Placeholder appears before the newest retained Shelf Batch;
+- a supported incoming drag keeps the existing 200 ms drag-entry expansion delay; after expansion, one 48-pixel Drop Placeholder appears before the newest retained Shelf Batch;
 - the placeholder uses a dashed drag-hover border and distinct background without applying a surface-wide Rail highlight;
 - drag hover does not temporarily change Rail height; an accepted new Shelf Batch updates height from the retained batch count through the existing Rail formula;
 - new batches can grow an already expanded rail;
@@ -499,9 +517,9 @@ Behavior:
 The expanded Edge Rail:
 
 - omits a retained-batch header title;
-- supports inspection and drag-out of compact Shelf Batch rows;
+- supports inspection, single-batch drag-out, and pointer Batch Selection drag-out of compact Shelf Batch rows;
 - supports drag of one item from Manage Items;
-- accepts new files/folders through drop-in;
+- accepts supported filesystem, website-image, and plain-text input through drop-in;
 - supports Pin/Unpin, Bulk Pinning, Remove Item, and Remove Batch;
 - shows a bottom-left Clear Temporary Items trash icon only while Temporary Items exist;
 - shows an inward Open Shelf arrow at top-right when docked Left and top-left when docked Right.
@@ -520,41 +538,53 @@ When fullscreen hiding begins, DropCove closes Edge Rail Manage Items and discar
 
 ## 12. Drop-in behavior
 
-DropCove accepts Windows storage items that provide non-empty filesystem paths.
+DropCove accepts one representation family from each Windows OLE data object, in this priority order:
 
-### 12.1 Batch creation
+1. existing filesystem storage items with non-empty paths;
+2. browser-provided virtual image files;
+3. non-empty Unicode plain text.
 
-One drag operation creates at most one Shelf Batch.
+The selected family is the richest supported representation for that drop. Representations are never combined: an image drag that also exposes URL or text data creates only image Shelf Items. If a higher-priority offered family is invalid, DropCove rejects it rather than silently falling back to a lower-priority representation. URL-only, HTML-only, rich-text, bitmap-only, and generic virtual-file payloads are unsupported. One drag operation creates at most one Shelf Batch.
+
+### 12.1 Existing filesystem storage items
 
 Processing order:
 
-1. discard unsupported entries without paths;
+1. discard entries without usable paths;
 2. remove repeated path strings within the payload using ordinal case-insensitive comparison;
 3. preserve the first occurrence and source order;
 4. compare the resulting path set with every retained Shelf Batch;
 5. add one new Shelf Batch only when no exact retained match exists.
 
-### 12.2 Duplicate Shelf Batch
+An incoming filesystem batch is duplicate when its item count matches a retained batch and every incoming path exists in that batch under ordinal case-insensitive comparison; item order is ignored. DropCove does not canonicalize path strings or rewrite separators. Exact duplicate batches are silent no-ops, partial overlap is accepted, and the same path may occur in different Shelf Batches. External filesystem drops remain format-agnostic; the website-image format rules do not restrict ordinary files or folders.
 
-An incoming batch is duplicate when:
+### 12.2 Website image virtual files
 
-- item count matches a retained batch; and
-- every incoming path exists in that retained batch under ordinal case-insensitive string comparison;
-- item order is ignored.
+DropCove accepts browser-provided `CFSTR_FILEDESCRIPTORW` plus indexed `CFSTR_FILECONTENTS` image data without issuing its own HTTP request. Edge and Chrome on Windows are the initial browser acceptance matrix.
 
-DropCove does not canonicalize path strings or rewrite separators for this comparison.
+Supported formats are PNG, JPEG, GIF, WebP, AVIF, SVG, BMP, and ICO. DropCove validates content and a safe browser-provided filename instead of trusting the extension alone. Raw SVG bytes are preserved with their `.svg` name, but DropCove never renders SVG in a WebView; Shell Visual may use a generic icon fallback.
 
-Consequences:
+Limits:
 
-- exact duplicate batch: silent no-op;
-- partial path overlap: accepted as a new batch;
-- the same path may appear in different Shelf Batches;
-- duplicate-only input does not persist, resize, reorder, scroll, or alter shake restoration.
+- `100 MiB` per image;
+- at most `20` images per drop;
+- at most `500 MiB` total image content per drop.
 
-### 12.3 Mixed supported and unsupported input
+Each accepted image becomes a Managed File and keeps its sanitized browser filename. Unsupported, invalid, or over-limit image entries are skipped and counted; if at least one valid image remains, all accepted images form one Shelf Batch in descriptor order. An I/O, Windows Attachment Services, or persistence failure rejects the complete drop and removes staged files rather than committing a partial batch.
 
-- If at least one supported path remains, DropCove accepts those paths and reports how many entries were skipped.
-- If no supported path remains, no batch is created.
+Every staged website image passes through Windows Attachment Services. An accompanying `http` or `https` source URL supplies the security zone; otherwise the Restricted Zone default applies. After Attachment Services returns, DropCove revalidates the final file and accepts it only if it still exists and satisfies the selected image format and size limits. Antivirus or trust-service changes are authoritative; pre-scan bytes are not retained.
+
+### 12.3 Plain text
+
+DropCove accepts non-empty `CF_UNICODETEXT`, encodes it as UTF-8, and creates one `.txt` Managed File in a one-item Shelf Batch. The maximum encoded size is `10 MiB`. The filename uses local time in the form `Dropped text YYYY-MM-DD HH-mm-ss.txt`, adding a numeric suffix when necessary.
+
+HTML and RTF formatting are discarded rather than preserved. A URL received as plain text remains literal text; DropCove does not open or download it. Plain-text intake does not apply website attachment-zone evidence.
+
+### 12.4 Duplicate and mixed-input results
+
+Managed Files are not content-hashed, shared, or deduplicated by bytes. Each accepted text or image drop represents a new user action and creates a new Shelf Batch even when its content matches a retained Managed File.
+
+Within the selected representation family, unsupported entries are skipped and reported. If none remain, no batch is created. Duplicate-only filesystem input, rejected higher-priority input, and unsupported input do not persist, resize, reorder, scroll, or alter Shake restoration.
 
 ## 13. Temporary and Pinned Item behavior
 
@@ -568,9 +598,9 @@ A Temporary Item remains until one of these events:
 - Remove Item;
 - Remove Batch;
 - Clear Temporary Items;
-- confirmed-Missing cleanup before batch drag.
+- confirmed-Missing cleanup before batch or Batch Selection drag.
 
-Temporary Items survive application and Windows restarts.
+Temporary Items survive application and Windows restarts. A retained Temporary Item backed by a Managed File keeps that file in Profile Data until the lifecycle ends.
 
 ### 13.2 Pinned Item
 
@@ -579,7 +609,8 @@ A Pinned Item:
 - displays a pin indicator;
 - remains after Successful Drag-Out;
 - can be returned to Temporary through Unpin or Bulk Unpin;
-- can still be removed explicitly through Remove Item or Remove Batch.
+- can still be removed explicitly through Remove Item or Remove Batch;
+- retains its Managed File across restart, update, and uninstall while the Shelf Item remains.
 
 ### 13.3 Bulk Pinning
 
@@ -595,27 +626,29 @@ Bulk Pinning includes Available, Missing, and Unavailable references still prese
 
 ### 13.4 Removal actions
 
-- **Remove Item** removes one reference and prunes its batch when empty.
-- **Remove Batch** removes every reference in that Shelf Batch.
+- **Remove Item** removes one Shelf Item and prunes its batch when empty.
+- **Remove Batch** removes every Shelf Item in that Shelf Batch.
 - **Clear Temporary Items** requires confirmation, removes Temporary Items across all batches, and preserves Pinned Items.
-- No removal action deletes a source filesystem object.
+- Removing an external reference never deletes, moves, renames, or overwrites its source filesystem object.
+- Removing a Managed File-backed item permanently deletes the app-owned file rather than sending it to the Recycle Bin.
 
-If persistence fails, the visible and durable state remain unchanged and DropCove reports the failure.
+Reference removal and a required Pending Managed File Deletion record commit atomically. DropCove attempts deletion immediately; a sharing, antivirus, or other filesystem failure leaves the item removed, reports how many app-owned files remain pending, and retries through event-driven cleanup and later startup. Best-effort deletion without durable retry is not permitted.
 
-The Drop Shelf Clear confirmation opens in its own decorated, fixed-size `360 × 130`-logical-pixel, taskbar-hidden, always-on-top window centered within the Drop Shelf monitor work area. Its heading is **Clear temporary items?**, its explanation is **Pinned items stay. Source files and folders aren’t deleted.**, and its actions are **Cancel** and **Clear**. Cancel is focused initially; `Escape` and the window close action cancel without mutation.
+If persistence fails, the visible and durable Shelf state remain unchanged and no Managed File becomes unowned.
+
+The Drop Shelf Clear confirmation opens in its own decorated, fixed-size `360 × 130`-logical-pixel, taskbar-hidden, always-on-top window centered within the Drop Shelf monitor work area. Its heading is **Clear temporary items?**, its explanation is **Pinned items stay. External sources stay. DropCove-created temporary files are permanently deleted.**, and its actions are **Cancel** and **Clear**. Cancel is focused initially; `Escape` and the window close action cancel without mutation.
 
 While this confirmation is open, the Drop Shelf cannot be dismissed, moved, resized, dragged from, or used for competing mutations or utility actions. Repeated requests focus the existing confirmation. Confirmation rechecks authoritative Temporary Item availability and invokes the existing atomic Clear operation; stale empty requests make no removal. Exit DropCove and Cooperative Shutdown retain normal teardown authority.
 
-The Edge Rail continues to use its existing local confirmation, transient hold, and Edge Rail fullscreen-cancellation lifecycle. It does not open the dedicated Drop Shelf confirmation.
+The Edge Rail keeps its local confirmation, transient hold, and fullscreen-cancellation lifecycle, uses the same explanation, and does not open the dedicated Drop Shelf confirmation.
 
 ## 14. Drag-out behavior
 
 DropCove supports:
 
 - dragging one Shelf Item;
-- dragging every eligible item in one Shelf Batch.
-
-Arbitrary selection across multiple Shelf Batches is not supported.
+- dragging every eligible item in one Shelf Batch;
+- dragging eligible items across one Batch Selection.
 
 ### 14.1 Copy-only contract
 
@@ -630,20 +663,20 @@ Completion rules:
 | User canceled             | Retained       | Retained    |
 | Failure before acceptance | Retained       | Retained    |
 
-If a mixed batch succeeds, participating Temporary Items are removed and participating Pinned Items remain in the smaller batch.
+For a Batch Selection, DropCove flattens batches in displayed newest-first order and preserves source order inside each batch. Exact paths repeated across selected batches are emitted once using ordinal case-insensitive comparison. Every selected Temporary occurrence represented by an emitted path is consumed after accepted `Copy`; selected Pinned occurrences remain. No content hashing or shared Managed File backing participates in this deduplication.
 
 ### 14.2 Availability preparation
 
-Before whole-batch drag:
+Before a whole-batch or Batch Selection drag, one serialized preparation:
 
-1. reclassify every path;
-2. durably remove confirmed Missing Items;
-3. retain Unavailable Items;
-4. collect Available Items as drag participants;
-5. if both Available and Unavailable Items remain, ask whether to drag only the Available Items;
-6. if no Available Items remain, cancel drag and show a status message.
+1. reclassifies every selected path;
+2. durably removes confirmed Missing Items and prunes empty batches;
+3. retains Unavailable Items;
+4. collects Available Items as drag participants;
+5. shows one aggregate confirmation when both Available and Unavailable Items remain;
+6. cancels with status feedback when no Available Item remains.
 
-Missing cleanup is not rolled back if the later drag is canceled or rejected.
+Missing cleanup is not rolled back if the later drag is canceled or rejected. Rejected, canceled, or pre-acceptance-failed drag-out retains all recorded Available participants and the current Batch Selection for retry.
 
 Before one-item drag, DropCove resolves that item's storage object. Failure cancels the drag and keeps its reference unless it has already been removed through a separate lifecycle action.
 
@@ -651,15 +684,15 @@ Before one-item drag, DropCove resolves that item's storage object. Failure canc
 
 Destination acceptance is the only completion signal available to DropCove. It cannot atomically coordinate its local database transaction with another application's later processing.
 
-If a destination accepts `Copy` and DropCove terminates before its removal is persisted, a Temporary Item may reappear after restart. Retaining an extra reference is preferred over incorrectly losing one.
+If a destination accepts `Copy` and DropCove terminates before its removal is persisted, a Temporary Item may reappear after restart. Retaining an extra reference is preferred over incorrectly losing one. After persisted consumption, a Temporary Managed File enters durable permanent cleanup even though DropCove cannot prove the destination's later internal processing.
 
 ## 15. Missing and Unavailable Items
 
-| Classification | Detection                                                                               | Behavior                               |
-| -------------- | --------------------------------------------------------------------------------------- | -------------------------------------- |
-| Available      | Filesystem attributes can be read                                                       | Eligible for drag-out.                 |
-| Missing        | File/directory is absent while its root is reachable                                    | Removed during batch drag preparation. |
-| Unavailable    | Root, volume, network, cloud, permission, or another error prevents a reliable decision | Retained and excluded from that drag.  |
+| Classification | Detection                                                                               | Behavior                                                |
+| -------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Available      | Filesystem attributes can be read                                                       | Eligible for item, batch, or Batch Selection drag-out. |
+| Missing        | File/directory is absent while its root remains reachable                               | Removed during batch or Batch Selection preparation.   |
+| Unavailable    | Root, volume, network, cloud, permission, or another error prevents a reliable decision | Retained and excluded from that drag.                   |
 
 Availability is refreshed at restore and drag boundaries. DropCove does not continuously watch every path for changes.
 
@@ -814,24 +847,32 @@ DropCove restores Temporary and Pinned Items after application or Windows restar
 Persisted shelf data includes:
 
 - Shelf Batch identity, creation time, and order;
-- Shelf Item identity, order, path, name, file/folder type, and pinned state;
+- Shelf Item identity, order, path, name, file/folder type, backing ownership, and pinned state;
+- Pending Managed File Deletion paths;
 - remembered Edge Rail dismissal monitor;
 - preferred shelf width and optional Manual Height Override while content exists.
 
-Not persisted:
+Managed File bytes live under `%LOCALAPPDATA%\DropCove\managed\`, isolated by Shelf Item identity while preserving the user-visible sanitized filename. They are Profile Data and survive restart, update, and uninstall while retained or pending deletion.
 
-- source file contents;
+Not persisted in `shelf.db`:
+
+- external source file contents;
+- Managed File bytes themselves;
 - icon or thumbnail bytes;
 - current availability classification;
-- transient popup/flyout state;
+- Batch Selection or other transient popup/flyout state;
 - automatic height as manual intent.
+
+Pending Managed File Deletions are retried at startup and after cleanup-producing mutations without a continuous polling loop. A successful deletion removes its pending record; a missing target is treated as already deleted.
 
 If the shelf database is corrupt or cannot be opened through a recoverable storage/format failure, DropCove:
 
-1. preserves the failed database and sidecar files under a timestamped `corrupt` name;
-2. creates a clean database;
+1. preserves the failed database, matching WAL/SHM sidecars, and the complete managed storage together in one timestamped Recovery Backup;
+2. creates a clean database and empty active managed-storage root;
 3. starts with an empty shelf;
 4. warns the user and provides the backup path.
+
+DropCove does not automatically salvage the preserved state. If complete preservation or clean recreation fails, startup remains fatal rather than deleting or partially reusing uncertain Managed Files.
 
 ## 18. Multi-monitor and DPI behavior
 
@@ -851,7 +892,7 @@ Top and bottom Edge Rail docking are not supported.
 - Action controls expose accessible names and use inline SVG icons that inherit the current semantic text or system color.
 - Icon actions expose native tooltips, hover treatment, and visible `focus-visible` indicators.
 - Binary Pin controls expose `aria-pressed`; tri-state Bulk Pinning exposes `role="checkbox"` with `aria-checked="false"`, `"true"`, or `"mixed"`.
-- Keyboard users can open and close Manage Items, traverse actions, activate buttons with standard Enter/Space behavior, operate the Appearance radio group with arrow keys, and restore focus to the originating control.
+- Keyboard users can open and close Manage Items, traverse actions, activate buttons with standard Enter/Space behavior, operate the Appearance radio group, and select Shelf Batches on the Drop Shelf with `Space`, `Ctrl+Space`, `Shift+Space`, `Ctrl+A`, and `Escape`; selected cards expose `aria-selected` and count changes are announced politely.
 - Full paths and drag instructions remain available through tooltips and accessibility text when visual text is shortened or omitted.
 - The resolved Appearance Mode drives Light or Dark semantic resources and matching native frames. Windows Contrast Theme bypasses the application palette and uses Windows system colors, explicit borders, and visible focus indicators.
 - Drop Placeholders use the drag-hover semantic colors in Dark and Light appearances and Windows system colors in Contrast Themes.
@@ -879,23 +920,24 @@ Primary actions use `#2B63EB` with white text. Dark accent text and icons use `#
 
 ## 20. Current limitations and deliberate exclusions
 
-- Files and folders must expose filesystem paths.
-- Stream-only or virtual shell content is not materialized into DropCove storage.
+- Ordinary external files and folders must expose filesystem paths; they remain references rather than imported copies.
+- Non-path intake is limited to validated website-image virtual files and Unicode plain text under the documented formats and size limits.
+- No HTTP URL fallback, URL items, HTML/RTF items, generic virtual-file intake, or content-addressed Managed File deduplication.
 - Drag-out is Copy-only.
 - Cross-integrity drag-and-drop is not guaranteed.
-- Arbitrary multi-selection across Shelf Batches is not supported.
-- Edge Rail supports only Left and Right docking.
+- Batch Selection is surface-local and session-only; it is not persisted or shared between the Drop Shelf and Edge Rail.
+- Edge Rail supports only Left and Right docking and remains pointer-only/no-activate.
 - No automatic updater.
-- No clipboard history, text snippets, URL items, accounts, cloud sync, plugins, named shelves, file synchronization, or application-owned file-copy storage.
+- No clipboard history, accounts, cloud sync, plugins, named shelves, file synchronization, or arbitrary application-owned copies of ordinary filesystem drops.
 - No custom accent color, user-authored palette, independent per-surface appearance, or scheduled theme switching.
 
 ## 21. End-to-end example
 
-1. The user drags `A.png`, `B.png`, and `C.png` into the Drop Shelf.
-2. DropCove creates one three-item Shelf Batch.
-3. The user separately drops `logo.svg`; DropCove creates a newer one-item Shelf Batch.
-4. The user pins `logo.svg`.
-5. The user successfully drags the first batch into another application with `Copy`; its Temporary Items are removed.
-6. The user successfully drags `logo.svg`; it remains because it is pinned.
-7. The user dismisses the non-empty Drop Shelf; it becomes the Edge Rail.
-8. The user can drag `logo.svg` directly from the rail or open the full shelf again.
+1. The user drags `A.png` and `B.png` from one folder into the Drop Shelf; DropCove creates one external-reference Shelf Batch.
+2. The user separately drags `C.png` from another folder; DropCove creates a second batch without copying any source file.
+3. The user drags `logo.svg` from Edge; DropCove validates the virtual file, applies Windows attachment security, and creates a Managed File-backed batch.
+4. The user drags plain text; DropCove creates a timestamped UTF-8 `.txt` Managed File in another batch.
+5. The user pins `logo.svg`, selects the two external batches and the text batch, and performs one Successful Drag-Out.
+6. The selected external Temporary references are consumed without deleting their source files. The text reference is consumed and its Managed File is permanently deleted or recorded for retry.
+7. The pinned `logo.svg` and its Managed File remain after drag-out and restart.
+8. The user dismisses the non-empty Drop Shelf; the Edge Rail appears and supports the same pointer Batch Selection workflow without taking foreground focus.

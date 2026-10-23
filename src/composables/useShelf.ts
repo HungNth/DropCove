@@ -113,9 +113,10 @@ export function useShelf() {
     const snapshot = await invoke<ShelfSnapshot>("get_shelf");
     if (!disposed && request === refreshRequest) {
       await apply(snapshot, request);
+      const previousWarning = pendingRecoveryWarning;
       pendingRecoveryWarning = snapshot.warning ?? null;
-      if (pendingRecoveryWarning && !status.value && !disposed) {
-        status.value = pendingRecoveryWarning;
+      if (!disposed && (!status.value || status.value === previousWarning)) {
+        status.value = pendingRecoveryWarning ?? "";
       }
     }
   }

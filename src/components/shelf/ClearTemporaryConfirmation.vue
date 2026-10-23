@@ -52,7 +52,7 @@ onUnmounted(() => {
         Clear temporary items?
       </h1>
       <p id="rail-clear-body" class="m-0 text-[12px] leading-[1.4] text-dc-text-secondary forced-colors:text-[CanvasText]">
-        Pinned items stay. Source files and folders aren’t deleted.
+        Pinned items stay. External sources stay. DropCove-created temporary files are permanently deleted.
       </p>
     </div>
     <div class="flex justify-end gap-[8px] mt-[16px]">

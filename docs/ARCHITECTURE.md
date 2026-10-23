@@ -10,13 +10,14 @@ This document defines the architecture required to implement the target DropCove
 
 DropCove is a resident, event-driven utility. Its architecture preserves these invariants:
 
-1. **References, not copies** — the application stores filesystem paths and metadata; it does not import source file contents into application storage.
-2. **One state owner** — all Shelf Batch, Shelf Item, display, placement, and sizing mutations pass through one core state module.
-3. **Durable user-visible mutations** — accepted drops, pinning, removals, drag-out consumption, rail placement, and retained sizing intent are persisted.
-4. **Event-driven residency** — hotkeys, pointer hooks, drag events, foreground changes, display changes, and window messages drive work. There is no continuous cursor or window polling loop.
-5. **Disposable presentation state** — windows project core state; they do not become a second durable state owner.
-6. **Windows interoperability behind adapters** — global input, shell drag-and-drop, monitor geometry, z-order, tray integration, and shell visuals remain isolated from domain rules.
-7. **Safe failure preference** — an extra retained reference is safer than incorrectly removing one.
+1. **External references, managed representations** — ordinary file and folder drops store paths only; supported non-filesystem drops become app-owned Managed Files so every Shelf Item still resolves through a filesystem path.
+2. **One state owner** — all Shelf Batch, Shelf Item, Managed File ownership, display, placement, and sizing mutations pass through one core state module.
+3. **Explicit deletion authority** — lifecycle removal can permanently delete only Managed Files owned by DropCove, never external referenced objects.
+4. **Durable user-visible mutations** — accepted drops, pinning, removals, drag-out consumption, pending cleanup, rail placement, and retained sizing intent are persisted.
+5. **Event-driven residency** — hotkeys, pointer hooks, drag events, cleanup-producing mutations, foreground changes, display changes, and window messages drive work. There is no continuous polling loop.
+6. **Disposable presentation state** — windows project core state; Batch Selection and other surface state never become a second durable state owner.
+7. **Windows interoperability behind adapters** — global input, OLE data formats, attachment security, shell drag-and-drop, monitor geometry, z-order, tray integration, and shell visuals remain isolated from domain rules.
+8. **Safe failure preference** — an extra retained reference or durable Pending Managed File Deletion is safer than incorrectly losing user-visible state or leaking cleanup responsibility.
 
 ## 2. Module map
 
@@ -26,9 +27,11 @@ graph TD
     Presentation[Presentation Module]
     State[Core Shelf State Module]
     ShelfStore[Shelf Persistence Adapter]
+    ManagedFiles[Managed File Store]
     Settings[Settings Adapter]
     Startup[Sign-in Startup Adapter]
-    Drag[Windows Storage Drag Adapter]
+    Drag[Windows OLE Drag Adapter]
+    Attachment[Windows Attachment Security Adapter]
     Windowing[Window and Monitor Adapter]
     Input[Hotkey and Pointer Input Adapters]
     Tray[Notification Area Adapter]
@@ -47,6 +50,8 @@ graph TD
     Presentation --> Visuals
 
     State --> ShelfStore
+    State --> ManagedFiles
+    Drag --> Attachment
     Drag --> State
     Input --> State
     Windowing --> Presentation
@@ -90,38 +95,46 @@ Owns:
 
 - newest-first Shelf Batch order;
 - source-order Shelf Items within each batch;
-- duplicate suppression;
+- external-reference versus Managed File backing ownership;
+- filesystem-batch duplicate suppression;
 - Temporary and Pinned Item lifecycle;
+- durable Pending Managed File Deletion responsibility;
 - availability classification supplied at event boundaries;
 - display state;
 - remembered rail monitor;
 - preferred width and optional Manual Height Override;
-- preparation and completion of item or batch drag-out;
+- preparation and completion of item, batch, or selected-batch drag-out;
 - serialized mutations.
 
-This is the main seam for reproducing DropCove behavior. Presentation and platform adapters must not independently implement lifecycle rules.
+This is the main seam for reproducing DropCove behavior. Presentation and platform adapters must not independently implement lifecycle, ownership, consumption, or cleanup rules.
 
 ### 2.4 Shelf Persistence Adapter
 
-Stores durable shelf state in a per-user SQLite database using write-ahead logging. It serializes database operations and performs integrity checking during open.
+Stores durable Shelf state and pending Managed File cleanup in a per-user SQLite database using write-ahead logging. It serializes database operations and performs integrity checking during open.
 
-### 2.5 Settings and Startup Adapters
+### 2.5 Managed File Store
+
+Owns staged and retained Managed File bytes under Profile Data, isolates user-visible filenames by Shelf Item identity, permanently deletes files requested by committed core mutations, and reports retryable failures. It never receives authority to delete an external reference.
+
+### 2.6 Settings and Startup Adapters
 
 - The Settings Adapter atomically reads and replaces a JSON settings file and owns the configured Rail preference, Shake preference, startup preference, hotkey, and `AppearanceMode`.
 - The Startup Adapter owns the current-user Windows sign-in registration and launches DropCove with the hidden-start option.
 
-### 2.6 Windows Integration Adapters
+### 2.7 Windows Integration Adapters
 
 Separate adapters own:
 
-- storage-item drag-in and copy-only drag-out;
+- OLE drag-in format selection for filesystem paths, virtual image files, and Unicode text;
+- copy-only path drag-out with destination result reporting;
+- Windows Attachment Services and post-scan validation for website images;
 - global hotkey registration;
 - low-level mouse events for Shake-to-open;
 - window styles, z-order, resize hit testing, DPI conversion, and monitor placement;
 - foreground-window tracking for topmost repair and Edge Rail fullscreen policy;
 - notification-area icon and menu;
 - application appearance resolution, live Windows theme observation for System mode, Contrast Theme precedence, and native-frame synchronization;
-- file/folder icons and thumbnails.
+- file/folder icons and image thumbnails.
 
 ## 3. Process and activation lifecycle
 
@@ -158,7 +171,10 @@ The instance identity is profile-specific. A normal profile and an explicit test
 | Concept | Durable fields | Rules |
 |---|---|---|
 | **Shelf Batch** | Identifier, creation time, position | Represents one accepted drop; ordered newest-first. |
-| **Shelf Item** | Identifier, batch identifier, position, path, display name, folder flag, pinned flag | Represents one path occurrence inside one batch. |
+| **Shelf Item** | Identifier, batch identifier, position, path, display name, folder flag, pinned flag | Represents one path occurrence; ownership is derived from the optional Managed File relation, never from path location. |
+| **Managed File** | Shelf Item identity, final relative path, ingestion state, optional staging relative path | App-owned backing for exactly one Shelf Item; `Staged` is not projected, `Ready` is user-visible. |
+| **Pending Managed File Deletion** | Cleanup identity and managed relative path | Survives after the Shelf Item is gone until permanent deletion succeeds or the target is already absent. |
+| **Batch Selection** | Not persisted | Surface-local ordered set of Shelf Batch identifiers used for one drag-out. |
 | **Display State** | Not persisted as a standalone value | `Hidden`, `Visible`, or `EdgeDocked`. |
 | **Rail Placement** | Settings: target monitor identifier and `Left` or `Right` edge; shelf state: actual latest dock monitor identifier | A connected explicit target wins; fresh automatic dismissal follows the pointer, while restoration reuses docked placement. Fallback never rewrites the explicit preference. |
 | **Sizing State** | Preferred logical width, nullable Manual Height Override | Automatic Shelf Sizing derives the exact current height from preferred width and responsive batch rows when manual height is absent. |
@@ -169,6 +185,7 @@ The instance identity is profile-specific. A normal profile and an explicit test
 ```mermaid
 erDiagram
     SHELF_BATCH ||--|{ SHELF_ITEM : contains
+    SHELF_ITEM o|--o| MANAGED_FILE : may-own
     SHELF_BATCH {
         string id
         timestamp created_at
@@ -183,9 +200,15 @@ erDiagram
         boolean is_folder
         boolean is_pinned
     }
+    MANAGED_FILE {
+        string item_id
+        string relative_path
+        string ingestion_state
+        string staging_relative_path
+    }
 ```
 
-A Shelf Batch never owns a pinned state. Bulk Pinning derives the current tri-state from its Shelf Items and then updates every item atomically.
+A Shelf Batch never owns a pinned state. Bulk Pinning derives the current tri-state from its Shelf Items and then updates every item atomically. Batch Selection contains batch identities only and never changes lifecycle state by itself.
 
 ## 5. State machines
 
@@ -225,61 +248,89 @@ stateDiagram-v2
 
 A Successful Drag-Out means that the destination reports the Windows `Copy` operation when the drag ends. It does not guarantee the destination's later internal processing.
 
+Managed File cleanup has a separate durable state because the Shelf Item may disappear before Windows releases the backing file:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Retained: Managed intake commits
+    Retained --> PendingDeletion: Shelf Item lifecycle ends
+    PendingDeletion --> [*]: Delete succeeds / file already absent
+    PendingDeletion --> PendingDeletion: Delete fails / retry later
+```
+
+The mutation that ends the Shelf Item lifecycle records `PendingDeletion` atomically with reference removal. External references never enter this state machine.
+
 ## 6. Core mutation interfaces and invariants
 
 The Core Shelf State Module exposes behavior equivalent to these operations:
 
 | Operation | Result and invariant |
 |---|---|
-| Accept one incoming drop | Creates zero or one Shelf Batch after filtering and duplicate suppression. |
+| Accept external storage drop | Creates zero or one Shelf Batch after path filtering and filesystem-batch duplicate suppression. |
+| Accept Managed File drop | Reconciles staged bytes through durable `Staged` then `Ready` ownership; only `Ready` items become visible, and every crash window has deterministic startup recovery. |
 | Pin or unpin one Shelf Item | Persists before callers observe the replacement item state. |
 | Set all items pinned/unpinned | One durable operation; no batch-level pin field. |
-| Remove Item | Removes one reference and prunes an empty batch. |
-| Remove Batch | Removes the batch and every contained reference. |
-| Clear Temporary Items | Removes only Temporary Items across all batches; Pinned Items remain. |
-| Prepare batch drag | Reclassifies paths, durably removes Missing Items, retains Unavailable Items, and records participating Available Items. |
-| Complete item or batch drag | Consumes participating Temporary Items only after accepted `Copy`; Pinned Items remain. |
+| Remove Item | Removes one reference, records owned-file cleanup when required, and prunes an empty batch. |
+| Remove Batch | Removes every item and records cleanup for every owned Managed File. |
+| Clear Temporary Items | Removes only Temporary Items across all batches, records their owned-file cleanup, and preserves Pinned Items. |
+| Prepare batch set drag | Reclassifies selected paths, durably removes Missing Items, retains Unavailable Items, deduplicates transfer paths, and records participating Available occurrences. |
+| Complete item or batch-set drag | Consumes participating Temporary occurrences only after accepted `Copy`; Pinned occurrences remain. |
+| Retry Managed File cleanup | Permanently deletes pending paths and removes records only after success or confirmed absence. |
 | Dismiss shelf | Chooses `Hidden` when empty or records the actual dismissal monitor and chooses `EdgeDocked` when non-empty; rail edge and target-monitor preference remain settings-owned. |
 | Save sizing intent | Persists while content exists; pending empty-shelf intent is persisted with the first accepted batch. |
 
-Mutations are serialized. A persistence failure must not leave a user-observable partial mutation. An accepted-drop implementation may optimistically stage memory state, but it must remove that state if the durable insert fails.
+Mutations are serialized. A persistence failure must not leave a user-observable partial mutation. Managed intake stages bytes before creating durable ownership, projects only `Ready` rows, and reconciles both database/filesystem crash windows before the Shelf is restored; lifecycle removal commits cleanup responsibility before attempting irreversible filesystem deletion.
 
 ## 7. Drag-in flow
 
-DropCove consumes the Windows storage-item data package rather than requiring callers to know a particular UI framework or COM interface.
+DropCove consumes the native Windows OLE `IDataObject` through a Windows adapter and chooses one representation family: filesystem paths, otherwise virtual image files, otherwise Unicode text. The `IDataObject` and borrowed COM media remain on the receiving window thread; only owned paths or staged files cross into persistence work.
 
 ```mermaid
 sequenceDiagram
     participant Source as Source Application
     participant Surface as Drop Shelf or Edge Rail
-    participant Adapter as Storage Drag Adapter
+    participant Adapter as Windows OLE Drag Adapter
+    participant Security as Attachment Security
+    participant Files as Managed File Store
     participant State as Core Shelf State
     participant DB as Shelf Database
 
-    Source->>Surface: Drag storage items with Copy allowed
-    Surface->>Adapter: Read storage items
-    Adapter->>Adapter: Keep items with non-empty filesystem paths
-    Adapter->>State: Accept paths in source order
-    State->>State: Filter unusable/repeated paths
-    State->>State: Suppress duplicate Shelf Batch
-    alt New Shelf Batch
-        State->>DB: Insert batch, items, and first sizing intent transactionally
+    Source->>Surface: Drag IDataObject
+    Surface->>Adapter: Native drop callback
+    Adapter->>Adapter: Select one representation family
+    alt Existing filesystem paths
+        Adapter->>State: Accept ordered paths
+    else Virtual website images
+        Adapter->>Files: Stage validated image streams
+        Files->>Security: Apply zone evidence and trust services
+        Security-->>Files: Final post-scan files
+        Files->>State: Accept staged Managed Files
+    else Unicode plain text
+        Adapter->>Files: Stage timestamped UTF-8 text file
+        Files->>State: Accept staged Managed File
+    end
+    State->>DB: Commit batch, items, and Managed File rows as Staged
+    alt Staged commit succeeds
+        DB-->>State: Durable ownership
+        State->>Files: Atomically promote staging to final paths
+        Files-->>State: Promotion complete
+        State->>DB: Mark Managed Files Ready
         DB-->>State: Commit
-        State-->>Surface: Added
-    else Duplicate or unsupported
-        State-->>Surface: No state change
+        State-->>Surface: Publish accepted batch
+    else Operational failure
+        DB-->>State: Roll back or remove Staged ownership
+        State-->>Files: Remove staging/final remnants
     end
 ```
 
-### 7.1 Path and duplicate rules
+### 7.1 Representation and duplicate rules
 
-- A usable item supplies a non-empty filesystem path.
-- Paths repeated within one payload are removed using ordinal case-insensitive comparison; the first occurrence keeps its source order.
-- The path strings are not canonicalized and separators are not rewritten.
-- An incoming batch is duplicate when its complete path set matches any retained batch, unordered and ordinal case-insensitive.
-- Partial overlap is not duplicate.
-- A duplicate-only drop is a silent no-op: no persistence, sizing, ordering, scrolling, or status change.
-- A mixed payload accepts supported filesystem items and counts skipped unsupported entries.
+- Representation families are never combined and invalid higher-priority data does not fall through to text or URL data.
+- External paths retain source order, ordinal case-insensitive repeated-path filtering, no canonicalization, and exact retained-batch duplicate suppression.
+- Website-image virtual files accept only the specified validated image formats and limits; Attachment Services output is revalidated before commit.
+- Plain text creates one bounded UTF-8 Managed File.
+- Managed content is not hashed, shared, or deduplicated by bytes; each accepted drop is distinct.
+- Unsupported entries within the selected family are counted, but an I/O, security, or persistence failure rejects the complete drop.
 
 ## 8. Drag-out flow
 
@@ -288,28 +339,30 @@ sequenceDiagram
     participant User
     participant Surface as Shelf Surface
     participant State as Core Shelf State
-    participant Adapter as Storage Drag Adapter
+    participant Adapter as Windows OLE Drag Adapter
     participant Target as Destination Application
     participant DB as Shelf Database
+    participant Files as Managed File Store
 
-    User->>Surface: Start item or batch drag
-    Surface->>State: Prepare participants
+    User->>Surface: Start item, batch, or Batch Selection drag
+    Surface->>State: Prepare selected batch identifiers
     State->>DB: Remove confirmed-Missing references
-    State-->>Surface: Available participants + retained Unavailable items
-    Surface->>Adapter: Create read-only storage-item data package, Copy only
+    State-->>Surface: Deduplicated Available paths + retained Unavailable items
+    Surface->>Adapter: Create read-only path data object, Copy only
     Adapter->>Target: Windows drag operation
     Target-->>Adapter: Copy / rejected / canceled
     Adapter->>State: Complete with outcome
     alt Accepted Copy
-        State->>DB: Remove participating Temporary Items
+        State->>DB: Remove participating Temporary occurrences and record owned cleanup
         DB-->>State: Commit
+        State->>Files: Attempt pending permanent deletions
         State-->>Surface: Refresh retained Pinned/unavailable items
     else Rejected, canceled, or failed
-        State-->>Surface: Keep participating references
+        State-->>Surface: Keep participating references and Batch Selection
     end
 ```
 
-Preparation and completion are intentionally separate. Whole-batch completion consumes only the Available Items recorded during preparation, preventing later state changes from consuming unrelated items.
+Preparation and completion are intentionally separate. A preparation token records every selected Available occurrence while the outbound path list is deduplicated ordinal case-insensitively in displayed batch and source-item order. Completion therefore consumes the correct Temporary occurrences without consuming unrelated or Pinned items.
 
 ## 9. Availability classification
 
@@ -317,17 +370,17 @@ Availability is evaluated at event boundaries, not through a filesystem watcher:
 
 - application restore;
 - shelf presentation refresh where required;
-- immediately before batch drag-out.
+- immediately before batch or Batch Selection drag-out.
 
 Classification rules:
 
 | State | Meaning | Drag preparation behavior |
 |---|---|---|
 | **Available** | Filesystem attributes can be read. | Participates in drag-out. |
-| **Missing** | The item or directory is confirmed absent while its root remains available. | Reference is durably removed before drag begins. |
+| **Missing** | The item or directory is confirmed absent while its root remains available. | Reference is durably removed before drag begins; a Missing Managed File is treated as already deleted when cleanup responsibility applies. |
 | **Unavailable** | The root, volume, network location, cloud provider, or permission state prevents a reliable existence decision. | Reference is retained and excluded from that drag. |
 
-When a batch contains both Available and Unavailable Items, presentation asks whether to drag only the Available Items. Canceling that confirmation does not restore Missing Items already removed during preparation.
+When a selected batch set contains both Available and Unavailable Items, presentation asks once whether to drag only the Available Items. Canceling that confirmation does not restore Missing Items already removed during preparation.
 
 ## 10. Persistence architecture
 
@@ -344,15 +397,32 @@ The database uses foreign keys, write-ahead logging, serialized access, and an i
 | Table | Columns | Purpose |
 |---|---|---|
 | `shelf_batches` | `id`, `created_at`, `position` | Newest-first batch order. |
-| `shelf_items` | `id`, `batch_id`, `position`, `path`, `name`, `is_folder`, `is_pinned` | Ordered item references and lifecycle state. |
+| `shelf_items` | `id`, `batch_id`, `position`, `path`, `name`, `is_folder`, `is_pinned` | Ordered item paths and lifecycle state. |
+| `managed_files` | `item_id`, `relative_path`, `ingestion_state`, nullable `staging_relative_path` | Explicit one-to-zero-or-one ownership plus crash-recoverable `Staged`/`Ready` intake state. |
+| `pending_managed_file_deletions` | `id`, `relative_path` | Durable permanent-cleanup responsibility after the owning Shelf Item is removed. |
 | `shelf_ui_state` | singleton `id`, nullable `rail_monitor` | Monitor actually used for the latest non-empty shelf dismissal. |
 | `shelf_settings` | singleton `id`, `preferred_width`, nullable `manual_height` | Retained user sizing intent. |
 
-The database does not store availability, source bytes, icons, or thumbnail bytes.
+The database does not store availability, external source bytes, Managed File bytes, icons, or thumbnail bytes. Absence of a `managed_files` row means the Shelf Item is an external reference; ownership is never inferred only from a path prefix.
 
-When no Shelf Items remain, empty batches and persisted sizing state are removed.
+When no Shelf Items remain, empty batches and persisted sizing state are removed. Pending deletion records remain until the matching Managed File is permanently absent.
 
-### 10.2 Settings file
+### 10.2 Managed File storage
+
+Retained files live under `%LOCALAPPDATA%\DropCove\managed\<item-id>\<sanitized-name>`. Per-item directories preserve the user-visible filename without introducing collision or shared-backing semantics. Uncommitted bytes live under a dedicated same-volume staging root.
+
+Managed intake follows a crash-recoverable sequence:
+
+1. Write, flush, validate, and security-scan owned bytes in staging.
+2. Commit the Shelf Batch, Shelf Items, and `managed_files` rows as `Staged`, recording both staging and final relative paths. `Staged` items are excluded from every presentation projection.
+3. Atomically rename each staged file to its per-item final path.
+4. Commit the rows as `Ready`, clear staging paths, and only then publish the accepted batch.
+
+Before normal Shelf restoration, reconciliation removes staging entries with no ownership row, promotes a valid `Staged` file when only staging exists, marks a `Staged` row `Ready` when the valid final file already exists, and removes the unprojected item/batch with a warning when neither valid file exists. A runtime failure after the first commit performs the same compensating removal; a process crash delegates that work to startup reconciliation. Managed Files are never content-hashed or reused by multiple Shelf Items.
+
+Cleanup permanently deletes only paths named by `managed_files` or `pending_managed_file_deletions` records, then removes the empty item directory. A path merely being inside Profile Data never grants deletion authority. A missing owned target counts as success. Sharing or antivirus failures retain the pending database row for event-driven retry at startup and after later cleanup-producing mutations.
+
+### 10.3 Settings file
 
 Default path:
 
@@ -364,21 +434,21 @@ Settings are written to a temporary file, flushed, and atomically moved over the
 
 `RailEdge`, `RailMonitorId`, and `AppearanceMode` are settings-owned. A non-empty `RailMonitorId` is an explicit target-monitor preference; an empty value selects `Follow pointer` for fresh dismissal. `shelf_ui_state.rail_monitor` retains actual dock placement for restoration rather than overriding a fresh automatic dismissal. `AppearanceMode` is one of `System`, `Dark`, or `Light` and defaults to `System`; adding it in `0.0.19` is a strict clean cutover rather than a migration.
 
-### 10.3 Sign-in startup registration
+### 10.4 Sign-in startup registration
 
 The current-user Windows `Run` entry contains the quoted executable path followed by `--autostart`. The application owns this registration; the installer does not enable or disable it independently.
 
-### 10.4 Recovery
+### 10.5 Recovery
 
 On a recoverable database open, format, integrity, or I/O failure:
 
-1. Preserve `shelf.db` as `shelf.corrupt-<timestamp>.db`.
-2. Move matching `-wal` and `-shm` sidecars with the backup when present.
-3. Create and open a clean database.
+1. Create one timestamped Recovery Backup destination.
+2. Preserve `shelf.db`, matching `-wal` and `-shm` sidecars, and the complete managed-storage root together.
+3. Create and open a clean database and empty active managed-storage root.
 4. Start with an empty shelf.
 5. Notify the user through the notification area and include the backup path.
 
-This favors continued application availability while preserving evidence for manual recovery.
+DropCove does not automatically salvage the backup. Incomplete preservation or failure to recreate either active store remains fatal. This extends ADR-0003 so preserved database evidence never loses the Managed Files it may reference.
 
 ## 11. Window, monitor, and DPI architecture
 
@@ -450,9 +520,10 @@ The Resident coordinator assigns each transient Shake session an ID. Native OLE 
 ## 14. Presentation projections and visual resources
 
 - Compact cards keep bounded preview data; a batch requests visuals for at most its first three Shelf Items.
-- Batch collections and Manage Items lists use virtualized presentation controls.
+- Batch collections and Manage Items lists use virtualized presentation controls. Batch Selection stores stable batch identities outside mounted-row lifetime and is discarded with its owning surface.
 - Full item projections are created when management UI opens and cleared when it closes or its owner disappears.
 - Icon and thumbnail loading is asynchronous. File/folder icons provide fallback when image thumbnails are unavailable.
+- Raw SVG Managed Files are never decoded or rendered inside a DropCove WebView. Shell Visual may return a native icon or ordinary unavailable-visual fallback.
 - Each surface owns cancellation and release of its active image resources even when visual loading is coordinated centrally. Leaving the Edge Rail closes its expanded subtree and invalidates its visual generation; ordinary hover expansion retains the native timing and existing virtualization policy.
 - Shell Visual watchers compare item ID, size, and the owning surface's numeric generation independently. Repeated generation snapshots and events from another surface must not clear loaded Blob URLs or cancel/restart extraction. `pnpm test` exercises concurrent visual mounts, unrelated-generation retention, genuine invalidation, and stale-URL release through the real Vue composable.
 - Drop Shelf refresh is emitted after successful native show. A generation-only refresh keeps the mounted image until a replacement is ready; item/size changes and unmount still release it. `get_shelf_visual` returns binary bytes for success, empty binary for a genuine unavailable visual, and JSON `null` for hidden, collapsed, or cancelled/stale work. Cancellation therefore cannot replace a good image with a fallback; a genuine failure still does. No durable or cross-component image cache is introduced. The Node regression uses native TypeScript import support (verified on Node 24.18.0).
@@ -464,9 +535,13 @@ The Resident coordinator assigns each transient Shake session an ID. Native OLE 
 |---|---|
 | Core mutations | Serialize through one mutation gate. |
 | Database operations | Serialize independently and execute away from presentation input handling. |
-| Shell visuals | Load asynchronously and cancel/release with presentation lifetime. |
+| OLE inbound media | Keep borrowed `IDataObject`/`STGMEDIUM` access on the registered window thread; copy or stream into owned staging before returning from the drop callback. |
+| Managed intake | Bound byte and item counts, flush staging, apply Attachment Services where required, revalidate, and commit one batch or remove all staging. |
+| Managed cleanup | Commit pending responsibility before permanent deletion; retry failures only from events or startup, never a polling loop. |
+| Shell visuals | Load asynchronously and cancel/release with presentation lifetime; never render raw SVG in a WebView. |
 | Hook callbacks | Do minimal capture work and queue processing. |
-| Persistence failure | Preserve prior user-observable state and report failure. |
+| Persistence failure | Preserve prior user-observable state and retain or remove staging according to the uncommitted operation. |
+| Attachment security failure | Reject the complete website-image drop and remove staging; accept only the valid post-scan file. |
 | Hotkey failure at startup | Keep resident process running; warn through the tray. |
 | Hotkey failure while saving | Keep prior registration and settings. |
 | Shake hook failure | Keep the rest of the application usable and warn. |
@@ -480,7 +555,10 @@ A conforming reimplementation needs Windows facilities equivalent to:
 - global hotkey registration;
 - low-level mouse event observation;
 - notification-area icon, menu, and warnings;
-- storage-item drag-and-drop with destination result reporting;
+- OLE filesystem-path, virtual-file-stream, URL metadata, and Unicode-text format handling;
+- copy-only storage drag-out with destination result reporting;
+- Windows Attachment Services and security-zone evidence;
+- permanent app-owned file deletion and retryable sharing-error handling;
 - topmost and no-activate window behavior;
 - foreground-window event hooks;
 - monitor enumeration, work-area bounds, and Per-Monitor V2 DPI;

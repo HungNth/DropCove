@@ -142,7 +142,7 @@ pub(crate) enum ShelfError {
     },
 }
 
-fn days_to_ymd(days: i64) -> (i64, u32, u32) {
+pub(crate) fn days_to_ymd(days: i64) -> (i64, u32, u32) {
     let z = days + 719468;
     let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
     let doe = (z - era * 146097) as u32;
@@ -357,6 +357,20 @@ fn validate_existing_database(path: &Path, shm_path: &Path) -> Result<(), ShelfE
                 |_| Ok(()),
             )
             .optional()?;
+        ro_conn
+            .query_row(
+                "SELECT item_id, relative_path, state, staging_path FROM managed_files LIMIT 1",
+                [],
+                |_| Ok(()),
+            )
+            .optional()?;
+        ro_conn
+            .query_row(
+                "SELECT id, relative_path FROM pending_managed_file_deletions LIMIT 1",
+                [],
+                |_| Ok(()),
+            )
+            .optional()?;
 
         Ok(())
     })();
@@ -525,6 +539,20 @@ impl ShelfState {
                         backup_dir.join(shm_path.file_name().unwrap()),
                     ));
                 }
+                let managed_dir = parent.join("managed");
+                if managed_dir.exists() {
+                    to_move.push((
+                        managed_dir.clone(),
+                        backup_dir.join("managed"),
+                    ));
+                }
+                let staging_dir = parent.join("staging");
+                if staging_dir.exists() {
+                    to_move.push((
+                        staging_dir.clone(),
+                        backup_dir.join("staging"),
+                    ));
+                }
 
                 let mut moved = Vec::new();
                 let mut move_failure = None;
@@ -570,6 +598,20 @@ impl ShelfState {
                         details: clean_err.to_string(),
                     }
                 })?;
+                if let Err(e) = fs::create_dir_all(parent.join("managed")) {
+                    return Err(ShelfError::RecoveryRecreationFailed {
+                        path: parent.join("managed").display().to_string(),
+                        backup_dir: backup_dir.clone(),
+                        details: format!("failed to recreate active managed directory: {e}"),
+                    });
+                }
+                if let Err(e) = fs::create_dir_all(parent.join("staging")) {
+                    return Err(ShelfError::RecoveryRecreationFailed {
+                        path: parent.join("staging").display().to_string(),
+                        backup_dir: backup_dir.clone(),
+                        details: format!("failed to recreate active staging directory: {e}"),
+                    });
+                }
 
                 Ok((
                     Self {
@@ -585,7 +627,9 @@ impl ShelfState {
 
     pub(crate) fn snapshot(&self) -> Result<ShelfSnapshot, ShelfError> {
         let mut snapshot = self.store()?.snapshot()?;
-        snapshot.warning = self.pending_warning.lock().ok().and_then(|w| w.clone());
+        if let Some(w) = self.pending_warning.lock().ok().and_then(|w| w.clone()) {
+            snapshot.warning = Some(w);
+        }
         Ok(snapshot)
     }
 
@@ -669,6 +713,37 @@ impl ShelfState {
         Ok(DropResult {
             snapshot: Some(snapshot),
             skipped,
+        })
+    }
+    pub(crate) fn accept_text(&self, text: String) -> Result<DropResult, ShelfError> {
+        let trimmed_nul = text.strip_suffix('\0').unwrap_or(&text);
+        if trimmed_nul.is_empty() {
+            return Ok(DropResult {
+                snapshot: None,
+                skipped: 0,
+            });
+        }
+        let bytes = trimmed_nul.as_bytes();
+        if bytes.len() > crate::managed_files::MAX_TEXT_BYTES {
+            return Ok(DropResult {
+                snapshot: None,
+                skipped: 1,
+            });
+        }
+        let now = SystemTime::now();
+        let timestamp_str = crate::managed_files::format_local_timestamp_now();
+        let created_at = now
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| ShelfError::InvalidSystemClock)?
+            .as_millis()
+            .try_into()
+            .map_err(|_| ShelfError::TimestampOverflow)?;
+
+        let mut store = self.store()?;
+        let snapshot = store.insert_managed_text(bytes, &timestamp_str, created_at)?;
+        Ok(DropResult {
+            snapshot: Some(snapshot),
+            skipped: 0,
         })
     }
 
@@ -795,6 +870,39 @@ impl ShelfState {
         result
     }
 
+    pub(crate) fn read_managed_text_content(&self, item_id: &str) -> Result<Option<String>, ShelfError> {
+        let store = self.store()?;
+        let relative_path: Option<String> = store.connection.query_row(
+            "SELECT mf.relative_path FROM managed_files mf WHERE mf.item_id = ?1 AND mf.state = 'ready'",
+            [item_id],
+            |row| row.get(0),
+        ).optional()?;
+        let relative_path = match relative_path {
+            Some(p) => p,
+            None => return Ok(None),
+        };
+        let managed_store = crate::managed_files::ManagedStore::new(&store.profile_root);
+        let full_path = match managed_store.full_path(&relative_path) {
+            Ok(p) => p,
+            Err(_) => return Ok(None),
+        };
+        let bytes = match std::fs::read(full_path) {
+            Ok(b) => b,
+            Err(_) => return Ok(None),
+        };
+        Ok(String::from_utf8(bytes).ok())
+    }
+
+    pub(crate) fn is_item_managed(&self, item_id: &str) -> Result<bool, ShelfError> {
+        let store = self.store()?;
+        let exists: bool = store.connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM managed_files WHERE item_id = ?1)",
+            [item_id],
+            |row| row.get(0),
+        )?;
+        Ok(exists)
+    }
+
     fn store(&self) -> Result<ShelfStoreGuard<'_>, ShelfError> {
         let guard = self.store.lock().map_err(|_| ShelfError::StatePoisoned)?;
         if guard.is_none() {
@@ -875,6 +983,9 @@ struct ShelfStore {
     availability: HashMap<String, Availability>,
     restored_availability: bool,
     prepared: Option<PreparedDrag>,
+    profile_root: std::path::PathBuf,
+    pending_deletions_count: usize,
+    pending_reconcile_warning: Option<String>,
 }
 
 impl ShelfStore {
@@ -926,6 +1037,16 @@ impl ShelfStore {
                  id INTEGER PRIMARY KEY CHECK (id = 1),
                  preferred_width REAL NOT NULL,
                  manual_height REAL
+             );
+             CREATE TABLE IF NOT EXISTS managed_files (
+                 item_id TEXT PRIMARY KEY REFERENCES shelf_items(id) ON DELETE CASCADE,
+                 relative_path TEXT NOT NULL,
+                 state TEXT NOT NULL CHECK (state IN ('staged', 'ready')),
+                 staging_path TEXT
+             );
+             CREATE TABLE IF NOT EXISTS pending_managed_file_deletions (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 relative_path TEXT NOT NULL
              );",
         )?;
 
@@ -945,6 +1066,17 @@ impl ShelfStore {
                 |_| Ok(()),
             )
             .optional()?;
+        let profile_root = path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf();
+        let pending_deletions_count: usize = connection
+            .query_row(
+                "SELECT count(*) FROM pending_managed_file_deletions",
+                [],
+                |row| row.get::<_, i64>(0),
+            )?
+            .max(0) as usize;
         let mut store = Self {
             connection,
             width,
@@ -953,9 +1085,35 @@ impl ShelfStore {
             availability: HashMap::new(),
             restored_availability: false,
             prepared: None,
+            profile_root,
+            pending_deletions_count,
+            pending_reconcile_warning: None,
         };
+        let initial_warning = store.reconcile_managed_files()?;
+        let _ = store.process_pending_managed_deletions();
+        let empty: bool = !store.connection.query_row(
+            "SELECT EXISTS (
+                SELECT 1 FROM shelf_items si
+                JOIN shelf_batches sb ON sb.id = si.batch_id
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM managed_files mf
+                    WHERE mf.item_id = si.id AND mf.state = 'staged'
+                )
+            )",
+            [],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if empty {
+            store.width = 191.0;
+            store.height = 180.0;
+            store.pending_manual_height = None;
+            let tx = store.connection.transaction()?;
+            clear_sizing_when_empty(&tx)?;
+            tx.commit()?;
+        }
         let snapshot = Self::read_snapshot(&store.connection, width, 180.0, &store.availability)?;
         store.height = snapshot.height;
+        store.pending_reconcile_warning = initial_warning;
         Ok(store)
     }
 
@@ -976,6 +1134,17 @@ impl ShelfStore {
             }
             self.record_snapshot(&snapshot);
             self.restored_availability = true;
+        }
+        if snapshot.warning.is_none() {
+            if let Some(ref w) = self.pending_reconcile_warning {
+                snapshot.warning = Some(w.clone());
+            } else if self.pending_deletions_count > 0 {
+                snapshot.warning = Some(if self.pending_deletions_count == 1 {
+                    "1 DropCove-created file is pending deletion.".to_string()
+                } else {
+                    format!("{} DropCove-created files are pending deletion.", self.pending_deletions_count)
+                });
+            }
         }
         Ok(snapshot)
     }
@@ -1002,9 +1171,17 @@ impl ShelfStore {
         availability: &HashMap<String, Availability>,
     ) -> Result<ShelfSnapshot, ShelfError> {
         let mut batches_statement = connection.prepare(
-            "SELECT id, created_at, position
-             FROM shelf_batches
-             ORDER BY position ASC",
+            "SELECT sb.id, sb.created_at, sb.position
+             FROM shelf_batches sb
+             WHERE EXISTS (
+                 SELECT 1 FROM shelf_items si
+                 WHERE si.batch_id = sb.id
+                   AND NOT EXISTS (
+                       SELECT 1 FROM managed_files mf
+                       WHERE mf.item_id = si.id AND mf.state = 'staged'
+                   )
+             )
+             ORDER BY sb.position ASC",
         )?;
         let batches = batches_statement
             .query_map([], |row| {
@@ -1024,10 +1201,14 @@ impl ShelfStore {
             warning: None,
         };
         let mut items_statement = connection.prepare(
-            "SELECT id, batch_id, position, path, name, is_folder, is_pinned
-             FROM shelf_items
-             WHERE batch_id = ?1
-             ORDER BY position ASC",
+            "SELECT si.id, si.batch_id, si.position, si.path, si.name, si.is_folder, si.is_pinned
+             FROM shelf_items si
+             WHERE si.batch_id = ?1
+               AND NOT EXISTS (
+                   SELECT 1 FROM managed_files mf
+                   WHERE mf.item_id = si.id AND mf.state = 'staged'
+               )
+             ORDER BY si.position ASC",
         )?;
         for batch in &mut snapshot.batches {
             batch.items = items_statement
@@ -1123,6 +1304,163 @@ impl ShelfStore {
         self.record_snapshot(&snapshot);
         Ok(snapshot)
     }
+    fn generate_text_snippet(bytes: &[u8]) -> String {
+        let text = std::str::from_utf8(bytes).unwrap_or("");
+        let collapsed: String = text
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        if collapsed.is_empty() {
+            return "Dropped text".to_string();
+        }
+        let char_count = collapsed.chars().count();
+        if char_count <= 28 {
+            collapsed
+        } else {
+            let truncated: String = collapsed.chars().take(25).collect();
+            format!("{truncated}...")
+        }
+    }
+    fn insert_managed_text(
+        &mut self,
+        bytes: &[u8],
+        timestamp_str: &str,
+        created_at: i64,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        let store = crate::managed_files::ManagedStore::new(&self.profile_root);
+        store.init_directories().map_err(|source| ShelfError::FileSystem {
+            path: self.profile_root.display().to_string(),
+            source,
+        })?;
+
+        // Generate display snippet from text content
+        let display_name = Self::generate_text_snippet(bytes);
+
+        // Determine collision-free filename
+        let base_filename = format!("Dropped text {timestamp_str}.txt");
+        let mut suffix = 1usize;
+        let filename = loop {
+            let candidate = if suffix == 1 {
+                base_filename.clone()
+            } else {
+                format!("Dropped text {timestamp_str} ({suffix}).txt")
+            };
+            let exists: bool = self.connection.query_row(
+                "SELECT EXISTS (
+                     SELECT 1 FROM shelf_items WHERE name = ?1
+                     UNION
+                     SELECT 1 FROM managed_files WHERE relative_path LIKE '%' || ?1
+                 )",
+                [&candidate],
+                |row| row.get(0),
+            )?;
+            if !exists {
+                break candidate;
+            }
+            suffix += 1;
+        };
+
+        let item_id = {
+            let tx = self.connection.transaction()?;
+            let id = random_id(&tx)?;
+            tx.rollback()?;
+            id
+        };
+        let staging_rel = crate::managed_files::ManagedStore::staging_rel_path(&item_id);
+        let final_rel = crate::managed_files::ManagedStore::final_rel_path(&item_id, &filename);
+        let final_path_str = store.full_path(&final_rel).map_err(|source| ShelfError::FileSystem {
+            path: final_rel.clone(), source,
+        })?.display().to_string();
+
+        // Step 1: Stage bytes to disk with flush
+        let stage_full = store.stage_bytes(&staging_rel, bytes).map_err(|source| {
+            ShelfError::FileSystem {
+                path: staging_rel.clone(),
+                source,
+            }
+        })?;
+
+        // Step 2: Commit batch, item, and managed_files as 'staged'
+        let transaction_result = (|| -> Result<(), ShelfError> {
+            let transaction = self.connection.transaction()?;
+            transaction.execute("UPDATE shelf_batches SET position = position + 1", [])?;
+            let batch_id = random_id(&transaction)?;
+            transaction.execute(
+                "INSERT OR IGNORE INTO shelf_settings (id, preferred_width, manual_height) VALUES (1, ?1, ?2)",
+                params![self.width, self.pending_manual_height],
+            )?;
+            transaction.execute(
+                "INSERT INTO shelf_batches (id, created_at, position) VALUES (?1, ?2, 0)",
+                params![batch_id, created_at],
+            )?;
+            transaction.execute(
+                "INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+                 VALUES (?1, ?2, 0, ?3, ?4, 0, 0)",
+                params![item_id, batch_id, final_path_str, display_name],
+            )?;
+            transaction.execute(
+                "INSERT INTO managed_files (item_id, relative_path, state, staging_path)
+                 VALUES (?1, ?2, 'staged', ?3)",
+                params![item_id, final_rel, staging_rel],
+            )?;
+            transaction.commit()?;
+            Ok(())
+        })();
+
+        if let Err(tx_err) = transaction_result {
+            let _ = fs::remove_file(stage_full);
+            return Err(tx_err);
+        }
+
+        // Step 3: Promote staged file to final path (atomic rename)
+        let promote_result = store.promote_staged(&staging_rel, &final_rel);
+        if let Err(promote_err) = promote_result {
+            // Compensation on runtime failure after staged commit:
+            // Enqueue pending deletion for both paths and remove unprojected row atomically,
+            // restoring sizing if empty, then attempting immediate deletion.
+            if let Ok(tx) = self.connection.transaction() {
+                let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&staging_rel]);
+                let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&final_rel]);
+                let _ = tx.execute("DELETE FROM shelf_items WHERE id = ?1", [&item_id]);
+                let _ = tx.execute("DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)", []);
+                let _ = clear_sizing_when_empty(&tx);
+                let _ = tx.commit();
+            }
+            let _ = store.delete_managed_target(&staging_rel);
+            let _ = store.delete_managed_target(&final_rel);
+            let _ = self.process_pending_managed_deletions();
+            return Err(ShelfError::FileSystem {
+                path: final_rel,
+                source: promote_err,
+            });
+        }
+
+        // Step 4: Commit 'ready'
+        let ready_result = self.connection.execute(
+            "UPDATE managed_files SET state = 'ready', staging_path = NULL WHERE item_id = ?1",
+            [&item_id],
+        );
+        if let Err(ready_err) = ready_result {
+            if let Ok(tx) = self.connection.transaction() {
+                let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&final_rel]);
+                let _ = tx.execute("DELETE FROM shelf_items WHERE id = ?1", [&item_id]);
+                let _ = tx.execute("DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)", []);
+                let _ = clear_sizing_when_empty(&tx);
+                let _ = tx.commit();
+            }
+            let _ = store.delete_managed_target(&final_rel);
+            let _ = self.process_pending_managed_deletions();
+            return Err(ShelfError::Database(ready_err));
+        }
+
+        // Step 5: Read snapshot and publish
+        self.availability.insert(item_id, Availability::Available);
+        let snapshot = self.snapshot()?;
+        self.height = snapshot.height;
+        self.pending_manual_height = None;
+        self.record_snapshot(&snapshot);
+        Ok(snapshot)
+    }
 
     fn prepare_batch(
         &mut self,
@@ -1153,6 +1491,7 @@ impl ShelfStore {
             }
         }
         let transaction = self.connection.transaction()?;
+        let _ = Self::queue_managed_deletions_for_items(&transaction, missing.iter().copied())?;
         for item_id in missing {
             transaction.execute("DELETE FROM shelf_items WHERE id = ?1", [item_id])?;
         }
@@ -1188,6 +1527,8 @@ impl ShelfStore {
             token: token.clone(),
             participants: Arc::new(participants),
         });
+        self.process_pending_managed_deletions()?;
+        let snapshot = self.snapshot()?;
         Ok(BatchPreparation {
             token,
             available,
@@ -1195,13 +1536,241 @@ impl ShelfStore {
             snapshot,
         })
     }
+    fn queue_managed_deletions_for_items<'a>(
+        transaction: &Transaction<'_>,
+        item_ids: impl Iterator<Item = &'a str>,
+    ) -> Result<(), ShelfError> {
+        let mut stmt = transaction.prepare(
+            "SELECT relative_path FROM managed_files WHERE item_id = ?1",
+        )?;
+        let mut insert_pending = transaction.prepare(
+            "INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)",
+        )?;
+        for item_id in item_ids {
+            let mut rows = stmt.query([item_id])?;
+            while let Some(row) = rows.next()? {
+                let rel_path: String = row.get(0)?;
+                insert_pending.execute([&rel_path])?;
+            }
+        }
+        Ok(())
+    }
+
+    fn queue_managed_deletions_for_batch(
+        transaction: &Transaction<'_>,
+        batch_id: &str,
+    ) -> Result<(), ShelfError> {
+        let mut stmt = transaction.prepare(
+            "SELECT mf.relative_path
+             FROM managed_files mf
+             JOIN shelf_items si ON si.id = mf.item_id
+             WHERE si.batch_id = ?1",
+        )?;
+        let mut insert_pending = transaction.prepare(
+            "INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)",
+        )?;
+        let mut rows = stmt.query([batch_id])?;
+        while let Some(row) = rows.next()? {
+            let rel_path: String = row.get(0)?;
+            insert_pending.execute([&rel_path])?;
+        }
+        Ok(())
+    }
+
+    fn queue_managed_deletions_for_unpinned(
+        transaction: &Transaction<'_>,
+    ) -> Result<(), ShelfError> {
+        let mut stmt = transaction.prepare(
+            "SELECT mf.relative_path
+             FROM managed_files mf
+             JOIN shelf_items si ON si.id = mf.item_id
+             WHERE si.is_pinned = 0",
+        )?;
+        let mut insert_pending = transaction.prepare(
+            "INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)",
+        )?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let rel_path: String = row.get(0)?;
+            insert_pending.execute([&rel_path])?;
+        }
+        Ok(())
+    }
+
+    fn process_pending_managed_deletions(&mut self) -> Result<(), ShelfError> {
+        let store = crate::managed_files::ManagedStore::new(&self.profile_root);
+        let mut stmt = self.connection.prepare(
+            "SELECT id, relative_path FROM pending_managed_file_deletions",
+        )?;
+        let pending: Vec<(i64, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+        drop(stmt);
+
+        for (id, rel_path) in pending {
+            match store.delete_managed_target(&rel_path) {
+                Ok(true) => {
+                    let _ = self.connection.execute(
+                        "DELETE FROM pending_managed_file_deletions WHERE id = ?1",
+                        [id],
+                    );
+                }
+                Ok(false) | Err(_) => {
+                    // Remains pending for retry on later mutations or restart
+                }
+            }
+        }
+        self.pending_deletions_count = self
+            .connection
+            .query_row(
+                "SELECT count(*) FROM pending_managed_file_deletions",
+                [],
+                |row| row.get::<_, i64>(0),
+            )?
+            .max(0) as usize;
+        Ok(())
+    }
+    fn validate_managed_text_file(path: &Path) -> bool {
+        if let Ok(meta) = fs::metadata(path) {
+            if meta.is_file() && meta.len() <= crate::managed_files::MAX_TEXT_BYTES as u64 {
+                if let Ok(bytes) = fs::read(path) {
+                    return std::str::from_utf8(&bytes).is_ok();
+                }
+            }
+        }
+        false
+    }
+
+    fn reconcile_managed_files(&mut self) -> Result<Option<String>, ShelfError> {
+        let store = crate::managed_files::ManagedStore::new(&self.profile_root);
+        let _ = store.init_directories();
+
+        let mut stmt = self.connection.prepare(
+            "SELECT item_id, relative_path, staging_path FROM managed_files WHERE state = 'staged'",
+        )?;
+        let staged_records: Vec<(String, String, Option<String>)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(stmt);
+
+        let mut discarded_count = 0usize;
+
+        for (item_id, final_rel, staging_rel_opt) in staged_records {
+            let staging_path = staging_rel_opt
+                .as_ref()
+                .and_then(|r| store.full_path(r).ok());
+            let final_path = store.full_path(&final_rel).ok();
+
+            let final_valid = final_path
+                .as_deref()
+                .map(Self::validate_managed_text_file)
+                .unwrap_or(false);
+            let staging_valid = staging_path
+                .as_deref()
+                .map(Self::validate_managed_text_file)
+                .unwrap_or(false);
+
+            if final_valid {
+                // Interrupted after promotion but before 'ready' commit
+                self.connection.execute(
+                    "UPDATE managed_files SET state = 'ready', staging_path = NULL WHERE item_id = ?1",
+                    [&item_id],
+                )?;
+                if let Some(st_rel) = &staging_rel_opt {
+                    let _ = store.delete_managed_target(st_rel);
+                }
+            } else if staging_valid {
+                // Interrupted before promotion; promote staged file and commit 'ready'
+                let st_rel = staging_rel_opt.as_ref().unwrap();
+                if store.promote_staged(st_rel, &final_rel).is_ok()
+                    && final_path.as_deref().map(Self::validate_managed_text_file).unwrap_or(false)
+                {
+                    self.connection.execute(
+                        "UPDATE managed_files SET state = 'ready', staging_path = NULL WHERE item_id = ?1",
+                        [&item_id],
+                    )?;
+                } else {
+                    // Promotion or validation failed: discard staged item and enqueue deletion
+                    discarded_count += 1;
+                    let tx = self.connection.transaction()?;
+                    let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [st_rel]);
+                    let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&final_rel]);
+                    tx.execute("DELETE FROM shelf_items WHERE id = ?1", [&item_id])?;
+                    tx.commit()?;
+                    let _ = store.delete_managed_target(st_rel);
+                    let _ = store.delete_managed_target(&final_rel);
+                }
+            } else {
+                // Neither file exists or is valid: discard unprojected item and queue cleanup
+                discarded_count += 1;
+                let tx = self.connection.transaction()?;
+                if let Some(st_rel) = &staging_rel_opt {
+                    let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [st_rel]);
+                }
+                let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&final_rel]);
+                tx.execute("DELETE FROM shelf_items WHERE id = ?1", [&item_id])?;
+                tx.commit()?;
+                if let Some(st_rel) = &staging_rel_opt {
+                    let _ = store.delete_managed_target(st_rel);
+                }
+                let _ = store.delete_managed_target(&final_rel);
+            }
+        }
+
+        self.connection.execute(
+            "DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)",
+            [],
+        )?;
+
+        let mut stmt = self.connection.prepare(
+            "SELECT staging_path FROM managed_files WHERE staging_path IS NOT NULL",
+        )?;
+        let active_staging: Vec<String> = stmt
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(stmt);
+        let _ = store.cleanup_unowned_staging(&active_staging);
+
+        let warning = if discarded_count > 0 {
+            Some(if discarded_count == 1 {
+                "Interrupted drop was discarded.".to_string()
+            } else {
+                format!("{discarded_count} interrupted drops were discarded.")
+            })
+        } else {
+            None
+        };
+
+        Ok(warning)
+    }
 
     fn consume_items<'a>(
         &mut self,
         item_ids: impl Iterator<Item = &'a str>,
     ) -> Result<ShelfSnapshot, ShelfError> {
+        let item_ids_vec: Vec<&str> = item_ids.collect();
         let transaction = self.connection.transaction()?;
-        for item_id in item_ids {
+        let mut unpinned_ids = Vec::new();
+        {
+            let mut check_pinned = transaction.prepare(
+                "SELECT is_pinned FROM shelf_items WHERE id = ?1",
+            )?;
+            for item_id in &item_ids_vec {
+                let pinned: bool = check_pinned
+                    .query_row([item_id], |row| row.get(0))
+                    .optional()?
+                    .unwrap_or(false);
+                if !pinned {
+                    unpinned_ids.push(*item_id);
+                }
+            }
+        }
+        Self::queue_managed_deletions_for_items(
+            &transaction,
+            unpinned_ids.iter().copied(),
+        )?;
+        for item_id in item_ids_vec {
             transaction.execute(
                 "DELETE FROM shelf_items WHERE id = ?1 AND is_pinned = 0",
                 [item_id],
@@ -1229,17 +1798,28 @@ impl ShelfStore {
             self.height = snapshot.height;
         }
         self.record_snapshot(&snapshot);
+        self.process_pending_managed_deletions()?;
+        let snapshot = self.snapshot()?;
         Ok(snapshot)
     }
 
     fn remove_batch(&mut self, batch_id: &str) -> Result<ShelfSnapshot, ShelfError> {
         let transaction = self.connection.transaction()?;
+        let _ = Self::queue_managed_deletions_for_batch(&transaction, batch_id)?;
         transaction.execute("DELETE FROM shelf_batches WHERE id = ?1", [batch_id])?;
         clear_sizing_when_empty(&transaction)?;
         let empty =
-            !transaction.query_row("SELECT EXISTS (SELECT 1 FROM shelf_items)", [], |row| {
-                row.get::<_, bool>(0)
-            })?;
+            !transaction.query_row(
+                "SELECT EXISTS (
+                    SELECT 1 FROM shelf_items si
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM managed_files mf
+                        WHERE mf.item_id = si.id AND mf.state = 'staged'
+                    )
+                )",
+                [],
+                |row| row.get::<_, bool>(0),
+            )?;
         let snapshot = Self::read_snapshot(
             &transaction,
             if empty { 191.0 } else { self.width },
@@ -1256,11 +1836,14 @@ impl ShelfStore {
             self.height = snapshot.height;
         }
         self.record_snapshot(&snapshot);
+        self.process_pending_managed_deletions()?;
+        let snapshot = self.snapshot()?;
         Ok(snapshot)
     }
 
     fn remove_item(&mut self, item_id: &str) -> Result<ShelfSnapshot, ShelfError> {
         let transaction = self.connection.transaction()?;
+        let _ = Self::queue_managed_deletions_for_items(&transaction, std::iter::once(item_id))?;
         let deleted = transaction.execute("DELETE FROM shelf_items WHERE id = ?1", [item_id])?;
         if deleted == 0 {
             return Err(ShelfError::ItemNotFound(item_id.to_owned()));
@@ -1290,10 +1873,14 @@ impl ShelfStore {
             self.height = snapshot.height;
         }
         self.record_snapshot(&snapshot);
+        self.process_pending_managed_deletions()?;
+        let snapshot = self.snapshot()?;
         Ok(snapshot)
     }
+
     fn clear_temporary(&mut self) -> Result<ShelfSnapshot, ShelfError> {
         let transaction = self.connection.transaction()?;
+        let _ = Self::queue_managed_deletions_for_unpinned(&transaction)?;
         transaction.execute("DELETE FROM shelf_items WHERE is_pinned = 0", [])?;
         transaction.execute(
             "DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)",
@@ -1320,6 +1907,8 @@ impl ShelfStore {
             self.height = snapshot.height;
         }
         self.record_snapshot(&snapshot);
+        self.process_pending_managed_deletions()?;
+        let snapshot = self.snapshot()?;
         Ok(snapshot)
     }
 
@@ -1346,10 +1935,14 @@ impl ShelfStore {
             .ok_or_else(|| ShelfError::BatchNotFound(batch_id.to_owned()))?;
 
         let mut items_statement = self.connection.prepare(
-            "SELECT id, batch_id, position, path, name, is_folder, is_pinned
-             FROM shelf_items
-             WHERE batch_id = ?1
-             ORDER BY position ASC",
+            "SELECT si.id, si.batch_id, si.position, si.path, si.name, si.is_folder, si.is_pinned
+             FROM shelf_items si
+             WHERE si.batch_id = ?1
+               AND NOT EXISTS (
+                   SELECT 1 FROM managed_files mf
+                   WHERE mf.item_id = si.id AND mf.state = 'staged'
+               )
+             ORDER BY si.position ASC",
         )?;
         batch.items = items_statement
             .query_map([batch_id], |row| {
@@ -1386,10 +1979,13 @@ impl ShelfStore {
         pinned: bool,
     ) -> Result<ShelfSnapshot, ShelfError> {
         let transaction = self.connection.transaction()?;
-        if transaction.execute(
-            "UPDATE shelf_items SET is_pinned = ?1 WHERE id = ?2",
+        let updated = transaction.execute(
+            "UPDATE shelf_items SET is_pinned = ?1
+             WHERE id = ?2
+               AND NOT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = ?2 AND mf.state = 'staged')",
             params![pinned, item_id],
-        )? == 0
+        )?;
+        if updated == 0
         {
             return Err(ShelfError::ItemNotFound(item_id.to_owned()));
         }
@@ -1405,7 +2001,9 @@ impl ShelfStore {
     ) -> Result<ShelfSnapshot, ShelfError> {
         let transaction = self.connection.transaction()?;
         let updated = transaction.execute(
-            "UPDATE shelf_items SET is_pinned = ?1 WHERE batch_id = ?2",
+            "UPDATE shelf_items SET is_pinned = ?1
+             WHERE batch_id = ?2
+               AND NOT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = shelf_items.id AND mf.state = 'staged')",
             params![pinned, batch_id],
         )?;
         if updated == 0 {
@@ -1424,10 +2022,14 @@ impl ShelfStore {
     ) -> Result<ShelfSnapshot, ShelfError> {
         let has_content: bool =
             self.connection
-                .query_row("SELECT EXISTS (SELECT 1 FROM shelf_items)", [], |row| {
-                    row.get(0)
-                })?;
-
+                .query_row(
+                    "SELECT EXISTS (
+                         SELECT 1 FROM shelf_items si
+                         WHERE NOT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = si.id AND mf.state = 'staged')
+                     )",
+                    [],
+                    |row| row.get(0),
+                )?;
         if !has_content {
             self.width = width;
             if let Some(height) = manual_height {
@@ -1438,7 +2040,15 @@ impl ShelfStore {
                 batches: Vec::new(),
                 preferred_width: self.width,
                 height: self.height,
-                warning: None,
+                warning: if self.pending_deletions_count > 0 {
+                    Some(if self.pending_deletions_count == 1 {
+                        "1 DropCove-created file is pending deletion.".to_string()
+                    } else {
+                        format!("{} DropCove-created files are pending deletion.", self.pending_deletions_count)
+                    })
+                } else {
+                    None
+                },
             });
         }
 
@@ -1461,7 +2071,9 @@ impl ShelfStore {
         Ok(self
             .connection
             .query_row(
-                "SELECT path FROM shelf_items WHERE id = ?1",
+                "SELECT si.path FROM shelf_items si
+                 WHERE si.id = ?1
+                   AND NOT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = si.id AND mf.state = 'staged')",
                 [item_id],
                 |row| row.get(0),
             )
@@ -1472,7 +2084,9 @@ impl ShelfStore {
         Ok(self
             .connection
             .query_row(
-                "SELECT path, is_folder FROM shelf_items WHERE id = ?1",
+                "SELECT si.path, si.is_folder FROM shelf_items si
+                 WHERE si.id = ?1
+                   AND NOT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = si.id AND mf.state = 'staged')",
                 [item_id],
                 |row| Ok((row.get(0)?, row.get::<_, bool>(1)?)),
             )
@@ -1486,7 +2100,11 @@ fn random_id(transaction: &Transaction<'_>) -> Result<String, rusqlite::Error> {
 
 fn clear_sizing_when_empty(transaction: &Transaction<'_>) -> Result<(), rusqlite::Error> {
     transaction.execute(
-        "DELETE FROM shelf_settings WHERE NOT EXISTS (SELECT 1 FROM shelf_items)",
+        "DELETE FROM shelf_settings
+         WHERE NOT EXISTS (
+             SELECT 1 FROM shelf_items si
+             WHERE NOT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = si.id AND mf.state = 'staged')
+         )",
         [],
     )?;
     Ok(())
@@ -3503,5 +4121,318 @@ mod tests {
         drop(state);
         let reopened = ShelfState::open(&database).unwrap();
         assert_eq!(reopened.rail_monitor().unwrap().as_deref(), Some("display-1"));
+    }
+
+    #[test]
+    fn accept_text_round_trip_utf8_restoration_and_copy_consumption() {
+        let directory = TestDirectory::new("accept-text-red");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        let sample_text = "DropCove 0.0.23 plain-text test\nLine 2: 🚀 Unicode characters\r\nLine 3: https://example.com/path?arg=1";
+        let result = state.accept_text(sample_text.to_string()).unwrap();
+        let snapshot = result.snapshot.expect("accept_text must produce a snapshot");
+        assert_eq!(snapshot.batches.len(), 1, "exactly one batch created");
+        let batch = &snapshot.batches[0];
+        assert_eq!(batch.items.len(), 1, "batch has exactly one item");
+        let item = &batch.items[0];
+        assert!(!item.is_folder);
+        assert!(!item.is_pinned);
+        assert_eq!(item.name, "DropCove 0.0.23 plain-tex...");
+        assert!(item.path.ends_with(".txt"));
+
+        let item_path = std::path::Path::new(&item.path);
+        assert!(item_path.is_file(), "managed file must exist on disk");
+        let disk_bytes = std::fs::read(item_path).expect("must read managed file");
+        assert_eq!(disk_bytes, sample_text.as_bytes(), "file bytes must match UTF-8 without BOM");
+
+        // Restart verification
+        drop(state);
+        let reopened = ShelfState::open(&database).unwrap();
+        let reopened_snapshot = reopened.snapshot().unwrap();
+        assert_eq!(reopened_snapshot.batches.len(), 1);
+        let restored_item = &reopened_snapshot.batches[0].items[0];
+        assert_eq!(restored_item.id, item.id);
+        assert_eq!(restored_item.path, item.path);
+
+        // Copy drag-out consumption permanent deletion
+        let prep = reopened.prepare_batch_drag(&batch.id).unwrap();
+        let token = prep.token.expect("token should be generated");
+        let consumed_snap = reopened
+            .complete_batch_drag(&token, DragOutcome::Copy)
+            .unwrap();
+        assert!(consumed_snap.batches.is_empty(), "temporary item consumed");
+        assert!(!item_path.exists(), "managed file permanently deleted after Copy consumption");
+    }
+
+    #[test]
+    fn accept_text_boundary_and_rejections() {
+        let directory = TestDirectory::new("accept-text-bounds");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        // Empty text is rejected
+        let res = state.accept_text("".to_string()).unwrap();
+        assert!(res.snapshot.is_none());
+        assert_eq!(res.skipped, 0);
+
+        // Terminal NUL only text is rejected
+        let res = state.accept_text("\0".to_string()).unwrap();
+        assert!(res.snapshot.is_none());
+        assert_eq!(res.skipped, 0);
+
+        // Whitespace-only text is accepted
+        let res = state.accept_text("   \n\t  ".to_string()).unwrap();
+        assert!(res.snapshot.is_some());
+        let snap = res.snapshot.unwrap();
+        assert_eq!(snap.batches.len(), 1);
+
+        // 10 MiB text exact boundary is accepted
+        let exact_10mb = vec![b'a'; 10 * 1024 * 1024];
+        let text_10mb = String::from_utf8(exact_10mb).unwrap();
+        let res = state.accept_text(text_10mb).unwrap();
+        assert!(res.snapshot.is_some());
+
+        // 10 MiB + 1 byte is rejected
+        let over_10mb = vec![b'b'; 10 * 1024 * 1024 + 1];
+        let text_over = String::from_utf8(over_10mb).unwrap();
+        let res = state.accept_text(text_over).unwrap();
+        assert!(res.snapshot.is_none());
+        assert_eq!(res.skipped, 1);
+    }
+
+    #[test]
+    fn managed_file_sharing_violation_retry_and_external_safety() {
+        let directory = TestDirectory::new("sharing-retry");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        // External file drop
+        let external_file = directory.path().join("external_source.txt");
+        fs::write(&external_file, b"safe external bytes").unwrap();
+        let _drop_res = state
+            .accept_drop(vec![Some(external_file.display().to_string())])
+            .unwrap();
+
+        // Managed text drop
+        let text_res = state.accept_text("managed text content".to_string()).unwrap();
+        let text_snap = text_res.snapshot.unwrap();
+        let text_batch = &text_snap.batches[0];
+        let text_item = &text_batch.items[0];
+        let text_path = PathBuf::from(&text_item.path);
+
+        // Hold the managed file open on Windows denying delete
+        #[cfg(windows)]
+        use std::os::windows::fs::OpenOptionsExt;
+        let lock = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(1 | 2) // FILE_SHARE_READ | FILE_SHARE_WRITE (no FILE_SHARE_DELETE)
+            .open(&text_path)
+            .unwrap();
+
+        // Remove batch while locked: mutation commits in SQLite, pending deletion queued, file remains
+        let snap_after_remove = state.remove_batch(&text_batch.id).unwrap();
+        assert!(text_path.exists(), "file remains on disk due to sharing violation");
+        assert_eq!(
+            snap_after_remove.warning.as_deref(),
+            Some("1 DropCove-created file is pending deletion.")
+        );
+
+        // External file must remain untouched
+        assert_eq!(fs::read(&external_file).unwrap(), b"safe external bytes");
+
+        // Release lock
+        drop(lock);
+
+        // Later mutation triggers cleanup retry
+        let retry_snap = state.clear_temporary().unwrap();
+        assert!(!text_path.exists(), "managed file deleted after lock release and retry");
+        assert!(retry_snap.warning.is_none(), "pending warning cleared");
+        // External file was temporary so reference removed, but source object remains untouched!
+        assert_eq!(fs::read(&external_file).unwrap(), b"safe external bytes");
+    }
+
+    #[test]
+    fn managed_file_recovery_preserves_managed_and_staging_roots() {
+        let directory = TestDirectory::new("recovery-managed-preservation");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        let text_res = state.accept_text("recovery text bytes".to_string()).unwrap();
+        let text_snap = text_res.snapshot.unwrap();
+        let text_item = &text_snap.batches[0].items[0];
+        let text_path = PathBuf::from(&text_item.path);
+        assert!(text_path.exists());
+
+        // Also create a dummy file in staging
+        let staging_file = directory.path().join("staging").join("0123456789abcdef0123456789abcdef.tmp");
+        fs::write(&staging_file, b"staged bytes").unwrap();
+
+        // Corrupt the database
+        drop(state);
+        fs::write(&database, b"corrupted shelf db").unwrap();
+
+        // Trigger open_or_recover
+        let (reopened, backup_dir_opt) = ShelfState::open_or_recover(&database).unwrap();
+        let backup_dir = backup_dir_opt.expect("recovery backup must be created");
+
+        // Active managed root is now clean and empty
+        let active_snap = reopened.snapshot().unwrap();
+        assert!(active_snap.batches.is_empty(), "clean empty shelf on recovery");
+        assert!(!text_path.exists(), "old managed file moved from active store");
+
+        // Backup directory must preserve database, managed root, and staging root
+        assert!(backup_dir.join("shelf.db").exists());
+        let preserved_managed = backup_dir.join("managed");
+        assert!(preserved_managed.exists(), "backup must contain managed root");
+        let preserved_staging = backup_dir.join("staging");
+        assert!(preserved_staging.exists(), "backup must contain staging root");
+        assert!(preserved_staging.join("0123456789abcdef0123456789abcdef.tmp").exists());
+    }
+
+    #[test]
+    fn startup_reconciles_promoted_and_staged_states() {
+        let directory = TestDirectory::new("crash-reconciliation");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        // Seed state: a staged managed file that was promoted to final path before crash
+        let store = crate::managed_files::ManagedStore::new(directory.path());
+        store.init_directories().unwrap();
+        let item_id = "0123456789abcdef0123456789abcdef";
+        let filename = "Dropped text 2026-10-23 12-00-00.txt";
+        let staging_rel = crate::managed_files::ManagedStore::staging_rel_path(item_id);
+        let final_rel = crate::managed_files::ManagedStore::final_rel_path(item_id, filename);
+        let final_full = store.full_path(&final_rel).unwrap();
+        if let Some(p) = final_full.parent() {
+            fs::create_dir_all(p).unwrap();
+        }
+        fs::write(&final_full, b"promoted bytes").unwrap();
+
+        // Seed SQLite as 'staged'
+        {
+            let store_guard = state.store().unwrap();
+            let conn = &store_guard.connection;
+            conn.execute("INSERT INTO shelf_batches (id, created_at, position) VALUES ('b1', 100, 0)", []).unwrap();
+            conn.execute(
+                "INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+                 VALUES (?1, 'b1', 0, ?2, ?3, 0, 0)",
+                [item_id, final_full.to_str().unwrap(), filename],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO managed_files (item_id, relative_path, state, staging_path)
+                 VALUES (?1, ?2, 'staged', ?3)",
+                [item_id, &final_rel, &staging_rel],
+            ).unwrap();
+        }
+        drop(state);
+
+        // Reopen database: startup reconciliation must promote 'staged' to 'ready'
+        let reopened = ShelfState::open(&database).unwrap();
+        let snap = reopened.snapshot().unwrap();
+        assert_eq!(snap.batches.len(), 1, "reconciled item becomes visible");
+        assert_eq!(snap.batches[0].items[0].id, item_id);
+        assert_eq!(fs::read(&final_full).unwrap(), b"promoted bytes");
+    }
+
+    #[test]
+    fn missing_managed_file_removal_also_removes_its_empty_directory() {
+        let directory = TestDirectory::new("managed-missing-directory");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let snapshot = state.accept_text("discard me".into()).unwrap().snapshot.unwrap();
+        let batch = &snapshot.batches[0];
+        let file = PathBuf::from(&batch.items[0].path);
+        let item_directory = file.parent().unwrap().to_path_buf();
+        fs::remove_file(&file).unwrap();
+        state.remove_batch(&batch.id).unwrap();
+        assert!(!item_directory.exists());
+        assert!(state.snapshot().unwrap().warning.is_none());
+    }
+
+    #[test]
+    fn pinned_managed_copy_retains_file_until_explicit_removal() {
+        let directory = TestDirectory::new("managed-pinned-copy");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let snapshot = state.accept_text("keep these exact bytes".into()).unwrap().snapshot.unwrap();
+        let item = &snapshot.batches[0].items[0];
+        state.set_item_pinned(&item.id, true).unwrap();
+        let retained = state.complete_item_drag(&item.id, DragOutcome::Copy).unwrap();
+        assert_eq!(retained.batches[0].items[0].id, item.id);
+        assert_eq!(fs::read(&item.path).unwrap(), b"keep these exact bytes");
+        state.remove_item(&item.id).unwrap();
+        assert!(!Path::new(&item.path).exists());
+    }
+
+    #[test]
+    fn pending_cleanup_warning_survives_snapshot_and_restart() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let directory = TestDirectory::new("managed-pending-snapshot");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let snapshot = state.accept_text("temporarily locked".into()).unwrap().snapshot.unwrap();
+        let batch = &snapshot.batches[0];
+        let path = &batch.items[0].path;
+        let lock = fs::OpenOptions::new().read(true).share_mode(3).open(path).unwrap();
+        state.remove_batch(&batch.id).unwrap();
+        assert_eq!(state.snapshot().unwrap().warning.as_deref(), Some("1 DropCove-created file is pending deletion."));
+        drop(state);
+        let restored = ShelfState::open(&database).unwrap();
+        assert_eq!(restored.snapshot().unwrap().warning.as_deref(), Some("1 DropCove-created file is pending deletion."));
+        drop(lock);
+        restored.clear_temporary().unwrap();
+        assert!(!Path::new(path).exists());
+        assert!(restored.snapshot().unwrap().warning.is_none());
+    }
+
+    #[test]
+    fn failed_ready_publication_compensates_without_leaking_managed_bytes() {
+        let directory = TestDirectory::new("managed-ready-rollback");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        state.store().unwrap().connection.execute_batch(
+            "CREATE TEMP TRIGGER reject_ready BEFORE UPDATE OF state ON managed_files WHEN NEW.state = 'ready' BEGIN SELECT RAISE(ABORT, 'ready blocked'); END;"
+        ).unwrap();
+        assert!(state.accept_text("must not appear".into()).is_err());
+        assert!(state.snapshot().unwrap().batches.is_empty());
+        assert_eq!(fs::read_dir(directory.path().join("managed")).unwrap().count(), 0);
+        assert_eq!(fs::read_dir(directory.path().join("staging")).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn clear_temporary_mixed_ownership_preserves_external_and_cleans_managed() {
+        let directory = TestDirectory::new("clear-mixed-ownership");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let external = directory.source_file();
+        state.accept_drop(vec![Some(external.to_str().unwrap().to_owned())]).unwrap();
+        let managed = state.accept_text("managed text for clear".into()).unwrap();
+        let managed_item = &managed.snapshot.unwrap().batches[0].items[0];
+        let managed_path = std::path::PathBuf::from(&managed_item.path);
+        assert!(managed_path.exists());
+        assert!(external.exists());
+
+        // Clear temporary items
+        state.clear_temporary().unwrap();
+        assert!(!managed_path.exists(), "managed file deleted");
+        assert!(external.exists(), "external source object preserved");
+        assert_eq!(state.snapshot().unwrap().batches.len(), 0);
+    }
+
+    #[test]
+    fn remove_item_cleans_only_managed_occurrence_leaving_same_name_external_intact() {
+        let directory = TestDirectory::new("remove-mixed-ownership");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let external = directory.source_file();
+        state.accept_drop(vec![Some(external.to_str().unwrap().to_owned())]).unwrap();
+        let managed = state.accept_text("managed text for remove".into()).unwrap();
+        let managed_item = &managed.snapshot.unwrap().batches[0].items[0];
+        let managed_path = std::path::PathBuf::from(&managed_item.path);
+        assert!(managed_path.exists());
+        assert!(external.exists());
+
+        state.remove_item(&managed_item.id).unwrap();
+        assert!(!managed_path.exists(), "managed file deleted");
+        assert!(external.exists(), "external source object preserved");
+        assert_eq!(state.snapshot().unwrap().batches.len(), 1);
     }
 }

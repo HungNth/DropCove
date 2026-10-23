@@ -59,14 +59,14 @@ onUnmounted(() => {
         Clear temporary items?
       </h1>
       <p id="clear-body" class="m-0 text-[12px] leading-[1.4] text-dc-text-secondary forced-colors:text-[CanvasText]">
-        Pinned items stay. Source files and folders aren’t deleted.
+        Pinned items stay. External sources stay. DropCove-created temporary files are permanently deleted.
       </p>
       <div v-if="error" class="max-h-[38px] overflow-y-auto p-[6px] border border-dc-danger-border bg-dc-danger-surface text-dc-danger-text rounded-[4px] text-[11px]" role="alert">
         {{ error }}
       </div>
     </div>
 
-    <div class="flex justify-end gap-[8px] mt-[12px]">
+    <div class="flex justify-end gap-[8px] mt-[6px]">
       <button
         ref="cancelButton"
         type="button"

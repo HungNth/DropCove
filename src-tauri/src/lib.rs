@@ -6,6 +6,7 @@ mod about;
 mod clear_confirmation;
 mod edge_rail;
 mod manage_items;
+pub(crate) mod managed_files;
 mod resident;
 mod resident_tray;
 mod settings;
@@ -47,6 +48,9 @@ fn publish_shelf(app: &tauri::AppHandle, snapshot: ShelfSnapshot) -> Result<Shel
     manage_items::synchronize(app)?;
     resident::synchronize(app, !snapshot.batches.is_empty())?;
     let _ = resident::update_rail_content(app, snapshot.batches.len());
+    if let Some(warning) = snapshot.warning.as_deref() {
+        let _ = resident::publish_warning(app, warning);
+    }
     use tauri::Emitter;
     let _ = app.emit("shelf-changed", ());
     Ok(snapshot)
@@ -416,10 +420,16 @@ async fn start_batch_drag(
         let participants = state
             .prepared_participants(&token)
             .map_err(|error| error.to_string())?;
+        let single_item_text = if participants.len() == 1 {
+            state.read_managed_text_content(&participants[0].id).ok().flatten()
+        } else {
+            None
+        };
         let outcome = storage_drag_on_window_thread(app.clone(), move |session| {
             windows_drag::perform_storage_drag(
                 session,
                 participants.iter().map(|item| item.path.as_str()),
+                single_item_text.as_deref(),
             )
         });
         match outcome {
@@ -453,9 +463,15 @@ async fn start_item_drag(
         let path = state
             .item_path(&item_id)
             .map_err(|error| error.to_string())?;
+        let unicode_text = state.read_managed_text_content(&item_id).ok().flatten();
         let outcome = storage_drag_on_window_thread(app.clone(), move |session| {
-            windows_drag::perform_storage_drag(session, std::iter::once(path.as_str()))
+            windows_drag::perform_storage_drag(
+                session,
+                std::iter::once(path.as_str()),
+                unicode_text.as_deref(),
+            )
         })?;
+
         if outcome == shelf::DragOutcome::Canceled {
             use tauri::Emitter;
             app.emit_to("manage-items", "item-drag-canceled", ())
@@ -465,6 +481,19 @@ async fn start_item_drag(
             .complete_item_drag(&item_id, outcome)
             .map_err(|error| error.to_string())?;
         publish_shelf(&app, snapshot)
+    })
+    .await
+}
+
+#[cfg(windows)]
+#[tauri::command]
+async fn get_managed_text(
+    item_id: String,
+    state: State<'_, ShelfState>,
+) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        state.read_managed_text_content(&item_id).map_err(|error| error.to_string())
     })
     .await
 }
@@ -849,6 +878,7 @@ pub fn run() {
             record_settings_key,
             save_settings,
             cancel_settings,
+            get_managed_text,
             get_shelf_visual,
             get_surface_generation,
             invalidate_surface_visuals,

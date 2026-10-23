@@ -171,6 +171,9 @@ pub(crate) async fn get_shelf_visual(window:tauri::WebviewWindow,app:tauri::AppH
             if !batch.items.iter().any(|item|item.id==item_id){return VisualOutcome::Fallback;}
         }
         let path=PathBuf::from(path);
+        if state.is_item_managed(&item_id).unwrap_or(false) {
+            return VisualOutcome::Fallback;
+        }
         let image=!folder && path.extension().and_then(|ext|ext.to_str()).is_some_and(|ext|["png","jpg","jpeg","bmp","gif","webp","ico","tiff","tif","avif"].iter().any(|format|ext.eq_ignore_ascii_case(format)));
         service.request(Key{surface,generation,item:item_id,size},path,if image{VisualRole::ImageThumbnail}else{VisualRole::ShellIcon},overscan.unwrap_or(false))
     }).await.map_err(|error|error.to_string())?;
