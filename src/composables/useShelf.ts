@@ -2,6 +2,8 @@ import { computed, nextTick, onMounted, onUnmounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
+import { useBatchSelection } from "./useBatchSelection.ts";
+import { useBatchDrag } from "./useBatchDrag.ts";
 
 export interface ShelfItem {
   id: string;
@@ -40,18 +42,9 @@ interface DropResult {
   message?: string;
 }
 
-interface BatchPreparation {
-  token: string | null;
-  available: number;
-  unavailable: number;
-  snapshot: ShelfSnapshot;
-}
-
-interface PendingDragConfirmation {
-  batchId: string;
-  token: string;
-  available: number;
-  unavailable: number;
+interface SelectionModifiers {
+  ctrlKey?: boolean;
+  shiftKey?: boolean;
 }
 
 export type ResizeEdge = "North" | "NorthEast" | "East" | "SouthEast" | "South" | "SouthWest" | "West" | "NorthWest";
@@ -63,14 +56,15 @@ export function useShelf() {
   const draggingOver = shallowRef(false);
   const resizing = shallowRef(false);
   const moving = shallowRef(false);
-  const pendingConfirmation = shallowRef<PendingDragConfirmation | null>(null);
   const confirmingClearTemporary = shallowRef(false);
-  let readyConfirmation: PendingDragConfirmation | null = null;
   let pendingRecoveryWarning: string | null = null;
   const window = getCurrentWindow();
   const unlisteners: UnlistenFn[] = [];
   let disposed = false;
   let refreshRequest = 0;
+  const selection = useBatchSelection(batches);
+  const batchDrag = useBatchDrag(batches, selection.ids, busy, status, refresh, selection.clear);
+  const pendingConfirmation = batchDrag.pending;
 
   const hasTemporaryItems = computed(() =>
     batches.value.some((batch) => batch.items.some((item) => !item.isPinned))
@@ -122,6 +116,7 @@ export function useShelf() {
     }
   }
   async function runAction(command: string, arguments_: Record<string, unknown> = {}) {
+    const control = document.activeElement?.closest(".card-actions") ? document.activeElement as HTMLElement : null;
     busy.value = true;
     try {
       await invoke<ShelfSnapshot>(command, arguments_);
@@ -130,7 +125,11 @@ export function useShelf() {
     } catch (error) {
       if (!disposed) status.value = String(error);
     } finally {
-      if (!disposed) busy.value = false;
+      if (!disposed) {
+        busy.value = false;
+        await nextTick();
+        if (control?.isConnected && document.activeElement === document.body) control.focus();
+      }
     }
   }
 
@@ -145,54 +144,13 @@ export function useShelf() {
     else unlisteners.push(unlisten);
   }
 
-  async function dispatchBatchDrag(token: string) {
-    pendingConfirmation.value = null;
-    readyConfirmation = null;
-    await runAction("start_batch_drag", { token });
-  }
-
-  async function cancelPreparedBatch() {
-    const pending = pendingConfirmation.value ?? readyConfirmation;
-    pendingConfirmation.value = null;
-    readyConfirmation = null;
-    if (pending) await runAction("cancel_batch_drag", { token: pending.token });
-  }
-
-  async function startBatchDrag(batchId: string) {
-    if (busy.value || pendingConfirmation.value) return;
-    if (readyConfirmation?.batchId === batchId) {
-      await dispatchBatchDrag(readyConfirmation.token);
-      return;
-    }
-    if (readyConfirmation) await cancelPreparedBatch();
-    busy.value = true;
-    try {
-      const preparation = await invoke<BatchPreparation>("prepare_batch_drag", { batchId });
-      await refresh();
-      if (!preparation.token || preparation.available === 0) {
-        status.value = "No available items remain in this batch.";
-        return;
-      }
-      if (preparation.unavailable > 0) {
-        pendingConfirmation.value = {
-          batchId,
-          token: preparation.token,
-          available: preparation.available,
-          unavailable: preparation.unavailable,
-        };
-        return;
-      }
-      await runAction("start_batch_drag", { token: preparation.token });
-    } catch (error) {
-      if (!disposed) status.value = String(error);
-    } finally {
-      if (!disposed) busy.value = false;
-    }
-  }
   async function onKeydown(event: KeyboardEvent) {
     if (event.key !== "Escape" || event.defaultPrevented || event.repeat) return;
+    if (batchDrag.hasPrepared()) {
+      await batchDrag.cancel();
+      return;
+    }
     if (
-      pendingConfirmation.value ||
       confirmingClearTemporary.value ||
       busy.value ||
       resizing.value ||
@@ -200,12 +158,18 @@ export function useShelf() {
     ) {
       return;
     }
+    const selectedAtEscape = selection.ids.value.join(",");
     try {
       const active = await invoke<ShelfBatch | null>("get_manage_items");
       if (active) {
         await invoke("close_manage_items");
         return;
       }
+      if (selectedAtEscape) {
+        if (selection.ids.value.join(",") === selectedAtEscape) selection.clear();
+        return;
+      }
+      if (selection.ids.value.length) return;
       await invoke("dismiss_drop_shelf");
     } catch (error) {
       if (!disposed) status.value = String(error);
@@ -215,9 +179,14 @@ export function useShelf() {
   onMounted(async () => {
     document.addEventListener("keydown", onKeydown);
     try {
+      await retainListener(window.listen("shelf-hidden", () => {
+        selection.clear();
+        void batchDrag.cancel();
+      }));
       await retainListener(window.listen<boolean>("shelf-resize-state", async ({ payload }) => {
         if (disposed) return;
         resizing.value = payload;
+        if (payload && batchDrag.hasPrepared()) await batchDrag.cancel();
         if (!payload) {
           moving.value = false;
           try { await refresh(); }
@@ -268,6 +237,7 @@ export function useShelf() {
   });
 
   onUnmounted(() => {
+    batchDrag.dispose();
     disposed = true;
     document.removeEventListener("keydown", onKeydown);
     for (const unlisten of unlisteners) unlisten();
@@ -275,6 +245,10 @@ export function useShelf() {
 
   return {
     batches,
+    selection,
+    selectBatch: (batchId: string, modifiers: SelectionModifiers) => {
+      if (!busy.value && !resizing.value && !moving.value && !confirmingClearTemporary.value) selection.select(batchId, modifiers);
+    },
     status,
     busy,
     draggingOver,
@@ -311,18 +285,9 @@ export function useShelf() {
     hasTemporaryItems,
     confirmingClearTemporary,
     requestClearTemporary,
-    confirmBatchDrag: () => {
-      const pending = pendingConfirmation.value;
-      if (!pending) return;
-      readyConfirmation = pending;
-      pendingConfirmation.value = null;
-      status.value = `Ready: drag the batch again to copy ${pending.available} available item(s).`;
-    },
-    dragConfirmedBatch: () => {
-      const pending = pendingConfirmation.value;
-      if (pending) void dispatchBatchDrag(pending.token);
-    },
-    cancelBatchDrag: () => void cancelPreparedBatch(),
+    confirmBatchDrag: batchDrag.confirm,
+    dragConfirmedBatch: batchDrag.dragConfirmed,
+    cancelBatchDrag: batchDrag.cancel,
     removeBatch: (batchId: string) => perform("remove_batch", { batchId }),
     setItemPinned: (itemId: string, pinned: boolean) => perform("set_item_pinned", { itemId, pinned }),
     setBatchPinned: (batchId: string, pinned: boolean) => perform("set_batch_pinned", { batchId, pinned }),
@@ -332,7 +297,7 @@ export function useShelf() {
       catch (error) { if (!disposed) status.value = String(error); }
     },
     startItemDrag: (itemId: string) => perform("start_item_drag", { itemId }),
-    startBatchDrag,
+    startBatchDrag: (batchId: string) => batchDrag.start(selection.dragIds(batchId)),
     dismissDropShelf: async () => {
       if (busy.value) return;
       try {

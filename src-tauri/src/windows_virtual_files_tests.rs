@@ -151,8 +151,9 @@ fn native_png_drop_preserves_bytes_name_restart_and_temporary_copy_cleanup() {
     drop(state);
     let state = ShelfState::open(&database).unwrap();
     assert_eq!(state.snapshot().unwrap().batches[0].items[0].id, item.id);
-    let preparation = state.prepare_batch_drag(&batch.id).unwrap();
-    state.complete_batch_drag(preparation.token.as_deref().unwrap(), crate::shelf::DragOutcome::Copy).unwrap();
+    let preparation = state.prepare_batch_drag(std::slice::from_ref(&batch.id)).unwrap();
+    let transfer = state.begin_batch_drag(preparation.token.as_deref().unwrap()).unwrap();
+    state.complete_batch_drag(&transfer, crate::shelf::DragOutcome::Copy).unwrap();
     assert!(state.snapshot().unwrap().batches.is_empty());
     assert!(!std::path::Path::new(&item.path).exists());
 }

@@ -250,7 +250,7 @@ mod tests {
         }
         let temp = std::env::temp_dir().join(format!("dropcove-icon-test-{}.txt", std::process::id()));
         let _ = std::fs::write(&temp, "test icon file");
-        let name = HSTRING::from(temp.as_os_str());
+        let name = windows::core::HSTRING::from(temp.as_os_str());
         let factory: IShellItemImageFactory = unsafe { SHCreateItemFromParsingName(&name, None) }
             .expect("SHCreateItemFromParsingName should succeed");
         let bitmap = unsafe { factory.GetImage(SIZE { cx: 32, cy: 32 }, SIIGBF_ICONONLY | SIIGBF_RESIZETOFIT) }

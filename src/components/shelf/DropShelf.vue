@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, shallowRef, useTemplateRef } from "vue";
+import { onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from "vue";
 import { useResizeObserver } from "@vueuse/core";
 import { useAnnouncer } from "../../composables/useAnnouncer";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
@@ -13,6 +13,8 @@ import UtilityMenu from "./UtilityMenu.vue";
 import { invoke } from "@tauri-apps/api/core";
 const {
   batches,
+  selection,
+  selectBatch,
   status,
   busy,
   draggingOver,
@@ -30,7 +32,6 @@ const {
   setItemPinned,
   setBatchPinned,
   openManageItems,
-  startItemDrag,
   startBatchDrag,
   dismissDropShelf,
   startMove,
@@ -58,7 +59,6 @@ async function openAboutFromMenu() {
 function onPointerDownOutside(event: PointerEvent) {
   const target = event.target as HTMLElement | null;
   if (target?.closest(".manage")) return;
-  event.preventDefault();
   void invoke("close_manage_items");
 }
 
@@ -77,6 +77,64 @@ useResizeObserver(gridRef, () => {
   if (gridRef.value) columns.value = getComputedStyle(gridRef.value).gridTemplateColumns.split(" ").length;
 });
 const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4, () => Number(draggingOver.value));
+const focusedBatch = shallowRef<string | null>(null);
+watch(() => `${selection.ids.value.join(',')}:${selection.itemCount.value}`, () => {
+  const count = selection.ids.value.length;
+  announce(count ? `${count} batches, ${selection.itemCount.value} items selected` : "Selection cleared");
+});
+
+async function onGridKeydown(event: KeyboardEvent) {
+  const target = event.target as HTMLElement;
+  if (event.key === "Tab") {
+    await virtual.onTab(event);
+    return;
+  }
+  if (!target.matches(".card-drag") || busy.value || resizing.value) {
+    await virtual.onTab(event);
+    return;
+  }
+  const card = target.closest<HTMLElement>("[data-batch-id]");
+  const index = batches.value.findIndex(batch => batch.id === card?.dataset.batchId);
+  if (index < 0) return;
+  const id = batches.value[index].id;
+  if (event.key === " ") {
+    event.preventDefault();
+    selectBatch(id, event);
+    return;
+  }
+  if (event.ctrlKey && event.key.toLowerCase() === "a") {
+    event.preventDefault();
+    selection.selectAll();
+    return;
+  }
+  let next = index;
+  switch (event.key) {
+    case "ArrowLeft": next--; break;
+    case "ArrowRight": next++; break;
+    case "ArrowUp": next -= columns.value; break;
+    case "ArrowDown": next += columns.value; break;
+    case "Home": next = 0; break;
+    case "End": next = batches.value.length - 1; break;
+    default: return;
+  }
+  event.preventDefault();
+  next = Math.max(0, Math.min(next, batches.value.length - 1));
+  focusedBatch.value = batches.value[next].id;
+  await virtual.focus(next, -2);
+}
+
+watch(batches, async (current, previous) => {
+  const index = previous.findIndex(batch => batch.id === focusedBatch.value);
+  if (index < 0 || current.some(batch => batch.id === focusedBatch.value)) return;
+  if (!current.length) {
+    focusedBatch.value = null;
+    document.querySelector<HTMLElement>(".more-action")?.focus();
+    return;
+  }
+  const next = Math.min(index, current.length - 1);
+  focusedBatch.value = current[next].id;
+  await virtual.focus(next, -2);
+}, { flush: "post" });
 </script>
 
 <template>
@@ -108,10 +166,14 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4, () => Num
       <section
         ref="gridRef"
         class="grid grid-cols-[repeat(auto-fill,minmax(164px,1fr))] [align-content:start] gap-[4px] pt-0 px-[7px] pb-[8px] min-h-0 overflow-x-hidden overflow-y-auto"
-        role="list"
+        role="grid"
+        aria-multiselectable="true"
         aria-label="Shelf batches"
+        :aria-rowcount="batches.length"
         :style="virtual.enabled.value ? { position: 'relative' } : {}"
-        @keydown="virtual.onTab"
+        @keydown="onGridKeydown"
+        @focusin="event => { const id = (event.target as HTMLElement).closest<HTMLElement>('[data-batch-id]')?.dataset.batchId; if (id) focusedBatch = id; }"
+        @pointerup="event => { if (!busy && !resizing && !(event.target as HTMLElement).closest('.card')) selection.clear(); }"
       >
       <div v-if="virtual.enabled.value" :style="{ height: `${virtual.totalHeight.value}px`, width: '100%', pointerEvents: 'none' }" />
       <DropPlaceholder v-if="draggingOver" :style="virtual.leadingPosition.value" />
@@ -120,17 +182,19 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4, () => Num
         :key="entry.item.id"
         :batch="entry.item"
         :busy="busy || resizing"
+        :selected="selection.selected.value.has(entry.item.id)"
+        :selection-tabindex="(focusedBatch ?? batches[0]?.id) === entry.item.id ? 0 : -1"
+        @select="selectBatch"
+        @focus-batch="id => focusedBatch = id"
         :data-virtual-index="entry.index"
         :data-virtual-id="entry.item.id"
-        :role="'listitem'"
-        :aria-setsize="batches.length"
-        :aria-posinset="entry.index + 1"
+        role="row"
+        :aria-rowindex="entry.index + 1"
         :style="virtual.position(entry.index)"
         @remove="(id) => { removeBatch(id); announce('Batch removed'); }"
         @pin-item="(id, p) => { setItemPinned(id, p); announce(p ? 'Item pinned' : 'Item unpinned'); }"
         @pin-batch="(id, p) => { setBatchPinned(id, p); announce(p ? 'Batch pinned' : 'Batch unpinned'); }"
         @manage="openManageItems"
-        @drag-item="startItemDrag"
         @drag-batch="startBatchDrag"
       />
       </section>
@@ -153,6 +217,7 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4, () => Num
         <ActionIcon name="trash" />
       </button>
       <div v-else class="size-[24px] flex-none" aria-hidden="true" />
+      <span v-if="selection.ids.value.length" class="min-w-0 flex-1 px-[4px] text-center text-[10px] text-dc-text-secondary" aria-hidden="true">{{ selection.ids.value.length }} batches · {{ selection.itemCount.value }} items</span>
       <UtilityMenu
         :disabled="busy || resizing || pendingConfirmation !== null || confirmingClearTemporary"
         @open-settings="openSettingsFromMenu"

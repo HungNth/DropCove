@@ -38,7 +38,7 @@ function pointerMove(event: PointerEvent) {
       {{ pending?.unavailable }} unavailable item(s) will remain. Drag only the {{ pending?.available }} available item(s)?
     </p>
     <p class="m-0 mb-[8px] text-dc-text-muted">
-      Drag the button to your destination, or confirm and then drag the batch again.
+      Drag the button to your destination, or confirm and then drag the same batches again.
     </p>
     <div class="flex flex-wrap gap-[6px]">
       <button

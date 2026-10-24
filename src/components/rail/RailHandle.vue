@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef, useTemplateRef } from "vue";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
+import { useBatchSelection } from "../../composables/useBatchSelection";
+import { useBatchDrag } from "../../composables/useBatchDrag";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -25,11 +27,6 @@ interface Projection {
   height: number;
 }
 
-interface BatchPreparation {
-  token: string;
-  available: number;
-  unavailable: number;
-}
 
 const edge = shallowRef<Projection["edge"]>("Right");
 const expanded = shallowRef(false);
@@ -38,13 +35,9 @@ const status = shallowRef("");
 const busy = shallowRef(false);
 const draggingOver = shallowRef(false);
 const confirmingClearTemporary = shallowRef(false);
-const pendingConfirmation = shallowRef<{
-  batchId: string;
-  token: string;
-  available: number;
-  unavailable: number;
-} | null>(null);
-let readyConfirmation: { batchId: string; token: string } | null = null;
+const selection = useBatchSelection(batches);
+const batchDrag = useBatchDrag(batches, selection.ids, busy, status, refreshBatches, selection.clear, active => setRailTransientHold(active, "batch-drag"));
+const pendingConfirmation = batchDrag.pending;
 let unlistenRail: UnlistenFn | undefined;
 let unlistenShelf: UnlistenFn | undefined;
 let unlistenTransientsClosed: UnlistenFn | undefined;
@@ -138,67 +131,8 @@ async function confirmClearTemporary() {
   await runAction("clear_temporary");
 }
 
-async function dispatchBatchDrag(token: string) {
-  pendingConfirmation.value = null;
-  readyConfirmation = null;
-  await setRailTransientHold(false, "batch-drag");
-  await runAction("start_batch_drag", { token });
-}
-
-async function cancelPreparedBatch() {
-  const pending = pendingConfirmation.value ?? readyConfirmation;
-  pendingConfirmation.value = null;
-  readyConfirmation = null;
-  await setRailTransientHold(false, "batch-drag");
-  if (pending) await runAction("cancel_batch_drag", { token: pending.token });
-}
-
 async function startBatchDrag(batchId: string) {
-  if (busy.value || pendingConfirmation.value) return;
-  if (readyConfirmation?.batchId === batchId) {
-    await dispatchBatchDrag(readyConfirmation.token);
-    return;
-  }
-  if (readyConfirmation) await cancelPreparedBatch();
-  busy.value = true;
-  try {
-    const preparation = await invoke<BatchPreparation>("prepare_batch_drag", { batchId });
-    await refreshBatches();
-    if (preparation.available === 0) {
-      readyConfirmation = null;
-      pendingConfirmation.value = null;
-      return;
-    }
-    if (preparation.unavailable > 0) {
-      const held = await setRailTransientHold(true, "batch-drag");
-      if (!held) return;
-      pendingConfirmation.value = {
-        batchId,
-        token: preparation.token,
-        available: preparation.available,
-        unavailable: preparation.unavailable,
-      };
-      return;
-    }
-    await invoke("start_batch_drag", { token: preparation.token });
-    await refreshBatches();
-  } catch (error) {
-    if (!disposed) status.value = String(error);
-  } finally {
-    if (!disposed) busy.value = false;
-  }
-}
-
-function confirmBatchDrag() {
-  const pending = pendingConfirmation.value;
-  if (!pending) return;
-  readyConfirmation = { batchId: pending.batchId, token: pending.token };
-  pendingConfirmation.value = null;
-}
-
-function dragConfirmedBatch() {
-  const pending = pendingConfirmation.value;
-  if (pending) void dispatchBatchDrag(pending.token);
+  await batchDrag.start(selection.dragIds(batchId));
 }
 
 async function openManageItems(batchId: string, anchor: ShelfAnchor, keyboard = false) {
@@ -245,6 +179,8 @@ onMounted(async () => {
         edge.value = payload.edge;
         expanded.value = payload.expanded;
         if (!payload.expanded) {
+          selection.clear();
+          await batchDrag.cancel();
           await invoke("invalidate_surface_visuals");
         }
       }
@@ -255,8 +191,9 @@ onMounted(async () => {
     unlistenTransientsClosed = await getCurrentWindow().listen("rail-transients-closed", async () => {
       if (disposed) return;
       expanded.value = false;
+      selection.clear();
       confirmingClearTemporary.value = false;
-      await cancelPreparedBatch();
+      await batchDrag.cancel();
       await invoke("invalidate_surface_visuals");
     });
     const projection = await invoke<Projection>("get_rail");
@@ -271,6 +208,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  batchDrag.dispose();
   disposed = true;
   window.removeEventListener("pointerdown", onPointerDownOutside);
   unlistenRail?.();
@@ -305,7 +243,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => N
         @click="openShelf"
       >
         <ActionIcon :name="edge === 'Left' ? 'right' : 'left'" :size="10" />
-        <span v-if="status" class="error absolute bottom-0 font-bold text-[10px] leading-none text-dc-danger" role="alert" aria-live="assertive">!</span>
+        <span v-if="status" class="error absolute bottom-0 font-bold text-[10px] leading-none text-dc-danger">!</span>
       </button>
       <div
         class="expansion-body flex flex-1 flex-col items-center justify-center w-full min-h-0 box-border cursor-default hover:bg-dc-surface-hover forced-colors:hover:bg-[Highlight]"
@@ -346,6 +284,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => N
           ref="railListRef"
           class="batch-list flex flex-col gap-[4px] pt-0 px-[6px] pb-[8px] overflow-y-auto flex-1 min-h-0 [&_.card]:h-[48px] [&_.card]:flex-[0_0_48px] [&_.card]:box-border [&_.card]:border [&_.card]:border-dc-border-subtle [&_.card]:rounded-[6px] [&_.card]:bg-dc-card [&_.card]:text-dc-text-primary forced-colors:[&_.card]:border-[ButtonText] forced-colors:[&_.card]:bg-[Canvas] forced-colors:[&_.card]:text-[CanvasText] [&_.card-drag]:min-h-full [&_.card-drag]:h-full [&_.card-drag]:box-border"
           :style="railVirtual.enabled.value ? { position: 'relative' } : {}"
+          @pointerup="event => { if (!busy && !(event.target as HTMLElement).closest('.card')) selection.clear(); }"
         >
         <div v-if="railVirtual.enabled.value" :style="{ height: `${railVirtual.totalHeight.value}px`, flex: 'none', width: '100%', pointerEvents: 'none' }" />
         <DropPlaceholder v-if="draggingOver" class="rounded-[6px]" :style="railVirtual.leadingPosition.value" />
@@ -354,6 +293,8 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => N
           :key="entry.item.id"
           :batch="entry.item"
           :busy="busy"
+          :selected="selection.selected.value.has(entry.item.id)"
+          @select="(id, modifiers) => { if (!busy && !confirmingClearTemporary) selection.select(id, modifiers); }"
           :data-virtual-index="entry.index"
           :data-virtual-id="entry.item.id"
           :role="'listitem'"
@@ -364,7 +305,6 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => N
           @pin-item="(id, pinned) => runAction('set_item_pinned', { itemId: id, pinned })"
           @pin-batch="(id, pinned) => runAction('set_batch_pinned', { batchId: id, pinned })"
           @manage="openManageItems"
-          @drag-item="(id) => runAction('start_item_drag', { itemId: id })"
           @drag-batch="startBatchDrag"
         />
         </div>
@@ -379,12 +319,13 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => N
           :disabled="busy || pendingConfirmation !== null"
           @click="requestClearTemporary"
         ><ActionIcon name="trash" /></button>
+        <span v-if="selection.ids.value.length" class="min-w-0 flex-1 px-[4px] text-center text-[10px] text-dc-text-secondary">{{ selection.ids.value.length }} batches · {{ selection.itemCount.value }} items</span>
       </footer>
       <BatchDragConfirmation
         :pending="pendingConfirmation"
-        @confirm="confirmBatchDrag"
-        @cancel="cancelPreparedBatch"
-        @drag="dragConfirmedBatch"
+        @confirm="batchDrag.confirm"
+        @cancel="batchDrag.cancel"
+        @drag="batchDrag.dragConfirmed"
       />
       <ClearTemporaryConfirmation
         :open="confirmingClearTemporary"
@@ -392,7 +333,7 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => N
         @confirm="confirmClearTemporary"
         @cancel="cancelClearTemporary"
       />
-      <span v-if="status" class="error-banner py-[4px] px-[8px] bg-dc-danger-surface text-dc-danger-text border border-dc-danger-border text-[10px]" role="alert" aria-live="assertive">{{ status }}</span>
+      <span v-if="status" class="error-banner py-[4px] px-[8px] bg-dc-danger-surface text-dc-danger-text border border-dc-danger-border text-[10px]">{{ status }}</span>
     </section>
   </div>
 </template>

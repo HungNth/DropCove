@@ -90,15 +90,19 @@ export function useVirtualCollection<T extends { id: string }>(
     }
     await nextTick();
     const row = container.value?.querySelector<HTMLElement>(`[data-virtual-index="${index}"]`);
-    const controls = row?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
-    controls?.[action < 0 ? controls.length - 1 : action]?.focus();
+    if (action === -2) {
+      row?.querySelector<HTMLElement>(".card-drag")?.focus();
+    } else {
+      const controls = row?.querySelectorAll<HTMLElement>(".card-drag[tabindex], button:not(:disabled)");
+      controls?.[action < 0 ? controls.length - 1 : action]?.focus();
+    }
   }
   async function onTab(event: KeyboardEvent) {
     if (event.key !== "Tab" || !enabled.value) return;
     const target = event.target as HTMLElement;
     const row = target.closest<HTMLElement>("[data-virtual-index]");
     if (!row) return;
-    const controls = Array.from(row.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
+    const controls = Array.from(row.querySelectorAll<HTMLElement>(".card-drag[tabindex], button:not(:disabled)"));
     const action = controls.findIndex(control => control === target);
     if (action < 0) return;
     const index = Number(row.dataset.virtualIndex);

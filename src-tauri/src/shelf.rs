@@ -26,7 +26,8 @@ struct IncomingItem {
     availability: Availability,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) enum DragOutcome {
     Copy,
     Rejected,
@@ -42,12 +43,17 @@ pub(crate) enum Availability {
 
 pub(crate) struct DragParticipant {
     pub(crate) id: String,
-    pub(crate) path: String,
+}
+
+pub(crate) struct PreparedTransfer {
+    pub(crate) participants: Vec<DragParticipant>,
+    pub(crate) paths: Vec<String>,
 }
 
 struct PreparedDrag {
     token: String,
-    participants: Arc<Vec<DragParticipant>>,
+    transfer: Arc<PreparedTransfer>,
+    changes: u64,
 }
 
 #[derive(Serialize)]
@@ -117,6 +123,10 @@ pub(crate) enum ShelfError {
     ItemNotFound(String),
     #[error("shelf batch not found: {0}")]
     BatchNotFound(String),
+    #[error("batch selection must contain at least one batch")]
+    EmptyBatchSelection,
+    #[error("batch selection contains a duplicate batch: {0}")]
+    DuplicateBatchSelection(String),
     #[error("prepared drag is no longer active")]
     InvalidPreparedDrag,
     #[error("system clock is before the Unix epoch")]
@@ -872,50 +882,56 @@ impl ShelfState {
 
     pub(crate) fn prepare_batch_drag(
         &self,
-        batch_id: &str,
+        batch_ids: &[String],
     ) -> Result<BatchPreparation, ShelfError> {
-        self.prepare_batch_drag_with(batch_id, windows_paths::classify)
+        self.prepare_batch_drag_with(batch_ids, windows_paths::classify)
     }
 
     fn prepare_batch_drag_with(
         &self,
-        batch_id: &str,
+        batch_ids: &[String],
         classifier: impl FnMut(&str) -> Availability,
     ) -> Result<BatchPreparation, ShelfError> {
-        self.store()?.prepare_batch(batch_id, classifier)
+        self.store()?.prepare_batches(batch_ids, classifier)
     }
 
-    pub(crate) fn prepared_participants(
+    pub(crate) fn begin_batch_drag(
         &self,
         token: &str,
-    ) -> Result<Arc<Vec<DragParticipant>>, ShelfError> {
-        self.store()?
+    ) -> Result<Arc<PreparedTransfer>, ShelfError> {
+        let mut store = self.store()?;
+        let prepared = store
             .prepared
             .as_ref()
             .filter(|prepared| prepared.token == token)
-            .map(|prepared| Arc::clone(&prepared.participants))
-            .ok_or(ShelfError::InvalidPreparedDrag)
+            .ok_or(ShelfError::InvalidPreparedDrag)?;
+        if prepared.changes != store.connection.total_changes() {
+            store.prepared = None;
+            return Err(ShelfError::InvalidPreparedDrag);
+        }
+        Ok(store.prepared.take().ok_or(ShelfError::InvalidPreparedDrag)?.transfer)
+    }
+
+    pub(crate) fn cancel_batch_drag(&self, token: &str) -> Result<ShelfSnapshot, ShelfError> {
+        let mut store = self.store()?;
+        if !store.prepared.as_ref().is_some_and(|prepared| prepared.token == token) {
+            return Err(ShelfError::InvalidPreparedDrag);
+        }
+        store.prepared = None;
+        store.snapshot()
     }
 
     pub(crate) fn complete_batch_drag(
         &self,
-        token: &str,
+        transfer: &PreparedTransfer,
         outcome: DragOutcome,
     ) -> Result<ShelfSnapshot, ShelfError> {
         let mut store = self.store()?;
-        let participants = store
-            .prepared
-            .as_ref()
-            .filter(|prepared| prepared.token == token)
-            .map(|prepared| Arc::clone(&prepared.participants))
-            .ok_or(ShelfError::InvalidPreparedDrag)?;
-        let result = if outcome == DragOutcome::Copy {
-            store.consume_items(participants.iter().map(|item| item.id.as_str()))
+        if outcome == DragOutcome::Copy {
+            store.consume_items(transfer.participants.iter().map(|item| item.id.as_str()))
         } else {
             store.snapshot()
-        };
-        store.prepared = None;
-        result
+        }
     }
 
     pub(crate) fn read_managed_text_content(&self, item_id: &str) -> Result<Option<String>, ShelfError> {
@@ -925,20 +941,18 @@ impl ShelfState {
             [item_id],
             |row| row.get(0),
         ).optional()?;
-        let relative_path = match &relative_path {
-            Some(p) if p.ends_with(".txt") => p.clone(),
-            _ => return Ok(None),
+        let Some(relative_path) = relative_path.filter(|path| path.ends_with(".txt")) else {
+            return Ok(None);
         };
         let managed_store = crate::managed_files::ManagedStore::new(&store.profile_root);
-        let full_path = match managed_store.full_path(&relative_path) {
-            Ok(p) => p,
-            Err(_) => return Ok(None),
-        };
-        let bytes = match std::fs::read(full_path) {
-            Ok(b) => b,
-            Err(_) => return Ok(None),
-        };
-        Ok(String::from_utf8(bytes).ok())
+        let full_path = managed_store.full_path(&relative_path).map_err(|source| ShelfError::FileSystem {
+            path: relative_path,
+            source,
+        })?;
+        fs::read_to_string(&full_path).map(Some).map_err(|source| ShelfError::FileSystem {
+            path: full_path.display().to_string(),
+            source,
+        })
     }
 
     pub(crate) fn is_item_managed(&self, item_id: &str) -> Result<bool, ShelfError> {
@@ -1664,36 +1678,69 @@ impl ShelfStore {
         Ok(snapshot)
     }
 
-    fn prepare_batch(
+    fn prepare_batches(
         &mut self,
-        batch_id: &str,
+        batch_ids: &[String],
         mut classifier: impl FnMut(&str) -> Availability,
     ) -> Result<BatchPreparation, ShelfError> {
-        let current = self.snapshot()?;
-        let batch = current
-            .batches
-            .iter()
-            .find(|batch| batch.id == batch_id)
-            .ok_or_else(|| ShelfError::BatchNotFound(batch_id.to_owned()))?;
-        let mut participants = Vec::with_capacity(batch.items.len());
-        let mut missing = Vec::new();
-        let mut unavailable = 0;
-        for item in &batch.items {
-            let availability = classifier(&item.path);
-            if let Some(value) = self.availability.get_mut(&item.id) {
-                *value = availability;
-            }
-            match availability {
-                Availability::Available => participants.push(DragParticipant {
-                    id: item.id.clone(),
-                    path: item.path.clone(),
-                }),
-                Availability::Missing => missing.push(item.id.as_str()),
-                Availability::Unavailable => unavailable += 1,
+        if batch_ids.is_empty() {
+            return Err(ShelfError::EmptyBatchSelection);
+        }
+        let mut selected = HashSet::with_capacity(batch_ids.len());
+        for id in batch_ids {
+            if !selected.insert(id.as_str()) {
+                return Err(ShelfError::DuplicateBatchSelection(id.clone()));
             }
         }
+        let current = self.snapshot()?;
+        for id in batch_ids {
+            if !current.batches.iter().any(|batch| &batch.id == id) {
+                return Err(ShelfError::BatchNotFound(id.clone()));
+            }
+        }
+        let selected_item_count = current
+            .batches
+            .iter()
+            .filter(|batch| selected.contains(batch.id.as_str()))
+            .map(|batch| batch.items.len())
+            .sum::<usize>();
+
+        let mut participants = Vec::with_capacity(selected_item_count);
+        let mut paths = Vec::with_capacity(selected_item_count);
+        let mut ordinal_paths: HashMap<usize, Vec<Vec<u16>>> = HashMap::new();
+        let mut missing = Vec::new();
+        let mut unavailable = 0;
+        let mut classifications = Vec::with_capacity(selected_item_count);
+        for batch in &current.batches {
+            if !selected.contains(batch.id.as_str()) {
+                continue;
+            }
+            for item in &batch.items {
+                let availability = classifier(&item.path);
+                classifications.push((item.id.as_str(), availability));
+                match availability {
+                    Availability::Available => {
+                        participants.push(DragParticipant {
+                            id: item.id.clone(),
+                        });
+                        let ordinal_path = item.path.encode_utf16().collect::<Vec<_>>();
+                        let same_length = ordinal_paths.entry(ordinal_path.len()).or_default();
+                        if !same_length
+                            .iter()
+                            .any(|existing| ordinal_equal(existing, &ordinal_path))
+                        {
+                            same_length.push(ordinal_path);
+                            paths.push(item.path.clone());
+                        }
+                    }
+                    Availability::Missing => missing.push(item.id.as_str()),
+                    Availability::Unavailable => unavailable += 1,
+                }
+            }
+        }
+
         let transaction = self.connection.transaction()?;
-        let _ = Self::queue_managed_deletions_for_items(&transaction, missing.iter().copied())?;
+        Self::queue_managed_deletions_for_items(&transaction, missing.iter().copied())?;
         for item_id in missing {
             transaction.execute("DELETE FROM shelf_items WHERE id = ?1", [item_id])?;
         }
@@ -1725,11 +1772,20 @@ impl ShelfStore {
             self.height = snapshot.height;
         }
         self.record_snapshot(&snapshot);
+        for (id, availability) in classifications {
+            if let Some(value) = self.availability.get_mut(id) {
+                *value = availability;
+            }
+        }
+        self.process_pending_managed_deletions()?;
         self.prepared = token.as_ref().map(|token| PreparedDrag {
             token: token.clone(),
-            participants: Arc::new(participants),
+            changes: self.connection.total_changes(),
+            transfer: Arc::new(PreparedTransfer {
+                participants,
+                paths,
+            }),
         });
-        self.process_pending_managed_deletions()?;
         let snapshot = self.snapshot()?;
         Ok(BatchPreparation {
             token,
@@ -2605,7 +2661,7 @@ mod tests {
             .snapshot
             .unwrap();
         let empty_prepared = state
-            .prepare_batch_drag_with(&initial.batches[0].id, |_| Availability::Unavailable)
+            .prepare_batch_drag_with(std::slice::from_ref(&initial.batches[0].id), |_| Availability::Unavailable)
             .unwrap();
         assert!(empty_prepared.token.is_none());
         assert_eq!(
@@ -2628,7 +2684,7 @@ mod tests {
             .snapshot
             .unwrap();
         let prepared = state
-            .prepare_batch_drag_with(&initial.batches[0].id, |path| {
+            .prepare_batch_drag_with(std::slice::from_ref(&initial.batches[0].id), |path| {
                 if path.starts_with("Z:") {
                     Availability::Unavailable
                 } else {
@@ -2637,6 +2693,7 @@ mod tests {
             })
             .unwrap();
         let token = prepared.token.unwrap();
+        let transfer = state.begin_batch_drag(&token).unwrap();
         let added = state
             .accept_drop(vec![Some("C:\\unrelated.txt".into())])
             .unwrap()
@@ -2644,7 +2701,7 @@ mod tests {
             .unwrap();
         assert_eq!(added.batches.len(), 2);
         let completed = state
-            .complete_batch_drag(&token, DragOutcome::Copy)
+            .complete_batch_drag(&transfer, DragOutcome::Copy)
             .unwrap();
         let original_batch = completed
             .batches
@@ -2759,10 +2816,11 @@ mod tests {
                     "clear" => state.clear_temporary().unwrap(),
                     "item-copy" => state.complete_item_drag(&batch.items[0].id, DragOutcome::Copy).unwrap(),
                     "batch-copy" => {
-                        let prepared = state.prepare_batch_drag_with(&batch.id, |_| super::Availability::Available).unwrap();
-                        state.complete_batch_drag(prepared.token.as_deref().unwrap(), DragOutcome::Copy).unwrap()
+                        let prepared = state.prepare_batch_drag_with(std::slice::from_ref(&batch.id), |_| super::Availability::Available).unwrap();
+                        let transfer = state.begin_batch_drag(prepared.token.as_deref().unwrap()).unwrap();
+                        state.complete_batch_drag(&transfer, DragOutcome::Copy).unwrap()
                     }
-                    "missing" => state.prepare_batch_drag_with(&batch.id, |_| super::Availability::Missing).unwrap().snapshot,
+                    "missing" => state.prepare_batch_drag_with(std::slice::from_ref(&batch.id), |_| super::Availability::Missing).unwrap().snapshot,
                     _ => unreachable!(),
                 };
                 assert_eq!(result.batches.len(), 4, "{operation}");
@@ -2805,7 +2863,7 @@ mod tests {
             .snapshot
             .unwrap();
         let prepared = state
-            .prepare_batch_drag_with(&initial.batches[0].id, |path| {
+            .prepare_batch_drag_with(std::slice::from_ref(&initial.batches[0].id), |path| {
                 if path.contains("missing") {
                     Availability::Missing
                 } else if path.starts_with("Z:") {
@@ -2817,7 +2875,7 @@ mod tests {
             .unwrap();
         assert_eq!((prepared.available, prepared.unavailable), (1, 1));
         let canceled = state
-            .complete_batch_drag(prepared.token.as_deref().unwrap(), DragOutcome::Canceled)
+            .cancel_batch_drag(prepared.token.as_deref().unwrap())
             .unwrap();
         assert_eq!(
             canceled.batches[0]
@@ -3375,8 +3433,9 @@ mod tests {
         let item_a_id = initial.batches[0].items[0].id.clone();
 
         // Prepare batch drag while items are temporary (is_pinned = false)
-        let prep = state.prepare_batch_drag(&batch_id).unwrap();
+        let prep = state.prepare_batch_drag(std::slice::from_ref(&batch_id)).unwrap();
         let token = prep.token.expect("batch drag token should exist");
+        let transfer = state.begin_batch_drag(&token).unwrap();
         assert_eq!(prep.available, 2);
 
         // While drag is active/prepared, user pins item_a via set_item_pinned
@@ -3387,7 +3446,7 @@ mod tests {
         // consume_items executes "DELETE FROM shelf_items WHERE id = ?1 AND is_pinned = 0"
         // Since item_a is now pinned, it MUST be retained; item_b is temporary, so it is consumed
         let snap = state
-            .complete_batch_drag(&token, DragOutcome::Copy)
+            .complete_batch_drag(&transfer, DragOutcome::Copy)
             .unwrap();
 
         assert_eq!(snap.batches.len(), 1);
@@ -3820,7 +3879,7 @@ mod tests {
         state.save_size(290.0, Some(240.0)).unwrap();
         let snap = state.snapshot().unwrap();
         let prep = state
-            .prepare_batch_drag_with(&snap.batches[0].id, |_| super::Availability::Missing)
+            .prepare_batch_drag_with(std::slice::from_ref(&snap.batches[0].id), |_| super::Availability::Missing)
             .unwrap();
         assert_eq!(
             (prep.snapshot.preferred_width, prep.snapshot.height),
@@ -4373,14 +4432,15 @@ mod tests {
         let initial_json = serde_json::to_value(&snap).unwrap();
         let batch_id = snap.batches[0].id.clone();
 
-        let prep = state.prepare_batch_drag(&batch_id).unwrap();
+        let prep = state.prepare_batch_drag(std::slice::from_ref(&batch_id)).unwrap();
         let token = prep.token.unwrap();
+        let transfer = state.begin_batch_drag(&token).unwrap();
 
         // Install trigger that fails item deletes
         state.install_test_delete_failure().unwrap();
 
         // Attempt to complete batch drag as Copy (consumption)
-        let result = state.complete_batch_drag(&token, DragOutcome::Copy);
+        let result = state.complete_batch_drag(&transfer, DragOutcome::Copy);
         assert!(result.is_err(), "Copy completion must fail if delete fails");
 
         // Visible snapshot retains prior state
@@ -4462,10 +4522,11 @@ mod tests {
         assert_eq!(restored_item.path, item.path);
 
         // Copy drag-out consumption permanent deletion
-        let prep = reopened.prepare_batch_drag(&batch.id).unwrap();
+        let prep = reopened.prepare_batch_drag(std::slice::from_ref(&batch.id)).unwrap();
         let token = prep.token.expect("token should be generated");
+        let transfer = reopened.begin_batch_drag(&token).unwrap();
         let consumed_snap = reopened
-            .complete_batch_drag(&token, DragOutcome::Copy)
+            .complete_batch_drag(&transfer, DragOutcome::Copy)
             .unwrap();
         assert!(consumed_snap.batches.is_empty(), "temporary item consumed");
         assert!(!item_path.exists(), "managed file permanently deleted after Copy consumption");
@@ -5320,5 +5381,108 @@ mod tests {
         assert_eq!(pending_count2, 0, "pending deletion completed successfully once lock released");
         assert!(!full_fin.exists(), "managed file deleted");
         assert!(external_file.exists(), "unowned external file still untouched");
+    }
+
+    #[test]
+    fn selected_drag_deduplicates_paths_but_consumes_every_temporary_occurrence() {
+        let directory = TestDirectory::new("selected-occurrences");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let older = state.accept_drop(vec![Some("C:\\same.txt".into()), Some("C:\\older.txt".into())]).unwrap().snapshot.unwrap();
+        let pinned = older.batches[0].items[0].id.clone();
+        state.set_item_pinned(&pinned, true).unwrap();
+        let newer = state.accept_drop(vec![Some("c:\\SAME.TXT".into()), Some("C:\\newer.txt".into())]).unwrap().snapshot.unwrap();
+        let ids = [older.batches[0].id.clone(), newer.batches[0].id.clone()];
+        let prepared = state.prepare_batch_drag_with(&ids, |_| super::Availability::Available).unwrap();
+        assert_eq!(prepared.available, 4);
+        let transfer = state.begin_batch_drag(prepared.token.as_deref().unwrap()).unwrap();
+        assert_eq!(transfer.paths, ["c:\\SAME.TXT", "C:\\newer.txt", "C:\\older.txt"]);
+        assert_eq!(transfer.participants.len(), 4);
+        let complete = state.complete_batch_drag(&transfer, DragOutcome::Copy).unwrap();
+        assert_eq!(complete.batches.len(), 1);
+        assert_eq!(complete.batches[0].items.iter().map(|item| item.id.as_str()).collect::<Vec<_>>(), [pinned.as_str()]);
+    }
+
+    #[test]
+    fn selected_drag_missing_cleanup_survives_cancel_and_retains_managed_bytes() {
+        let directory = TestDirectory::new("selected-missing");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let external = state.accept_drop(vec![Some("C:\\missing.txt".into()), Some("Z:\\offline.txt".into())]).unwrap().snapshot.unwrap();
+        let managed = state.accept_text("keep exact text".into()).unwrap().snapshot.unwrap();
+        let managed_path = managed.batches[0].items[0].path.clone();
+        let ids = [external.batches[0].id.clone(), managed.batches[0].id.clone()];
+        let prepared = state.prepare_batch_drag_with(&ids, |path| {
+            if path == "C:\\missing.txt" { super::Availability::Missing }
+            else if path.starts_with("Z:") { super::Availability::Unavailable }
+            else { super::Availability::Available }
+        }).unwrap();
+        assert_eq!((prepared.available, prepared.unavailable), (1, 1));
+        let canceled = state.cancel_batch_drag(prepared.token.as_deref().unwrap()).unwrap();
+        assert_eq!(canceled.batches.iter().flat_map(|batch| &batch.items).map(|item| item.path.as_str()).collect::<Vec<_>>(), [managed_path.as_str(), "Z:\\offline.txt"]);
+        assert_eq!(fs::read(&managed_path).unwrap(), b"keep exact text");
+        let prepared = state.prepare_batch_drag_with(&[managed.batches[0].id.clone()], |_| super::Availability::Available).unwrap();
+        let transfer = state.begin_batch_drag(prepared.token.as_deref().unwrap()).unwrap();
+        state.complete_batch_drag(&transfer, DragOutcome::Copy).unwrap();
+        assert!(!Path::new(&managed_path).exists());
+    }
+
+    #[test]
+    fn selected_drag_rejects_empty_duplicate_and_unknown_identifiers_without_mutation() {
+        let directory = TestDirectory::new("selected-invalid");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let initial = state.accept_drop(vec![Some("C:\\a.txt".into())]).unwrap().snapshot.unwrap();
+        let id = initial.batches[0].id.clone();
+        assert!(state.prepare_batch_drag(&[]).is_err());
+        assert!(state.prepare_batch_drag(&[id.clone(), id.clone()]).is_err());
+        assert!(state.prepare_batch_drag(&[id, "unknown".into()]).is_err());
+        assert_eq!(serde_json::to_value(state.snapshot().unwrap()).unwrap(), serde_json::to_value(initial).unwrap());
+    }
+
+    #[test]
+    fn selected_preparation_failure_preserves_availability_and_armed_start_rejects_mutation() {
+        let directory = TestDirectory::new("selected-preparation-rollback");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let snapshot = state.accept_drop(vec![Some("C:\\available.txt".into()), Some("C:\\missing.txt".into())]).unwrap().snapshot.unwrap();
+        let ids = [snapshot.batches[0].id.clone()];
+        let before = serde_json::to_value(state.snapshot().unwrap()).unwrap();
+        state.install_test_delete_failure().unwrap();
+        assert!(state.prepare_batch_drag_with(&ids, |path| if path.ends_with("missing.txt") { super::Availability::Missing } else { super::Availability::Available }).is_err());
+        assert_eq!(serde_json::to_value(state.snapshot().unwrap()).unwrap(), before);
+        let prepared = state.prepare_batch_drag_with(&ids, |_| super::Availability::Available).unwrap();
+        state.set_item_pinned(&snapshot.batches[0].items[0].id, true).unwrap();
+        assert!(state.begin_batch_drag(prepared.token.as_deref().unwrap()).is_err());
+        assert!(state.cancel_batch_drag(prepared.token.as_deref().unwrap()).is_err());
+    }
+
+    #[test]
+    fn running_drag_completes_its_captured_occurrences_without_clearing_a_new_preparation() {
+        let directory = TestDirectory::new("overlapping-prepared-drag");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let first = state.accept_drop(vec![Some("C:\\first.txt".into())]).unwrap().snapshot.unwrap();
+        let second = state.accept_drop(vec![Some("C:\\second.txt".into())]).unwrap().snapshot.unwrap();
+        let first_prepared = state.prepare_batch_drag_with(std::slice::from_ref(&first.batches[0].id), |_| super::Availability::Available).unwrap();
+        let first_token = first_prepared.token.unwrap();
+        let running = state.begin_batch_drag(&first_token).unwrap();
+        let next = state.prepare_batch_drag_with(std::slice::from_ref(&second.batches[0].id), |_| super::Availability::Available).unwrap();
+        assert!(state.cancel_batch_drag(&first_token).is_err(), "an old token must not cancel a new pending drag");
+        let completed = state.complete_batch_drag(&running, DragOutcome::Copy).unwrap();
+        assert_eq!(completed.batches.iter().flat_map(|batch| &batch.items).map(|item| item.path.as_str()).collect::<Vec<_>>(), ["C:\\second.txt"]);
+        state.cancel_batch_drag(next.token.as_deref().unwrap()).unwrap();
+        assert_eq!(state.snapshot().unwrap().batches[0].id, second.batches[0].id);
+    }
+
+    #[test]
+    fn managed_text_read_failure_retains_the_occurrence_and_reports_the_error() {
+        let directory = TestDirectory::new("managed-text-drag-read-failure");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let snapshot = state.accept_text("preserve this content".into()).unwrap().snapshot.unwrap();
+        let item = &snapshot.batches[0].items[0];
+        fs::remove_file(&item.path).unwrap();
+        let failure = state.read_managed_text_content(&item.id).unwrap_err();
+        assert!(matches!(failure, super::ShelfError::FileSystem { ref source, .. } if source.kind() == std::io::ErrorKind::NotFound));
+        assert_eq!(state.snapshot().unwrap().batches[0].items[0].id, item.id);
+        fs::write(&item.path, "preserve this content").unwrap();
+        assert_eq!(state.read_managed_text_content(&item.id).unwrap().as_deref(), Some("preserve this content"));
+        fs::write(&item.path, [0xff]).unwrap();
+        assert!(matches!(state.read_managed_text_content(&item.id), Err(super::ShelfError::FileSystem { source, .. }) if source.kind() == std::io::ErrorKind::InvalidData));
     }
 }

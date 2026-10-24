@@ -1120,25 +1120,44 @@ Approved DAG: `01 → 02 → {03, 04} → 05`.
 
 ## 0.0.25 — Multi-batch selection and drag-out
 
-**Status:** Planned — depends on completed `0.0.23` and `0.0.24` so selected drag-out handles both external references and Managed Files from its first release.
+**Status:** Completed — tickets 01–05 resolved; release candidate 0.0.25 packaged and accepted by user on 2026-10-24.
+
+Design confirmation: approved by the user through `grill-with-docs` on 2026-10-24.
+
+Testing seam confirmation: approved by the user through `to-spec` on 2026-10-24.
 
 Requirements: [Product Specification](SPECIFICATION.md#93-batch-selection) · [Architecture](ARCHITECTURE.md#8-drag-out-flow).
 
 ### Scope
 
-- Add Explorer-style Batch Selection to the Drop Shelf and expanded Edge Rail: click selects one, `Ctrl+click` toggles, `Shift+click` selects a visible-order range, dragging a selected card drags the complete selection, and dragging an unselected card drags only it.
-- Keep selection surface-local and session-only. Rejected/canceled drag retains it; Successful Drag-Out, empty-space click, `Escape`, hide, surface switch, or restart clears it.
-- Add Drop Shelf keyboard and accessibility semantics: focusable batch regions, `Space`, `Ctrl+Space`, `Shift+Space`, `Ctrl+A`, `Escape`, multiselectable collection state, per-card `aria-selected`, and polite selected batch/item counts. Keep the no-activate Edge Rail pointer-only.
-- Prepare selected batches as one serialized operation: preserve displayed batch and source-item order, remove Missing references, retain Unavailable references, show one aggregate confirmation, and cancel when no Available participant remains.
-- Deduplicate outbound path strings ordinal case-insensitively while recording every selected occurrence. Accepted Copy consumes every represented Temporary occurrence and permanently cleans its Managed File when owned; Pinned occurrences remain.
-- Preserve existing single-item, single-batch, Manage Items, Pinning, Clear, virtualization, sizing, Rail no-focus, and Copy-only contracts.
+- Add Explorer-style Batch Selection to the Drop Shelf and expanded Edge Rail: click selects one, `Ctrl+click` toggles and moves the anchor, `Shift+click` replaces selection with the complete visible-order range, dragging a selected card drags the complete selection, and dragging an unselected card drags only it. Selection remains stable across virtualization.
+- Keep selection surface-local and session-only. Rejected/canceled drag retains it unless a separate clear trigger occurs; Successful Drag-Out, empty-space click, `Escape`, hide, surface switch, or restart clears it. Hide remains authoritative during an active native drag.
+- Show selected cards with existing accent resources and compact footer batch/item occurrence counts on both surfaces. Add a multiselectable ARIA grid, roving focus, arrow/Home/End navigation, `Space`, `Ctrl+Space`, `Shift+Space`, `Ctrl+A`, focus recovery, and polite count announcements to the Drop Shelf while keeping the Edge Rail pointer-only/no-activate.
+- Prepare selected batches as one serialized operation bound to the exact ordered selected identities and Shelf snapshot: preserve displayed batch and source-item order, remove Missing references, retain Unavailable references, count occurrences, show one aggregate confirmation, invalidate stale prepared tokens, and cancel when no Available participant remains.
+- Deduplicate outbound path strings ordinal case-insensitively while recording every selected Available occurrence. Accepted Copy consumes every represented Temporary occurrence and permanently cleans its Managed File when owned; Pinned occurrences remain.
+- Preserve existing Manage Items item drag, Pinning, Clear, virtualization, sizing, Shell Visual, fullscreen, Shake, Rail no-focus, and Copy-only contracts.
 
-### Planned delivery slices
+### Approved delivery tickets
 
-1. Selection presentation: add surface-local identity state, pointer gestures, selected visuals/counts, virtualized collection stability, clear/retain transitions, and ordinary action-control isolation on both Shelf surfaces.
-2. Selected drag core: add batch-set preparation tokens, deterministic flattening/path deduplication, aggregate availability confirmation, occurrence-specific completion, Managed File cleanup, and rollback-safe persistence.
-3. Drop Shelf accessibility and release: add keyboard/ARIA/live announcements, preserve Edge Rail no-activate behavior, run the complete interaction matrix, synchronize `0.0.25`, and package/install one exact accepted NSIS candidate.
+1. [Drop Shelf pointer Batch Selection Copy round trip](../.scratch/multi-batch-selection-drag-out/issues/01-drop-shelf-pointer-batch-selection-copy.md) — resolved; establishes pointer selection and real all-Available multi-batch Copy.
+2. [Occurrence-safe mixed batch-set drag core](../.scratch/multi-batch-selection-drag-out/issues/02-occurrence-safe-mixed-batch-set-drag.md) — resolved; adds ordering, deduplication, mixed availability, exact occurrence completion, Managed File cleanup, and rollback.
+3. [Edge Rail pointer selection and lifecycle parity](../.scratch/multi-batch-selection-drag-out/issues/03-edge-rail-pointer-selection-lifecycle-parity.md) — resolved; extends the complete pointer workflow across the no-activate Rail and its surface/fullscreen lifecycle.
+4. [Drop Shelf accessible multiselectable grid](../.scratch/multi-batch-selection-drag-out/issues/04-drop-shelf-accessible-multiselectable-grid.md) — resolved; adds the approved keyboard, ARIA, focus-recovery, announcement, and virtualized accessibility contract.
+5. [Release DropCove 0.0.25](../.scratch/multi-batch-selection-drag-out/issues/05-release-dropcove-0.0.25.md) — resolved; owns integration, version synchronization, packaging, installed proof, and human acceptance.
 
+Approved DAG: `01 → 02 → {03, 04} → 05`.
+
+### Release Evidence — 2026-10-24
+
+| Final Retained Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `build/DropCove-Setup-0.0.25.exe` | 3,667,115 | `a7f23f7131b09f7c5d245af680e573d3a464b3fe9b308209667e1194a5c2a1d0` |
+| Exact built candidate `dropcove.exe` | 15,103,488 | `4d0bd588fd166426b8b3b1805ed1be31c17fe075eda92083ff3ff4261aabdcf3` |
+| Exact installed candidate `dropcove.exe` | 15,103,488 | `ab3c10f8bb132f82b00e3c5fc38895d15abdf04de63b47eb4dd7e39a298788e8` |
+
+- Independent standards and specification reviews passed across the complete implementation.
+- Full test suites passed: **181/181 native tests**, **39/39 frontend tests**, Vue production build, and cargo-xwin NSIS packaging.
+- Real installed candidate verified with embedded production assets across multi-batch pointer selection, virtualized range selection, native Copy, cancellation/rejection retention, mixed-ownership deduplication, occurrence-safe cleanup, fullscreen active-drag hiding, keyboard grid accessibility, Contrast focus distinguishability, and update Profile Data preservation.
 ### Planned verification
 
 - Exercise click, `Ctrl`, `Shift`, drag threshold, empty-space clear, `Escape` ordering, cancel/reject retention, Successful Copy clear, surface switch, hide/reopen, restart, action controls, and ordinary/virtualized collections above 50 batches.

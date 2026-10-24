@@ -379,16 +379,17 @@ fn storage_drag_on_window_thread(
 
 #[tauri::command]
 async fn prepare_batch_drag(
-    batch_id: String,
+    batch_ids: Vec<String>,
     app: tauri::AppHandle,
     state: State<'_, ShelfState>,
 ) -> Result<shelf::BatchPreparation, String> {
     let state = state.inner().clone();
     run_blocking(move || {
+        manage_items::close(&app)?;
         let preparation = state
-            .prepare_batch_drag(&batch_id)
+            .prepare_batch_drag(&batch_ids)
             .map_err(|error| error.to_string())?;
-        manage_items::synchronize(&app)?;
+        publish_shelf(&app, preparation.snapshot.clone())?;
         Ok::<_, String>(preparation)
     })
     .await
@@ -403,11 +404,17 @@ async fn cancel_batch_drag(
     let state = state.inner().clone();
     run_blocking(move || {
         let snapshot = state
-            .complete_batch_drag(&token, shelf::DragOutcome::Canceled)
+            .cancel_batch_drag(&token)
             .map_err(|error| error.to_string())?;
         publish_shelf(&app, snapshot)
     })
     .await
+}
+
+#[derive(serde::Serialize)]
+struct BatchDragResult {
+    outcome: shelf::DragOutcome,
+    error: Option<String>,
 }
 
 #[tauri::command]
@@ -415,39 +422,43 @@ async fn start_batch_drag(
     token: String,
     app: tauri::AppHandle,
     state: State<'_, ShelfState>,
-) -> Result<ShelfSnapshot, String> {
+) -> Result<BatchDragResult, String> {
     let state = state.inner().clone();
     run_blocking(move || {
-        manage_items::close(&app)?;
-        let participants = state
-            .prepared_participants(&token)
+        if let Err(error) = manage_items::close(&app) {
+            return match state.cancel_batch_drag(&token) {
+                Ok(_) => Err(error),
+                Err(cleanup) => Err(format!("{error}; prepared drag cancellation failed: {cleanup}")),
+            };
+        }
+        let transfer = state
+            .begin_batch_drag(&token)
             .map_err(|error| error.to_string())?;
-        let single_item_text = if participants.len() == 1 {
-            state.read_managed_text_content(&participants[0].id).ok().flatten()
+        let single_item_text = if transfer.participants.len() == 1 {
+            state.read_managed_text_content(&transfer.participants[0].id).map_err(|error| error.to_string())?
         } else {
             None
         };
+        let native_transfer = std::sync::Arc::clone(&transfer);
         let outcome = storage_drag_on_window_thread(app.clone(), move |session| {
             windows_drag::perform_storage_drag(
                 session,
-                participants.iter().map(|item| item.path.as_str()),
+                native_transfer.paths.iter().map(String::as_str),
                 single_item_text.as_deref(),
             )
         });
         match outcome {
             Ok(outcome) => {
-                let snapshot = state
-                    .complete_batch_drag(&token, outcome)
-                    .map_err(|error| error.to_string())?;
-                publish_shelf(&app, snapshot)
+                let completion = state
+                    .complete_batch_drag(&transfer, outcome)
+                    .map_err(|error| error.to_string())
+                    .and_then(|snapshot| publish_shelf(&app, snapshot));
+                Ok(BatchDragResult { outcome, error: completion.err() })
             }
-            Err(error) => {
-                state
-                    .complete_batch_drag(&token, shelf::DragOutcome::Canceled)
-                    .map_err(|cancel| cancel.to_string())?;
-                manage_items::synchronize(&app)?;
-                Err(error)
-            }
+            Err(error) => match manage_items::synchronize(&app) {
+                Ok(()) => Err(error),
+                Err(cleanup) => Err(format!("{error}; Manage Items synchronization failed: {cleanup}")),
+            },
         }
     })
     .await
@@ -465,7 +476,7 @@ async fn start_item_drag(
         let path = state
             .item_path(&item_id)
             .map_err(|error| error.to_string())?;
-        let unicode_text = state.read_managed_text_content(&item_id).ok().flatten();
+        let unicode_text = state.read_managed_text_content(&item_id).map_err(|error| error.to_string())?;
         let outcome = storage_drag_on_window_thread(app.clone(), move |session| {
             windows_drag::perform_storage_drag(
                 session,

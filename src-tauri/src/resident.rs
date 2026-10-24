@@ -811,6 +811,7 @@ impl<'a> WindowOps for NativeWindowOps<'a> {
         if unsafe { IsWindowVisible(hwnd) }.as_bool() {
             return Err("transient Shake Shelf remained visible after hide".into());
         }
+        self.window.emit("shelf-hidden", ()).map_err(|error| error.to_string())?;
         Ok(())
     }
 

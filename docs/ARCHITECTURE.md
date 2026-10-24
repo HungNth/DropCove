@@ -174,7 +174,7 @@ The instance identity is profile-specific. A normal profile and an explicit test
 | **Shelf Item** | Identifier, batch identifier, position, path, display name, folder flag, pinned flag | Represents one path occurrence; ownership is derived from the optional Managed File relation, never from path location. |
 | **Managed File** | Shelf Item identity, final relative path, ingestion state, optional staging relative path | App-owned backing for exactly one Shelf Item; `Staged` is not projected, `Ready` is user-visible. |
 | **Pending Managed File Deletion** | Cleanup identity and managed relative path | Survives after the Shelf Item is gone until permanent deletion succeeds or the target is already absent. |
-| **Batch Selection** | Not persisted | Surface-local ordered set of Shelf Batch identifiers used for one drag-out. |
+| **Batch Selection** | Not persisted | Surface-local selected Shelf Batch identities plus an optional selection anchor and focused identity; current display order determines range and drag order. |
 | **Display State** | Not persisted as a standalone value | `Hidden`, `Visible`, or `EdgeDocked`. |
 | **Rail Placement** | Settings: target monitor identifier and `Left` or `Right` edge; shelf state: actual latest dock monitor identifier | A connected explicit target wins; fresh automatic dismissal follows the pointer, while restoration reuses docked placement. Fallback never rewrites the explicit preference. |
 | **Sizing State** | Preferred logical width, nullable Manual Height Override | Automatic Shelf Sizing derives the exact current height from preferred width and responsive batch rows when manual height is absent. |
@@ -208,7 +208,7 @@ erDiagram
     }
 ```
 
-A Shelf Batch never owns a pinned state. Bulk Pinning derives the current tri-state from its Shelf Items and then updates every item atomically. Batch Selection contains batch identities only and never changes lifecycle state by itself.
+A Shelf Batch never owns a pinned state. Bulk Pinning derives the current tri-state from its Shelf Items and then updates every item atomically. Batch Selection contains batch identities only, survives virtual-row mount churn, and never changes item lifecycle or ownership state by itself.
 
 ## 5. State machines
 
@@ -348,25 +348,38 @@ sequenceDiagram
     participant DB as Shelf Database
     participant Files as Managed File Store
 
-    User->>Surface: Start item, batch, or Batch Selection drag
-    Surface->>State: Prepare selected batch identifiers
-    State->>DB: Remove confirmed-Missing references
-    State-->>Surface: Deduplicated Available paths + retained Unavailable items
+    User->>Surface: Drag card or Manage Items row
+    alt Card drag
+        Surface->>Surface: Resolve selected batch IDs in display order
+        Surface->>State: Prepare ordered batch set
+        State->>DB: Remove confirmed-Missing occurrences
+        State-->>Surface: Token + occurrence counts + deduplicated paths
+        opt Available and Unavailable are mixed
+            Surface-->>User: One aggregate confirmation
+            User->>Surface: Drag prepared action / arm retry / cancel
+        end
+    else Manage Items row drag
+        Surface->>State: Resolve one item path
+    end
     Surface->>Adapter: Create read-only path data object, Copy only
     Adapter->>Target: Windows drag operation
     Target-->>Adapter: Copy / rejected / canceled
     Adapter->>State: Complete with outcome
     alt Accepted Copy
-        State->>DB: Remove participating Temporary occurrences and record owned cleanup
+        State->>DB: Remove represented Temporary occurrences and record owned cleanup
         DB-->>State: Commit
         State->>Files: Attempt pending permanent deletions
         State-->>Surface: Refresh retained Pinned/unavailable items
     else Rejected, canceled, or failed
-        State-->>Surface: Keep participating references and Batch Selection
+        State-->>Surface: Keep represented occurrences
     end
 ```
 
-Preparation and completion are intentionally separate. A preparation token records every selected Available occurrence while the outbound path list is deduplicated ordinal case-insensitively in displayed batch and source-item order. Completion therefore consumes the correct Temporary occurrences without consuming unrelated or Pinned items.
+Card drag always uses the batch-set path. Dragging an unselected card prepares a singleton set; dragging a selected card prepares the complete surface-local Batch Selection. Direct one-item drag remains confined to Manage Items.
+
+Preparation and completion are intentionally separate. A preparation token is bound to the exact ordered selected batch identities and authoritative Shelf snapshot. It records every selected Available occurrence while the outbound path list is deduplicated ordinal case-insensitively in displayed batch and source-item order. Selection or Shelf mutation invalidates an armed token and requires cancellation followed by preparation again.
+
+Completion therefore consumes the correct Temporary occurrences without consuming unrelated or currently Pinned items. Selection clearing is presentation-owned and independent of token completion: hide or surface switch can clear selection while an already-running native drag still completes against its recorded participants.
 
 ## 9. Availability classification
 
@@ -524,7 +537,9 @@ The Resident coordinator assigns each transient Shake session an ID. Native OLE 
 ## 14. Presentation projections and visual resources
 
 - Compact cards keep bounded preview data; a batch requests visuals for at most its first three Shelf Items.
-- Batch collections and Manage Items lists use virtualized presentation controls. Batch Selection stores stable batch identities outside mounted-row lifetime and is discarded with its owning surface.
+- Batch collections and Manage Items lists use virtualized presentation controls. Batch Selection stores stable batch identities, an optional anchor, and focused identity outside mounted-row lifetime and is discarded with its owning surface.
+- The Drop Shelf collection projects a multiselectable ARIA grid with roving batch focus, row selected state, responsive arrow navigation, focus recovery after pruning, and one polite coalesced selection-count channel.
+- Both Shelf surfaces project selected cards through existing accent resources and show compact selected batch/item occurrence counts in their existing footer budgets. The no-activate Edge Rail adds no keyboard or live-region ownership.
 - Full item projections are created when management UI opens and cleared when it closes or its owner disappears.
 - Icon and thumbnail loading is asynchronous. File/folder icons provide fallback when image thumbnails are unavailable.
 - Raw SVG Managed Files are never decoded or rendered inside a DropCove WebView. Shell Visual may return a native icon or ordinary unavailable-visual fallback.

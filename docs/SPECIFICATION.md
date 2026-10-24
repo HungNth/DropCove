@@ -293,7 +293,7 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 - Maximum actual bounds: current monitor work area.
 - Resizable from all four edges and all four corners.
 - Resize hit region: approximately `8` logical pixels around the perimeter.
-- Resize hover displays the appropriate pointer and an accent outline.
+- Resize hover displays the appropriate pointer without changing the Shelf border or adding an accent outline.
 - The rounded surface background and border align flush with the transparent window frame at all four corners.
 - No persistent title/subtitle header is shown.
 - A titleless `28`-logical-pixel control strip contains a top-right `24 × 24` close action named **Hide Drop Shelf**. The action uses Dismiss Drop Shelf: empty content becomes `Hidden`, retained content becomes `EdgeDocked`, Manage Items closes, and the Resident Instance remains running without discarding references.
@@ -301,13 +301,13 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 - Reopening the Drop Shelf uses canonical cursor-monitor or Edge Rail placement; dragged coordinates are not persisted.
 - When no supported incoming drag is over the surface, an empty Drop Shelf shows only a downward icon and `Drop here`.
 - During a supported incoming drag, the Drop Shelf shows one `48`-logical-pixel Drop Placeholder at the prospective newest Shelf Batch position. It replaces the empty prompt or precedes retained batches, uses a dashed drag-hover border and a background distinct from the Shelf surface, and does not show a filename, thumbnail, or item count before acceptance.
-- Drag entry does not apply a surface-wide background, border, outline, or glow and does not temporarily resize the Drop Shelf. The resize-hover accent outline remains independent. Leaving or completing the drag removes the placeholder; an accepted new Shelf Batch then applies Automatic Shelf Sizing.
+- Drag entry does not apply a surface-wide background, border, outline, or glow and does not temporarily resize the Drop Shelf. Leaving or completing the drag removes the placeholder; an accepted new Shelf Batch then applies Automatic Shelf Sizing.
 - A bottom-left trash icon exposes **Clear Temporary Items** only while temporary content exists.
 - An always-visible bottom-right `24 × 24` **More** action opens the Drop Shelf Utility Menu above it. The menu contains **Settings** then **About**, supports standard keyboard navigation, and closes on outside click or `Escape`. Dismissal restores focus unless an opened utility surface receives it. Settings reuses its existing singleton window and Save/Cancel lifecycle.
 - The Utility Menu uses a stronger border token than Shelf batch cards and an elevated shadow to remain distinct from the Drop Shelf in Dark and Light themes. Windows Contrast retains a system-color border even when shadows are suppressed.
 - Status messages can be dismissed independently.
 - Foreground application changes reassert topmost z-order without activating the shelf.
-- `Esc` closes Manage Items first, then clears a non-empty Batch Selection, then dismisses the shelf on a later press.
+- `Esc` cancels an active batch availability confirmation and its prepared token first, then closes Manage Items, then clears a non-empty Batch Selection, then dismisses the shelf on a later press. Existing Utility Menu and Clear confirmation cancellation remain authoritative while those surfaces are open.
 
 ### 8.2 Responsive batch grid
 
@@ -402,18 +402,21 @@ Visible drag-hint subtitles are not shown on either card type. Full paths and dr
 
 ### 9.3 Batch Selection
 
-Batch Selection is transient presentation state owned by the current surface. It is not persisted or shared when switching between the Drop Shelf and Edge Rail.
+Batch Selection is transient presentation state owned by the current surface. It stores stable Shelf Batch identities plus one optional selection anchor; neither is persisted or shared when switching between the Drop Shelf and Edge Rail.
 
-- Click selects one Shelf Batch.
-- `Ctrl+click` toggles one batch without clearing the others.
-- `Shift+click` selects the visible-order range from the selection anchor.
-- Dragging a selected card drags the complete Batch Selection; dragging an unselected card drags only that batch.
-- Rejected or canceled drag-out retains the selection for retry. Successful Drag-Out clears it.
-- Clicking empty collection space, pressing `Escape`, hiding the surface, switching surfaces, or restarting clears the selection.
-- Selected cards expose a visible selected state and the surface reports the selected batch and Shelf Item counts.
-- Card action controls operate normally without implicitly changing selection.
+- Plain click selects one Shelf Batch and sets the anchor. `Ctrl+click` toggles one batch without clearing the others and sets the anchor even when the batch is toggled off.
+- `Shift+click` replaces the current selection with the inclusive range from the anchor to the target in complete displayed newest-first row-major order, including virtualized batches outside the viewport. Shift does not move a valid anchor. With no valid anchor it selects only the target and establishes it as anchor. `Ctrl+Shift` has the same replacement-range behavior in `0.0.25`.
+- Plain pointer press on an already selected card delays collapse until release below the established drag threshold. Crossing the threshold uses the pre-press selection: dragging a selected card drags the complete Batch Selection, while dragging an unselected card drags only that batch.
+- The card rule applies to one-item and multi-item Shelf Batches. Direct one-item drag remains available only from Manage Items.
+- Pin/Unpin, Bulk Pinning, Manage Items, and accepted drop-in do not change selection. Remove and confirmed-Missing cleanup remove only identities that disappear; surviving selected batches remain selected, item counts update, and a removed anchor becomes absent without selecting a replacement.
+- Rejected or canceled drag-out retains selection when no separate clear trigger occurs. Successful Drag-Out, empty collection-space click, `Escape`, surface hide, surface switch, or restart clears it. Hide or surface switch remains authoritative if a native drag is already active; its prepared participants complete independently and rejection does not restore hidden selection.
+- Selected cards use the accent border and accent-subtle surface, with Windows Highlight resources in Contrast Themes. The footer on each surface reports `N batches · M items`, where `M` counts current Shelf Item occurrences in the selected batches before availability preparation. No selection toolbar, mode, checkbox, or per-card count badge is added.
 
-On the Drop Shelf, batch drag regions are keyboard-focusable: `Space` selects only the focused batch, `Ctrl+Space` toggles it, `Shift+Space` extends the range, `Ctrl+A` selects all batches, and `Escape` clears selection before shelf dismissal. The batch collection exposes multiselectable semantics, each card exposes `aria-selected`, and count changes use the existing polite announcement channel. The no-activate Edge Rail remains pointer-only; keyboard users open the Drop Shelf through the global hotkey.
+On the Drop Shelf, the batch collection is a multiselectable ARIA grid because cards contain independently operable action controls. Each selectable batch row exposes `aria-selected`; its drag region participates in roving focus. Left/Right and Up/Down move through the responsive row-major layout, `Home` and `End` move to collection boundaries, `Space` selects only the focused batch, `Ctrl+Space` toggles it, `Shift+Space` selects the anchor range, and `Ctrl+A` selects the complete collection without changing a valid anchor. If no anchor exists, `Ctrl+A` leaves it absent, so the next Shift gesture selects only its target and establishes a new anchor. `Escape` follows the ordering in section 8.1.
+
+Pointer selection on the Drop Shelf focuses the card drag region; action-control activation retains control focus. If the focused batch disappears, focus moves to the batch now at the same displayed index, otherwise the previous batch, otherwise the More action when the Shelf becomes empty. Selection changes use the existing polite announcement channel with coalesced batch/item counts or `Selection cleared`.
+
+The no-activate Edge Rail exposes the same pointer gestures, selected visual, and footer count but remains pointer-only. It does not add focusable selection regions, keyboard selection, or a live announcement channel; keyboard users open the Drop Shelf through the global hotkey.
 
 ## 10. Manage Items
 
@@ -527,6 +530,8 @@ The expanded Edge Rail:
 
 Both expanded-Rail corner actions retain `24 × 24`-logical-pixel targets and `6`-pixel horizontal insets. Open Shelf is offset `4` pixels from the top edge within the existing `28`-pixel header budget; Clear Temporary Items is offset `4` pixels from the bottom edge while retaining the existing footer budget. These visual offsets mirror across Left and Right docking and do not change the height formula or expansion tiers.
 
+The expanded Rail footer also shows the compact Batch Selection count when selection is non-empty. This label shares the existing footer budget without changing the height formula, corner-action targets, no-activate behavior, or expansion tiers.
+
 The collapsed Rail Handle remains the full Open Shelf activation target and retains its vertical label.
 
 ### 11.4 Fullscreen policy
@@ -535,7 +540,7 @@ The collapsed Rail Handle remains the full Open Shelf activation target and reta
 
 When disabled, the requested rail hides while the selected monitor is fully covered by the foreground window and returns when that condition ends. When enabled, the rail remains visible over fullscreen windows.
 
-When fullscreen hiding begins, DropCove closes Edge Rail Manage Items and discards any unconfirmed Clear Temporary Items prompt. When fullscreen coverage ends, only the collapsed Rail Handle returns. An already-running native drag is not canceled by this presentation change.
+When fullscreen hiding begins, DropCove closes Edge Rail Manage Items, discards any unconfirmed Clear Temporary Items prompt, and clears Edge Rail Batch Selection. When fullscreen coverage ends, only the collapsed Rail Handle returns. An already-running native drag is not canceled by this presentation change; its prepared participants complete independently and do not restore selection after rejection or cancellation.
 
 ## 12. Drop-in behavior
 
@@ -666,20 +671,24 @@ Completion rules:
 | User canceled             | Retained       | Retained    |
 | Failure before acceptance | Retained       | Retained    |
 
-For a Batch Selection, DropCove flattens batches in displayed newest-first order and preserves source order inside each batch. Exact paths repeated across selected batches are emitted once using ordinal case-insensitive comparison. Every selected Temporary occurrence represented by an emitted path is consumed after accepted `Copy`; selected Pinned occurrences remain. No content hashing or shared Managed File backing participates in this deduplication.
+For a Batch Selection, DropCove resolves selected Shelf Batch identities in displayed newest-first order and preserves source order inside each batch; click order never controls payload order. Exact paths repeated across selected batches are emitted once using ordinal case-insensitive comparison, while same filenames at different paths remain distinct. The preparation token records every selected Available occurrence represented by an emitted path. Accepted `Copy` consumes every represented Temporary occurrence and retains every represented Pinned occurrence. No content hashing or shared Managed File backing participates in this deduplication.
 
 ### 14.2 Availability preparation
 
-Before a whole-batch or Batch Selection drag, one serialized preparation:
+Every card drag uses one serialized batch-set preparation; an unselected card supplies a singleton set. Before drag-out it:
 
-1. reclassifies every selected path;
-2. durably removes confirmed Missing Items and prunes empty batches;
-3. retains Unavailable Items;
-4. collects Available Items as drag participants;
-5. shows one aggregate confirmation when both Available and Unavailable Items remain;
-6. cancels with status feedback when no Available Item remains.
+1. binds preparation to the exact ordered selected batch identifiers and authoritative Shelf snapshot;
+2. reclassifies every selected Shelf Item occurrence;
+3. durably removes confirmed Missing Items, records required Managed File cleanup, and prunes empty batches;
+4. retains Unavailable Items;
+5. records every Available occurrence while producing ordinal case-insensitively deduplicated outbound paths;
+6. reports Available and Unavailable counts as Shelf Item occurrences;
+7. shows one aggregate confirmation when both Available and Unavailable occurrences remain;
+8. cancels with status feedback when no Available occurrence remains.
 
-Missing cleanup is not rolled back if the later drag is canceled or rejected. Rejected, canceled, or pre-acceptance-failed drag-out retains all recorded Available participants and the current Batch Selection for retry.
+Dragging the confirmation primary action starts that exact prepared operation immediately. Clicking it may arm a later card drag only while the selected identifiers and Shelf snapshot remain unchanged; any selection or Shelf mutation cancels the old token and requires preparation again. `Cancel` or `Escape` cancels the token but retains selection.
+
+Missing cleanup is not rolled back if the later confirmation or drag is canceled or rejected. Rejected, canceled, or pre-acceptance-failed drag-out retains all recorded Available participants and the current Batch Selection only when no hide, surface-switch, restart, or other selection-clear trigger occurred.
 
 Before one-item drag, DropCove resolves that item's storage object. Failure cancels the drag and keeps its reference unless it has already been removed through a separate lifecycle action.
 
@@ -895,7 +904,9 @@ Top and bottom Edge Rail docking are not supported.
 - Action controls expose accessible names and use inline SVG icons that inherit the current semantic text or system color.
 - Icon actions expose native tooltips, hover treatment, and visible `focus-visible` indicators.
 - Binary Pin controls expose `aria-pressed`; tri-state Bulk Pinning exposes `role="checkbox"` with `aria-checked="false"`, `"true"`, or `"mixed"`.
-- Keyboard users can open and close Manage Items, traverse actions, activate buttons with standard Enter/Space behavior, operate the Appearance radio group, and select Shelf Batches on the Drop Shelf with `Space`, `Ctrl+Space`, `Shift+Space`, `Ctrl+A`, and `Escape`; selected cards expose `aria-selected` and count changes are announced politely.
+- Keyboard users can open and close Manage Items, traverse actions, activate buttons with standard Enter/Space behavior, and operate the Appearance radio group.
+- The Drop Shelf batch collection uses `role="grid"` with `aria-multiselectable="true"`; selected batch rows expose `aria-selected`, batch drag regions use roving focus with arrow/Home/End navigation, and `Space`, `Ctrl+Space`, `Shift+Space`, `Ctrl+A`, and `Escape` operate the Batch Selection contract in section 9.3.
+- Selection count changes are announced politely and coalesced on the Drop Shelf. The Edge Rail remains pointer-only/no-activate and exposes only the visible selected treatment and footer count.
 - Full paths and drag instructions remain available through tooltips and accessibility text when visual text is shortened or omitted.
 - The resolved Appearance Mode drives Light or Dark semantic resources and matching native frames. Windows Contrast Theme bypasses the application palette and uses Windows system colors, explicit borders, and visible focus indicators.
 - Drop Placeholders use the drag-hover semantic colors in Dark and Light appearances and Windows system colors in Contrast Themes.
@@ -929,6 +940,7 @@ Primary actions use `#2B63EB` with white text. Dark accent text and icons use `#
 - Drag-out is Copy-only.
 - Cross-integrity drag-and-drop is not guaranteed.
 - Batch Selection is surface-local and session-only; it is not persisted or shared between the Drop Shelf and Edge Rail.
+- Additive `Ctrl+Shift` ranges, named selections, selection mode UI, and arbitrary item-level multi-selection are not supported.
 - Edge Rail supports only Left and Right docking and remains pointer-only/no-activate.
 - No automatic updater.
 - No clipboard history, accounts, cloud sync, plugins, named shelves, file synchronization, or arbitrary application-owned copies of ordinary filesystem drops.
