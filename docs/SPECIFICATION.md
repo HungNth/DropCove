@@ -134,6 +134,7 @@ Therefore `shelf.db`, `settings.json`, retained Managed Files, pending deletion 
 | **Drop Placeholder**              | Transient card-shaped marker for the newest position of one incoming Shelf Batch.                                                 |
 | **Shelf Item**                    | One filesystem path occurrence inside a Shelf Batch, backed by an external object or a Managed File.                              |
 | **Managed File**                  | Filesystem file created and owned by DropCove for accepted content that did not arrive as a filesystem object.                    |
+| **Website Image Virtual File**    | Image file represented by supplied bytes rather than a durable source filesystem object.                                         |
 | **Pending Managed File Deletion** | Managed File whose Shelf Item lifecycle ended but whose permanent deletion still awaits retry.                                   |
 | **Temporary Item**                | Shelf Item removed after Successful Drag-Out unless removed earlier by the user or Missing cleanup.                               |
 | **Pinned Item**                   | Shelf Item retained after Successful Drag-Out.                                                                                    |
@@ -541,7 +542,7 @@ When fullscreen hiding begins, DropCove closes Edge Rail Manage Items and discar
 DropCove accepts one representation family from each Windows OLE data object, in this priority order:
 
 1. existing filesystem storage items with non-empty paths;
-2. browser-provided virtual image files;
+2. Website Image Virtual Files;
 3. non-empty Unicode plain text.
 
 The selected family is the richest supported representation for that drop. Representations are never combined: an image drag that also exposes URL or text data creates only image Shelf Items. If a higher-priority offered family is invalid, DropCove rejects it rather than silently falling back to a lower-priority representation. URL-only, HTML-only, rich-text, bitmap-only, and generic virtual-file payloads are unsupported. One drag operation creates at most one Shelf Batch.
@@ -560,19 +561,21 @@ An incoming filesystem batch is duplicate when its item count matches a retained
 
 ### 12.2 Website image virtual files
 
-DropCove accepts browser-provided `CFSTR_FILEDESCRIPTORW` plus indexed `CFSTR_FILECONTENTS` image data without issuing its own HTTP request. Edge and Chrome on Windows are the initial browser acceptance matrix.
+DropCove accepts `CFSTR_FILEDESCRIPTORW` plus indexed `CFSTR_FILECONTENTS` image data without issuing its own HTTP request. Source application identity is not required. Current stable Edge and Chrome on Windows are the release acceptance matrix; compatible payloads from other applications are best-effort only.
 
-Supported formats are PNG, JPEG, GIF, WebP, AVIF, SVG, BMP, and ICO. DropCove validates content and a safe browser-provided filename instead of trusting the extension alone. Raw SVG bytes are preserved with their `.svg` name, but DropCove never renders SVG in a WebView; Shell Visual may use a generic icon fallback.
+Supported formats are PNG, JPEG, GIF, WebP, AVIF, SVG, BMP, and ICO. DropCove validates content instead of trusting the extension alone. It preserves a sanitized basename, replaces the extension with one matching the validated content, and generates `Dropped image YYYY-MM-DD HH-mm-ss[-N].ext` when no safe basename remains.
 
-Limits:
+Raster validation uses bounded parsers and must not require more than `512 MiB` of decoded allocation for one entry. A malformed entry, an unsupported parser path, or a decoder that cannot stay within that bound is skipped. Raw SVG bytes are preserved with an `.svg` name after secure well-formed XML validation with DTD and entity expansion disabled. DropCove does not remove scripts or external references from SVG, but it never renders SVG in a WebView; Shell Visual may use a generic icon fallback.
 
-- `100 MiB` per image;
-- at most `20` images per drop;
-- at most `500 MiB` total image content per drop.
+DropCove examines only the first `20` descriptors in source order. Each image has a `100 MiB` encoded-byte limit and the drop has a `500 MiB` accepted encoded-byte limit. An entry that exceeds its individual limit or would make the accepted total exceed the drop limit is skipped; a later descriptor among the first `20` may still be accepted when it fits. Content for descriptors after the first `20` is not opened.
 
-Each accepted image becomes a Managed File and keeps its sanitized browser filename. Unsupported, invalid, or over-limit image entries are skipped and counted; if at least one valid image remains, all accepted images form one Shelf Batch in descriptor order. An I/O, Windows Attachment Services, or persistence failure rejects the complete drop and removes staged files rather than committing a partial batch.
+Each accepted image becomes a Managed File. Unsupported, invalid, or over-limit image entries are skipped and counted; if at least one valid image remains, all accepted images form one Shelf Batch in descriptor order. Multiple entries may retain the same sanitized source filename because Managed File identity isolates their backing paths; only generated fallback names receive a numeric suffix. A partial success reports one non-modal **Added N images; skipped M.** status. A fully rejected image family reports one non-modal categorized warning for invalid or over-limit input, Attachment Services, I/O, or persistence failure. An I/O, Windows Attachment Services, or persistence failure rejects the complete drop and removes staged files rather than committing a partial batch.
 
-Every staged website image passes through Windows Attachment Services. An accompanying `http` or `https` source URL supplies the security zone; otherwise the Restricted Zone default applies. After Attachment Services returns, DropCove revalidates the final file and accepts it only if it still exists and satisfies the selected image format and size limits. Antivirus or trust-service changes are authoritative; pre-scan bytes are not retained.
+Every staged website image passes through mandatory Windows Attachment Services using non-UI `IAttachmentExecute::Save`; `0.0.24` provides no bypass, allowlist, or retry-without-scan path. Only `http` or `https` URLs obtained from `CFSTR_INETURLW` or `CFSTR_INETURLA` supply the security zone; DropCove never derives provenance from companion text, HTML, filenames, or image content. When no accepted source URL exists, the Restricted Zone default applies. A trust-service failure or requirement for user interaction rejects the complete drop without opening a security prompt. Successful `Save` is authoritative even when Windows policy or the profile filesystem does not create `Zone.Identifier`; DropCove preserves zone metadata whenever the filesystem provides it.
+
+After Attachment Services returns, DropCove revalidates the final file. Final supported bytes that remain within all limits are authoritative even when a trust service changed the content or image type: DropCove preserves those exact bytes, animation, and metadata, and repairs the extension to match the final type. A missing, invalid, unsupported, or over-limit final file rejects the complete drop; pre-scan bytes are never retained.
+
+`0.0.24` adds no intake progress or cancellation surface. Native extraction is bounded by the descriptor and byte limits, and each surface reports one aggregate result when processing finishes.
 
 ### 12.3 Plain text
 

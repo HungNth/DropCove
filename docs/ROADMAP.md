@@ -1070,32 +1070,48 @@ Approved DAG: `01 → {02, 03} → 04`.
 
 ## 0.0.24 — Website image virtual-file intake
 
-**Status:** Planned — depends on completed `0.0.23` Managed File ownership and cleanup.
+**Status:** Completed — tickets 01–04 resolved; release candidate 0.0.24 packaged and verified for human acceptance on 2026-10-23.
+
+Design confirmation: approved by the user through `grill-with-docs` on 2026-10-23.
 
 Requirements: [Product Specification](SPECIFICATION.md#122-website-image-virtual-files) · [Architecture](ARCHITECTURE.md#7-drag-in-flow) · [ADR-0006](adr/0006-managed-files-and-durable-cleanup.md) · [Windows payload research](../.scratch/content-intake-multi-batch/research/windows-non-path-drag-payloads.md).
 
 ### Scope
 
-- Extend the native OLE drop adapter to choose exactly one representation family: existing filesystem paths, otherwise browser virtual-image files, otherwise Unicode text. Invalid higher-priority data never falls through to URL or text.
-- Accept browser `CFSTR_FILEDESCRIPTORW` plus indexed `CFSTR_FILECONTENTS` streams from Edge and Chrome on Windows; do not add HTTP URL fallback or generic virtual-file intake.
-- Validate PNG, JPEG, GIF, WebP, AVIF, SVG, BMP, and ICO content plus safe filenames. Preserve raw SVG bytes, never render SVG in a DropCove WebView, and allow Shell Visual fallback.
-- Enforce `100 MiB` per image, at most `20` images and `500 MiB` total per drop. Skip unsupported/invalid/over-limit entries, but reject and clean the complete drop on I/O, trust-service, or persistence failure.
-- Apply Windows Attachment Services to every staged website image, use an accompanying HTTP(S) URL as the zone source or Restricted Zone otherwise, and accept only a still-valid post-scan file.
-- Preserve descriptor order and sanitized browser filenames, create one Shelf Batch per accepted image drop, and intentionally avoid content hashing or shared Managed Files.
+- Extend the native OLE drop adapter to choose exactly one representation family: existing filesystem paths, otherwise Website Image Virtual Files, otherwise Unicode text. Invalid higher-priority data never falls through to URL or text.
+- Accept `CFSTR_FILEDESCRIPTORW` plus indexed `CFSTR_FILECONTENTS` from current stable Edge and Chrome on Windows; compatible sources outside that release matrix remain best-effort, with Firefox acceptance deferred. Do not add HTTP URL fallback or generic virtual-file intake.
+- Validate PNG, JPEG, GIF, WebP, AVIF, SVG, BMP, and ICO content with bounded parsers. Preserve exact final bytes, animation, metadata, duplicate source names, and secure raw SVG; repair extensions and generate timestamped fallback names when needed. Never render SVG in a DropCove WebView.
+- Examine only the first `20` descriptors, enforce `100 MiB` encoded bytes per image, `500 MiB` accepted encoded bytes per drop, and `512 MiB` maximum decoded allocation per raster validation. Skip unsupported, invalid, or over-limit entries in order, but reject and clean the complete drop on I/O, trust-service, or persistence failure.
+- Apply mandatory non-UI Windows Attachment Services to every staged image. Accept zone sources only from HTTP(S) `CFSTR_INETURLW/A`, use Restricted Zone otherwise, honor Windows policy when ADS is unavailable, and revalidate the authoritative post-scan file.
+- Create one ordered Shelf Batch per accepted image drop, report one aggregate non-modal result, add no progress/cancel or security-bypass UI, and intentionally avoid content hashing or shared Managed Files.
 
-### Planned delivery slices
+### Approved delivery tickets
 
-1. OLE virtual-file adapter: enumerate and read bounded file descriptors/streams on the registered window thread, preserve existing path intake, enforce representation precedence, and stage owned bytes without crossing borrowed COM media between threads.
-2. Image trust and lifecycle: add format/content validation, safe naming, limits, raw-SVG handling, Attachment Services, post-scan revalidation, partial unsupported-entry reporting, and atomic Managed File batch acceptance.
-3. Release gate: verify the accepted implementation against Edge and Chrome, synchronize `0.0.24`, run complete regressions, package/install one exact NSIS candidate, record evidence and limits, and obtain human acceptance.
+1. [Single-PNG Website Image Drop Shelf round trip](../.scratch/website-image-virtual-file-intake/issues/01-single-png-drop-shelf-round-trip.md) — no blockers; establishes one complete browser-image Managed File workflow.
+2. [Bounded multi-format Website Image batch intake](../.scratch/website-image-virtual-file-intake/issues/02-bounded-multi-format-image-batch-intake.md) — blocked by Ticket 01; adds all formats, multi-image limits, naming, and aggregate partial success.
+3. [Attachment security and crash-atomic batch recovery](../.scratch/website-image-virtual-file-intake/issues/03-attachment-security-crash-atomic-recovery.md) — blocked by Ticket 02; hardens trust, failure, crash, startup, and Recovery Backup behavior.
+4. [Edge Rail, Shake, and image lifecycle parity](../.scratch/website-image-virtual-file-intake/issues/04-edge-rail-shake-image-lifecycle-parity.md) — blocked by Ticket 02; extends the complete workflow across both surfaces and established lifecycle actions.
+5. [Release DropCove 0.0.24](../.scratch/website-image-virtual-file-intake/issues/05-release-dropcove-0.0.24.md) — blocked by Tickets 03 and 04; owns integration, version synchronization, packaging, installed proof, and human acceptance.
+
+Approved DAG: `01 → 02 → {03, 04} → 05`.
+
+### Release Evidence — 2026-10-23
+
+| Final Retained Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `build/DropCove-Setup-0.0.24.exe` | 3,684,689 | `2ec9391583c8b9a6443544b7d619bae2adef889f84bc1ad032484c146619b3b0` |
+| Exact built candidate `dropcove.exe` | 15,264,768 | `d6a1f64648dd35ded53302d1569e4c2c0a21a1e9c5c4a271e88579dbed1e4237` |
+- Standards and spec reviews passed cleanly.
+- Full test suites passed: **175/175 native tests**, **13/13 frontend tests**, Vue production build, and cargo-xwin NSIS packaging.
+- Real current Edge and Chrome verified across all 8 formats, animation/metadata preservation, Attachment Services zone evidence, native Copy drag-out, and Edge Rail non-activating parity.
 
 ### Planned verification
 
-- Exercise real Edge and Chrome drags for every supported format on both surfaces, including raw SVG, animation-preserving formats, multiple image descriptors, same-name files, missing/unsafe names, corrupt bytes, extension/content mismatch, and URL/text companion formats.
+- Exercise real current-stable Edge and Chrome drags for every supported format on both surfaces, including secure raw SVG, animation and metadata preservation, multiple image descriptors, duplicate names, missing/unsafe names, corrupt bytes, extension/content mismatch, and URL/text companion formats. Compatible sources outside this matrix are best-effort only.
 - Prove representation precedence: ordinary filesystem drops remain format-agnostic references; image bytes beat companion URL/text; URL-only, HTML-only, bitmap-only, generic virtual-file, and invalid higher-priority payloads create no Shelf state.
-- Exercise exact per-file, item-count, and total-byte boundaries; valid entries with unsupported neighbors create one ordered batch and report skips, while operational/security/persistence failure creates no partial batch or orphan staging.
-- Observe Windows Attachment Services zone evidence, source-URL and Restricted-Zone paths, antivirus/trust rejection, deletion or alteration followed by post-scan revalidation, and installed drag-out of the final accepted bytes.
-- Verify Temporary/Pinned lifecycle, permanent cleanup, retry, restart/update/uninstall/recovery retention, Shell Visual fallback, no WebView SVG rendering, Dark/Light/Contrast presentation, cargo-xwin build, and exact installed NSIS lifecycle.
+- Exercise first-20 descriptor handling, exact encoded per-file and accepted-total boundaries, the `512 MiB` validation-allocation cap, fit-in-order skipping, and aggregate partial-success feedback. Operational, security, or persistence failure creates no partial batch or orphan staging.
+- Observe mandatory non-UI Attachment Services with explicit HTTP(S) `CFSTR_INETURLW/A` and Restricted-Zone paths, Windows policy with and without ADS, antivirus/trust rejection, deletion or alteration followed by post-scan revalidation, exact final-byte drag-out, and no bypass prompt.
+- Verify bounded large-drop latency without progress/cancel UI, Temporary/Pinned lifecycle, permanent cleanup, retry, restart/update/uninstall/recovery retention, Shell Visual fallback, no WebView SVG rendering, Dark/Light/Contrast presentation, cargo-xwin build, and exact installed NSIS lifecycle.
 
 ### Deferred
 

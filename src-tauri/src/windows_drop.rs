@@ -1,4 +1,4 @@
-use std::{cell::Cell, sync::LazyLock, sync::Mutex};
+use std::{cell::Cell, sync::Mutex};
 
 use tauri::{Emitter, Manager, WebviewWindow};
 use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Controller4;
@@ -10,7 +10,6 @@ use windows::{
             Com::{
                 CoTaskMemFree, IDataObject, DVASPECT_CONTENT, FORMATETC, STGMEDIUM, TYMED_HGLOBAL,
             },
-            DataExchange::RegisterClipboardFormatW,
             Memory::{GlobalLock, GlobalSize, GlobalUnlock},
             Ole::{
                 IDropTarget, IDropTarget_Impl, RegisterDragDrop, ReleaseStgMedium, RevokeDragDrop,
@@ -21,7 +20,7 @@ use windows::{
         UI::{
             Shell::{
                 DragQueryFileW, IShellItemArray, SHCreateShellItemArrayFromDataObject,
-                CFSTR_FILEDESCRIPTORW, HDROP, SIGDN_FILESYSPATH,
+                HDROP, SIGDN_FILESYSPATH,
             },
             WindowsAndMessaging::EnumChildWindows,
         },
@@ -33,15 +32,6 @@ use crate::windows_drag::DragSession;
 
 pub(crate) const MAX_UNICODE_TEXT_BYTES: usize = 10 * 1024 * 1024;
 
-static FILE_DESCRIPTOR_W_FORMAT: LazyLock<u32> = LazyLock::new(|| {
-    // SAFETY: RegisterClipboardFormatW safely registers or returns the atom for FileGroupDescriptorW.
-    unsafe { RegisterClipboardFormatW(CFSTR_FILEDESCRIPTORW) }
-});
-
-static FILE_DESCRIPTOR_A_FORMAT: LazyLock<u32> = LazyLock::new(|| {
-    // SAFETY: RegisterClipboardFormatW safely registers or returns the atom for FileGroupDescriptor (ANSI).
-    unsafe { RegisterClipboardFormatW(windows::core::w!("FileGroupDescriptor")) }
-});
 
 #[implement(IDropTarget)]
 struct StorageDropTarget {
@@ -55,6 +45,7 @@ struct RegisteredDropWindows(Mutex<Vec<isize>>);
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum EvaluatedPayload {
     Filesystem(Vec<Option<String>>),
+    VirtualImages,
     UnicodeText(String),
     InvalidUnicodeText,
     Unsupported,
@@ -64,7 +55,7 @@ impl EvaluatedPayload {
     pub(crate) fn is_supported(&self) -> bool {
         match self {
             Self::Filesystem(paths) => paths.iter().any(Option::is_some),
-            Self::UnicodeText(_) => true,
+            Self::UnicodeText(_) | Self::VirtualImages => true,
             Self::InvalidUnicodeText => false,
             Self::Unsupported => false,
         }
@@ -81,54 +72,6 @@ unsafe extern "system" fn collect_child(hwnd: HWND, context: LPARAM) -> BOOL {
     true.into()
 }
 
-fn has_non_url_file_group_descriptor(data: &IDataObject) -> bool {
-    for (format_id, wide) in [(*FILE_DESCRIPTOR_W_FORMAT, true), (*FILE_DESCRIPTOR_A_FORMAT, false)] {
-        if format_id == 0 { continue; }
-        let format = FORMATETC {
-            cfFormat: format_id as u16, ptd: std::ptr::null_mut(), dwAspect: DVASPECT_CONTENT.0,
-            lindex: -1, tymed: TYMED_HGLOBAL.0 as u32,
-        };
-        // SAFETY: GetData transfers an owned STGMEDIUM. StorageMedium ensures ReleaseStgMedium runs.
-        let medium = match unsafe { data.GetData(&format) } {
-            Ok(medium) => StorageMedium(medium),
-            Err(_) => continue,
-        };
-        let hglobal = unsafe { medium.0.u.hGlobal };
-        if medium.0.tymed != TYMED_HGLOBAL.0 as u32 || hglobal.is_invalid() { continue; }
-        // SAFETY: GlobalLock is safe on a valid HGLOBAL and balanced by GlobalUnlock.
-        let ptr = unsafe { GlobalLock(hglobal) };
-        if ptr.is_null() { continue; }
-        struct Unlock(windows::Win32::Foundation::HGLOBAL);
-        impl Drop for Unlock { fn drop(&mut self) { unsafe { let _ = GlobalUnlock(self.0); } } }
-        let _unlock = Unlock(hglobal);
-        let count = unsafe { *(ptr as *const u32) };
-        if count == 0 { continue; }
-        // Chromium and Edge synthesize a single .url Internet Shortcut when dragging links.
-        // If every descriptor in the payload is a synthesized .url file, do not treat it as a
-        // file-like payload that suppresses accompanying plain text.
-        let is_url_descriptor = |name: &str| name.to_ascii_lowercase().ends_with(".url");
-        let mut only_urls = true;
-        if wide {
-            #[repr(C)]
-            struct FILEDESCRIPTORW_HEAD { flags: u32, clsid: [u8; 16], size: [u32; 2], point: [i32; 2], file_attribs: u32, ft: [u32; 6], size_high: u32, size_low: u32, name: [u16; 260] }
-            let first = unsafe { &*((ptr as *const u8).add(4) as *const FILEDESCRIPTORW_HEAD) };
-            let len = first.name.iter().position(|&c| c == 0).unwrap_or(first.name.len());
-            if let Ok(name) = String::from_utf16(&first.name[..len]) {
-                if !is_url_descriptor(&name) { only_urls = false; }
-            } else { only_urls = false; }
-        } else {
-            #[repr(C)]
-            struct FILEDESCRIPTORA_HEAD { flags: u32, clsid: [u8; 16], size: [u32; 2], point: [i32; 2], file_attribs: u32, ft: [u32; 6], size_high: u32, size_low: u32, name: [u8; 260] }
-            let first = unsafe { &*((ptr as *const u8).add(4) as *const FILEDESCRIPTORA_HEAD) };
-            let len = first.name.iter().position(|&c| c == 0).unwrap_or(first.name.len());
-            if let Ok(name) = std::str::from_utf8(&first.name[..len]) {
-                if !is_url_descriptor(name) { only_urls = false; }
-            } else { only_urls = false; }
-        }
-        if !only_urls { return true; }
-    }
-    false
-}
 
 fn storage_paths(data: &IDataObject) -> Result<Vec<Option<String>>> {
     // SAFETY: The callback owns a live IDataObject for this synchronous read. COM interface
@@ -158,7 +101,7 @@ fn storage_paths(data: &IDataObject) -> Result<Vec<Option<String>>> {
     }
 }
 
-struct StorageMedium(STGMEDIUM);
+pub(crate) struct StorageMedium(pub(crate) STGMEDIUM);
 
 impl Drop for StorageMedium {
     fn drop(&mut self) {
@@ -307,9 +250,7 @@ pub(crate) fn evaluate_payload_precedence(
         return EvaluatedPayload::Unsupported;
     }
     if has_virtual_file_format {
-        // Higher-priority virtual file format was offered; unsupported in 0.0.23, reject without
-        // falling through to companion text/URL.
-        return EvaluatedPayload::Unsupported;
+        return EvaluatedPayload::VirtualImages;
     }
     match text_extraction {
         TextExtraction::Valid(text) => EvaluatedPayload::UnicodeText(text),
@@ -326,7 +267,7 @@ pub(crate) fn evaluate_data_payload(data: &IDataObject) -> EvaluatedPayload {
             None
         }
     });
-    let has_virtual = has_non_url_file_group_descriptor(data);
+    let has_virtual = crate::windows_virtual_files::has_virtual_family(data);
     let text_extraction = if filesystem_paths.is_none() && !has_virtual {
         extract_unicode_text(data)
     } else {
@@ -512,15 +453,31 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         }
         let window = self.window.clone();
         let state = window.state::<ShelfState>().inner().clone();
+        let images = if matches!(payload, EvaluatedPayload::VirtualImages) {
+            let prepared = state.image_staging_store().map_err(|e| format!("Image I/O failed: {e}"))
+                .and_then(|store| data.as_ref().ok_or_else(|| "Image I/O failed: missing data object.".to_string())
+                    .and_then(|data| crate::windows_virtual_files::extract(data, store)));
+            match prepared {
+                Ok(images) => Some(images),
+                Err(error) => {
+                    let _ = crate::resident::complete_shake_drop(window.app_handle(), shake_id, false);
+                    let _ = crate::resident::publish_warning(window.app_handle(), &error);
+                    let _ = window.app_handle().emit("shelf-error", error);
+                    return Ok(());
+                }
+            }
+        } else { None };
         // The IDataObject never crosses threads. Only owned extracted data does.
         tauri::async_runtime::spawn_blocking(move || {
             let intake_result = match payload {
-                EvaluatedPayload::Filesystem(paths) => state.accept_drop(paths),
-                EvaluatedPayload::UnicodeText(text) => state.accept_text(text),
+                EvaluatedPayload::Filesystem(paths) => state.accept_drop(paths).map_err(|e| e.to_string()),
+                EvaluatedPayload::UnicodeText(text) => state.accept_text(text).map_err(|e| e.to_string()),
+                EvaluatedPayload::VirtualImages => images.ok_or_else(|| "Image I/O failed: missing staged images.".to_string()).and_then(|images| images.accept(&state)),
                 EvaluatedPayload::InvalidUnicodeText | EvaluatedPayload::Unsupported => {
                     Ok(crate::shelf::DropResult {
                         snapshot: None,
                         skipped: 0,
+                        message: None,
                     })
                 }
             };
@@ -639,6 +596,17 @@ pub(crate) fn unregister(app: &tauri::AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn virtual_image_family_is_eligible_without_falling_through_to_companion_text() {
+        let payload = evaluate_payload_precedence(
+            None,
+            true,
+            TextExtraction::Valid("https://example.test/image.png".into()),
+        );
+        assert!(payload.is_supported(), "virtual images must be eligible for native Copy intake");
+        assert!(!matches!(payload, EvaluatedPayload::UnicodeText(_)));
+    }
 
     #[test]
     fn decode_bounded_unicode_text_rejects_empty_and_unterminated() {
@@ -763,7 +731,7 @@ mod tests {
                 true,
                 TextExtraction::Valid("https://example.com/image.png".into())
             ),
-            EvaluatedPayload::Unsupported
+            EvaluatedPayload::VirtualImages
         );
 
         // Pure unicode text with no higher priority formats is accepted

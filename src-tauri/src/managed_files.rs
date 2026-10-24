@@ -55,8 +55,13 @@ impl ManagedStore {
                 let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
                     || (stem.len() == 4 && (stem.starts_with("COM") || stem.starts_with("LPT"))
                         && matches!(stem.as_bytes()[3], b'1'..=b'9'));
+                let ext = filename.rsplit('.').next().unwrap_or_default().to_ascii_lowercase();
+                let valid_ext = matches!(
+                    ext.as_str(),
+                    "txt" | "png" | "jpg" | "jpeg" | "gif" | "webp" | "avif" | "svg" | "bmp" | "ico"
+                );
                 if filename.is_empty() || filename.starts_with('.') || filename.ends_with(['.', ' '])
-                    || !filename.ends_with(".txt") || reserved {
+                    || !valid_ext || reserved {
                     return Err(invalid());
                 }
             }

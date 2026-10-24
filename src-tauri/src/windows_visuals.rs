@@ -1,8 +1,8 @@
 //! Surface-owned Windows Shell visuals; failures are silent presentation fallbacks.
-use std::{collections::{HashMap, VecDeque}, path::{Path, PathBuf}, sync::{Arc, Condvar, Mutex, MutexGuard, mpsc}, thread::JoinHandle};
+use std::{collections::{HashMap, VecDeque}, os::windows::ffi::OsStrExt, path::{Path, PathBuf}, sync::{Arc, Condvar, Mutex, MutexGuard, mpsc}, thread::JoinHandle};
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager};
-use windows::{core::HSTRING, Win32::{Foundation::SIZE, Graphics::Gdi::{DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ}, System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED}, UI::{Shell::{IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_ICONONLY, SIIGBF_RESIZETOFIT}, WindowsAndMessaging::IsWindowVisible}}};
+use windows::{core::PCWSTR, Win32::{Foundation::SIZE, Graphics::Gdi::{DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ}, System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED}, UI::{Shell::{IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_ICONONLY, SIIGBF_RESIZETOFIT}, WindowsAndMessaging::IsWindowVisible}}};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -36,9 +36,19 @@ impl Drop for Bitmap { fn drop(&mut self) {
 } }
 impl ShellVisualExtractor for WindowsShellExtractor {
     fn extract(&self, path: &Path, role: VisualRole, size: u32) -> VisualOutcome {
-        let name = HSTRING::from(path.as_os_str());
-        // SAFETY: Workers have initialized COM; name owns a valid UTF-16 parsing name.
-        let factory: IShellItemImageFactory = match unsafe { SHCreateItemFromParsingName(&name,None) } { Ok(value)=>value, Err(_)=>return VisualOutcome::Fallback };
+        let path_str = path.to_string_lossy();
+        let mut wide_path = Vec::new();
+        if let Some(unc) = path_str.strip_prefix(r"\\?\UNC\") {
+            wide_path.extend(r"\\".encode_utf16());
+            wide_path.extend(unc.encode_utf16());
+        } else if let Some(stripped) = path_str.strip_prefix(r"\\?\") {
+            wide_path.extend(stripped.encode_utf16());
+        } else {
+            wide_path.extend(path.as_os_str().encode_wide());
+        }
+        wide_path.push(0);
+        // SAFETY: Workers have initialized COM; wide_path owns a valid NUL-terminated UTF-16 parsing name.
+        let factory: IShellItemImageFactory = match unsafe { SHCreateItemFromParsingName(PCWSTR::from_raw(wide_path.as_ptr()), None) } { Ok(value)=>value, Err(_)=>return VisualOutcome::Fallback };
         let flags = match role { VisualRole::ImageThumbnail=>SIIGBF_RESIZETOFIT, VisualRole::ShellIcon=>SIIGBF_ICONONLY | SIIGBF_RESIZETOFIT };
         // SAFETY: Request dimensions are validated and bounded at the command interface.
         let bitmap = match unsafe { factory.GetImage(SIZE{cx:size as i32,cy:size as i32},flags) } { Ok(value)=>Bitmap(value), Err(_)=>return VisualOutcome::Fallback };
@@ -151,6 +161,20 @@ impl Drop for ShellVisualService {fn drop(&mut self){
 pub(crate) struct ShellVisualState(pub(crate) Arc<ShellVisualService>);
 impl ShellVisualState{pub(crate) fn new()->Self{Self(Arc::new(ShellVisualService::new()))}}
 fn visual_size(size:Option<u32>,scale:Option<f64>)->Option<u32>{let size=size.unwrap_or(32);let scale=scale.unwrap_or(1.0);if !matches!(size,24|32)||!scale.is_finite()||!(0.5..=8.0).contains(&scale){return None;}Some((size as f64*scale).round() as u32)}
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum VisualPlan {
+    Extract(PathBuf, VisualRole),
+    Fallback,
+}
+
+pub(crate) fn resolve_visual_plan(path: PathBuf, is_folder: bool, is_managed: bool) -> VisualPlan {
+    if is_managed && path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("txt") || ext.eq_ignore_ascii_case("svg")) {
+        return VisualPlan::Fallback;
+    }
+    let is_image = !is_folder && path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ["png","jpg","jpeg","bmp","gif","webp","ico","tiff","tif","avif"].iter().any(|format| ext.eq_ignore_ascii_case(format)));
+    VisualPlan::Extract(path, if is_image { VisualRole::ImageThumbnail } else { VisualRole::ShellIcon })
+}
+
 #[tauri::command]
 pub(crate) async fn get_shelf_visual(window:tauri::WebviewWindow,app:tauri::AppHandle,shelf_state:tauri::State<'_,crate::shelf::ShelfState>,visual_state:tauri::State<'_,ShellVisualState>,item_id:String,generation:u64,size:Option<u32>,scale_factor:Option<f64>,overscan:Option<bool>)->Result<tauri::ipc::Response,String>{
     let empty=||tauri::ipc::Response::new(Vec::new());
@@ -171,11 +195,13 @@ pub(crate) async fn get_shelf_visual(window:tauri::WebviewWindow,app:tauri::AppH
             if !batch.items.iter().any(|item|item.id==item_id){return VisualOutcome::Fallback;}
         }
         let path=PathBuf::from(path);
-        if state.is_item_managed(&item_id).unwrap_or(false) {
-            return VisualOutcome::Fallback;
+        let is_managed = state.is_item_managed(&item_id).unwrap_or(false);
+        match resolve_visual_plan(path, folder, is_managed) {
+            VisualPlan::Fallback => VisualOutcome::Fallback,
+            VisualPlan::Extract(path, role) => {
+                service.request(Key{surface,generation,item:item_id,size}, path, role, overscan.unwrap_or(false))
+            }
         }
-        let image=!folder && path.extension().and_then(|ext|ext.to_str()).is_some_and(|ext|["png","jpg","jpeg","bmp","gif","webp","ico","tiff","tif","avif"].iter().any(|format|ext.eq_ignore_ascii_case(format)));
-        service.request(Key{surface,generation,item:item_id,size},path,if image{VisualRole::ImageThumbnail}else{VisualRole::ShellIcon},overscan.unwrap_or(false))
     }).await.map_err(|error|error.to_string())?;
     if visual_state.0.current_generation(surface)!=generation{return Ok(cancelled());}
     Ok(match outcome{VisualOutcome::Success(bytes)=>tauri::ipc::Response::new(bytes),VisualOutcome::Fallback=>empty(),VisualOutcome::Cancelled=>cancelled()})
@@ -243,5 +269,65 @@ mod tests {
         assert!(has_transparent, "Encoded icon must have transparent pixels for background");
         unsafe { let _ = DeleteObject(HGDIOBJ(bitmap.0)); }
         let _ = std::fs::remove_file(temp);
+    }
+
+    #[test]
+    fn windows_shell_extractor_handles_verbatim_path() {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
+        let temp = std::env::temp_dir().join(format!("dropcove-verbatim-test-{}.png", std::process::id()));
+        let png_bytes = &[
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+            0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+            0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+        std::fs::write(&temp, png_bytes).unwrap();
+        
+        let verbatim_path = temp.canonicalize().unwrap();
+        assert!(verbatim_path.to_str().unwrap().starts_with(r"\\?\"));
+        
+        let extractor = WindowsShellExtractor;
+        let outcome_verbatim = extractor.extract(&verbatim_path, VisualRole::ImageThumbnail, 32);
+        
+        let _ = std::fs::remove_file(temp);
+        assert!(matches!(outcome_verbatim, VisualOutcome::Success(_)), "verbatim path extraction must succeed");
+    }
+
+    #[test]
+    fn visual_plan_for_managed_files_allows_raster_and_falls_back_for_text_and_svg() {
+        // Managed text falls back
+        assert_eq!(
+            resolve_visual_plan(PathBuf::from("managed/item/file.txt"), false, true),
+            VisualPlan::Fallback
+        );
+        // Managed SVG falls back
+        assert_eq!(
+            resolve_visual_plan(PathBuf::from("managed/item/vector.svg"), false, true),
+            VisualPlan::Fallback
+        );
+        // Managed PNG requests ImageThumbnail
+        assert_eq!(
+            resolve_visual_plan(PathBuf::from("managed/item/photo.png"), false, true),
+            VisualPlan::Extract(PathBuf::from("managed/item/photo.png"), VisualRole::ImageThumbnail)
+        );
+        // Managed JPEG requests ImageThumbnail
+        assert_eq!(
+            resolve_visual_plan(PathBuf::from("managed/item/photo.jpg"), false, true),
+            VisualPlan::Extract(PathBuf::from("managed/item/photo.jpg"), VisualRole::ImageThumbnail)
+        );
+        // External text requests ShellIcon
+        assert_eq!(
+            resolve_visual_plan(PathBuf::from("C:\\docs\\notes.txt"), false, false),
+            VisualPlan::Extract(PathBuf::from("C:\\docs\\notes.txt"), VisualRole::ShellIcon)
+        );
+        // External PNG requests ImageThumbnail
+        assert_eq!(
+            resolve_visual_plan(PathBuf::from("C:\\photos\\pic.png"), false, false),
+            VisualPlan::Extract(PathBuf::from("C:\\photos\\pic.png"), VisualRole::ImageThumbnail)
+        );
     }
 }

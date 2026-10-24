@@ -16,6 +16,8 @@ use thiserror::Error;
 pub(crate) struct DropResult {
     pub(crate) snapshot: Option<ShelfSnapshot>,
     pub(crate) skipped: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) message: Option<String>,
 }
 
 struct IncomingItem {
@@ -683,6 +685,7 @@ impl ShelfState {
             return Ok(DropResult {
                 snapshot: None,
                 skipped: 0,
+                message: None,
             });
         }
         let mut store = self.store()?;
@@ -700,6 +703,7 @@ impl ShelfState {
                 return Ok(DropResult {
                     snapshot: None,
                     skipped: 0,
+                    message: None,
                 });
             }
         }
@@ -713,6 +717,7 @@ impl ShelfState {
         Ok(DropResult {
             snapshot: Some(snapshot),
             skipped,
+            message: None,
         })
     }
     pub(crate) fn accept_text(&self, text: String) -> Result<DropResult, ShelfError> {
@@ -721,6 +726,7 @@ impl ShelfState {
             return Ok(DropResult {
                 snapshot: None,
                 skipped: 0,
+                message: None,
             });
         }
         let bytes = trimmed_nul.as_bytes();
@@ -728,6 +734,7 @@ impl ShelfState {
             return Ok(DropResult {
                 snapshot: None,
                 skipped: 1,
+                message: None,
             });
         }
         let now = SystemTime::now();
@@ -744,6 +751,47 @@ impl ShelfState {
         Ok(DropResult {
             snapshot: Some(snapshot),
             skipped: 0,
+            message: None,
+        })
+    }
+
+    pub(crate) fn image_staging_store(&self) -> Result<crate::managed_files::ManagedStore, ShelfError> {
+        let store = self.store()?;
+        Ok(crate::managed_files::ManagedStore::new(&store.profile_root))
+    }
+
+    pub(crate) fn accept_image_files(
+        &self,
+        candidates: Vec<(String, String)>,
+        skipped: usize,
+    ) -> Result<DropResult, ShelfError> {
+        if candidates.is_empty() {
+            return Ok(DropResult {
+                snapshot: None,
+                skipped,
+                message: None,
+            });
+        }
+        let now = SystemTime::now();
+        let created_at = now
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| ShelfError::InvalidSystemClock)?
+            .as_millis()
+            .try_into()
+            .map_err(|_| ShelfError::TimestampOverflow)?;
+
+        let mut store = self.store()?;
+        let count = candidates.len();
+        let snapshot = store.insert_managed_images(candidates, created_at)?;
+        let message = if skipped > 0 {
+            Some(format!("Added {count} images; skipped {skipped}."))
+        } else {
+            None
+        };
+        Ok(DropResult {
+            snapshot: Some(snapshot),
+            skipped,
+            message,
         })
     }
 
@@ -877,9 +925,9 @@ impl ShelfState {
             [item_id],
             |row| row.get(0),
         ).optional()?;
-        let relative_path = match relative_path {
-            Some(p) => p,
-            None => return Ok(None),
+        let relative_path = match &relative_path {
+            Some(p) if p.ends_with(".txt") => p.clone(),
+            _ => return Ok(None),
         };
         let managed_store = crate::managed_files::ManagedStore::new(&store.profile_root);
         let full_path = match managed_store.full_path(&relative_path) {
@@ -1418,14 +1466,13 @@ impl ShelfStore {
             // Compensation on runtime failure after staged commit:
             // Enqueue pending deletion for both paths and remove unprojected row atomically,
             // restoring sizing if empty, then attempting immediate deletion.
-            if let Ok(tx) = self.connection.transaction() {
-                let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&staging_rel]);
-                let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&final_rel]);
-                let _ = tx.execute("DELETE FROM shelf_items WHERE id = ?1", [&item_id]);
-                let _ = tx.execute("DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)", []);
-                let _ = clear_sizing_when_empty(&tx);
-                let _ = tx.commit();
-            }
+            let tx = self.connection.transaction()?;
+            tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&staging_rel])?;
+            tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&final_rel])?;
+            tx.execute("DELETE FROM shelf_items WHERE id = ?1", [&item_id])?;
+            tx.execute("DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)", [])?;
+            clear_sizing_when_empty(&tx)?;
+            tx.commit()?;
             let _ = store.delete_managed_target(&staging_rel);
             let _ = store.delete_managed_target(&final_rel);
             let _ = self.process_pending_managed_deletions();
@@ -1441,13 +1488,12 @@ impl ShelfStore {
             [&item_id],
         );
         if let Err(ready_err) = ready_result {
-            if let Ok(tx) = self.connection.transaction() {
-                let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&final_rel]);
-                let _ = tx.execute("DELETE FROM shelf_items WHERE id = ?1", [&item_id]);
-                let _ = tx.execute("DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)", []);
-                let _ = clear_sizing_when_empty(&tx);
-                let _ = tx.commit();
-            }
+            let tx = self.connection.transaction()?;
+            tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&final_rel])?;
+            tx.execute("DELETE FROM shelf_items WHERE id = ?1", [&item_id])?;
+            tx.execute("DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)", [])?;
+            clear_sizing_when_empty(&tx)?;
+            tx.commit()?;
             let _ = store.delete_managed_target(&final_rel);
             let _ = self.process_pending_managed_deletions();
             return Err(ShelfError::Database(ready_err));
@@ -1455,6 +1501,162 @@ impl ShelfStore {
 
         // Step 5: Read snapshot and publish
         self.availability.insert(item_id, Availability::Available);
+        let snapshot = self.snapshot()?;
+        self.height = snapshot.height;
+        self.pending_manual_height = None;
+        self.record_snapshot(&snapshot);
+        Ok(snapshot)
+    }
+
+    fn insert_managed_images(
+        &mut self,
+        candidates: Vec<(String, String)>,
+        created_at: i64,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        let store = crate::managed_files::ManagedStore::new(&self.profile_root);
+        store.init_directories().map_err(|source| ShelfError::FileSystem {
+            path: self.profile_root.display().to_string(),
+            source,
+        })?;
+
+        struct PreparedItem {
+            item_id: String,
+            position: i64,
+            display_name: String,
+            staging_rel: String,
+            final_rel: String,
+            final_path_str: String,
+        }
+
+        let mut prepared = Vec::with_capacity(candidates.len());
+        for (pos, (staging_rel, filename)) in candidates.into_iter().enumerate() {
+            let parts: Vec<&str> = staging_rel.split(['/', '\\']).collect();
+            let item_id = match parts.as_slice() {
+                ["staging", fname] => fname
+                    .strip_suffix(".tmp")
+                    .filter(|id| id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit()))
+                    .map(ToString::to_string)
+                    .ok_or_else(|| ShelfError::InvalidPath)?,
+                _ => return Err(ShelfError::InvalidPath),
+            };
+            let final_rel = crate::managed_files::ManagedStore::final_rel_path(&item_id, &filename);
+            let final_path_str = store.full_path(&final_rel).map_err(|source| ShelfError::FileSystem {
+                path: final_rel.clone(),
+                source,
+            })?.display().to_string();
+            prepared.push(PreparedItem {
+                item_id,
+                position: pos as i64,
+                display_name: filename,
+                staging_rel,
+                final_rel,
+                final_path_str,
+            });
+        }
+
+        // Step 1: Commit batch, all items, and managed_files as 'staged' in one transaction
+        let tx_res = (|| -> Result<String, ShelfError> {
+            let tx = self.connection.transaction()?;
+            tx.execute("UPDATE shelf_batches SET position = position + 1", [])?;
+            let batch_id = random_id(&tx)?;
+            tx.execute(
+                "INSERT OR IGNORE INTO shelf_settings (id, preferred_width, manual_height) VALUES (1, ?1, ?2)",
+                params![self.width, self.pending_manual_height],
+            )?;
+            tx.execute(
+                "INSERT INTO shelf_batches (id, created_at, position) VALUES (?1, ?2, 0)",
+                params![batch_id, created_at],
+            )?;
+            for item in &prepared {
+                tx.execute(
+                    "INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+                     VALUES (?1, ?2, ?3, ?4, ?5, 0, 0)",
+                    params![item.item_id, batch_id, item.position, item.final_path_str, item.display_name],
+                )?;
+                tx.execute(
+                    "INSERT INTO managed_files (item_id, relative_path, state, staging_path)
+                     VALUES (?1, ?2, 'staged', ?3)",
+                    params![item.item_id, item.final_rel, item.staging_rel],
+                )?;
+            }
+            tx.commit()?;
+            Ok(batch_id)
+        })();
+
+        let batch_id = match tx_res {
+            Ok(b) => b,
+            Err(err) => {
+                // Failure before durable commit: delete all uncommitted staging files
+                for item in &prepared {
+                    let _ = store.delete_managed_target(&item.staging_rel);
+                }
+                return Err(err);
+            }
+        };
+
+        let mut first_promote_err = None;
+        for item in &prepared {
+            if let Err(err) = store.promote_staged(&item.staging_rel, &item.final_rel) {
+                first_promote_err = Some(ShelfError::FileSystem {
+                    path: item.final_rel.clone(),
+                    source: err,
+                });
+                break;
+            }
+        }
+
+        if let Some(first_err) = first_promote_err {
+            // Group rollback: record cleanup responsibility for all staging and final paths
+            let tx = self.connection.transaction()?;
+            for item in &prepared {
+                tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&item.staging_rel])?;
+                tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&item.final_rel])?;
+            }
+            tx.execute("DELETE FROM shelf_batches WHERE id = ?1", [&batch_id])?;
+            clear_sizing_when_empty(&tx)?;
+            tx.commit()?;
+
+            for item in &prepared {
+                let _ = store.delete_managed_target(&item.staging_rel);
+                let _ = store.delete_managed_target(&item.final_rel);
+            }
+            let _ = self.process_pending_managed_deletions();
+            return Err(first_err);
+        }
+
+        // Step 3: Commit all ownership rows to 'ready' in one transaction
+        let ready_res = (|| -> Result<(), rusqlite::Error> {
+            let tx = self.connection.transaction()?;
+            for item in &prepared {
+                tx.execute(
+                    "UPDATE managed_files SET state = 'ready', staging_path = NULL WHERE item_id = ?1",
+                    [&item.item_id],
+                )?;
+            }
+            tx.commit()?;
+            Ok(())
+        })();
+
+        if let Err(ready_err) = ready_res {
+            let tx = self.connection.transaction()?;
+            for item in &prepared {
+                tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&item.final_rel])?;
+            }
+            tx.execute("DELETE FROM shelf_batches WHERE id = ?1", [&batch_id])?;
+            clear_sizing_when_empty(&tx)?;
+            tx.commit()?;
+
+            for item in &prepared {
+                let _ = store.delete_managed_target(&item.final_rel);
+            }
+            let _ = self.process_pending_managed_deletions();
+            return Err(ShelfError::Database(ready_err));
+        }
+
+        // Step 4: Publish accepted snapshot
+        for item in &prepared {
+            self.availability.insert(item.item_id.clone(), Availability::Available);
+        }
         let snapshot = self.snapshot()?;
         self.height = snapshot.height;
         self.pending_manual_height = None;
@@ -1631,91 +1833,195 @@ impl ShelfStore {
             .max(0) as usize;
         Ok(())
     }
-    fn validate_managed_text_file(path: &Path) -> bool {
-        if let Ok(meta) = fs::metadata(path) {
-            if meta.is_file() && meta.len() <= crate::managed_files::MAX_TEXT_BYTES as u64 {
-                if let Ok(bytes) = fs::read(path) {
-                    return std::str::from_utf8(&bytes).is_ok();
+    fn validate_managed_file(path: &Path) -> Result<bool, ShelfError> {
+        let meta = match fs::metadata(path) {
+            Ok(m) => m,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(e) => return Err(ShelfError::FileSystem {
+                path: path.display().to_string(),
+                source: e,
+            }),
+        };
+        if !meta.is_file() {
+            return Ok(false);
+        }
+        let is_txt = path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("txt")).unwrap_or(false);
+        if is_txt {
+            if meta.len() <= crate::managed_files::MAX_TEXT_BYTES as u64 {
+                let bytes = match fs::read(path) {
+                    Ok(b) => b,
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+                    Err(e) => return Err(ShelfError::FileSystem {
+                        path: path.display().to_string(),
+                        source: e,
+                    }),
+                };
+                return Ok(std::str::from_utf8(&bytes).is_ok());
+            }
+            return Ok(false);
+        } else {
+            match crate::website_images::validate_image(path) {
+                Ok(_) => Ok(true),
+                Err(crate::website_images::ValidationError::Invalid(_)) => Ok(false),
+                Err(crate::website_images::ValidationError::Io(e)) => {
+                    if e.kind() == std::io::ErrorKind::NotFound {
+                        Ok(false)
+                    } else {
+                        Err(ShelfError::FileSystem {
+                            path: path.display().to_string(),
+                            source: e,
+                        })
+                    }
                 }
             }
         }
-        false
     }
 
     fn reconcile_managed_files(&mut self) -> Result<Option<String>, ShelfError> {
         let store = crate::managed_files::ManagedStore::new(&self.profile_root);
         let _ = store.init_directories();
 
-        let mut stmt = self.connection.prepare(
-            "SELECT item_id, relative_path, staging_path FROM managed_files WHERE state = 'staged'",
+        // Query all distinct batch_ids that have staged items
+        let mut batch_stmt = self.connection.prepare(
+            "SELECT DISTINCT si.batch_id
+             FROM shelf_items si
+             JOIN managed_files mf ON mf.item_id = si.id
+             WHERE mf.state = 'staged'",
         )?;
-        let staged_records: Vec<(String, String, Option<String>)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+        let staged_batch_ids: Vec<String> = batch_stmt
+            .query_map([], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;
-        drop(stmt);
+        drop(batch_stmt);
 
         let mut discarded_count = 0usize;
 
-        for (item_id, final_rel, staging_rel_opt) in staged_records {
-            let staging_path = staging_rel_opt
-                .as_ref()
-                .and_then(|r| store.full_path(r).ok());
-            let final_path = store.full_path(&final_rel).ok();
-
-            let final_valid = final_path
-                .as_deref()
-                .map(Self::validate_managed_text_file)
-                .unwrap_or(false);
-            let staging_valid = staging_path
-                .as_deref()
-                .map(Self::validate_managed_text_file)
-                .unwrap_or(false);
-
-            if final_valid {
-                // Interrupted after promotion but before 'ready' commit
-                self.connection.execute(
-                    "UPDATE managed_files SET state = 'ready', staging_path = NULL WHERE item_id = ?1",
-                    [&item_id],
-                )?;
-                if let Some(st_rel) = &staging_rel_opt {
-                    let _ = store.delete_managed_target(st_rel);
-                }
-            } else if staging_valid {
-                // Interrupted before promotion; promote staged file and commit 'ready'
-                let st_rel = staging_rel_opt.as_ref().unwrap();
-                if store.promote_staged(st_rel, &final_rel).is_ok()
-                    && final_path.as_deref().map(Self::validate_managed_text_file).unwrap_or(false)
-                {
-                    self.connection.execute(
-                        "UPDATE managed_files SET state = 'ready', staging_path = NULL WHERE item_id = ?1",
-                        [&item_id],
-                    )?;
-                } else {
-                    // Promotion or validation failed: discard staged item and enqueue deletion
-                    discarded_count += 1;
-                    let tx = self.connection.transaction()?;
-                    let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [st_rel]);
-                    let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&final_rel]);
-                    tx.execute("DELETE FROM shelf_items WHERE id = ?1", [&item_id])?;
-                    tx.commit()?;
-                    let _ = store.delete_managed_target(st_rel);
-                    let _ = store.delete_managed_target(&final_rel);
-                }
-            } else {
-                // Neither file exists or is valid: discard unprojected item and queue cleanup
-                discarded_count += 1;
-                let tx = self.connection.transaction()?;
-                if let Some(st_rel) = &staging_rel_opt {
-                    let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [st_rel]);
-                }
-                let _ = tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&final_rel]);
-                tx.execute("DELETE FROM shelf_items WHERE id = ?1", [&item_id])?;
-                tx.commit()?;
-                if let Some(st_rel) = &staging_rel_opt {
-                    let _ = store.delete_managed_target(st_rel);
-                }
-                let _ = store.delete_managed_target(&final_rel);
+        for batch_id in staged_batch_ids {
+            // Retrieve all items for this batch
+            let mut item_stmt = self.connection.prepare(
+                "SELECT si.id, mf.relative_path, mf.staging_path
+                 FROM shelf_items si
+                 JOIN managed_files mf ON mf.item_id = si.id
+                 WHERE si.batch_id = ?1",
+            )?;
+            struct BatchItemRecord {
+                item_id: String,
+                final_rel: String,
+                staging_rel_opt: Option<String>,
+                needs_promotion: bool,
             }
+            let mut records = Vec::new();
+            let mut batch_valid = true;
+
+            let rows = item_stmt.query_map([&batch_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?))
+            })?;
+
+            for row in rows {
+                let (item_id, final_rel, staging_rel_opt) = row?;
+                let staging_path = staging_rel_opt.as_ref().and_then(|r| store.full_path(r).ok());
+                let final_path = store.full_path(&final_rel).ok();
+
+                let final_valid = match final_path.as_deref() {
+                    Some(p) => Self::validate_managed_file(p)?,
+                    None => false,
+                };
+                let staging_valid = match staging_path.as_deref() {
+                    Some(p) => Self::validate_managed_file(p)?,
+                    None => false,
+                };
+
+                if final_valid {
+                    records.push(BatchItemRecord {
+                        item_id,
+                        final_rel,
+                        staging_rel_opt,
+                        needs_promotion: false,
+                    });
+                } else if staging_valid {
+                    records.push(BatchItemRecord {
+                        item_id,
+                        final_rel,
+                        staging_rel_opt,
+                        needs_promotion: true,
+                    });
+                } else {
+                    batch_valid = false;
+                    records.push(BatchItemRecord {
+                        item_id,
+                        final_rel,
+                        staging_rel_opt,
+                        needs_promotion: false,
+                    });
+                }
+            }
+            drop(item_stmt);
+
+            if batch_valid {
+                // Try promoting all items that need promotion
+                let mut promotion_ok = true;
+                for item in &records {
+                    if item.needs_promotion {
+                        let st_rel = item.staging_rel_opt.as_ref().unwrap();
+                        if store.promote_staged(st_rel, &item.final_rel).is_err() {
+                            promotion_ok = false;
+                            break;
+                        }
+                        let final_path = store.full_path(&item.final_rel).map_err(|e| ShelfError::FileSystem {
+                            path: item.final_rel.clone(),
+                            source: e,
+                        })?;
+                        if !Self::validate_managed_file(&final_path)? {
+                            promotion_ok = false;
+                            break;
+                        }
+                    }
+                }
+
+                if promotion_ok {
+                    // Mark all ready atomically
+                    let tx_res = (|| -> Result<(), rusqlite::Error> {
+                        let tx = self.connection.transaction()?;
+                        for item in &records {
+                            tx.execute(
+                                "UPDATE managed_files SET state = 'ready', staging_path = NULL WHERE item_id = ?1",
+                                [&item.item_id],
+                            )?;
+                        }
+                        tx.commit()?;
+                        Ok(())
+                    })();
+
+                    if tx_res.is_ok() {
+                        for item in &records {
+                            if let Some(st_rel) = &item.staging_rel_opt {
+                                let _ = store.delete_managed_target(st_rel);
+                            }
+                        }
+                        continue; // Successfully reconciled this batch
+                    }
+                }
+            }
+
+            // Batch recovery failed or not fully valid: discard entire batch atomically
+            discarded_count += records.len();
+            let tx = self.connection.transaction()?;
+            for item in &records {
+                if let Some(st_rel) = &item.staging_rel_opt {
+                    tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [st_rel])?;
+                }
+                tx.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&item.final_rel])?;
+            }
+            tx.execute("DELETE FROM shelf_batches WHERE id = ?1", [&batch_id])?;
+            clear_sizing_when_empty(&tx)?;
+            tx.commit()?;
+
+            for item in &records {
+                if let Some(st_rel) = &item.staging_rel_opt {
+                    let _ = store.delete_managed_target(st_rel);
+                }
+                let _ = store.delete_managed_target(&item.final_rel);
+            }
+            let _ = self.process_pending_managed_deletions();
         }
 
         self.connection.execute(
@@ -4434,5 +4740,585 @@ mod tests {
         assert!(!managed_path.exists(), "managed file deleted");
         assert!(external.exists(), "external source object preserved");
         assert_eq!(state.snapshot().unwrap().batches.len(), 1);
+    }
+
+    #[test]
+    fn image_group_acceptance_ordered_and_copy_lifecycle() {
+        let directory = TestDirectory::new("image-group-copy-lifecycle");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let store = state.image_staging_store().unwrap();
+        store.init_directories().unwrap();
+
+        let id1 = "11111111111111111111111111111111";
+        let id2 = "22222222222222222222222222222222";
+        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
+
+        // Minimal 1x1 valid PNG bytes
+        let png_bytes = &[
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+            0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+            0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+        store.stage_bytes(&st1, png_bytes).unwrap();
+        store.stage_bytes(&st2, png_bytes).unwrap();
+
+        let candidates = vec![
+            (st1.clone(), "first.png".to_string()),
+            (st2.clone(), "second.png".to_string()),
+        ];
+        let res = state.accept_image_files(candidates, 1).unwrap();
+        assert_eq!(res.skipped, 1);
+        assert_eq!(res.message, Some("Added 2 images; skipped 1.".to_string()));
+        let snap = res.snapshot.unwrap();
+        assert_eq!(snap.batches.len(), 1);
+        let batch = &snap.batches[0];
+        assert_eq!(batch.items.len(), 2);
+        assert_eq!(batch.items[0].name, "first.png");
+        assert_eq!(batch.items[1].name, "second.png");
+
+        let path1 = PathBuf::from(&batch.items[0].path);
+        let path2 = PathBuf::from(&batch.items[1].path);
+        assert!(path1.exists());
+        assert!(path2.exists());
+
+        // Pin first item, leave second temporary
+        state.set_item_pinned(&batch.items[0].id, true).unwrap();
+
+        // Complete Copy drag for second item (temporary): consumed & cleaned
+        state.complete_item_drag(&batch.items[1].id, DragOutcome::Copy).unwrap();
+        assert!(!path2.exists(), "temporary image deleted on Copy completion");
+
+        // Complete Copy drag for first item (pinned): retained
+        let retained = state.complete_item_drag(&batch.items[0].id, DragOutcome::Copy).unwrap();
+        assert_eq!(retained.batches[0].items.len(), 1);
+        assert!(path1.exists(), "pinned image retained after Copy");
+
+        // Explicit removal removes pinned image file
+        state.remove_item(&batch.items[0].id).unwrap();
+        assert!(!path1.exists(), "explicit removal cleans pinned image file");
+    }
+
+    #[test]
+    fn image_group_startup_reconciliation_restores_complete_ready_batch() {
+        let directory = TestDirectory::new("image-group-reconciliation");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let store = state.image_staging_store().unwrap();
+        store.init_directories().unwrap();
+
+        let id1 = "33333333333333333333333333333333";
+        let id2 = "44444444444444444444444444444444";
+        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
+        let fin1 = crate::managed_files::ManagedStore::final_rel_path(id1, "a.png");
+        let fin2 = crate::managed_files::ManagedStore::final_rel_path(id2, "b.png");
+
+        let png_bytes = &[
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+            0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+            0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+        // Item 1 was promoted before crash
+        let full_fin1 = store.full_path(&fin1).unwrap();
+        fs::create_dir_all(full_fin1.parent().unwrap()).unwrap();
+        fs::write(&full_fin1, png_bytes).unwrap();
+
+        // Item 2 was still in staging before crash
+        store.stage_bytes(&st2, png_bytes).unwrap();
+
+        // Seed SQLite as 'staged' for both items in one batch
+        {
+            let store_guard = state.store().unwrap();
+            let conn = &store_guard.connection;
+            conn.execute("INSERT INTO shelf_batches (id, created_at, position) VALUES ('b_img', 100, 0)", []).unwrap();
+            conn.execute(
+                "INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+                 VALUES (?1, 'b_img', 0, ?2, 'a.png', 0, 0)",
+                [id1, full_fin1.to_str().unwrap()],
+            ).unwrap();
+            let full_fin2 = store.full_path(&fin2).unwrap();
+            conn.execute(
+                "INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+                 VALUES (?1, 'b_img', 1, ?2, 'b.png', 0, 0)",
+                [id2, full_fin2.to_str().unwrap()],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO managed_files (item_id, relative_path, state, staging_path)
+                 VALUES (?1, ?2, 'staged', ?3)",
+                [id1, &fin1, &st1],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO managed_files (item_id, relative_path, state, staging_path)
+                 VALUES (?1, ?2, 'staged', ?3)",
+                [id2, &fin2, &st2],
+            ).unwrap();
+        }
+        drop(state);
+
+        // Reopen database: startup reconciliation must promote both and mark Ready atomically
+        let reopened = ShelfState::open(&database).unwrap();
+        let snap = reopened.snapshot().unwrap();
+        assert_eq!(snap.batches.len(), 1, "reconciled image batch becomes visible");
+        assert_eq!(snap.batches[0].items.len(), 2);
+        assert_eq!(snap.batches[0].items[0].id, id1);
+        assert_eq!(snap.batches[0].items[1].id, id2);
+    }
+
+    #[test]
+    fn image_group_startup_reconciliation_rolls_back_if_any_sibling_corrupt() {
+        let directory = TestDirectory::new("image-group-sibling-fail");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let store = state.image_staging_store().unwrap();
+        store.init_directories().unwrap();
+
+        let id1 = "55555555555555555555555555555555";
+        let id2 = "66666666666666666666666666666666";
+        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
+        let fin1 = crate::managed_files::ManagedStore::final_rel_path(id1, "ok.png");
+        let fin2 = crate::managed_files::ManagedStore::final_rel_path(id2, "bad.png");
+
+        let png_bytes = &[
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+            0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+            0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+        // Item 1 has valid PNG in staging
+        store.stage_bytes(&st1, png_bytes).unwrap();
+        // Item 2 has corrupt bytes in staging
+        store.stage_bytes(&st2, b"not a png").unwrap();
+
+        // Seed SQLite as 'staged' for both items in one batch
+        {
+            let store_guard = state.store().unwrap();
+            let conn = &store_guard.connection;
+            conn.execute("INSERT INTO shelf_batches (id, created_at, position) VALUES ('b_fail', 100, 0)", []).unwrap();
+            let full_fin1 = store.full_path(&fin1).unwrap();
+            let full_fin2 = store.full_path(&fin2).unwrap();
+            conn.execute(
+                "INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+                 VALUES (?1, 'b_fail', 0, ?2, 'ok.png', 0, 0)",
+                [id1, full_fin1.to_str().unwrap()],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+                 VALUES (?1, 'b_fail', 1, ?2, 'bad.png', 0, 0)",
+                [id2, full_fin2.to_str().unwrap()],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO managed_files (item_id, relative_path, state, staging_path)
+                 VALUES (?1, ?2, 'staged', ?3)",
+                [id1, &fin1, &st1],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO managed_files (item_id, relative_path, state, staging_path)
+                 VALUES (?1, ?2, 'staged', ?3)",
+                [id2, &fin2, &st2],
+            ).unwrap();
+        }
+        drop(state);
+
+        // Reopen database: sibling failure means NO batch is published, all are discarded
+        let reopened = ShelfState::open(&database).unwrap();
+        let snap = reopened.snapshot().unwrap();
+        assert_eq!(snap.batches.len(), 0, "corrupt sibling discards entire batch");
+    }
+
+    #[test]
+    fn image_group_insert_staged_transaction_failure_cleans_up_staging_files() {
+        let directory = TestDirectory::new("image-group-tx-fail");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let store = state.image_staging_store().unwrap();
+        store.init_directories().unwrap();
+
+        let id1 = "11111111111111111111111111111111";
+        let id2 = "22222222222222222222222222222222";
+        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
+        let png_bytes = &[
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+            0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+            0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+        let path1 = store.stage_bytes(&st1, png_bytes).unwrap();
+        let path2 = store.stage_bytes(&st2, png_bytes).unwrap();
+        assert!(path1.exists());
+        assert!(path2.exists());
+
+        // Inject trigger to fail the staged transaction on insert into shelf_batches
+        state.store().unwrap().connection.execute_batch(
+            "CREATE TEMP TRIGGER abort_batch_insert BEFORE INSERT ON shelf_batches BEGIN SELECT RAISE(ABORT, 'staged tx blocked'); END;"
+        ).unwrap();
+
+        let candidates = vec![
+            (st1.clone(), "img1.png".to_string()),
+            (st2.clone(), "img2.png".to_string()),
+        ];
+        let res = state.accept_image_files(candidates, 0);
+        assert!(res.is_err());
+
+        // Staging files must be cleaned up immediately, and no shelf batches exist
+        assert!(!path1.exists(), "staging file 1 deleted on tx failure");
+        assert!(!path2.exists(), "staging file 2 deleted on tx failure");
+        let snap = state.snapshot().unwrap();
+        assert!(snap.batches.is_empty());
+    }
+
+    #[test]
+    fn image_group_insert_sibling_promotion_failure_compensates_whole_batch() {
+        let directory = TestDirectory::new("image-group-promo-fail");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let store = state.image_staging_store().unwrap();
+        store.init_directories().unwrap();
+
+        let id1 = "33333333333333333333333333333333";
+        let id2 = "44444444444444444444444444444444";
+        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
+        let fin1 = crate::managed_files::ManagedStore::final_rel_path(id1, "first.png");
+        let fin2 = crate::managed_files::ManagedStore::final_rel_path(id2, "second.png");
+        let png_bytes = &[
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+            0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+            0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+        let path1 = store.stage_bytes(&st1, png_bytes).unwrap();
+        let _path2 = store.stage_bytes(&st2, png_bytes).unwrap();
+
+        // Pre-create destination directory of item 2 as a file to force fs::create_dir_all failure on second promote
+        let full_fin2 = store.full_path(&fin2).unwrap();
+        let conflict_parent = full_fin2.parent().unwrap();
+        fs::write(conflict_parent, b"blocking file").unwrap();
+
+        let candidates = vec![
+            (st1.clone(), "first.png".to_string()),
+            (st2.clone(), "second.png".to_string()),
+        ];
+        let res = state.accept_image_files(candidates, 0);
+        assert!(res.is_err());
+
+        // Sibling failure must compensate entire batch: no shelf items/batches, item1 final cleaned up
+        let full_fin1 = store.full_path(&fin1).unwrap();
+        assert!(!full_fin1.exists(), "item 1 promoted file must be compensated");
+        assert!(!path1.exists(), "item 1 staging cleaned up");
+        let snap = state.snapshot().unwrap();
+        assert!(snap.batches.is_empty(), "no partial batch visible");
+    }
+
+    #[test]
+    fn image_group_insert_ready_transaction_failure_cleans_up_and_rolls_back() {
+        let directory = TestDirectory::new("image-group-ready-fail");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let store = state.image_staging_store().unwrap();
+        store.init_directories().unwrap();
+
+        let id1 = "77777777777777777777777777777777";
+        let id2 = "88888888888888888888888888888888";
+        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
+        let fin1 = crate::managed_files::ManagedStore::final_rel_path(id1, "r1.png");
+        let fin2 = crate::managed_files::ManagedStore::final_rel_path(id2, "r2.png");
+        let png_bytes = &[
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+            0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+            0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+        store.stage_bytes(&st1, png_bytes).unwrap();
+        store.stage_bytes(&st2, png_bytes).unwrap();
+
+        // Block transition to 'ready'
+        state.store().unwrap().connection.execute_batch(
+            "CREATE TEMP TRIGGER block_ready BEFORE UPDATE OF state ON managed_files WHEN NEW.state = 'ready' BEGIN SELECT RAISE(ABORT, 'ready blocked'); END;"
+        ).unwrap();
+
+        let candidates = vec![
+            (st1.clone(), "r1.png".to_string()),
+            (st2.clone(), "r2.png".to_string()),
+        ];
+        let res = state.accept_image_files(candidates, 0);
+        assert!(res.is_err());
+
+        // No items or batches visible, promoted files deleted
+        let full_fin1 = store.full_path(&fin1).unwrap();
+        let full_fin2 = store.full_path(&fin2).unwrap();
+        assert!(!full_fin1.exists(), "item 1 promoted file deleted");
+        assert!(!full_fin2.exists(), "item 2 promoted file deleted");
+        let snap = state.snapshot().unwrap();
+        assert!(snap.batches.is_empty(), "no partial ready batch visible");
+    }
+
+    #[test]
+    fn startup_reconciliation_mixed_staged_promoted_preserves_batch() {
+        let directory = TestDirectory::new("reconcile-mixed-staged-promoted");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let store = state.image_staging_store().unwrap();
+        store.init_directories().unwrap();
+
+        let id1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let id2 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
+        let fin1 = crate::managed_files::ManagedStore::final_rel_path(id1, "mix1.png");
+        let fin2 = crate::managed_files::ManagedStore::final_rel_path(id2, "mix2.png");
+        let png_bytes = &[
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+            0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+            0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+
+        // Sibling 1 already promoted to final path
+        let full_fin1 = store.full_path(&fin1).unwrap();
+        if let Some(p) = full_fin1.parent() {
+            fs::create_dir_all(p).unwrap();
+        }
+        fs::write(&full_fin1, png_bytes).unwrap();
+
+        // Sibling 2 still in staging
+        store.stage_bytes(&st2, png_bytes).unwrap();
+
+        // Seed both as 'staged' in DB
+        {
+            let store_guard = state.store().unwrap();
+            let conn = &store_guard.connection;
+            conn.execute("INSERT INTO shelf_batches (id, created_at, position) VALUES ('b_mix', 100, 0)", []).unwrap();
+            let full_fin2 = store.full_path(&fin2).unwrap();
+            conn.execute(
+                "INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+                 VALUES (?1, 'b_mix', 0, ?2, 'mix1.png', 0, 0)",
+                [id1, full_fin1.to_str().unwrap()],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+                 VALUES (?1, 'b_mix', 1, ?2, 'mix2.png', 0, 0)",
+                [id2, full_fin2.to_str().unwrap()],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO managed_files (item_id, relative_path, state, staging_path)
+                 VALUES (?1, ?2, 'staged', ?3)",
+                [id1, &fin1, &st1],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO managed_files (item_id, relative_path, state, staging_path)
+                 VALUES (?1, ?2, 'staged', ?3)",
+                [id2, &fin2, &st2],
+            ).unwrap();
+        }
+        drop(state);
+
+        // Startup reconciliation reconciles both into a complete ready batch
+        let reopened = ShelfState::open(&database).unwrap();
+        let snap = reopened.snapshot().unwrap();
+        assert_eq!(snap.batches.len(), 1, "reconciled mixed batch is visible");
+        assert_eq!(snap.batches[0].items.len(), 2);
+        assert_eq!(snap.batches[0].items[0].id, id1);
+        assert_eq!(snap.batches[0].items[1].id, id2);
+        let full_fin2 = store.full_path(&fin2).unwrap();
+        assert!(full_fin2.exists(), "sibling 2 promoted to final path");
+    }
+
+    #[test]
+    fn unavailable_staging_file_io_error_fails_startup_safely_without_discard() {
+        let directory = TestDirectory::new("reconcile-unavailable-io");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let store = state.image_staging_store().unwrap();
+        store.init_directories().unwrap();
+
+        let id = "cccccccccccccccccccccccccccccccc";
+        let st = crate::managed_files::ManagedStore::staging_rel_path(id);
+        let fin = crate::managed_files::ManagedStore::final_rel_path(id, "locked.png");
+        let png_bytes = &[
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+            0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+            0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+        let full_st = store.stage_bytes(&st, png_bytes).unwrap();
+
+        // Seed staged item
+        {
+            let store_guard = state.store().unwrap();
+            let conn = &store_guard.connection;
+            conn.execute("INSERT INTO shelf_batches (id, created_at, position) VALUES ('b_lock', 100, 0)", []).unwrap();
+            let full_fin = store.full_path(&fin).unwrap();
+            conn.execute(
+                "INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+                 VALUES (?1, 'b_lock', 0, ?2, 'locked.png', 0, 0)",
+                [id, full_fin.to_str().unwrap()],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO managed_files (item_id, relative_path, state, staging_path)
+                 VALUES (?1, ?2, 'staged', ?3)",
+                [id, &fin, &st],
+            ).unwrap();
+        }
+        drop(state);
+
+        // Lock staging file exclusively with Windows sharing mode 0 (no sharing)
+        use std::os::windows::fs::OpenOptionsExt;
+        let _lock_handle = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .share_mode(0)
+            .open(&full_st)
+            .unwrap();
+
+        // Reopen database: reading staging file should fail with I/O sharing violation, NOT treated as invalid content!
+        // Must return Err rather than silently discarding/deleting the file.
+        let reopen_res = ShelfState::open(&database);
+        assert!(reopen_res.is_err(), "startup must fail on inaccessible I/O error");
+
+        // File must NOT be deleted or discarded
+        drop(_lock_handle);
+        assert!(full_st.exists(), "staged file preserved across temporary I/O lock");
+    }
+
+    #[test]
+    fn image_recovery_backup_preserves_bytes_and_ads() {
+        let directory = TestDirectory::new("recovery-image-ads");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let store = state.image_staging_store().unwrap();
+        store.init_directories().unwrap();
+
+        let id = "dddddddddddddddddddddddddddddddd";
+        let st = crate::managed_files::ManagedStore::staging_rel_path(id);
+        let fin = crate::managed_files::ManagedStore::final_rel_path(id, "zone.png");
+        let png_bytes = &[
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+            0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+            0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+        let _path = store.stage_bytes(&st, png_bytes).unwrap();
+        let candidates = vec![(st, "zone.png".to_string())];
+        let drop_res = state.accept_image_files(candidates, 0).unwrap();
+        let snap = drop_res.snapshot.unwrap();
+        assert_eq!(snap.batches.len(), 1);
+
+        let full_fin = store.full_path(&fin).unwrap();
+        assert!(full_fin.exists());
+
+        // Write Zone.Identifier ADS to the managed file
+        let ads_path = format!("{}:Zone.Identifier", full_fin.display());
+        fs::write(&ads_path, b"[ZoneTransfer]\r\nZoneId=3\r\n").unwrap();
+        assert_eq!(fs::read(&ads_path).unwrap(), b"[ZoneTransfer]\r\nZoneId=3\r\n");
+
+        // Corrupt the database to force Recovery Backup
+        drop(state);
+        fs::write(&database, b"corrupt db forcing recovery").unwrap();
+
+        // Reopen via open_or_recover
+        let (reopened, backup_dir_opt) = ShelfState::open_or_recover(&database).unwrap();
+        let backup_dir = backup_dir_opt.expect("recovery backup created");
+
+        // Active shelf is clean and empty
+        assert!(reopened.snapshot().unwrap().batches.is_empty());
+        assert!(!full_fin.exists(), "moved out of active managed store");
+
+        // Check preserved file and ADS in backup directory
+        let preserved_file = backup_dir.join("managed").join(id).join("zone.png");
+        assert!(preserved_file.exists(), "preserved managed file in backup");
+        assert_eq!(fs::read(&preserved_file).unwrap(), png_bytes);
+
+        let preserved_ads = format!("{}:Zone.Identifier", preserved_file.display());
+        assert_eq!(fs::read(&preserved_ads).unwrap(), b"[ZoneTransfer]\r\nZoneId=3\r\n", "Zone.Identifier ADS preserved in Recovery Backup");
+    }
+
+    #[test]
+    fn pending_cleanup_queue_persists_across_restart_and_unowned_prefix_is_not_deleted() {
+        let directory = TestDirectory::new("cleanup-queue-persistence");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let store = state.image_staging_store().unwrap();
+        store.init_directories().unwrap();
+
+        // Create a managed file and an external file in the same directory structure or profile
+        let id = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        let fin = crate::managed_files::ManagedStore::final_rel_path(id, "test.png");
+        let full_fin = store.full_path(&fin).unwrap();
+        if let Some(p) = full_fin.parent() {
+            fs::create_dir_all(p).unwrap();
+        }
+        fs::write(&full_fin, b"test").unwrap();
+
+        // Insert into pending_managed_file_deletions manually
+        {
+            let store_guard = state.store().unwrap();
+            let conn = &store_guard.connection;
+            conn.execute("INSERT INTO pending_managed_file_deletions (relative_path) VALUES (?1)", [&fin]).unwrap();
+        }
+
+        // Also create an external unowned file that shares the directory prefix or name
+        let external_file = directory.path().join("managed").join("external.txt");
+        fs::write(&external_file, b"unowned external file").unwrap();
+
+        // Lock the managed file so deletion cannot succeed immediately
+        use std::os::windows::fs::OpenOptionsExt;
+        let lock_handle = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .share_mode(0)
+            .open(&full_fin)
+            .unwrap();
+
+        drop(state);
+
+        // Reopen database: pending deletion was attempted and failed due to lock, so it must remain in pending queue!
+        let reopened = ShelfState::open(&database).unwrap();
+        let pending_count: i64 = reopened.store().unwrap().connection.query_row(
+            "SELECT count(*) FROM pending_managed_file_deletions",
+            [],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(pending_count, 1, "pending deletion must survive failed deletion on startup");
+        assert!(external_file.exists(), "unowned file never deleted by prefix or location");
+
+        // Release lock
+        drop(lock_handle);
+        drop(reopened);
+
+        // Reopen database again: pending deletion should now succeed and row removed
+        let reopened2 = ShelfState::open(&database).unwrap();
+        let pending_count2: i64 = reopened2.store().unwrap().connection.query_row(
+            "SELECT count(*) FROM pending_managed_file_deletions",
+            [],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(pending_count2, 0, "pending deletion completed successfully once lock released");
+        assert!(!full_fin.exists(), "managed file deleted");
+        assert!(external_file.exists(), "unowned external file still untouched");
     }
 }

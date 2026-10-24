@@ -50,6 +50,7 @@ let unlistenShelf: UnlistenFn | undefined;
 let unlistenTransientsClosed: UnlistenFn | undefined;
 let unlistenDragOver: UnlistenFn | undefined;
 let unlistenError: UnlistenFn | undefined;
+let unlistenDrop: UnlistenFn | undefined;
 let disposed = false;
 let pendingWarning = "";
 const hasTemporaryItems = computed(() =>
@@ -234,6 +235,11 @@ onMounted(async () => {
     unlistenError = await getCurrentWindow().listen<string>("shelf-error", ({ payload }) => {
       if (!disposed) status.value = payload;
     });
+    unlistenDrop = await getCurrentWindow().listen<{ snapshot: ShelfSnapshot | null; skipped: number; message?: string }>("shelf-drop", ({ payload }) => {
+      if (disposed || !payload.snapshot) return;
+      draggingOver.value = false;
+      status.value = payload.message ?? (payload.skipped ? `${payload.skipped} unsupported item(s) skipped.` : pendingWarning);
+    });
     unlistenRail = await getCurrentWindow().listen<Projection>("rail-changed", async ({ payload }) => {
       if (!disposed) {
         edge.value = payload.edge;
@@ -272,6 +278,7 @@ onUnmounted(() => {
   unlistenTransientsClosed?.();
   unlistenDragOver?.();
   unlistenError?.();
+  unlistenDrop?.();
 });
 const railListRef = useTemplateRef<HTMLElement>("railListRef");
 const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => Number(draggingOver.value));

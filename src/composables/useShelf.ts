@@ -37,6 +37,7 @@ interface ShelfSnapshot {
 interface DropResult {
   snapshot: ShelfSnapshot | null;
   skipped: number;
+  message?: string;
 }
 
 interface BatchPreparation {
@@ -233,7 +234,7 @@ export function useShelf() {
         if (!payload.snapshot || disposed) return;
         try {
           await refresh();
-          status.value = payload.skipped ? `${payload.skipped} unsupported item(s) skipped.` : (pendingRecoveryWarning ?? "");
+          status.value = payload.message ?? (payload.skipped ? `${payload.skipped} unsupported item(s) skipped.` : (pendingRecoveryWarning ?? ""));
         } catch (error) { status.value = String(error); }
       }));
       await retainListener(window.listen<boolean>("shelf-drag-over", ({ payload }) => {

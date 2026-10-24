@@ -80,6 +80,10 @@ _Avoid_: File copy, attachment, payload
 A filesystem file created and owned by DropCove to represent accepted content that did not arrive as a filesystem object.
 _Avoid_: Managed Item, temporary file, cached copy
 
+**Website Image Virtual File**:
+An image file represented by supplied bytes rather than a durable source filesystem object. Source application identity and a source URL are optional evidence, not part of the concept.
+_Avoid_: Browser image, downloaded image, temporary image
+
 **Pending Managed File Deletion**:
 A Managed File whose Shelf Item lifecycle has ended but whose permanent deletion remains pending.
 _Avoid_: Orphan file, leaked temporary file, Recycle Bin item

@@ -283,7 +283,7 @@ Mutations are serialized. A persistence failure must not leave a user-observable
 
 ## 7. Drag-in flow
 
-DropCove consumes the native Windows OLE `IDataObject` through a Windows adapter and chooses one representation family: filesystem paths, otherwise virtual image files, otherwise Unicode text. The `IDataObject` and borrowed COM media remain on the receiving window thread; only owned paths or staged files cross into persistence work.
+DropCove consumes the native Windows OLE `IDataObject` through a Windows adapter and chooses one representation family: filesystem paths, otherwise Website Image Virtual Files, otherwise Unicode text. The `IDataObject` and borrowed COM media remain on the receiving window thread while virtual-file contents are copied in bounded chunks to owned staging files; only owned paths or staged files cross into trust, validation, and persistence work. `0.0.24` adds no separate progress or cancellation surface.
 
 ```mermaid
 sequenceDiagram
@@ -300,11 +300,11 @@ sequenceDiagram
     Adapter->>Adapter: Select one representation family
     alt Existing filesystem paths
         Adapter->>State: Accept ordered paths
-    else Virtual website images
-        Adapter->>Files: Stage validated image streams
-        Files->>Security: Apply zone evidence and trust services
+    else Website Image Virtual Files
+        Adapter->>Files: Stage bounded candidate streams
+        Files->>Security: Apply mandatory non-UI attachment security
         Security-->>Files: Final post-scan files
-        Files->>State: Accept staged Managed Files
+        Files->>State: Revalidate and accept staged Managed Files
     else Unicode plain text
         Adapter->>Files: Stage timestamped UTF-8 text file
         Files->>State: Accept staged Managed File
@@ -327,10 +327,14 @@ sequenceDiagram
 
 - Representation families are never combined and invalid higher-priority data does not fall through to text or URL data.
 - External paths retain source order, ordinal case-insensitive repeated-path filtering, no canonicalization, and exact retained-batch duplicate suppression.
-- Website-image virtual files accept only the specified validated image formats and limits; Attachment Services output is revalidated before commit.
+- Website Image Virtual Files are capability-based rather than source-application-based. Current stable Edge and Chrome form the acceptance matrix; compatible sources outside that matrix are best-effort.
+- Intake examines only the first `20` descriptors, enforces `100 MiB` encoded bytes per image, `500 MiB` accepted encoded bytes per drop, and `512 MiB` maximum decoded allocation per raster validation, and can accept a later in-range descriptor after skipping an earlier over-limit entry.
+- Filenames use a sanitized basename and a content-matching extension, preserve duplicate source names, and use timestamped numeric-suffix fallbacks only when no safe basename remains.
+- SVG validation disables DTD and entity expansion but preserves raw scripts and external references; no DropCove WebView renders SVG.
+- Attachment Services is mandatory and non-interactive. Only explicit HTTP(S) `CFSTR_INETURLW/A` data supplies a source; otherwise Restricted Zone applies. Successful Windows policy is authoritative, and existing zone metadata is preserved.
+- Final post-scan supported bytes are authoritative and remain byte-exact, including animation and metadata. Unsupported entries are counted, but an I/O, security, or persistence failure rejects the complete drop.
 - Plain text creates one bounded UTF-8 Managed File.
 - Managed content is not hashed, shared, or deduplicated by bytes; each accepted drop is distinct.
-- Unsupported entries within the selected family are counted, but an I/O, security, or persistence failure rejects the complete drop.
 
 ## 8. Drag-out flow
 

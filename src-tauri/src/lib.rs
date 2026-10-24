@@ -19,6 +19,8 @@ mod windows_auxiliary;
 mod windows_drag;
 #[cfg(windows)]
 mod windows_drop;
+mod website_images;
+mod windows_virtual_files;
 mod windows_foreground;
 mod windows_hotkey;
 mod windows_instance;
