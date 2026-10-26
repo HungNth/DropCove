@@ -91,9 +91,9 @@ export function useVirtualCollection<T extends { id: string }>(
     await nextTick();
     const row = container.value?.querySelector<HTMLElement>(`[data-virtual-index="${index}"]`);
     if (action === -2) {
-      row?.querySelector<HTMLElement>(".card-drag")?.focus();
+      row?.querySelector<HTMLElement>(".card-drag, .item-drag")?.focus();
     } else {
-      const controls = row?.querySelectorAll<HTMLElement>(".card-drag[tabindex], button:not(:disabled)");
+      const controls = row?.querySelectorAll<HTMLElement>(".card-drag[tabindex], .item-drag[tabindex], button:not(:disabled)");
       controls?.[action < 0 ? controls.length - 1 : action]?.focus();
     }
   }
@@ -102,7 +102,7 @@ export function useVirtualCollection<T extends { id: string }>(
     const target = event.target as HTMLElement;
     const row = target.closest<HTMLElement>("[data-virtual-index]");
     if (!row) return;
-    const controls = Array.from(row.querySelectorAll<HTMLElement>(".card-drag[tabindex], button:not(:disabled)"));
+    const controls = Array.from(row.querySelectorAll<HTMLElement>(".card-drag[tabindex], .item-drag[tabindex], button:not(:disabled)"));
     const action = controls.findIndex(control => control === target);
     if (action < 0) return;
     const index = Number(row.dataset.virtualIndex);

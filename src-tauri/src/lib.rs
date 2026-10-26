@@ -195,6 +195,71 @@ async fn get_manage_items_keyboard(app: tauri::AppHandle) -> Result<bool, String
 }
 
 #[tauri::command]
+async fn get_manage_items_origin(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    manage_items::origin(&app)
+}
+
+#[tauri::command]
+async fn prepare_item_drag(
+    item_ids: Vec<String>,
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    state: State<'_, ShelfState>,
+) -> Result<shelf::ItemPreparation, String> {
+    if window.label() != "manage-items" {
+        return Err("prepare_item_drag is only permitted from Manage Items".to_owned());
+    }
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let active_batch = manage_items::active_batch(&app)?
+            .ok_or_else(|| "Manage Items is not active".to_owned())?;
+        let preparation = state
+            .prepare_item_drag(&active_batch, &item_ids)
+            .map_err(|error| error.to_string())?;
+        if let Err(error) = publish_shelf(&app, preparation.snapshot.clone()) {
+            let mut message = error;
+            if let Some(token) = &preparation.token {
+                if let Err(cleanup) = state.cancel_item_drag(token) {
+                    message.push_str(&format!("; prepared drag cancellation failed: {cleanup}"));
+                }
+            }
+            if let Err(cleanup) = manage_items::synchronize(&app) {
+                message.push_str(&format!("; Manage Items synchronization failed: {cleanup}"));
+            }
+            return Err(message);
+        }
+        Ok(preparation)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn cancel_item_drag(
+    token: String,
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    state: State<'_, ShelfState>,
+) -> Result<ShelfSnapshot, String> {
+    if window.label() != "manage-items" {
+        return Err("cancel_item_drag is only permitted from Manage Items".to_owned());
+    }
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let snapshot = state
+            .cancel_item_drag(&token)
+            .map_err(|error| error.to_string())?;
+        publish_shelf(&app, snapshot)
+    })
+    .await
+}
+
+#[derive(serde::Serialize)]
+struct ItemDragResult {
+    outcome: shelf::DragOutcome,
+    error: Option<String>,
+}
+
+#[tauri::command]
 async fn close_manage_items(app: tauri::AppHandle) -> Result<(), String> {
     run_blocking(move || manage_items::close_explicit(&app)).await
 }
@@ -467,33 +532,61 @@ async fn start_batch_drag(
 #[cfg(windows)]
 #[tauri::command]
 async fn start_item_drag(
-    item_id: String,
+    token: String,
+    window: tauri::WebviewWindow,
     app: tauri::AppHandle,
     state: State<'_, ShelfState>,
-) -> Result<ShelfSnapshot, String> {
+) -> Result<ItemDragResult, String> {
+    if window.label() != "manage-items" {
+        return Err("start_item_drag is only permitted from Manage Items".to_owned());
+    }
     let state = state.inner().clone();
     run_blocking(move || {
-        let path = state
-            .item_path(&item_id)
+        let active_batch = manage_items::active_batch(&app)?
+            .ok_or_else(|| "Manage Items is not active".to_owned())?;
+        let transfer = state
+            .begin_item_drag(&token, Some(&active_batch))
             .map_err(|error| error.to_string())?;
-        let unicode_text = state.read_managed_text_content(&item_id).map_err(|error| error.to_string())?;
+        let single_item_text = if transfer.participants.len() == 1 {
+            state.read_managed_text_content(&transfer.participants[0].id).map_err(|error| error.to_string())?
+        } else {
+            None
+        };
+        let native_transfer = std::sync::Arc::clone(&transfer);
         let outcome = storage_drag_on_window_thread(app.clone(), move |session| {
             windows_drag::perform_storage_drag(
                 session,
-                std::iter::once(path.as_str()),
-                unicode_text.as_deref(),
+                native_transfer.paths.iter().map(String::as_str),
+                single_item_text.as_deref(),
             )
-        })?;
+        });
 
-        if outcome == shelf::DragOutcome::Canceled {
-            use tauri::Emitter;
-            app.emit_to("manage-items", "item-drag-canceled", ())
-                .map_err(|error| error.to_string())?;
+        match outcome {
+            Ok(outcome) => {
+                if outcome == shelf::DragOutcome::Canceled {
+                    use tauri::Emitter;
+                    let _ = app.emit_to("manage-items", "item-drag-canceled", ());
+                }
+                let completion = state
+                    .complete_item_drag(&transfer, outcome)
+                    .map_err(|error| error.to_string())
+                    .and_then(|snapshot| publish_shelf(&app, snapshot));
+                if let Err(sync_error) = manage_items::synchronize(&app) {
+                    let error_message = match completion.err() {
+                        Some(err) => format!("{err}; Manage Items synchronization failed: {sync_error}"),
+                        None => format!("Manage Items synchronization failed: {sync_error}"),
+                    };
+                    return Ok(ItemDragResult { outcome, error: Some(error_message) });
+                }
+                Ok(ItemDragResult { outcome, error: completion.err() })
+            }
+            Err(error) => {
+                match manage_items::synchronize(&app) {
+                    Ok(()) => Err(error),
+                    Err(cleanup) => Err(format!("{error}; Manage Items synchronization failed: {cleanup}")),
+                }
+            }
         }
-        let snapshot = state
-            .complete_item_drag(&item_id, outcome)
-            .map_err(|error| error.to_string())?;
-        publish_shelf(&app, snapshot)
     })
     .await
 }
@@ -877,6 +970,9 @@ pub fn run() {
             get_manage_items,
             get_manage_items_keyboard,
             close_manage_items,
+            get_manage_items_origin,
+            prepare_item_drag,
+            cancel_item_drag,
             start_item_drag,
             prepare_batch_drag,
             cancel_batch_drag,

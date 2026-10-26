@@ -1,8 +1,8 @@
 import { computed, shallowRef, watch, type Ref } from "vue";
 
-interface SelectableBatch {
+export interface SelectableItem {
   id: string;
-  items: readonly { id: string }[];
+  items?: readonly { id: string }[];
 }
 
 export interface SelectionModifiers {
@@ -10,11 +10,11 @@ export interface SelectionModifiers {
   shiftKey?: boolean;
 }
 
-export function useBatchSelection(batches: Ref<readonly SelectableBatch[]>) {
+export function useSelection<T extends SelectableItem>(items: Ref<readonly T[]>) {
   const selected = shallowRef<ReadonlySet<string>>(new Set());
   const anchor = shallowRef<string | null>(null);
-  const ids = computed(() => batches.value.filter(batch => selected.value.has(batch.id)).map(batch => batch.id));
-  const itemCount = computed(() => batches.value.reduce((count, batch) => count + (selected.value.has(batch.id) ? batch.items.length : 0), 0));
+  const ids = computed(() => items.value.filter(item => selected.value.has(item.id)).map(item => item.id));
+  const itemCount = computed(() => items.value.reduce((count, item) => count + (selected.value.has(item.id) ? (item.items ? item.items.length : 1) : 0), 0));
 
   function clear() {
     if (selected.value.size) selected.value = new Set();
@@ -22,11 +22,11 @@ export function useBatchSelection(batches: Ref<readonly SelectableBatch[]>) {
   }
 
   function select(id: string, modifiers: SelectionModifiers) {
-    if (!batches.value.some(batch => batch.id === id)) return;
+    if (!items.value.some(item => item.id === id)) return;
     if (modifiers.shiftKey && anchor.value !== null) {
-      const start = batches.value.findIndex(batch => batch.id === anchor.value);
-      const end = batches.value.findIndex(batch => batch.id === id);
-      selected.value = new Set(batches.value.slice(Math.min(start, end), Math.max(start, end) + 1).map(batch => batch.id));
+      const start = items.value.findIndex(item => item.id === anchor.value);
+      const end = items.value.findIndex(item => item.id === id);
+      selected.value = new Set(items.value.slice(Math.min(start, end), Math.max(start, end) + 1).map(item => item.id));
       return;
     }
     if (modifiers.ctrlKey && !modifiers.shiftKey) {
@@ -39,8 +39,8 @@ export function useBatchSelection(batches: Ref<readonly SelectableBatch[]>) {
     anchor.value = id;
   }
 
-  watch(batches, current => {
-    const existing = new Set(current.map(batch => batch.id));
+  watch(items, current => {
+    const existing = new Set(current.map(item => item.id));
     if (Array.from(selected.value).some(id => !existing.has(id))) {
       selected.value = new Set(Array.from(selected.value).filter(id => existing.has(id)));
     }
@@ -53,7 +53,7 @@ export function useBatchSelection(batches: Ref<readonly SelectableBatch[]>) {
     itemCount,
     select,
     clear,
-    selectAll: () => { selected.value = new Set(batches.value.map(batch => batch.id)); },
+    selectAll: () => { selected.value = new Set(items.value.map(item => item.id)); },
     dragIds: (id: string) => selected.value.has(id) ? ids.value : [id],
   };
 }

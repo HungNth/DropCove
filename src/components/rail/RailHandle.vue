@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef, useTemplateRef } from "vue";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
-import { useBatchSelection } from "../../composables/useBatchSelection";
-import { useBatchDrag } from "../../composables/useBatchDrag";
+import { useSelection } from "../../composables/useSelection";
+import { usePreparedDrag } from "../../composables/usePreparedDrag";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -35,8 +35,8 @@ const status = shallowRef("");
 const busy = shallowRef(false);
 const draggingOver = shallowRef(false);
 const confirmingClearTemporary = shallowRef(false);
-const selection = useBatchSelection(batches);
-const batchDrag = useBatchDrag(batches, selection.ids, busy, status, refreshBatches, selection.clear, active => setRailTransientHold(active, "batch-drag"));
+const selection = useSelection(batches);
+const batchDrag = usePreparedDrag("batch", batches, selection.ids, busy, status, refreshBatches, selection.clear, active => setRailTransientHold(active, "batch-drag"));
 const pendingConfirmation = batchDrag.pending;
 let unlistenRail: UnlistenFn | undefined;
 let unlistenShelf: UnlistenFn | undefined;

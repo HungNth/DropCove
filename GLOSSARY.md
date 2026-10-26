@@ -60,6 +60,10 @@ _Avoid_: Drop group, file list, collection
 The transient, surface-local set of Shelf Batches chosen for one multi-batch drag-out.
 _Avoid_: Selected Shelf, persistent selection, batch group
 
+**Item Selection**:
+The transient set of Shelf Items chosen within one Shelf Batch through Manage Items for one multi-item drag-out.
+_Avoid_: Cross-batch selection, persistent item selection, bulk action group
+
 **Drop Placeholder**:
 A transient card-shaped marker showing where one incoming Shelf Batch would be inserted while a supported incoming drag is over the Drop Shelf or expanded Edge Rail.
 _Avoid_: File placeholder, hover card, ghost batch

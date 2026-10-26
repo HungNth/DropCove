@@ -2,8 +2,8 @@ import { computed, nextTick, onMounted, onUnmounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
-import { useBatchSelection } from "./useBatchSelection.ts";
-import { useBatchDrag } from "./useBatchDrag.ts";
+import { useSelection } from "./useSelection.ts";
+import { usePreparedDrag } from "./usePreparedDrag.ts";
 
 export interface ShelfItem {
   id: string;
@@ -62,8 +62,8 @@ export function useShelf() {
   const unlisteners: UnlistenFn[] = [];
   let disposed = false;
   let refreshRequest = 0;
-  const selection = useBatchSelection(batches);
-  const batchDrag = useBatchDrag(batches, selection.ids, busy, status, refresh, selection.clear);
+  const selection = useSelection(batches);
+  const batchDrag = usePreparedDrag("batch", batches, selection.ids, busy, status, refresh, selection.clear);
   const pendingConfirmation = batchDrag.pending;
 
   const hasTemporaryItems = computed(() =>
@@ -214,9 +214,10 @@ export function useShelf() {
       }));
       await retainListener(window.listen<string>("manage-items-closed", ({ payload: batchId }) => {
         if (disposed) return;
-        const selector = `[data-batch-id="${CSS.escape(batchId)}"] .manage`;
-        const manageButton = document.querySelector<HTMLElement>(selector);
-        manageButton?.focus();
+        const escaped = CSS.escape(batchId);
+        const card = document.querySelector<HTMLElement>(`[data-batch-id="${escaped}"]`);
+        const target = card?.querySelector<HTMLElement>(".manage") ?? card?.querySelector<HTMLElement>(".card-drag");
+        target?.focus();
       }));
       await retainListener(window.listen<boolean>("shelf-clear-confirmation-state", ({ payload }) => {
         if (disposed) return;

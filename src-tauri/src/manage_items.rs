@@ -166,6 +166,10 @@ pub(crate) fn is_keyboard_activated(app: &AppHandle) -> Result<bool, String> {
     Ok(app.state::<ManageItemsState>().lock()?.keyboard)
 }
 
+pub(crate) fn origin(app: &AppHandle) -> Result<Option<String>, String> {
+    Ok(app.state::<ManageItemsState>().lock()?.origin_label.clone())
+}
+
 pub(crate) fn open(
     app: &AppHandle,
     batch: &ShelfBatch,
@@ -187,6 +191,9 @@ pub(crate) fn open(
     if origin != "main" && origin != "edge-rail" {
         return Err("unsupported Manage Items origin window".to_owned());
     }
+    app.state::<ShelfState>()
+        .cancel_prepared_item_drag()
+        .map_err(|error| error.to_string())?;
     let owner_label = origin;
     let owner = app
         .get_webview_window(owner_label)
@@ -404,7 +411,7 @@ pub(crate) fn open(
 
 pub(crate) fn close_explicit(app: &AppHandle) -> Result<(), String> {
     if app.state::<DragSession>().is_active() {
-        return Ok(());
+        return close(app);
     }
     let (batch_id, origin_label) = {
         let state = app.state::<ManageItemsState>();
@@ -436,6 +443,9 @@ pub(crate) fn close(app: &AppHandle) -> Result<(), String> {
         app.state::<ManageItemsState>().lock()?.pending_close = true;
         return Ok(());
     }
+    app.state::<ShelfState>()
+        .cancel_prepared_item_drag()
+        .map_err(|error| error.to_string())?;
     if let Some(popup) = app.get_webview_window(LABEL) {
         popup.hide().map_err(|error| error.to_string())?;
         popup.close().map_err(|error| error.to_string())?;
@@ -493,7 +503,7 @@ pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) {
         match event {
             WindowEvent::CloseRequested { api, .. } if app.state::<DragSession>().is_active() => {
                 api.prevent_close();
-                Ok(())
+                close(app)
             }
             WindowEvent::CloseRequested { .. } => close_explicit(app),
             WindowEvent::Destroyed => match app.state::<ManageItemsState>().lock() {

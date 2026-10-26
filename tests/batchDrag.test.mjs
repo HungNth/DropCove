@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { setImmediate as settle } from "node:timers/promises";
 import { effectScope, shallowRef } from "vue";
-import { useBatchDrag } from "../src/composables/useBatchDrag.ts";
+import { usePreparedDrag } from "../src/composables/usePreparedDrag.ts";
 
 function fixture(unavailable = 1) {
   const batches = shallowRef([{ id: "a", items: [{ id: "1" }, { id: "2" }] }]);
@@ -24,7 +24,7 @@ function fixture(unavailable = 1) {
     return handlers[command]();
   } } };
   const scope = effectScope();
-  const drag = scope.run(() => useBatchDrag(batches, ids, busy, status, () => hooks.refresh(), () => { copied++; ids.value = []; }, active => hooks.hold(active)));
+  const drag = scope.run(() => usePreparedDrag("batch", batches, ids, busy, status, () => hooks.refresh(), () => { copied++; ids.value = []; }, active => hooks.hold(active)));
   return {
     batches, ids, busy, status, calls, hooks, handlers, preparation, drag,
     get copied() { return copied; },

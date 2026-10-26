@@ -1,8 +1,10 @@
-import { onMounted, onUnmounted, shallowRef } from "vue";
+import { computed, onMounted, onUnmounted, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import type { ShelfBatch } from "./useShelf";
+import { useSelection } from "./useSelection";
+import { usePreparedDrag } from "./usePreparedDrag";
 
 export function useManageItems() {
   const batch = shallowRef<ShelfBatch | null>(null);
@@ -12,6 +14,10 @@ export function useManageItems() {
   const unlisteners: UnlistenFn[] = [];
   let disposed = false;
   let refreshRequest = 0;
+  const items = computed(() => batch.value?.items ?? []);
+  const selection = useSelection(items);
+  const projection = computed(() => batch.value ? [batch.value] : []);
+  const itemDrag = usePreparedDrag("item", projection, selection.ids, busy, status, refresh, selection.clear);
 
   async function refresh() {
     const request = ++refreshRequest;
@@ -23,6 +29,7 @@ export function useManageItems() {
     if (busy.value || disposed) return;
     busy.value = true;
     try {
+      await itemDrag.cancel();
       const result = await invoke<{ warning?: string | null } | null>(command, arguments_);
       await refresh();
       if (!disposed) status.value = result?.warning ?? "";
@@ -37,8 +44,11 @@ export function useManageItems() {
     try {
       for (const event of ["shelf-changed", "manage-items-opened"]) {
         const unlisten = await window.listen(event, async () => {
-          try { await refresh(); }
-          catch (error) { if (!disposed) status.value = String(error); }
+          try {
+            if (itemDrag.hasPrepared()) await itemDrag.cancel();
+            if (event === "manage-items-opened") selection.clear();
+            await refresh();
+          } catch (error) { if (!disposed) status.value = String(error); }
         });
         if (disposed) unlisten();
         else unlisteners.push(unlisten);
@@ -51,10 +61,11 @@ export function useManageItems() {
 
   onUnmounted(() => {
     disposed = true;
+    itemDrag.dispose();
+    selection.clear();
     batch.value = null;
     for (const unlisten of unlisteners) unlisten();
   });
-
   return {
     batch,
     status,
@@ -63,7 +74,16 @@ export function useManageItems() {
     setItemPinned: (itemId: string, pinned: boolean) => perform("set_item_pinned", { itemId, pinned }),
     setBatchPinned: (batchId: string, pinned: boolean) => perform("set_batch_pinned", { batchId, pinned }),
     removeItem: (itemId: string) => perform("remove_item", { itemId }),
-    startItemDrag: (itemId: string) => perform("start_item_drag", { itemId }),
+    startItemDrag: (itemId: string) => itemDrag.start(selection.dragIds(itemId)),
+    cancelPreparedDrag: itemDrag.cancel,
+    confirmItemDrag: itemDrag.confirm,
+    dragConfirmedItem: itemDrag.dragConfirmed,
+    pendingConfirmation: itemDrag.pending,
+    selection,
+    hasPreparedDrag: itemDrag.hasPrepared,
+    selectItem: selection.select,
+    selectAllItems: selection.selectAll,
+    clearSelection: selection.clear,
     close: () => perform("close_manage_items"),
     dismissStatus: () => { status.value = ""; },
   };

@@ -50,8 +50,16 @@ pub(crate) struct PreparedTransfer {
     pub(crate) paths: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DragDomain {
+    Batch,
+    Item,
+}
+
 struct PreparedDrag {
     token: String,
+    domain: DragDomain,
+    batch_id: Option<String>,
     transfer: Arc<PreparedTransfer>,
     changes: u64,
 }
@@ -63,6 +71,56 @@ pub(crate) struct BatchPreparation {
     pub(crate) available: usize,
     pub(crate) unavailable: usize,
     pub(crate) snapshot: ShelfSnapshot,
+}
+
+pub(crate) type ItemPreparation = BatchPreparation;
+struct PreparedCandidateItems<'a> {
+    participants: Vec<DragParticipant>,
+    paths: Vec<String>,
+    missing: Vec<&'a str>,
+    unavailable: usize,
+    classifications: Vec<(&'a str, Availability)>,
+}
+
+fn classify_and_dedupe_candidates<'a>(
+    items: impl IntoIterator<Item = &'a ShelfItem>,
+    mut classifier: impl FnMut(&str) -> Availability,
+) -> PreparedCandidateItems<'a> {
+    let mut participants = Vec::new();
+    let mut paths = Vec::new();
+    let mut ordinal_paths: HashMap<usize, Vec<Vec<u16>>> = HashMap::new();
+    let mut missing = Vec::new();
+    let mut unavailable = 0;
+    let mut classifications = Vec::new();
+    for item in items {
+        let availability = classifier(&item.path);
+        classifications.push((item.id.as_str(), availability));
+        match availability {
+            Availability::Available => {
+                participants.push(DragParticipant {
+                    id: item.id.clone(),
+                });
+                let ordinal_path = item.path.encode_utf16().collect::<Vec<_>>();
+                let same_length = ordinal_paths.entry(ordinal_path.len()).or_default();
+                if !same_length
+                    .iter()
+                    .any(|existing| ordinal_equal(existing, &ordinal_path))
+                {
+                    same_length.push(ordinal_path);
+                    paths.push(item.path.clone());
+                }
+            }
+            Availability::Missing => missing.push(item.id.as_str()),
+            Availability::Unavailable => unavailable += 1,
+        }
+    }
+    PreparedCandidateItems {
+        participants,
+        paths,
+        missing,
+        unavailable,
+        classifications,
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -127,6 +185,10 @@ pub(crate) enum ShelfError {
     EmptyBatchSelection,
     #[error("batch selection contains a duplicate batch: {0}")]
     DuplicateBatchSelection(String),
+    #[error("item selection must contain at least one item")]
+    EmptyItemSelection,
+    #[error("item selection contains a duplicate item: {0}")]
+    DuplicateItemSelection(String),
     #[error("prepared drag is no longer active")]
     InvalidPreparedDrag,
     #[error("system clock is before the Unix epoch")]
@@ -820,18 +882,6 @@ impl ShelfState {
         }
         self.store()?.save_size(width, manual_height)
     }
-    pub(crate) fn complete_item_drag(
-        &self,
-        item_id: &str,
-        outcome: DragOutcome,
-    ) -> Result<ShelfSnapshot, ShelfError> {
-        let mut store = self.store()?;
-        if outcome == DragOutcome::Copy {
-            store.consume_items(std::iter::once(item_id))
-        } else {
-            store.snapshot()
-        }
-    }
 
     pub(crate) fn remove_batch(&self, batch_id: &str) -> Result<ShelfSnapshot, ShelfError> {
         self.store()?.remove_batch(batch_id)
@@ -870,11 +920,6 @@ impl ShelfState {
         self.store()?.set_batch_pinned(batch_id, pinned)
     }
 
-    pub(crate) fn item_path(&self, item_id: &str) -> Result<String, ShelfError> {
-        self.store()?
-            .item_path(item_id)?
-            .ok_or_else(|| ShelfError::ItemNotFound(item_id.to_owned()))
-    }
 
     pub(crate) fn item_visual_target(&self, item_id: &str) -> Result<Option<(String, bool)>, ShelfError> {
         self.store()?.item_visual_target(item_id)
@@ -903,7 +948,7 @@ impl ShelfState {
         let prepared = store
             .prepared
             .as_ref()
-            .filter(|prepared| prepared.token == token)
+            .filter(|prepared| prepared.token == token && prepared.domain == DragDomain::Batch)
             .ok_or(ShelfError::InvalidPreparedDrag)?;
         if prepared.changes != store.connection.total_changes() {
             store.prepared = None;
@@ -914,11 +959,80 @@ impl ShelfState {
 
     pub(crate) fn cancel_batch_drag(&self, token: &str) -> Result<ShelfSnapshot, ShelfError> {
         let mut store = self.store()?;
-        if !store.prepared.as_ref().is_some_and(|prepared| prepared.token == token) {
-            return Err(ShelfError::InvalidPreparedDrag);
-        }
+        store
+            .prepared
+            .as_ref()
+            .filter(|prepared| prepared.token == token && prepared.domain == DragDomain::Batch)
+            .ok_or(ShelfError::InvalidPreparedDrag)?;
         store.prepared = None;
         store.snapshot()
+    }
+
+    pub(crate) fn prepare_item_drag(
+        &self,
+        batch_id: &str,
+        item_ids: &[String],
+    ) -> Result<ItemPreparation, ShelfError> {
+        self.prepare_item_drag_with(batch_id, item_ids, windows_paths::classify)
+    }
+
+    pub(crate) fn prepare_item_drag_with(
+        &self,
+        batch_id: &str,
+        item_ids: &[String],
+        classifier: impl FnMut(&str) -> Availability,
+    ) -> Result<ItemPreparation, ShelfError> {
+        self.store()?.prepare_items(batch_id, item_ids, classifier)
+    }
+
+    pub(crate) fn begin_item_drag(
+        &self,
+        token: &str,
+        expected_batch_id: Option<&str>,
+    ) -> Result<Arc<PreparedTransfer>, ShelfError> {
+        let mut store = self.store()?;
+        let prepared = store
+            .prepared
+            .as_ref()
+            .filter(|prepared| {
+                prepared.token == token
+                    && prepared.domain == DragDomain::Item
+                    && (expected_batch_id.is_none()
+                        || prepared.batch_id.as_deref() == expected_batch_id)
+            })
+            .ok_or(ShelfError::InvalidPreparedDrag)?;
+        if prepared.changes != store.connection.total_changes() {
+            store.prepared = None;
+            return Err(ShelfError::InvalidPreparedDrag);
+        }
+        Ok(store.prepared.take().ok_or(ShelfError::InvalidPreparedDrag)?.transfer)
+    }
+
+    pub(crate) fn cancel_item_drag(&self, token: &str) -> Result<ShelfSnapshot, ShelfError> {
+        let mut store = self.store()?;
+        store
+            .prepared
+            .as_ref()
+            .filter(|prepared| prepared.token == token && prepared.domain == DragDomain::Item)
+            .ok_or(ShelfError::InvalidPreparedDrag)?;
+        store.prepared = None;
+        store.snapshot()
+    }
+
+    pub(crate) fn cancel_prepared_item_drag(&self) -> Result<(), ShelfError> {
+        let mut store = self.store()?;
+        if store.prepared.as_ref().is_some_and(|prepared| prepared.domain == DragDomain::Item) {
+            store.prepared = None;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn complete_item_drag(
+        &self,
+        transfer: &PreparedTransfer,
+        outcome: DragOutcome,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        self.complete_batch_drag(transfer, outcome)
     }
 
     pub(crate) fn complete_batch_drag(
@@ -1678,10 +1792,74 @@ impl ShelfStore {
         Ok(snapshot)
     }
 
+
+    fn commit_drag_preparation(
+        &mut self,
+        domain: DragDomain,
+        batch_id: Option<String>,
+        candidates: PreparedCandidateItems<'_>,
+    ) -> Result<(Option<String>, usize, usize, ShelfSnapshot), ShelfError> {
+        let transaction = self.connection.transaction()?;
+        Self::queue_managed_deletions_for_items(&transaction, candidates.missing.iter().copied())?;
+        for item_id in &candidates.missing {
+            transaction.execute("DELETE FROM shelf_items WHERE id = ?1", [item_id])?;
+        }
+        transaction.execute("DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)", [])?;
+        clear_sizing_when_empty(&transaction)?;
+        let empty =
+            !transaction.query_row("SELECT EXISTS (SELECT 1 FROM shelf_items)", [], |row| {
+                row.get::<_, bool>(0)
+            })?;
+        let snapshot = Self::read_snapshot(
+            &transaction,
+            if empty { 191.0 } else { self.width },
+            if empty { 180.0 } else { self.height },
+            &self.availability,
+        )?;
+        let available = candidates.participants.len();
+        let token = if available > 0 {
+            let id = random_id(&transaction)?;
+            match domain {
+                DragDomain::Batch => Some(format!("batch_{id}")),
+                DragDomain::Item => Some(format!("item_{id}")),
+            }
+        } else {
+            None
+        };
+        transaction.commit()?;
+        if empty {
+            self.width = 191.0;
+            self.height = 180.0;
+            self.pending_manual_height = None;
+        } else {
+            self.width = snapshot.preferred_width;
+            self.height = snapshot.height;
+        }
+        self.record_snapshot(&snapshot);
+        for (id, availability) in candidates.classifications {
+            if let Some(value) = self.availability.get_mut(id) {
+                *value = availability;
+            }
+        }
+        self.process_pending_managed_deletions()?;
+        self.prepared = token.as_ref().map(|token| PreparedDrag {
+            token: token.clone(),
+            domain,
+            batch_id,
+            changes: self.connection.total_changes(),
+            transfer: Arc::new(PreparedTransfer {
+                participants: candidates.participants,
+                paths: candidates.paths,
+            }),
+        });
+        let snapshot = self.snapshot()?;
+        Ok((token, available, candidates.unavailable, snapshot))
+    }
+
     fn prepare_batches(
         &mut self,
         batch_ids: &[String],
-        mut classifier: impl FnMut(&str) -> Availability,
+        classifier: impl FnMut(&str) -> Availability,
     ) -> Result<BatchPreparation, ShelfError> {
         if batch_ids.is_empty() {
             return Err(ShelfError::EmptyBatchSelection);
@@ -1698,96 +1876,56 @@ impl ShelfStore {
                 return Err(ShelfError::BatchNotFound(id.clone()));
             }
         }
-        let selected_item_count = current
+        let candidate_items = current
             .batches
             .iter()
             .filter(|batch| selected.contains(batch.id.as_str()))
-            .map(|batch| batch.items.len())
-            .sum::<usize>();
-
-        let mut participants = Vec::with_capacity(selected_item_count);
-        let mut paths = Vec::with_capacity(selected_item_count);
-        let mut ordinal_paths: HashMap<usize, Vec<Vec<u16>>> = HashMap::new();
-        let mut missing = Vec::new();
-        let mut unavailable = 0;
-        let mut classifications = Vec::with_capacity(selected_item_count);
-        for batch in &current.batches {
-            if !selected.contains(batch.id.as_str()) {
-                continue;
-            }
-            for item in &batch.items {
-                let availability = classifier(&item.path);
-                classifications.push((item.id.as_str(), availability));
-                match availability {
-                    Availability::Available => {
-                        participants.push(DragParticipant {
-                            id: item.id.clone(),
-                        });
-                        let ordinal_path = item.path.encode_utf16().collect::<Vec<_>>();
-                        let same_length = ordinal_paths.entry(ordinal_path.len()).or_default();
-                        if !same_length
-                            .iter()
-                            .any(|existing| ordinal_equal(existing, &ordinal_path))
-                        {
-                            same_length.push(ordinal_path);
-                            paths.push(item.path.clone());
-                        }
-                    }
-                    Availability::Missing => missing.push(item.id.as_str()),
-                    Availability::Unavailable => unavailable += 1,
-                }
-            }
-        }
-
-        let transaction = self.connection.transaction()?;
-        Self::queue_managed_deletions_for_items(&transaction, missing.iter().copied())?;
-        for item_id in missing {
-            transaction.execute("DELETE FROM shelf_items WHERE id = ?1", [item_id])?;
-        }
-        transaction.execute("DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)", [])?;
-        clear_sizing_when_empty(&transaction)?;
-        let empty =
-            !transaction.query_row("SELECT EXISTS (SELECT 1 FROM shelf_items)", [], |row| {
-                row.get::<_, bool>(0)
-            })?;
-        let snapshot = Self::read_snapshot(
-            &transaction,
-            if empty { 191.0 } else { self.width },
-            if empty { 180.0 } else { self.height },
-            &self.availability,
-        )?;
-        let available = participants.len();
-        let token = if available > 0 {
-            Some(random_id(&transaction)?)
-        } else {
-            None
-        };
-        transaction.commit()?;
-        if empty {
-            self.width = 191.0;
-            self.height = 180.0;
-            self.pending_manual_height = None;
-        } else {
-            self.width = snapshot.preferred_width;
-            self.height = snapshot.height;
-        }
-        self.record_snapshot(&snapshot);
-        for (id, availability) in classifications {
-            if let Some(value) = self.availability.get_mut(id) {
-                *value = availability;
-            }
-        }
-        self.process_pending_managed_deletions()?;
-        self.prepared = token.as_ref().map(|token| PreparedDrag {
-            token: token.clone(),
-            changes: self.connection.total_changes(),
-            transfer: Arc::new(PreparedTransfer {
-                participants,
-                paths,
-            }),
-        });
-        let snapshot = self.snapshot()?;
+            .flat_map(|batch| &batch.items);
+        let candidates = classify_and_dedupe_candidates(candidate_items, classifier);
+        let (token, available, unavailable, snapshot) =
+            self.commit_drag_preparation(DragDomain::Batch, None, candidates)?;
         Ok(BatchPreparation {
+            token,
+            available,
+            unavailable,
+            snapshot,
+        })
+    }
+
+    fn prepare_items(
+        &mut self,
+        batch_id: &str,
+        item_ids: &[String],
+        classifier: impl FnMut(&str) -> Availability,
+    ) -> Result<ItemPreparation, ShelfError> {
+        if item_ids.is_empty() {
+            return Err(ShelfError::EmptyItemSelection);
+        }
+        let mut selected = HashSet::with_capacity(item_ids.len());
+        for id in item_ids {
+            if !selected.insert(id.as_str()) {
+                return Err(ShelfError::DuplicateItemSelection(id.clone()));
+            }
+        }
+        let current = self.snapshot()?;
+        let batch = current
+            .batches
+            .iter()
+            .find(|batch| batch.id == batch_id)
+            .ok_or_else(|| ShelfError::BatchNotFound(batch_id.to_string()))?;
+        for id in item_ids {
+            if !batch.items.iter().any(|item| &item.id == id) {
+                return Err(ShelfError::ItemNotFound(id.clone()));
+            }
+        }
+        let candidate_items = batch
+            .items
+            .iter()
+            .filter(|item| selected.contains(item.id.as_str()));
+        let candidates = classify_and_dedupe_candidates(candidate_items, classifier);
+        let (token, available, unavailable, snapshot) =
+            self.commit_drag_preparation(DragDomain::Item, Some(batch_id.to_string()), candidates)?;
+        Ok(ItemPreparation {
             token,
             available,
             unavailable,
@@ -2429,18 +2567,6 @@ impl ShelfStore {
         Ok(snapshot)
     }
 
-    fn item_path(&self, item_id: &str) -> Result<Option<String>, ShelfError> {
-        Ok(self
-            .connection
-            .query_row(
-                "SELECT si.path FROM shelf_items si
-                 WHERE si.id = ?1
-                   AND NOT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = si.id AND mf.state = 'staged')",
-                [item_id],
-                |row| row.get(0),
-            )
-            .optional()?)
-    }
 
     fn item_visual_target(&self, item_id: &str) -> Result<Option<(String, bool)>, ShelfError> {
         Ok(self
@@ -2577,13 +2703,20 @@ mod tests {
             .expect("path should be accepted")
             .snapshot
             .unwrap();
+        let batch_id = &snapshot.batches[0].id;
         let item_id = &snapshot.batches[0].items[0].id;
 
+        let prep = state
+            .prepare_item_drag(batch_id, std::slice::from_ref(item_id))
+            .expect("item drag should prepare");
+        let transfer = state
+            .begin_item_drag(prep.token.as_deref().unwrap(), Some(batch_id))
+            .expect("item drag should begin");
         let completed = state
-            .complete_item_drag(item_id, DragOutcome::Copy)
+            .complete_item_drag(&transfer, DragOutcome::Copy)
             .expect("copy completion should persist");
-
         assert!(completed.batches.is_empty());
+        assert!(directory.source_file().exists());
     }
 
     #[test]
@@ -2597,12 +2730,18 @@ mod tests {
             .expect("path should be accepted")
             .snapshot
             .unwrap();
+        let batch_id = &snapshot.batches[0].id;
         let item_id = &snapshot.batches[0].items[0].id;
 
+        let prep = state
+            .prepare_item_drag(batch_id, std::slice::from_ref(item_id))
+            .expect("item drag should prepare");
+        let transfer = state
+            .begin_item_drag(prep.token.as_deref().unwrap(), Some(batch_id))
+            .expect("item drag should begin");
         let completed = state
-            .complete_item_drag(item_id, DragOutcome::Canceled)
+            .complete_item_drag(&transfer, DragOutcome::Canceled)
             .expect("cancellation should succeed");
-
         assert_eq!(completed.batches[0].items[0].id, *item_id);
     }
 
@@ -2618,13 +2757,21 @@ mod tests {
             .expect("path should be accepted")
             .snapshot
             .unwrap();
+        let batch_id = &snapshot.batches[0].id;
         let item_id = snapshot.batches[0].items[0].id.clone();
+
+        let prep = state
+            .prepare_item_drag(batch_id, std::slice::from_ref(&item_id))
+            .expect("item drag should prepare");
+        let transfer = state
+            .begin_item_drag(prep.token.as_deref().unwrap(), Some(batch_id))
+            .expect("item drag should begin");
 
         state
             .install_test_delete_failure()
             .expect("failure trigger should install");
         assert!(state
-            .complete_item_drag(&item_id, DragOutcome::Copy)
+            .complete_item_drag(&transfer, DragOutcome::Copy)
             .is_err());
         drop(state);
 
@@ -2814,7 +2961,11 @@ mod tests {
                         state.remove_item(&batch.items[1].id).unwrap()
                     }
                     "clear" => state.clear_temporary().unwrap(),
-                    "item-copy" => state.complete_item_drag(&batch.items[0].id, DragOutcome::Copy).unwrap(),
+                    "item-copy" => {
+                        let prep = state.prepare_item_drag_with(&batch.id, std::slice::from_ref(&batch.items[0].id), |_| super::Availability::Available).unwrap();
+                        let transfer = state.begin_item_drag(prep.token.as_deref().unwrap(), Some(&batch.id)).unwrap();
+                        state.complete_item_drag(&transfer, DragOutcome::Copy).unwrap()
+                    }
                     "batch-copy" => {
                         let prepared = state.prepare_batch_drag_with(std::slice::from_ref(&batch.id), |_| super::Availability::Available).unwrap();
                         let transfer = state.begin_batch_drag(prepared.token.as_deref().unwrap()).unwrap();
@@ -2911,22 +3062,28 @@ mod tests {
             serde_json::to_value(restored.snapshot().unwrap()).unwrap(),
             expected
         );
+        let batch_id = &restored.snapshot().unwrap().batches[0].id;
         for outcome in [
             DragOutcome::Canceled,
             DragOutcome::Rejected,
             DragOutcome::Copy,
         ] {
-            let retained = restored.complete_item_drag(item_id, outcome).unwrap();
+            let prep = restored.prepare_item_drag(batch_id, std::slice::from_ref(item_id)).unwrap();
+            let transfer = restored.begin_item_drag(prep.token.as_deref().unwrap(), Some(batch_id)).unwrap();
+            let retained = restored.complete_item_drag(&transfer, outcome).unwrap();
             assert_eq!(serde_json::to_value(retained).unwrap(), expected);
         }
         restored.set_item_pinned(item_id, false).unwrap();
         drop(restored);
         let temporary = ShelfState::open(&database).unwrap();
         assert!(!temporary.snapshot().unwrap().batches[0].items[0].is_pinned);
+        let temp_batch_id = &temporary.snapshot().unwrap().batches[0].id;
         for outcome in [DragOutcome::Canceled, DragOutcome::Rejected] {
+            let prep = temporary.prepare_item_drag(temp_batch_id, std::slice::from_ref(item_id)).unwrap();
+            let transfer = temporary.begin_item_drag(prep.token.as_deref().unwrap(), Some(temp_batch_id)).unwrap();
             assert_eq!(
                 temporary
-                    .complete_item_drag(item_id, outcome)
+                    .complete_item_drag(&transfer, outcome)
                     .unwrap()
                     .batches[0]
                     .items[0]
@@ -2934,8 +3091,10 @@ mod tests {
                 *item_id
             );
         }
+        let prep = temporary.prepare_item_drag(temp_batch_id, std::slice::from_ref(item_id)).unwrap();
+        let transfer = temporary.begin_item_drag(prep.token.as_deref().unwrap(), Some(temp_batch_id)).unwrap();
         assert!(temporary
-            .complete_item_drag(item_id, DragOutcome::Copy)
+            .complete_item_drag(&transfer, DragOutcome::Copy)
             .unwrap()
             .batches
             .is_empty());
@@ -3205,14 +3364,18 @@ mod tests {
         state.set_item_pinned(item1_id, true).unwrap();
 
         // Complete item drag for pinned item1 as Copy - should retain it
+        let prep1 = state.prepare_item_drag(batch_id, std::slice::from_ref(item1_id)).unwrap();
+        let transfer1 = state.begin_item_drag(prep1.token.as_deref().unwrap(), Some(batch_id)).unwrap();
         let snap_after_pinned_drag = state
-            .complete_item_drag(item1_id, DragOutcome::Copy)
+            .complete_item_drag(&transfer1, DragOutcome::Copy)
             .unwrap();
         assert_eq!(snap_after_pinned_drag.batches[0].items.len(), 2);
 
         // Complete item drag for temporary item2 as Copy - should consume only item2
+        let prep2 = state.prepare_item_drag(batch_id, std::slice::from_ref(item2_id)).unwrap();
+        let transfer2 = state.begin_item_drag(prep2.token.as_deref().unwrap(), Some(batch_id)).unwrap();
         let snap_after_temp_drag = state
-            .complete_item_drag(item2_id, DragOutcome::Copy)
+            .complete_item_drag(&transfer2, DragOutcome::Copy)
             .unwrap();
         let remaining_batch = &snap_after_temp_drag.batches[0];
         assert_eq!(remaining_batch.id, *batch_id);
@@ -3867,8 +4030,14 @@ mod tests {
         // 2. Remove final item via consume_items (Copy outcome)
         state.save_size(270.0, Some(230.0)).unwrap();
         let snap = state.snapshot().unwrap();
+        let prep = state
+            .prepare_item_drag_with(&snap.batches[0].id, std::slice::from_ref(&snap.batches[0].items[0].id), |_| super::Availability::Available)
+            .unwrap();
+        let transfer = state
+            .begin_item_drag(prep.token.as_deref().unwrap(), Some(&snap.batches[0].id))
+            .unwrap();
         let empty = state
-            .complete_item_drag(&snap.batches[0].items[0].id, DragOutcome::Copy)
+            .complete_item_drag(&transfer, DragOutcome::Copy)
             .unwrap();
         assert_eq!((empty.preferred_width, empty.height), (191.0, 180.0));
 
@@ -4721,9 +4890,12 @@ mod tests {
         let directory = TestDirectory::new("managed-pinned-copy");
         let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
         let snapshot = state.accept_text("keep these exact bytes".into()).unwrap().snapshot.unwrap();
+        let batch_id = &snapshot.batches[0].id;
         let item = &snapshot.batches[0].items[0];
         state.set_item_pinned(&item.id, true).unwrap();
-        let retained = state.complete_item_drag(&item.id, DragOutcome::Copy).unwrap();
+        let prep = state.prepare_item_drag(batch_id, std::slice::from_ref(&item.id)).unwrap();
+        let transfer = state.begin_item_drag(prep.token.as_deref().unwrap(), Some(batch_id)).unwrap();
+        let retained = state.complete_item_drag(&transfer, DragOutcome::Copy).unwrap();
         assert_eq!(retained.batches[0].items[0].id, item.id);
         assert_eq!(fs::read(&item.path).unwrap(), b"keep these exact bytes");
         state.remove_item(&item.id).unwrap();
@@ -4851,11 +5023,15 @@ mod tests {
         state.set_item_pinned(&batch.items[0].id, true).unwrap();
 
         // Complete Copy drag for second item (temporary): consumed & cleaned
-        state.complete_item_drag(&batch.items[1].id, DragOutcome::Copy).unwrap();
+        let prep2 = state.prepare_item_drag(&batch.id, std::slice::from_ref(&batch.items[1].id)).unwrap();
+        let transfer2 = state.begin_item_drag(prep2.token.as_deref().unwrap(), Some(&batch.id)).unwrap();
+        state.complete_item_drag(&transfer2, DragOutcome::Copy).unwrap();
         assert!(!path2.exists(), "temporary image deleted on Copy completion");
 
         // Complete Copy drag for first item (pinned): retained
-        let retained = state.complete_item_drag(&batch.items[0].id, DragOutcome::Copy).unwrap();
+        let prep1 = state.prepare_item_drag(&batch.id, std::slice::from_ref(&batch.items[0].id)).unwrap();
+        let transfer1 = state.begin_item_drag(prep1.token.as_deref().unwrap(), Some(&batch.id)).unwrap();
+        let retained = state.complete_item_drag(&transfer1, DragOutcome::Copy).unwrap();
         assert_eq!(retained.batches[0].items.len(), 1);
         assert!(path1.exists(), "pinned image retained after Copy");
 
@@ -5484,5 +5660,199 @@ mod tests {
         assert_eq!(state.read_managed_text_content(&item.id).unwrap().as_deref(), Some("preserve this content"));
         fs::write(&item.path, [0xff]).unwrap();
         assert!(matches!(state.read_managed_text_content(&item.id), Err(super::ShelfError::FileSystem { source, .. }) if source.kind() == std::io::ErrorKind::InvalidData));
+    }
+
+    #[test]
+    fn prepare_item_drag_validates_batch_boundary_and_source_order() {
+        let directory = TestDirectory::new("prepare-item-drag-foundation");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let paths: Vec<String> = (0..3).map(|index| {
+            let path = directory.path().join(format!("item{index}.txt"));
+            fs::write(&path, format!("source {index}")).unwrap();
+            path.to_string_lossy().into_owned()
+        }).collect();
+        let drop1 = state.accept_drop(paths.iter().cloned().map(Some).collect()).unwrap().snapshot.unwrap();
+        let drop2 = state.accept_drop(vec![
+            Some("C:\\other.txt".into()),
+        ]).unwrap().snapshot.unwrap();
+        let batch1 = &drop1.batches[0];
+        let batch2 = &drop2.batches[0];
+
+        // Empty selection rejected
+        assert!(matches!(
+            state.prepare_item_drag(&batch1.id, &[]),
+            Err(super::ShelfError::EmptyItemSelection)
+        ));
+
+        // Duplicate selection rejected
+        assert!(matches!(
+            state.prepare_item_drag(&batch1.id, &[batch1.items[0].id.clone(), batch1.items[0].id.clone()]),
+            Err(super::ShelfError::DuplicateItemSelection(_))
+        ));
+
+        // Nonexistent batch rejected
+        assert!(matches!(
+            state.prepare_item_drag("nonexistent", &[batch1.items[0].id.clone()]),
+            Err(super::ShelfError::BatchNotFound(_))
+        ));
+
+        // Item not in active batch rejected
+        assert!(matches!(
+            state.prepare_item_drag(&batch1.id, &[batch2.items[0].id.clone()]),
+            Err(super::ShelfError::ItemNotFound(_))
+        ));
+
+        // Source order preserved regardless of input order (reverse: 2, 0)
+        let item_ids = vec![
+            batch1.items[2].id.clone(),
+            batch1.items[0].id.clone(),
+        ];
+        let prepared = state.prepare_item_drag(&batch1.id, &item_ids).unwrap();
+        assert!(prepared.token.is_some());
+        assert_eq!(prepared.available, 2);
+        assert_eq!(prepared.unavailable, 0);
+
+        let token = prepared.token.as_deref().unwrap();
+        let transfer = state.begin_item_drag(token, Some(&batch1.id)).unwrap();
+        assert_eq!(transfer.participants.len(), 2);
+        assert_eq!(transfer.participants[0].id, batch1.items[0].id);
+        assert_eq!(transfer.participants[1].id, batch1.items[2].id);
+        assert_eq!(transfer.paths, [paths[0].clone(), paths[2].clone()]);
+    }
+
+    #[test]
+    fn item_drag_token_domain_isolation_and_invalidation() {
+        let directory = TestDirectory::new("item-drag-domain-isolation");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let unselected = directory.path().join("unselected.txt");
+        fs::write(&unselected, b"not selected").unwrap();
+        let snapshot = state.accept_drop(vec![Some(directory.source_file().to_string_lossy().into_owned()), Some(unselected.to_string_lossy().into_owned())]).unwrap().snapshot.unwrap();
+        let batch = &snapshot.batches[0];
+
+        // 1. Prepare item drag
+        let item_prep = state.prepare_item_drag(&batch.id, &[batch.items[0].id.clone()]).unwrap();
+        let item_token = item_prep.token.as_deref().unwrap();
+        assert!(item_prep.available == 1);
+
+        // Cross-domain rejection: batch begin/cancel reject item token
+        assert!(matches!(
+            state.begin_batch_drag(item_token),
+            Err(super::ShelfError::InvalidPreparedDrag)
+        ));
+        assert!(matches!(
+            state.cancel_batch_drag(item_token),
+            Err(super::ShelfError::InvalidPreparedDrag)
+        ));
+
+        // Wrong active batch rejection:
+        assert!(matches!(
+            state.begin_item_drag(item_token, Some("other_batch")),
+            Err(super::ShelfError::InvalidPreparedDrag)
+        ));
+
+        // Cancel item drag succeeds
+        state.cancel_item_drag(item_token).unwrap();
+
+        // 2. Prepare batch drag
+        let batch_prep = state.prepare_batch_drag(std::slice::from_ref(&batch.id)).unwrap();
+        let batch_token = batch_prep.token.as_deref().unwrap();
+        assert_eq!(batch_prep.available, 2);
+
+        // Cross-domain rejection: item begin/cancel reject batch token
+        assert!(matches!(
+            state.begin_item_drag(batch_token, Some(&batch.id)),
+            Err(super::ShelfError::InvalidPreparedDrag)
+        ));
+        assert!(matches!(
+            state.cancel_item_drag(batch_token),
+            Err(super::ShelfError::InvalidPreparedDrag)
+        ));
+
+        // cancel_prepared_item_drag does NOT cancel batch token
+        state.cancel_prepared_item_drag().unwrap();
+        assert!(state.begin_batch_drag(batch_token).is_ok());
+
+        // 3. Mutation invalidates armed item token
+        let item_prep2 = state.prepare_item_drag(&batch.id, &[batch.items[0].id.clone()]).unwrap();
+        let item_token2 = item_prep2.token.as_deref().unwrap();
+        state.set_item_pinned(&batch.items[1].id, true).unwrap();
+        assert!(matches!(
+            state.begin_item_drag(item_token2, Some(&batch.id)),
+            Err(super::ShelfError::InvalidPreparedDrag)
+        ));
+    }
+
+    #[test]
+    fn mixed_availability_deduplication_and_missing_cleanup() {
+        let directory = TestDirectory::new("mixed-availability-drag");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let snapshot = state.accept_drop(vec![
+            Some("C:\\file1.txt".into()),
+            Some("C:\\second-occurrence.txt".into()),
+            Some("C:\\missing.txt".into()),
+            Some("Z:\\unavailable.txt".into()),
+        ]).unwrap().snapshot.unwrap();
+        let batch = &snapshot.batches[0];
+        // Model a restored batch with repeated path occurrences without intake deduplication.
+        state.store().unwrap().connection.execute(
+            "UPDATE shelf_items SET path = 'c:\\FILE1.TXT' WHERE id = ?1",
+            [&batch.items[1].id],
+        ).unwrap();
+        let all_ids: Vec<String> = batch.items.iter().map(|item| item.id.clone()).collect();
+
+        // Prepare with classifier
+        let prep = state.prepare_item_drag_with(&batch.id, &all_ids, |path| {
+            if path.contains("missing") {
+                super::Availability::Missing
+            } else if path.starts_with("Z:") {
+                super::Availability::Unavailable
+            } else {
+                super::Availability::Available
+            }
+        }).unwrap();
+
+        assert_eq!(prep.available, 2);
+        assert_eq!(prep.unavailable, 1);
+        let token = prep.token.expect("token should be generated for available items");
+
+        // Missing item was durably removed during preparation
+        let current = state.snapshot().unwrap();
+        assert_eq!(current.batches[0].items.len(), 3);
+        assert!(!current.batches[0].items.iter().any(|i| i.path.contains("missing")));
+
+        // Begin drag: transfer paths deduplicated ordinal case-insensitively, but both occurrences present
+        let transfer = state.begin_item_drag(&token, Some(&batch.id)).unwrap();
+        assert_eq!(transfer.paths, vec!["C:\\file1.txt"]);
+        assert_eq!(transfer.participants.len(), 2);
+
+        // Complete Copy: consumes the 2 available temporary items, keeps the 1 unavailable item
+        let completed = state.complete_item_drag(&transfer, DragOutcome::Copy).unwrap();
+        assert_eq!(completed.batches[0].items.len(), 1);
+        assert_eq!(completed.batches[0].items[0].path, "Z:\\unavailable.txt");
+    }
+
+    #[test]
+    fn all_unavailable_or_all_missing_item_drag_yields_no_token() {
+        let directory = TestDirectory::new("all-unavailable-drag");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let snapshot = state.accept_drop(vec![
+            Some("Z:\\item1.txt".into()),
+            Some("Z:\\item2.txt".into()),
+        ]).unwrap().snapshot.unwrap();
+        let batch = &snapshot.batches[0];
+        let item_ids: Vec<String> = batch.items.iter().map(|i| i.id.clone()).collect();
+
+        // All unavailable -> no token, available 0, unavailable 2
+        let prep = state.prepare_item_drag_with(&batch.id, &item_ids, |_| super::Availability::Unavailable).unwrap();
+        assert!(prep.token.is_none());
+        assert_eq!(prep.available, 0);
+        assert_eq!(prep.unavailable, 2);
+
+        // All missing -> missing items removed, empty batch pruned, no token
+        let prep_missing = state.prepare_item_drag_with(&batch.id, &item_ids, |_| super::Availability::Missing).unwrap();
+        assert!(prep_missing.token.is_none());
+        assert_eq!(prep_missing.available, 0);
+        assert_eq!(prep_missing.unavailable, 0);
+        assert!(state.snapshot().unwrap().batches.is_empty());
     }
 }

@@ -1168,4 +1168,69 @@ Approved DAG: `01 → 02 → {03, 04} → 05`.
 
 ### Deferred
 
-- Persistent or cross-surface selection, named selections, batch reordering, selection toolbar/mode, always-visible checkboxes, keyboard activation of the Edge Rail, keyboard-only OLE destination drag, arbitrary item-level selection across batches, and non-Windows behavior.
+- Persistent or cross-surface Batch Selection, named selections, batch reordering, selection toolbar/mode, always-visible checkboxes, keyboard activation of the Edge Rail, keyboard-only OLE destination drag, Item Selection outside one active Manage Items batch, and non-Windows behavior.
+
+## 0.0.26 — Manage Items item selection and drag-out
+
+**Status:** Completed — tickets 01–06 resolved; exact 0.0.26 candidate packaged, verified, and accepted by the user on 2026-10-26; commit explicitly authorized.
+
+Design confirmation: approved by the user through `grill-with-docs` on 2026-10-26.
+
+Testing seam confirmation: approved by the user through `to-spec` on 2026-10-26.
+
+Ticket breakdown confirmation: approved by the user through `to-tickets` on 2026-10-26.
+
+Plan: [Specification](../.scratch/manage-items-item-selection-drag-out/spec.md).
+
+Requirements: [Product Specification](SPECIFICATION.md#103-item-selection) · [Architecture](ARCHITECTURE.md#8-drag-out-flow).
+
+### Version boundary
+
+Item Selection and occurrence-safe multi-item drag-out ship together in `0.0.26`. There is no selection-only intermediate release because selection without its drag outcome is not a complete user workflow. Delivery uses six tracer-bullet tickets with DAG `01 → 02 → {03, 04} → 05 → 06`.
+
+### Scope
+
+- Add popup-local Item Selection for one active Shelf Batch in Manage Items: plain click selects one, `Ctrl+click` toggles and moves the anchor, `Shift+click` replaces selection with the complete source-order range, dragging a selected row drags the complete selection, and dragging an unselected row drags only that item. Selection remains stable across virtualization.
+- Add the complete keyboard and accessibility contract to the shared popup: a multiselectable ARIA grid, roving item focus, Up/Down/Home/End, `Space`, `Ctrl+Space`, `Shift+Space`, `Ctrl+A`, deterministic focus recovery, selected-row accent treatment, and polite selected-item counts. Pointer opening remains no-activate, including from the Edge Rail.
+- Add a distinct item-occurrence preparation contract bound to the exact ordered selected item identities and authoritative Shelf snapshot. Reuse lower-level availability, deduplicated transfer, occurrence completion, and Managed File cleanup primitives without passing item identities through the batch preparation API.
+- Preserve source order, ordinal case-insensitive path deduplication, durable Missing cleanup, retained Unavailable occurrences, one aggregate confirmation, stale-token invalidation, Temporary consumption, Pinned retention, pending Managed File deletion retry, and source-file safety. A singleton Available plain-text Managed File retains the 0.0.25 Unicode text-only OLE representation; multi-item payloads remain storage-only.
+- Keep Pin/Unpin and Remove scoped to their clicked item and Bulk Pinning scoped to the complete batch. Keep the popup open while its batch exists, including at one remaining item; clear selection on Successful Copy or popup-lifetime clear triggers; defer close during an active native drag and apply the approved focus-recovery rules afterward.
+
+### Approved delivery tickets
+
+1. [Occurrence-safe item-set drag foundation](../.scratch/manage-items-item-selection-drag-out/issues/01-occurrence-safe-item-set-drag-foundation.md) — no blockers; cuts existing row drag over to the final item-set preparation/completion contract through a complete singleton workflow.
+2. [Manage Items pointer Item Selection Copy round trip](../.scratch/manage-items-item-selection-drag-out/issues/02-manage-items-pointer-item-selection-copy-round-trip.md) — blocked by Ticket 01; adds stable pointer selection and all-Available selected/unselected native Copy.
+3. [Mixed availability and ownership-safe Item Selection drag](../.scratch/manage-items-item-selection-drag-out/issues/03-mixed-availability-ownership-safe-item-selection-drag.md) — blocked by Ticket 02; adds confirmation, stale-token safety, occurrence deduplication, mixed ownership, rollback, and cleanup.
+4. [Accessible Manage Items multiselectable grid](../.scratch/manage-items-item-selection-drag-out/issues/04-accessible-manage-items-multiselectable-grid.md) — blocked by Ticket 02; adds keyboard, ARIA, announcements, virtualization focus, and deterministic focus recovery in parallel with Ticket 03.
+5. [Cross-origin Item Selection lifecycle integration](../.scratch/manage-items-item-selection-drag-out/issues/05-cross-origin-item-selection-lifecycle-integration.md) — blocked by Tickets 03 and 04; integrates Escape, pending close, one-item survival, focus restoration, and Edge Rail no-activate behavior.
+6. [Release DropCove 0.0.26](../.scratch/manage-items-item-selection-drag-out/issues/06-release-dropcove-0.0.26.md) — blocked by Ticket 05; owns final integration, version synchronization, packaging, exact installed proof, and human candidate acceptance.
+
+Approved DAG: `01 → 02 → {03, 04} → 05 → 06`.
+
+### Planned verification
+
+- Exercise ordinary and virtualized item collections with click, `Ctrl`, `Shift`, non-additive `Ctrl+Shift`, drag threshold, selected/unselected row drag, empty-space clear, popup replacement, one-item survival, and `Escape` ordering.
+- Inspect the actual Manage Items accessibility tree, selected states, roving focus, Tab cycle, action isolation, live announcements, focus recovery, Dark/Light/Windows Contrast treatment, and pointer no-activation from both Drop Shelf and Edge Rail origins.
+- Prove deterministic source order, case-insensitive path deduplication, repeated occurrence recording, same-name different-path retention, singleton Unicode text, multi-item storage payloads, one aggregate mixed-availability confirmation, and stale-token cancellation.
+- Prove accepted Copy consumes every represented Temporary occurrence, retains currently Pinned and Unavailable occurrences, permanently cleans owned Managed Files or records durable retry, never deletes external sources, and closes or preserves the popup according to the final batch state.
+- Run frontend/native regressions, real Windows Copy/cancel/reject smoke, cargo-xwin Windows build, exact NSIS packaging, installed restart/reinstall/uninstall, and Profile Data preservation after implementation acceptance.
+
+### Deferred
+
+- Persistent, named, cross-popup, or cross-batch Item Selection and arbitrary item selection outside the active Manage Items batch.
+- Selection-scoped Pin/Unpin, Remove, bulk actions, item reordering, checkboxes, selection mode UI, and a new toolbar or footer.
+- Concatenating multiple text items, keyboard-only OLE destination drag, Move semantics, non-Windows behavior, or a second item lifecycle model.
+- Manage Items size, row density, placement, per-origin geometry, or broader surface redesign.
+
+### Observed implementation and release evidence — 2026-10-26
+
+- Shared ID selection and prepared-drag composables now serve Batch Selection and Manage Items Item Selection; the old batch-only composable paths and standalone item completion route are removed. Native item preparation validates active-batch membership, separates item/batch tokens, reuses occurrence-safe classification/deduplication/completion, and cancels item tokens when management closes or changes batch.
+- Frontend suite **43/43** and freshly cargo-xwin-compiled Windows native suite **185/185** passed. Production typecheck/Vite build and cargo-xwin Windows x64 NSIS packaging passed. Final independent Standards and Spec reviews reported zero remaining actionable findings.
+- Exact installed proof covered pointer modifiers and virtualized ranges, keyboard grid/Tab/focus/announcements, real Copy/cancel/reject, selected versus singleton payloads, aggregate mixed-availability confirmation, armed retry/stale-token cancellation, Temporary/Pinned lifecycle, Unicode text-only singleton and storage-only multi-item representations, real Managed File sharing failure/retry, one-item survival, parent focus recovery, Rail no-activation, and active-drag pending close.
+- Installed 65-item management measured **240 × 480**, with **54-pixel** rows and **10** mounted rows at the end. PE, actual About, and uninstall metadata reported `0.0.26`; installed embedded assets ran with the development server unavailable. Restart preserved 65 exact identities/paths/Pin states and discarded selection. Install, reinstall/update, and uninstall returned 0 and preserved owned Profile Data; ambient installation/Run registration and shortcut ownership were restored, and all 75 external fixture sources stayed byte-exact.
+- Full evidence, fixture corrections, and observation limits: [Release ticket](../.scratch/manage-items-item-selection-drag-out/issues/06-release-dropcove-0.0.26.md). Dark/Light resources and forced-colors/reduced-motion emulation were inspected; physical high/mixed DPI, touchpad, spoken screen-reader output, and actual OS Contrast Theme switching remain unobserved by agent verification. The user subsequently confirmed all their testing passed, accepted the candidate, and explicitly authorized the commit on 2026-10-26.
+
+| Candidate artifact | Bytes | SHA-256 |
+|---|---:|---|
+| [DropCove-Setup-0.0.26.exe](../build/DropCove-Setup-0.0.26.exe) | 3,688,557 | `f02bd5ddbf3343a711ebe7aeb7ee3fb44b5848d387f952f923ce30704f2da78b` |
+| Exact installed executable | 15,243,264 | `ebb5aa4143a1a6bb901d699d63f4ba97cfff3fe0b8e67802e1ef2ab9eb3cc66d` |

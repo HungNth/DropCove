@@ -141,9 +141,13 @@ fn native_png_drop_preserves_bytes_name_restart_and_temporary_copy_cleanup() {
     let snapshot = result.snapshot.unwrap();
     let batch = &snapshot.batches[0];
     let item = &batch.items[0];
-    state.complete_item_drag(&item.id, crate::shelf::DragOutcome::Canceled).unwrap();
+    let prep1 = state.prepare_item_drag(&batch.id, std::slice::from_ref(&item.id)).unwrap();
+    let transfer1 = state.begin_item_drag(prep1.token.as_deref().unwrap(), Some(&batch.id)).unwrap();
+    state.complete_item_drag(&transfer1, crate::shelf::DragOutcome::Canceled).unwrap();
     assert_eq!(fs::read(&item.path).unwrap(), bytes);
-    state.complete_item_drag(&item.id, crate::shelf::DragOutcome::Rejected).unwrap();
+    let prep2 = state.prepare_item_drag(&batch.id, std::slice::from_ref(&item.id)).unwrap();
+    let transfer2 = state.begin_item_drag(prep2.token.as_deref().unwrap(), Some(&batch.id)).unwrap();
+    state.complete_item_drag(&transfer2, crate::shelf::DragOutcome::Rejected).unwrap();
     assert_eq!(fs::read(&item.path).unwrap(), bytes);
     assert_eq!(item.name, "photo.png");
     assert_eq!(fs::read(&item.path).unwrap(), bytes);

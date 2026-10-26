@@ -1,28 +1,86 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, useTemplateRef } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { useManageItems } from "../../composables/useManageItems";
 import BulkPinning from "./BulkPinning.vue";
 import ShelfItemRow from "./ShelfItemRow.vue";
+import BatchDragConfirmation from "./BatchDragConfirmation.vue";
 import { useAnnouncer } from "../../composables/useAnnouncer";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
 import ActionIcon from "./ActionIcon.vue";
 
-const { batch, status, busy, refresh, setItemPinned, setBatchPinned, removeItem, startItemDrag, close, dismissStatus } = useManageItems();
+const {
+  batch,
+  status,
+  busy,
+  refresh,
+  setItemPinned,
+  setBatchPinned,
+  removeItem,
+  startItemDrag,
+  cancelPreparedDrag,
+  confirmItemDrag,
+  dragConfirmedItem,
+  pendingConfirmation,
+  hasPreparedDrag,
+  selection,
+  selectItem,
+  selectAllItems,
+  clearSelection,
+  close,
+  dismissStatus,
+} = useManageItems();
 const { announcement, announce } = useAnnouncer();
 
 const pinnedCount = computed(() => batch.value?.items.filter((item) => item.isPinned).length ?? 0);
 const totalCount = computed(() => batch.value?.items.length ?? 0);
+const selectedCount = computed(() => selection.ids.value.length);
 
 const rootRef = useTemplateRef<HTMLElement>("root");
 const itemsContainerRef = useTemplateRef<HTMLElement>("itemsContainer");
 const itemsList = computed(() => batch.value?.items ?? []);
 const virtual = useVirtualCollection(itemsList, itemsContainerRef, 1, 54, 5);
+const focusedItem = shallowRef<string | null>(null);
+const isRailOrigin = shallowRef(false);
 const window = getCurrentWindow();
 const unlisteners: UnlistenFn[] = [];
 let cancelKeydownSeen = false;
+
+watch(
+  () => selection.ids.value.length,
+  (count, prev) => {
+    if (isRailOrigin.value) return;
+    if (count > 0) announce(`${count} ${count === 1 ? "item" : "items"} selected`);
+    else if (prev && prev > 0) announce("Selection cleared");
+  },
+  { flush: "post" },
+);
+
+watch(
+  itemsList,
+  async (current, previous) => {
+    if (!focusedItem.value) return;
+    const index = previous.findIndex((item) => item.id === focusedItem.value);
+    if (index < 0 || current.some((item) => item.id === focusedItem.value)) return;
+    if (!current.length) {
+      focusedItem.value = null;
+      if (!isRailOrigin.value) getBulkElement()?.focus();
+      return;
+    }
+    const next = Math.min(index, current.length - 1);
+    focusedItem.value = current[next].id;
+    if (!isRailOrigin.value) {
+      if (virtual.enabled.value) await virtual.focus(next, -2);
+      else {
+        await nextTick();
+        itemsContainerRef.value?.querySelector<HTMLElement>(`[data-item-id="${focusedItem.value}"] .item-drag`)?.focus();
+      }
+    }
+  },
+  { flush: "post" },
+);
 
 function getBulkElement(): HTMLElement | null {
   return rootRef.value?.querySelector<HTMLElement>(".bulk-pin") ?? null;
@@ -30,84 +88,39 @@ function getBulkElement(): HTMLElement | null {
 
 let focusRequest = 0;
 let disposed = false;
-async function focusBulkControl() {
+async function focusInitialControl() {
   const request = ++focusRequest;
   await refresh();
   await nextTick();
-  if (!disposed && request === focusRequest) getBulkElement()?.focus();
-}
-
-function getFocusableElements(): HTMLElement[] {
-  if (!rootRef.value) return [];
-  // Canonical order: Bulk Pinning, Close, then row Pin/Unpin and Remove controls in row order
-  const elements: HTMLElement[] = [];
-  const bulk = getBulkElement();
-  if (bulk && !bulk.hasAttribute("disabled")) elements.push(bulk);
-  const closeBtn = rootRef.value.querySelector<HTMLElement>(".header .close");
-  if (closeBtn && !closeBtn.hasAttribute("disabled")) elements.push(closeBtn);
-
-  const rows = rootRef.value.querySelectorAll<HTMLElement>(".items .item-row");
-  for (const row of rows) {
-    const pinBtn = row.querySelector<HTMLElement>(".item-actions .action.pin");
-    if (pinBtn && !pinBtn.hasAttribute("disabled")) elements.push(pinBtn);
-    const removeBtn = row.querySelector<HTMLElement>(".item-actions .action.remove");
-    if (removeBtn && !removeBtn.hasAttribute("disabled")) elements.push(removeBtn);
+  if (disposed || request !== focusRequest) return;
+  const first = itemsList.value[0]?.id;
+  if (first) {
+    focusedItem.value = first;
+    if (virtual.enabled.value) await virtual.focus(0, -2);
+    else itemsContainerRef.value?.querySelector<HTMLElement>(`[data-item-id="${first}"] .item-drag`)?.focus();
+  } else {
+    getBulkElement()?.focus();
   }
-  return elements;
 }
+
 
 async function onKeydown(event: KeyboardEvent) {
-  if (event.key === "Tab") {
-    const bulk = getBulkElement();
-    const closeBtn = rootRef.value?.querySelector<HTMLElement>(".header .close");
-    const active = document.activeElement;
-
-    if (virtual.enabled.value) {
-      if (active === bulk && !event.shiftKey) {
-        event.preventDefault();
-        closeBtn?.focus();
-        return;
-      }
-      if (active === closeBtn) {
-        event.preventDefault();
-        if (event.shiftKey) bulk?.focus();
-        else await virtual.focus(0, 0);
-        return;
-      }
-      const isInsideRows = itemsContainerRef.value?.contains(active);
-      if (isInsideRows) {
-        const row = (active as HTMLElement)?.closest<HTMLElement>("[data-virtual-index]");
-        const index = row ? Number(row.dataset.virtualIndex) : -1;
-        const controls = row ? Array.from(row.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")) : [];
-        const actionIdx = controls.findIndex(c => c === active);
-        if (event.shiftKey && index === 0 && actionIdx === 0) {
-          event.preventDefault();
-          closeBtn?.focus();
-          return;
-        }
-        if (!event.shiftKey && index === itemsList.value.length - 1 && actionIdx === controls.length - 1) {
-          event.preventDefault();
-          bulk?.focus();
-          return;
-        }
-        await virtual.onTab(event);
-        return;
-      }
-    }
-
-    const focusables = getFocusableElements();
-    if (focusables.length === 0) {
-      event.preventDefault();
-      return;
-    }
-    const currentIndex = focusables.findIndex((el) => el === active || el.contains(active));
+  if (event.key === "Tab" && !pendingConfirmation.value && !busy.value) {
     event.preventDefault();
-    if (event.shiftKey) {
-      const nextIndex = currentIndex <= 0 ? focusables.length - 1 : currentIndex - 1;
-      focusables[nextIndex]?.focus();
+    const active = document.activeElement as HTMLElement | null;
+    const row = active?.closest<HTMLElement>("[data-item-id]");
+    const index = itemsList.value.findIndex(item => item.id === row?.dataset.itemId);
+    let position = active === getBulkElement() ? 0 : active?.matches(".header .close") ? 1 : 2;
+    if (index >= 0 && active?.matches("button")) position = 3 + index * 2 + (active.matches(".remove") ? 1 : 0);
+    const length = 3 + itemsList.value.length * 2;
+    const next = (position + (event.shiftKey ? -1 : 1) + length) % length;
+    if (next === 0) getBulkElement()?.focus();
+    else if (next === 1) rootRef.value?.querySelector<HTMLElement>(".header .close")?.focus();
+    else if (next === 2) {
+      const focused = itemsList.value.findIndex(item => item.id === focusedItem.value);
+      await virtual.focus(Math.max(0, focused), -2);
     } else {
-      const nextIndex = currentIndex === -1 || currentIndex >= focusables.length - 1 ? 0 : currentIndex + 1;
-      focusables[nextIndex]?.focus();
+      await virtual.focus(Math.floor((next - 3) / 2), 1 + (next - 3) % 2);
     }
     return;
   }
@@ -115,16 +128,68 @@ async function onKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") {
     event.stopPropagation();
     event.preventDefault();
+    if (pendingConfirmation.value || hasPreparedDrag()) {
+      await cancelPreparedDrag();
+      return;
+    }
     if (busy.value) {
-      // While item drag busy Escape cancels native drag; guard first cancellation so it doesn't close popup
       cancelKeydownSeen = true;
       return;
     }
     if (cancelKeydownSeen) {
-      // Already guarded in keydown while busy, ignore residual keydown
+      return;
+    }
+    if (selection.ids.value.length > 0) {
+      clearSelection();
       return;
     }
     void close();
+  }
+}
+
+async function onGridKeydown(event: KeyboardEvent) {
+  if (event.defaultPrevented || event.key === "Tab") return;
+  const target = event.target as HTMLElement;
+  if (!target.matches(".item-drag") || busy.value) return;
+  const row = target.closest<HTMLElement>("[data-item-id]");
+  const index = itemsList.value.findIndex((item) => item.id === row?.dataset.itemId);
+  if (index < 0) return;
+  const id = itemsList.value[index].id;
+
+  if (event.key === " ") {
+    event.preventDefault();
+    selectItem(id, { ctrlKey: event.ctrlKey, shiftKey: event.shiftKey });
+    return;
+  }
+  if (event.ctrlKey && event.key.toLowerCase() === "a") {
+    event.preventDefault();
+    selectAllItems();
+    return;
+  }
+  let next = index;
+  switch (event.key) {
+    case "ArrowUp":
+      next--;
+      break;
+    case "ArrowDown":
+      next++;
+      break;
+    case "Home":
+      next = 0;
+      break;
+    case "End":
+      next = itemsList.value.length - 1;
+      break;
+    default:
+      return;
+  }
+  event.preventDefault();
+  next = Math.max(0, Math.min(next, itemsList.value.length - 1));
+  focusedItem.value = itemsList.value[next].id;
+  if (virtual.enabled.value) await virtual.focus(next, -2);
+  else {
+    await nextTick();
+    itemsContainerRef.value?.querySelector<HTMLElement>(`[data-item-id="${focusedItem.value}"] .item-drag`)?.focus();
   }
 }
 
@@ -145,14 +210,28 @@ onMounted(async () => {
     const cancelListener = await window.listen("item-drag-canceled", () => { cancelKeydownSeen = true; });
     if (disposed) { cancelListener(); return; }
     unlisteners.push(cancelListener);
+    isRailOrigin.value = await invoke<string | null>("get_manage_items_origin") === "edge-rail";
+
     const unlisten = await window.listen<boolean>("manage-items-opened", async ({ payload: keyboard }) => {
-      if (!keyboard) { ++focusRequest; return; }
-      try { await focusBulkControl(); }
-      catch (error) { if (!disposed) status.value = String(error); }
+      isRailOrigin.value = await invoke<string | null>("get_manage_items_origin") === "edge-rail";
+      if (!keyboard || isRailOrigin.value) {
+        ++focusRequest;
+        return;
+      }
+      try {
+        await focusInitialControl();
+      } catch (error) {
+        if (!disposed) status.value = String(error);
+      }
     });
-    if (disposed) { unlisten(); return; }
+    if (disposed) {
+      unlisten();
+      return;
+    }
     unlisteners.push(unlisten);
-    if (await invoke<boolean>("get_manage_items_keyboard")) await focusBulkControl();
+    if (!isRailOrigin.value && (await invoke<boolean>("get_manage_items_keyboard"))) {
+      await focusInitialControl();
+    }
   } catch (error) {
     if (!disposed) status.value = String(error);
   }
@@ -176,7 +255,7 @@ onUnmounted(() => {
     <header class="header flex items-center justify-between gap-[6px] p-[9px]">
       <div class="header-info flex min-w-0 flex-col gap-[2px]">
         <h1 class="title m-0 text-[13px] text-dc-text-primary">Manage Items<span v-if="batch" class="count text-dc-text-muted font-normal"> · {{ batch.items.length }}</span></h1>
-        <span v-if="batch" class="summary text-dc-text-muted text-[11px]">{{ pinnedCount }}/{{ totalCount }} pinned</span>
+        <span v-if="batch" class="summary text-dc-text-muted text-[11px]">{{ selectedCount > 0 ? `${selectedCount} selected · ${pinnedCount}/${totalCount} pinned` : `${pinnedCount}/${totalCount} pinned` }}</span>
       </div>
       <div class="header-actions flex items-center gap-[6px]">
         <BulkPinning
@@ -199,9 +278,14 @@ onUnmounted(() => {
       <ul
         ref="itemsContainer"
         class="items flex flex-col gap-[5px] min-h-0 overflow-y-auto overflow-x-hidden m-0 pt-0 px-[7px] pb-[3px] list-none"
-        role="list"
+        role="grid"
+        aria-multiselectable="true"
         :aria-label="`Batch items (${batch.items.length})`"
+        :aria-rowcount="batch.items.length"
         :style="virtual.enabled.value ? { position: 'relative' } : {}"
+        @keydown="onGridKeydown"
+        @focusin="(event) => { const id = (event.target as HTMLElement).closest<HTMLElement>('[data-item-id]')?.dataset.itemId; if (id) focusedItem = id; }"
+        @pointerup="(event) => { if (!busy && !(event.target as HTMLElement).closest('.item-row')) clearSelection(); }"
       >
       <div v-if="virtual.enabled.value" :style="{ height: `${virtual.totalHeight.value}px`, flex: 'none', width: '100%', pointerEvents: 'none' }" />
       <ShelfItemRow
@@ -209,23 +293,27 @@ onUnmounted(() => {
         :key="entry.item.id"
         :item="entry.item"
         :busy="busy"
+        :selected="selection.selected.value.has(entry.item.id)"
+        :selection-tabindex="(focusedItem ?? itemsList[0]?.id) === entry.item.id ? 0 : -1"
         :data-virtual-index="entry.index"
         :data-virtual-id="entry.item.id"
-        :role="'listitem'"
-        :aria-setsize="batch.items.length"
-        :aria-posinset="entry.index + 1"
+        role="row"
+        :aria-rowindex="entry.index + 1"
         :style="virtual.position(entry.index)"
-        @pin="(id, p) => { setItemPinned(id, p); announce(p ? 'Item pinned' : 'Item unpinned'); }"
-        @remove="(id) => { removeItem(id); announce('Item removed'); }"
+        @select="selectItem"
+        @focus-item="(id) => focusedItem = id"
+        @pin="(id, p) => { setItemPinned(id, p); if (!isRailOrigin) announce(p ? 'Item pinned' : 'Item unpinned'); }"
+        @remove="(id) => { removeItem(id); if (!isRailOrigin) announce('Item removed'); }"
         @drag="startItemDrag"
       />
       </ul>
     </div>
+    <BatchDragConfirmation :pending="pendingConfirmation" @confirm="confirmItemDrag" @cancel="cancelPreparedDrag" @drag="dragConfirmedItem" />
     <div v-if="status" class="status flex [align-items:start] gap-[4px] shrink-0 mt-auto mx-[7px] mb-[7px] p-[6px] border border-dc-warning-border bg-dc-warning-surface text-dc-warning-text rounded-[5px] text-[11px] [overflow-wrap:anywhere]" role="alert">
       <span>{{ status }}</span>
       <button class="dismiss ml-auto border-0 border-none text-inherit bg-transparent cursor-pointer" type="button" aria-label="Dismiss status" @click="dismissStatus">×</button>
     </div>
-    <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+    <div v-if="!isRailOrigin" class="sr-only" role="status" aria-live="polite" aria-atomic="true">
       {{ announcement }}
     </div>
   </main>

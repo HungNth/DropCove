@@ -5,18 +5,28 @@ import type { ShelfItem } from "../../composables/useShelf";
 import ShellVisual from "./ShellVisual.vue";
 import ActionIcon from "./ActionIcon.vue";
 
-const props = defineProps<{ item: ShelfItem; busy: boolean }>();
+const props = defineProps<{
+  item: ShelfItem;
+  busy: boolean;
+  selected?: boolean;
+  selectionTabindex?: number;
+}>();
 const emit = defineEmits<{
   pin: [itemId: string, pinned: boolean];
   remove: [itemId: string];
   drag: [itemId: string];
+  select: [itemId: string, modifiers: { ctrlKey: boolean; shiftKey: boolean }];
+  focusItem: [itemId: string];
 }>();
-let pointerStart: { id: number; x: number; y: number } | undefined;
+let pointerStart: { id: number; x: number; y: number; ctrlKey: boolean; shiftKey: boolean } | undefined;
+const pointerFocus = shallowRef(false);
 
 function pointerDown(event: PointerEvent) {
   if (event.button !== 0 || props.busy) return;
-  pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
-  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey };
+  pointerFocus.value = true;
+  emit("focusItem", props.item.id);
+  (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
 }
 
 function pointerMove(event: PointerEvent) {
@@ -24,8 +34,24 @@ function pointerMove(event: PointerEvent) {
   if (!(event.buttons & 1)) { pointerStart = undefined; return; }
   if (Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) < 6) return;
   pointerStart = undefined;
-  (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+  (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
   emit("drag", props.item.id);
+}
+
+function pointerUp(event: PointerEvent) {
+  const start = pointerStart;
+  pointerStart = undefined;
+  if (!start || start.id !== event.pointerId || props.busy) return;
+  emit("select", props.item.id, { ctrlKey: start.ctrlKey, shiftKey: start.shiftKey });
+}
+
+function onBlur() {
+  pointerFocus.value = false;
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (["Shift", "Control", "Alt", "Meta"].includes(event.key)) return;
+  pointerFocus.value = false;
 }
 const fullText = shallowRef<string | null>(null);
 const hoverTitle = computed(() => {
@@ -53,16 +79,24 @@ async function loadFullText() {
   <li
     class="item-row flex flex-none items-center gap-[5px] min-w-0 h-[54px] box-border border border-dc-border-default rounded-[7px] p-[5px] bg-dc-surface-elevated text-dc-text-primary transition-[opacity,transform] duration-[140ms,140ms] ease-[cubic-bezier(0.16,1,0.3,1)] forced-colors:border-[ButtonText]"
     :data-item-id="item.id"
+    :data-selected="selected || undefined"
+    :aria-selected="selectionTabindex !== undefined ? Boolean(selected) : undefined"
     :aria-label="`${item.name}, ${item.path}, ${item.availability}`"
   >
     <div
       class="item-drag flex flex-1 min-w-0 items-center gap-[5px] cursor-grab select-none touch-none active:cursor-grabbing"
       :title="hoverTitle"
       :aria-label="`Drag ${item.path} to copy`"
+      :data-pointer-focus="pointerFocus || undefined"
+      :role="selectionTabindex !== undefined ? 'gridcell' : undefined"
+      :tabindex="selectionTabindex"
+      @focus="emit('focusItem', item.id)"
+      @blur="onBlur"
+      @keydown="onKeydown"
       @pointerenter="loadFullText"
-      @pointerdown.prevent="pointerDown"
+      @pointerdown="pointerDown"
       @pointermove="pointerMove"
-      @pointerup="pointerStart = undefined"
+      @pointerup="pointerUp"
       @pointercancel="pointerStart = undefined"
       @dragstart.prevent
     >
@@ -78,7 +112,7 @@ async function loadFullText() {
         <span class="availability whitespace-nowrap text-dc-text-muted text-[10px]">{{ item.availability }}</span>
       </span>
     </div>
-    <div class="item-actions flex flex-none items-center gap-[3px]">
+    <div class="item-actions flex flex-none items-center gap-[3px]" :role="selectionTabindex !== undefined ? 'gridcell' : undefined">
       <button
         class="action pin inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-transparent rounded-[4px] bg-transparent text-dc-text-secondary cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
         type="button"
@@ -99,4 +133,29 @@ async function loadFullText() {
     </div>
   </li>
   </template>
+
+<style scoped>
+.item-row[data-selected] {
+  border-color: var(--dc-accent);
+  background: var(--dc-accent-subtle);
+}
+.item-drag:focus-visible:not([data-pointer-focus]) {
+  outline: 2px solid var(--dc-focus);
+  outline-offset: -3px;
+  border-radius: 6px;
+}
+.item-drag[data-pointer-focus]:focus-visible {
+  outline: none !important;
+}
+@media (forced-colors: active) {
+  .item-row[data-selected] {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .item-row[data-selected] :deep(.item-name) { color: HighlightText; }
+  .item-row[data-selected] .item-drag:focus-visible:not([data-pointer-focus]) { outline-color: HighlightText !important; }
+}
+</style>
 

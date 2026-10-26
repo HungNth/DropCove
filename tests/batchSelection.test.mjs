@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { effectScope, shallowRef } from "vue";
-import { useBatchSelection } from "../src/composables/useBatchSelection.ts";
+import { useSelection } from "../src/composables/useSelection.ts";
 
 function fixture(count = 60) {
   const scope = effectScope();
   const batches = shallowRef(Array.from({ length: count }, (_, index) => ({ id: String(index), items: [{ id: `i${index}` }] })));
-  const selection = scope.run(() => useBatchSelection(batches));
+  const selection = scope.run(() => useSelection(batches));
   return { batches, selection, close: () => scope.stop() };
 }
 

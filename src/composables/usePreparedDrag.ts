@@ -9,7 +9,7 @@ interface Preparation {
   snapshot: { batches: ShelfBatch[] };
 }
 
-interface BatchDragResult {
+interface DragResult {
   outcome: "copy" | "rejected" | "canceled";
   error: string | null;
 }
@@ -17,12 +17,13 @@ interface Confirmation {
   token: string;
   available: number;
   unavailable: number;
-  batchIds: string[];
+  ids: string[];
   binding: string;
 }
 
-export function useBatchDrag(
-  batches: Ref<ShelfBatch[]>,
+export function usePreparedDrag(
+  kind: "batch" | "item",
+  batches: Readonly<Ref<ShelfBatch[]>>,
   selectedIds: Readonly<Ref<string[]>>,
   busy: Ref<boolean>,
   status: Ref<string>,
@@ -36,6 +37,9 @@ export function useBatchDrag(
   let generation = 0;
   const binding = () => JSON.stringify([selectedIds.value, batches.value]);
   let holdEpoch = 0;
+  const command = (operation: "prepare" | "start" | "cancel") => `${operation}_${kind}_drag`;
+  const project = (snapshot: ShelfBatch[]) => kind === "batch" ? snapshot : snapshot.filter(batch => batch.id === batches.value[0]?.id);
+  const identities = (snapshot: ShelfBatch[]) => kind === "batch" ? snapshot.map(batch => batch.id) : snapshot.flatMap(batch => batch.items.map(item => item.id));
 
   async function releaseHold(epoch: number) {
     if (!epoch || epoch !== holdEpoch) return true;
@@ -61,7 +65,7 @@ export function useBatchDrag(
     ready = null;
     let canceled = true;
     try {
-      if (prepared) await invoke("cancel_batch_drag", { token: prepared.token });
+      if (prepared) await invoke(command("cancel"), { token: prepared.token });
     } catch (error) {
       canceled = false;
       if (!disposed) status.value = String(error);
@@ -78,7 +82,7 @@ export function useBatchDrag(
     status.value = "";
     try {
       // Hold the Rail until native ActiveDrag has taken ownership.
-      const result = await invoke<BatchDragResult>("start_batch_drag", { token });
+      const result = await invoke<DragResult>(command("start"), { token });
       if (result.outcome === "copy") copied();
       try {
         await refresh();
@@ -88,17 +92,20 @@ export function useBatchDrag(
       }
       if (result.error && !disposed) status.value = result.error;
     } catch (error) {
-      if (!disposed) status.value = String(error);
+      let message = String(error);
+      try { await invoke(command("cancel"), { token }); }
+      catch (cleanup) { message += `; prepared drag cancellation failed: ${cleanup}`; }
+      if (!disposed) status.value = message;
     } finally {
       await releaseHold(activeHold);
       if (!disposed) busy.value = false;
     }
   }
 
-  async function start(batchIds: string[]) {
+  async function start(ids: string[]) {
     if (busy.value || pending.value || disposed) return;
     busy.value = true;
-    if (ready && ready.binding === binding() && JSON.stringify(ready.batchIds) === JSON.stringify(batchIds)) {
+    if (ready && ready.binding === binding() && JSON.stringify(ready.ids) === JSON.stringify(ids)) {
       await dispatch(ready.token);
       return;
     }
@@ -111,16 +118,18 @@ export function useBatchDrag(
         return;
       }
       if (disposed || request !== generation) return;
-      const preparation = await invoke<Preparation>("prepare_batch_drag", { batchIds });
+      const preparation = await invoke<Preparation>(command("prepare"), kind === "batch" ? { batchIds: ids } : { itemIds: ids });
       ownedToken = preparation.token;
       await refresh();
       if (disposed || request !== generation) return;
       if (!preparation.token || !preparation.available) {
-        status.value = "No available items remain in these batches.";
+        status.value = kind === "batch" ? "No available items remain in these batches." : "No available items remain in this batch.";
         return;
       }
-      const survivingSelection = selectedAtStart.filter(id => preparation.snapshot.batches.some(batch => batch.id === id));
-      const preparedBinding = JSON.stringify([survivingSelection, preparation.snapshot.batches]);
+      const preparedProjection = project(preparation.snapshot.batches);
+      const existing = new Set(identities(preparedProjection));
+      const survivingSelection = selectedAtStart.filter(id => existing.has(id));
+      const preparedBinding = JSON.stringify([survivingSelection, preparedProjection]);
       if (binding() !== preparedBinding) {
         status.value = "Shelf or selection changed while preparing this drag; drag again.";
         return;
@@ -129,7 +138,7 @@ export function useBatchDrag(
         if (!await hold(true)) return;
         holdEpoch = request;
         if (disposed || request !== generation || binding() !== preparedBinding) return;
-        pending.value = { ...preparation, token: preparation.token, batchIds, binding: preparedBinding };
+        pending.value = { ...preparation, token: preparation.token, ids: ids.filter(id => existing.has(id)), binding: preparedBinding };
         ownedToken = null;
       } else {
         ownedToken = null;
@@ -141,7 +150,7 @@ export function useBatchDrag(
       const epoch = request;
       if (ownedToken) {
         try {
-          await invoke("cancel_batch_drag", { token: ownedToken });
+          await invoke(command("cancel"), { token: ownedToken });
         } catch (error) {
           if (!disposed) status.value = `${status.value}; prepared drag cancellation failed: ${error}`;
         }
@@ -163,7 +172,7 @@ export function useBatchDrag(
     confirm: () => {
       ready = pending.value;
       pending.value = null;
-      if (ready) status.value = `Ready: drag the same batches again to copy ${ready.available} available item(s).`;
+      if (ready) status.value = `Ready: drag the same ${kind === "batch" ? "batches" : "items"} again to copy ${ready.available} available item(s).`;
     },
     dragConfirmed: () => {
       const prepared = pending.value ?? ready;
