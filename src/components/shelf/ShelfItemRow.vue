@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { computed, shallowRef } from "vue";
+import { computed, shallowRef, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { ShelfItem } from "../../composables/useShelf";
 import ShellVisual from "./ShellVisual.vue";
 import ActionIcon from "./ActionIcon.vue";
+import ItemActionsMenu, { type ShelfItemAction } from "./ItemActionsMenu.vue";
 
 const props = defineProps<{
   item: ShelfItem;
   busy: boolean;
   selected?: boolean;
   selectionTabindex?: number;
+  menuOpen?: boolean;
+  noActivate?: boolean;
 }>();
 const emit = defineEmits<{
   pin: [itemId: string, pinned: boolean];
@@ -17,6 +20,9 @@ const emit = defineEmits<{
   drag: [itemId: string];
   select: [itemId: string, modifiers: { ctrlKey: boolean; shiftKey: boolean }];
   focusItem: [itemId: string];
+  openMenu: [itemId: string];
+  closeMenu: [itemId: string];
+  action: [itemId: string, action: ShelfItemAction];
 }>();
 let pointerStart: { id: number; x: number; y: number; ctrlKey: boolean; shiftKey: boolean } | undefined;
 const pointerFocus = shallowRef(false);
@@ -54,24 +60,52 @@ function onKeydown(event: KeyboardEvent) {
   pointerFocus.value = false;
 }
 const fullText = shallowRef<string | null>(null);
+const isManagedText = computed(() => props.item.ownership === "Managed" && props.item.managedContentKind === "Text");
+const isManagedImage = computed(() => props.item.ownership === "Managed" && props.item.managedContentKind === "Image");
+const hasItemActions = computed(() => props.item.ownership === "External" || isManagedText.value);
+
+const rowAriaLabel = computed(() => {
+  if (props.item.ownership === "External") {
+    return `${props.item.name}, ${props.item.path}, ${props.item.availability}`;
+  }
+  if (isManagedImage.value) {
+    return `${props.item.name}, DropCove-created image, ${props.item.availability}`;
+  }
+  return `${props.item.name}, ${props.item.availability}`;
+});
+
 const hoverTitle = computed(() => {
-  const normalized = props.item.path.replace(/\\/g, "/").toLowerCase();
-  if (normalized.includes("/managed/") && normalized.endsWith(".txt")) {
+  if (props.item.ownership === "External") {
+    return props.item.path;
+  }
+  if (isManagedText.value) {
     return fullText.value ?? props.item.name;
   }
-  return props.item.path;
-});
-async function loadFullText() {
-  if (fullText.value !== null) return;
-  const normalized = props.item.path.replace(/\\/g, "/").toLowerCase();
-  if (normalized.includes("/managed/") && normalized.endsWith(".txt")) {
-    try {
-      const text = await invoke<string | null>("get_managed_text", { itemId: props.item.id });
-      if (text) {
-        fullText.value = text.length > 500 ? text.slice(0, 500) + "..." : text;
-      }
-    } catch {}
+  if (isManagedImage.value) {
+    return `${props.item.name} (DropCove-created image)`;
   }
+  return props.item.name;
+});
+
+const dragAriaLabel = computed(() => {
+  if (props.item.ownership === "External") {
+    return `Drag ${props.item.path} to copy`;
+  }
+  return `Drag ${props.item.name} to copy`;
+});
+
+watch(() => props.item.id, () => {
+  fullText.value = null;
+});
+
+async function loadFullText() {
+  if (fullText.value !== null || !isManagedText.value) return;
+  try {
+    const text = await invoke<string | null>("get_managed_text", { itemId: props.item.id });
+    if (text !== null && text !== undefined) {
+      fullText.value = text.length > 500 ? text.slice(0, 500) + "..." : text;
+    }
+  } catch {}
 }
 </script>
 
@@ -81,12 +115,12 @@ async function loadFullText() {
     :data-item-id="item.id"
     :data-selected="selected || undefined"
     :aria-selected="selectionTabindex !== undefined ? Boolean(selected) : undefined"
-    :aria-label="`${item.name}, ${item.path}, ${item.availability}`"
+    :aria-label="rowAriaLabel"
   >
     <div
       class="item-drag flex flex-1 min-w-0 items-center gap-[5px] cursor-grab select-none touch-none active:cursor-grabbing"
       :title="hoverTitle"
-      :aria-label="`Drag ${item.path} to copy`"
+      :aria-label="dragAriaLabel"
       :data-pointer-focus="pointerFocus || undefined"
       :role="selectionTabindex !== undefined ? 'gridcell' : undefined"
       :tabindex="selectionTabindex"
@@ -122,6 +156,16 @@ async function loadFullText() {
         :title="item.isPinned ? 'Make temporary; consumed after successful Copy' : 'Keep this reference after successful Copy'"
         @click="emit('pin', item.id, !item.isPinned)"
       ><ActionIcon name="pin" :filled="item.isPinned" /></button>
+      <ItemActionsMenu
+        v-if="hasItemActions"
+        :item="item"
+        :disabled="busy"
+        :is-open="menuOpen"
+        :no-activate="noActivate"
+        @open="emit('openMenu', item.id)"
+        @close="emit('closeMenu', item.id)"
+        @action="a => emit('action', item.id, a)"
+      />
       <button
         class="action remove inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-transparent rounded-[4px] bg-transparent text-dc-text-secondary cursor-pointer [&.remove:hover:not(:disabled)]:border-dc-danger-border [&:hover:not(:disabled)]:bg-dc-surface-hover [&.remove:hover:not(:disabled)]:text-dc-danger aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
         type="button"

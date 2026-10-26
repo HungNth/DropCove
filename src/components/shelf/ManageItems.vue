@@ -10,6 +10,7 @@ import BatchDragConfirmation from "./BatchDragConfirmation.vue";
 import { useAnnouncer } from "../../composables/useAnnouncer";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
 import ActionIcon from "./ActionIcon.vue";
+import type { ShelfItemAction } from "./ItemActionsMenu.vue";
 
 const {
   batch,
@@ -44,6 +45,7 @@ const itemsList = computed(() => batch.value?.items ?? []);
 const virtual = useVirtualCollection(itemsList, itemsContainerRef, 1, 54, 5);
 const focusedItem = shallowRef<string | null>(null);
 const isRailOrigin = shallowRef(false);
+const activeItemMenuId = shallowRef<string | null>(null);
 const window = getCurrentWindow();
 const unlisteners: UnlistenFn[] = [];
 let cancelKeydownSeen = false;
@@ -81,6 +83,28 @@ watch(
   },
   { flush: "post" },
 );
+watch([itemsList, busy, pendingConfirmation], () => {
+  activeItemMenuId.value = null;
+});
+
+async function handlePerformItemAction(itemId: string, action: ShelfItemAction) {
+  try {
+    await invoke("perform_item_action", { itemId, action });
+    activeItemMenuId.value = null;
+    if (action === "CopyPath") {
+      if (!isRailOrigin.value) announce("Path copied.");
+    } else if (action === "CopyText") {
+      if (!isRailOrigin.value) announce("Text copied.");
+    }
+    if (!isRailOrigin.value && action !== "ShowInExplorer") {
+      await nextTick();
+      rootRef.value?.querySelector<HTMLButtonElement>(`[data-item-id="${CSS.escape(itemId)}"] .more`)?.focus();
+    }
+  } catch (error) {
+    activeItemMenuId.value = null;
+    status.value = String(error);
+  }
+}
 
 function getBulkElement(): HTMLElement | null {
   return rootRef.value?.querySelector<HTMLElement>(".bulk-pin") ?? null;
@@ -105,14 +129,50 @@ async function focusInitialControl() {
 
 
 async function onKeydown(event: KeyboardEvent) {
+  if (activeItemMenuId.value) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      const targetId = activeItemMenuId.value;
+      activeItemMenuId.value = null;
+      if (!isRailOrigin.value) {
+        await nextTick();
+        rootRef.value?.querySelector<HTMLButtonElement>(`[data-item-id="${CSS.escape(targetId)}"] .more`)?.focus();
+      }
+      return;
+    }
+    if (event.key === "Tab") {
+      activeItemMenuId.value = null;
+    }
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(".item-actions-menu, .more")) {
+      return;
+    }
+  }
+
   if (event.key === "Tab" && !pendingConfirmation.value && !busy.value) {
     event.preventDefault();
+    activeItemMenuId.value = null;
     const active = document.activeElement as HTMLElement | null;
     const row = active?.closest<HTMLElement>("[data-item-id]");
     const index = itemsList.value.findIndex(item => item.id === row?.dataset.itemId);
+    const rowButtons: Array<{ rowIndex: number; controlIndex: number; kind: "pin" | "more" | "remove" }> = [];
+    itemsList.value.forEach((item, rowIndex) => {
+      rowButtons.push({ rowIndex, controlIndex: 1, kind: "pin" });
+      if (item.ownership === "External" || (item.ownership === "Managed" && item.managedContentKind === "Text")) {
+        rowButtons.push({ rowIndex, controlIndex: 2, kind: "more" });
+        rowButtons.push({ rowIndex, controlIndex: 3, kind: "remove" });
+      } else {
+        rowButtons.push({ rowIndex, controlIndex: 2, kind: "remove" });
+      }
+    });
     let position = active === getBulkElement() ? 0 : active?.matches(".header .close") ? 1 : 2;
-    if (index >= 0 && active?.matches("button")) position = 3 + index * 2 + (active.matches(".remove") ? 1 : 0);
-    const length = 3 + itemsList.value.length * 2;
+    if (index >= 0 && active?.matches("button")) {
+      const kind = active.matches(".pin") ? "pin" : active.matches(".more") ? "more" : "remove";
+      const buttonIndex = rowButtons.findIndex(b => b.rowIndex === index && b.kind === kind);
+      if (buttonIndex >= 0) position = 3 + buttonIndex;
+    }
+    const length = 3 + rowButtons.length;
     const next = (position + (event.shiftKey ? -1 : 1) + length) % length;
     if (next === 0) getBulkElement()?.focus();
     else if (next === 1) rootRef.value?.querySelector<HTMLElement>(".header .close")?.focus();
@@ -120,7 +180,8 @@ async function onKeydown(event: KeyboardEvent) {
       const focused = itemsList.value.findIndex(item => item.id === focusedItem.value);
       await virtual.focus(Math.max(0, focused), -2);
     } else {
-      await virtual.focus(Math.floor((next - 3) / 2), 1 + (next - 3) % 2);
+      const target = rowButtons[next - 3];
+      await virtual.focus(target.rowIndex, target.controlIndex);
     }
     return;
   }
@@ -137,6 +198,15 @@ async function onKeydown(event: KeyboardEvent) {
       return;
     }
     if (cancelKeydownSeen) {
+      return;
+    }
+    if (activeItemMenuId.value) {
+      const targetId = activeItemMenuId.value;
+      activeItemMenuId.value = null;
+      if (!isRailOrigin.value) {
+        await nextTick();
+        rootRef.value?.querySelector<HTMLButtonElement>(`[data-item-id="${CSS.escape(targetId)}"] .more`)?.focus();
+      }
       return;
     }
     if (selection.ids.value.length > 0) {
@@ -283,9 +353,10 @@ onUnmounted(() => {
         :aria-label="`Batch items (${batch.items.length})`"
         :aria-rowcount="batch.items.length"
         :style="virtual.enabled.value ? { position: 'relative' } : {}"
+        @scroll="activeItemMenuId = null"
         @keydown="onGridKeydown"
         @focusin="(event) => { const id = (event.target as HTMLElement).closest<HTMLElement>('[data-item-id]')?.dataset.itemId; if (id) focusedItem = id; }"
-        @pointerup="(event) => { if (!busy && !(event.target as HTMLElement).closest('.item-row')) clearSelection(); }"
+        @pointerup="(event) => { if (!busy && !(event.target as HTMLElement).closest('.item-row, .item-actions-menu, .more')) clearSelection(); }"
       >
       <div v-if="virtual.enabled.value" :style="{ height: `${virtual.totalHeight.value}px`, flex: 'none', width: '100%', pointerEvents: 'none' }" />
       <ShelfItemRow
@@ -295,6 +366,8 @@ onUnmounted(() => {
         :busy="busy"
         :selected="selection.selected.value.has(entry.item.id)"
         :selection-tabindex="(focusedItem ?? itemsList[0]?.id) === entry.item.id ? 0 : -1"
+        :menu-open="activeItemMenuId === entry.item.id"
+        :no-activate="isRailOrigin"
         :data-virtual-index="entry.index"
         :data-virtual-id="entry.item.id"
         role="row"
@@ -305,6 +378,9 @@ onUnmounted(() => {
         @pin="(id, p) => { setItemPinned(id, p); if (!isRailOrigin) announce(p ? 'Item pinned' : 'Item unpinned'); }"
         @remove="(id) => { removeItem(id); if (!isRailOrigin) announce('Item removed'); }"
         @drag="startItemDrag"
+        @open-menu="id => activeItemMenuId = id"
+        @close-menu="id => { if (activeItemMenuId === id) activeItemMenuId = null; }"
+        @action="handlePerformItemAction"
       />
       </ul>
     </div>

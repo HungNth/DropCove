@@ -56,7 +56,7 @@ for (const count of [1, 2]) {
   test(`${count}-item card preserves selected drag scope until the threshold and exposes row selection`, async () => {
     const selected = shallowRef(true);
     const actions = [];
-    const batch = { id: "batch", items: Array.from({ length: count }, (_, index) => ({ id: `item${index}`, name: `item${index}.txt`, path: `C:\\item${index}.txt`, isPinned: false, isFolder: false })) };
+    const batch = { id: "batch", items: Array.from({ length: count }, (_, index) => ({ id: `item${index}`, name: `item${index}.txt`, path: `C:\\item${index}.txt`, isPinned: false, isFolder: false, ownership: "External", managedContentKind: null, availability: "Available" })) };
     const app = renderer.createApp({ render: () => h(ShelfBatchCard, { batch, busy: false, selected: selected.value, selectionTabindex: 0, role: "row", onSelect: (...args) => actions.push(["select", ...args]), onDragBatch: id => actions.push(["drag", id]) }) });
     const root = node("root");
     app.mount(root);
@@ -119,7 +119,7 @@ test("Rail pointer selection and visible errors never add focus or live announce
       async invoke(command, args) {
         if (command === "plugin:event|listen") { listeners.set(args.event, callbacks.get(args.handler)); return nextCallback; }
         if (command === "get_rail") return { edge: "Right", expanded: true, width: 280, height: 280 };
-        if (command === "get_shelf") return { batches: [{ id: "batch", items: [{ id: "item", name: "a.txt", path: "C:\\a.txt", isFolder: false, isPinned: false }] }], preferredWidth: 191, height: 180 };
+        if (command === "get_shelf") return { batches: [{ id: "batch", items: [{ id: "item", name: "a.txt", path: "C:\\a.txt", isFolder: false, isPinned: false, ownership: "External", managedContentKind: null, availability: "Available" }] }], preferredWidth: 191, height: 180 };
         if (["plugin:event|unlisten", "set_rail_transient_hold", "invalidate_surface_visuals"].includes(command)) return;
         throw Error(command);
       },

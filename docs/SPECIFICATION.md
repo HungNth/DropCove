@@ -390,9 +390,10 @@ A single-item card displays:
 - truncated display name;
 - direct card drag-out;
 - compact Pin/Unpin icon action;
+- compact More icon action when its Shelf Item has Item Actions;
 - compact Remove Batch icon action.
 
-It does not show Manage Items because its only Shelf Item is already directly accessible. Pin and Remove occupy one trailing icon-control row.
+It does not show Manage Items because its only Shelf Item is already directly accessible. The trailing controls are Pin/Unpin, More when eligible, and Remove. A Managed Image retains only Pin/Unpin and Remove.
 
 ### 9.2 Multi-item batch
 
@@ -407,7 +408,7 @@ A multi-item card displays:
 
 On both the Drop Shelf and expanded Edge Rail, each multi-item preview occupies a `24 × 24` logical-pixel box. The first Shelf Item is the front layer at the lower-left; each following layer sits behind it, offset `3` logical pixels up and right. The preview region is `30 × 30` logical pixels, bounded to three layers. Each visual retains its natural transparency with no opaque per-layer backing; later layers or the card surface may show through transparent artwork and aspect-fit margins. The stack remains decorative and non-interactive; the existing item-count title, batch drag region, trailing controls, and `48`-pixel card height are unchanged.
 
-Visible drag-hint subtitles are not shown on either card type. Full paths and drag instructions remain available through tooltips and accessibility text. Multi-item actions occupy one trailing icon-control row.
+Visible drag-hint subtitles are not shown on either card type. External Reference full paths and drag instructions remain available through tooltips and accessibility text. Managed Files use their user-visible name/content rather than a Profile Data path. Multi-item actions occupy one trailing icon-control row.
 
 ### 9.3 Batch Selection
 
@@ -426,6 +427,31 @@ On the Drop Shelf, the batch collection is a multiselectable ARIA grid because c
 Pointer selection on the Drop Shelf focuses the card drag region; action-control activation retains control focus. If the focused batch disappears, focus moves to the batch now at the same displayed index, otherwise the previous batch, otherwise the More action when the Shelf becomes empty. Selection changes use the existing polite announcement channel with coalesced batch/item counts or `Selection cleared`.
 
 The no-activate Edge Rail exposes the same pointer gestures, selected visual, and footer count but remains pointer-only. It does not add focusable selection regions, keyboard selection, or a live announcement channel; keyboard users open the Drop Shelf through the global hotkey.
+
+### 9.4 Item Actions Menu
+
+The per-item **More** button opens one transient **Item Actions Menu**. It appears on eligible single-item cards in the Drop Shelf and expanded Edge Rail and eligible rows in Manage Items. A multi-item card has no item menu; use Manage Items to target a specific Shelf Item.
+
+| Authoritative classification | Menu actions, in order |
+|---|---|
+| External Reference, file or folder | Show in File Explorer; Copy Path |
+| Plain-text Managed File | Copy Text |
+| Image Managed File | No More button or Item Actions Menu |
+
+Core Shelf State supplies ownership and Managed content kind; presentation never infers them from path substrings or extensions. Requests contain only the Shelf Item identity and requested action, not a caller-provided path or text payload.
+
+- **Copy Path** replaces the Windows clipboard with the exact retained absolute External Reference path as Unicode text, without quotes, newline, normalization, or existence requirement.
+- **Copy Text** replaces the clipboard with the full original Managed Text, preserving Unicode and line endings rather than copying a truncated preview. The menu remains available for cached Available, Missing, and Unavailable items. Invocation requires a committed `ready` Managed File record and attempts a live read; `ready` is not an availability classification. Read failure retains the item without cleanup or availability mutation.
+- **Show in File Explorer** checks the current External Reference path, selects the file or non-root folder in its parent, and opens a filesystem root directly. Missing/inaccessible paths report an error without mutation. Explicit reveal may activate Explorer; Copy actions never activate the Edge Rail.
+- Every action targets only the item whose More button opened it. Batch Selection, Item Selection, anchors, Pin state, Temporary/Pinned lifecycle, ordering, sizing, and display state remain unchanged. Clipboard Copy is not Successful Drag-Out and never consumes a Temporary Item.
+- Copy success reports `Path copied.` or `Text copied.` locally; failures identify the operation locally. No Windows toast is emitted, and successful Explorer reveal needs no duplicate banner.
+
+The menu follows the Utility Menu keyboard contract: menu/menuitem semantics, Arrow Up/Down, Home/End, Enter/Space, Escape, Tab exit, outside-click dismissal, and focus restoration to the originating More button. Explorer activation is not followed by forced DropCove focus. The Edge Rail and its pointer-opened management popup remain no-activate and do not claim keyboard/live-announcement ownership.
+
+Only one item menu is open per surface. It closes on action, dismissal, another menu, projection replacement, target disappearance/unmount, scroll, drag/resize/movement, modal or busy ownership, surface hide/close, and Rail collapse/fullscreen/display transitions. The popover stays within its surface without resizing it. Rail menu lifetime uses a dedicated transient hold released on dismissal; leaving the Rail closes the menu and permits normal delayed collapse.
+
+Managed File internal paths are not shown or copied by item actions, tooltips, accessibility labels, status, or announcements. Managed Text uses its user-visible name and content preview; Managed Image uses its name and `DropCove-created image`. External References retain their full user-facing path.
+
 
 ## 10. Manage Items
 
@@ -457,8 +483,9 @@ Each `54`-logical-pixel row, separated by a `5`-pixel gap, exposes:
 - icon or thumbnail;
 - item name on the first text line;
 - availability on the second text line as `Available`, `Unavailable`, or `Missing`, without a duplicate `Pinned ·` prefix;
-- full path through the drag-region tooltip and accessibility text, but not as visible row content;
+- External Reference full path through the drag-region tooltip and accessibility text, but not as visible row content; Managed Files use ownership-appropriate name/content descriptions without Profile Data paths;
 - compact Pin/Unpin icon action;
+- compact More icon action when eligible under section 9.4;
 - compact Remove Item icon action;
 - Item Selection-aware direct drag-out from the row drag region.
 
@@ -483,7 +510,7 @@ Item Selection is transient presentation state owned by the current Manage Items
 - Keyboard opening from the Drop Shelf with `Enter` or `Space` focuses the current item drag region in the collection grid.
 - The item collection exposes `role="grid"` with `aria-multiselectable="true"`; rows expose `aria-selected`, one item drag region is the roving focus target, and Pin/Unpin and Remove remain independent buttons.
 - Up/Down moves item focus, Home/End moves to collection boundaries, `Space` selects one, `Ctrl+Space` toggles, `Shift+Space` replaces with the anchor range, and `Ctrl+A` selects every item without changing a valid anchor or creating an absent one.
-- `Tab` and `Shift+Tab` cycle through Bulk Pinning, Close, the grid's primary drag-region stop, then item Pin/Unpin and Remove controls in source order. Virtualized targets are mounted and scrolled into view before focus moves.
+- `Tab` and `Shift+Tab` cycle through Bulk Pinning, Close, the grid's primary drag-region stop, then item Pin/Unpin, eligible More, and Remove controls in source order. Virtualized targets are mounted and scrolled into view before focus moves.
 - If the focused item disappears while the batch survives, focus moves to the item now at the same source index, otherwise the previous item, otherwise Bulk Pinning. Selection changes use the existing polite announcement channel with coalesced selected-item counts or `Selection cleared`.
 - Explicit close restores focus to the originating Manage Items control when it still exists. If the batch has become a one-item card, focus returns to that card's drag region. If the batch disappeared, the Drop Shelf recovers to the batch now at the same displayed index, otherwise the previous batch, otherwise More. A pointer-opened Edge Rail origin does not receive focus.
 - `Esc` cancels an active item availability confirmation or native item drag first, then clears non-empty Item Selection, then closes Manage Items on a later press.
@@ -935,7 +962,7 @@ Top and bottom Edge Rail docking are not supported.
 - Item Selection count changes are announced politely and coalesced. Pointer opening, including from the Edge Rail, does not activate or focus the popup; keyboard opening from the Drop Shelf focuses the grid.
 - The Drop Shelf batch collection uses `role="grid"` with `aria-multiselectable="true"`; selected batch rows expose `aria-selected`, batch drag regions use roving focus with arrow/Home/End navigation, and `Space`, `Ctrl+Space`, `Shift+Space`, `Ctrl+A`, and `Escape` operate the Batch Selection contract in section 9.3.
 - Batch Selection count changes are announced politely and coalesced on the Drop Shelf. The Edge Rail remains pointer-only/no-activate and exposes only the visible selected treatment and footer count.
-- Full paths and drag instructions remain available through tooltips and accessibility text when visual text is shortened or omitted.
+- External Reference full paths and drag instructions remain available through tooltips and accessibility text when visual text is shortened or omitted. Managed Files never expose Profile Data paths there; use user-visible names, text previews, or `DropCove-created image` instead.
 - The resolved Appearance Mode drives Light or Dark semantic resources and matching native frames. Windows Contrast Theme bypasses the application palette and uses Windows system colors, explicit borders, and visible focus indicators.
 - Drop Placeholders use the drag-hover semantic colors in Dark and Light appearances and Windows system colors in Contrast Themes.
 - Entrance, insertion, removal, and rail transitions are short opacity/scale effects.

@@ -1,12 +1,20 @@
 <script setup lang="ts">
-import { computed, shallowRef, useTemplateRef } from "vue";
+import { computed, shallowRef, useTemplateRef, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { ShelfAnchor, ShelfBatch } from "../../composables/useShelf";
 import BulkPinning from "./BulkPinning.vue";
 import ShellVisual from "./ShellVisual.vue";
 import ActionIcon from "./ActionIcon.vue";
+import ItemActionsMenu, { type ShelfItemAction } from "./ItemActionsMenu.vue";
 
-const props = defineProps<{ batch: ShelfBatch; busy: boolean; selected?: boolean; selectionTabindex?: number }>();
+const props = defineProps<{
+  batch: ShelfBatch;
+  busy: boolean;
+  selected?: boolean;
+  selectionTabindex?: number;
+  menuOpenItemId?: string | null;
+  noActivate?: boolean;
+}>();
 const emit = defineEmits<{
   remove: [batchId: string];
   dragBatch: [batchId: string];
@@ -15,33 +23,53 @@ const emit = defineEmits<{
   pinItem: [itemId: string, pinned: boolean];
   pinBatch: [batchId: string, pinned: boolean];
   manage: [batchId: string, anchor: ShelfAnchor, keyboard: boolean];
+  openItemMenu: [itemId: string];
+  closeItemMenu: [itemId: string];
+  itemAction: [itemId: string, action: ShelfItemAction];
 }>();
 let pointerStart: { id: number; x: number; y: number; ctrlKey: boolean; shiftKey: boolean } | undefined;
 const singleItem = computed(() => props.batch.items.length === 1 ? props.batch.items[0] : undefined);
 const pointerFocus = shallowRef(false);
 const title = computed(() => props.batch.items.length === 1 ? props.batch.items[0].name : `${props.batch.items.length} items`);
 const fullText = shallowRef<string | null>(null);
+const isManagedText = computed(() => singleItem.value?.ownership === "Managed" && singleItem.value?.managedContentKind === "Text");
+const isManagedImage = computed(() => singleItem.value?.ownership === "Managed" && singleItem.value?.managedContentKind === "Image");
+const hasItemActions = computed(() => singleItem.value && (singleItem.value.ownership === "External" || isManagedText.value));
+
 const hoverTitle = computed(() => {
-  if (props.batch.items.length !== 1) return title.value;
-  const item = props.batch.items[0];
-  const normalized = item.path.replace(/\\/g, "/").toLowerCase();
-  if (normalized.includes("/managed/") && normalized.endsWith(".txt")) {
+  if (props.batch.items.length !== 1 || !singleItem.value) return title.value;
+  const item = singleItem.value;
+  if (item.ownership === "External") {
+    return item.path;
+  }
+  if (isManagedText.value) {
     return fullText.value ?? item.name;
   }
-  return item.path;
-});
-async function loadFullText() {
-  if (props.batch.items.length !== 1 || fullText.value !== null) return;
-  const item = props.batch.items[0];
-  const normalized = item.path.replace(/\\/g, "/").toLowerCase();
-  if (normalized.includes("/managed/") && normalized.endsWith(".txt")) {
-    try {
-      const text = await invoke<string | null>("get_managed_text", { itemId: item.id });
-      if (text) {
-        fullText.value = text.length > 500 ? text.slice(0, 500) + "..." : text;
-      }
-    } catch {}
+  if (isManagedImage.value) {
+    return `${item.name} (DropCove-created image)`;
   }
+  return item.name;
+});
+
+const dragAriaLabel = computed(() => {
+  if (props.batch.items.length === 1 && singleItem.value) {
+    return `Drag ${title.value} to copy`;
+  }
+  return `Drag batch ${title.value} to copy`;
+});
+
+watch(() => singleItem.value?.id, () => {
+  fullText.value = null;
+});
+
+async function loadFullText() {
+  if (props.batch.items.length !== 1 || !singleItem.value || fullText.value !== null || !isManagedText.value) return;
+  try {
+    const text = await invoke<string | null>("get_managed_text", { itemId: singleItem.value.id });
+    if (text !== null && text !== undefined) {
+      fullText.value = text.length > 500 ? text.slice(0, 500) + "..." : text;
+    }
+  } catch {}
 }
 const previews = computed(() => props.batch.items.slice(0, 3));
 const card = useTemplateRef<HTMLElement>("card");
@@ -102,7 +130,7 @@ function onKeydown(event: KeyboardEvent) {
     <div
       class="card-drag flex flex-1 min-w-0 items-center gap-[4px] h-full box-border p-[5px] cursor-grab select-none touch-none active:cursor-grabbing"
       :title="hoverTitle"
-      :aria-label="batch.items.length === 1 ? `Drag ${title} to copy` : `Drag batch ${title} to copy`"
+      :aria-label="dragAriaLabel"
       :data-pointer-focus="pointerFocus || undefined"
       :role="selectionTabindex !== undefined ? 'gridcell' : undefined"
       :tabindex="selectionTabindex"
@@ -152,7 +180,17 @@ function onKeydown(event: KeyboardEvent) {
       :title="singleItem.isPinned ? 'Make temporary; consumed after successful Copy' : 'Keep this reference after successful Copy'"
       @click="emit('pinItem', singleItem.id, !singleItem.isPinned)"
     ><ActionIcon name="pin" :filled="singleItem.isPinned" /></button>
-    <template v-else>
+    <ItemActionsMenu
+      v-if="singleItem && hasItemActions"
+      :item="singleItem"
+      :disabled="busy"
+      :is-open="menuOpenItemId === singleItem.id"
+      :no-activate="noActivate"
+      @open="emit('openItemMenu', singleItem.id)"
+      @close="emit('closeItemMenu', singleItem.id)"
+      @action="singleItem && emit('itemAction', singleItem.id, $event)"
+    />
+    <template v-if="!singleItem">
       <BulkPinning
         :batch="batch"
         :busy="busy"

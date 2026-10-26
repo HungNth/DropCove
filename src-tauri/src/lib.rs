@@ -21,6 +21,8 @@ mod windows_drag;
 mod windows_drop;
 mod website_images;
 mod windows_virtual_files;
+#[cfg(windows)]
+mod windows_actions;
 mod windows_foreground;
 mod windows_hotkey;
 mod windows_instance;
@@ -604,6 +606,35 @@ async fn get_managed_text(
     .await
 }
 
+#[cfg(windows)]
+#[tauri::command]
+async fn perform_item_action(
+    item_id: String,
+    action: shelf::ItemActionKind,
+    state: State<'_, ShelfState>,
+    window: tauri::WebviewWindow,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    let owner = window.hwnd().map_err(|error| error.to_string())?.0 as usize;
+    run_blocking(move || {
+        let resolved = state
+            .resolve_item_action(&item_id, action)
+            .map_err(|error| error.to_string())?;
+        match resolved {
+            shelf::ResolvedItemAction::ShowInExplorer { path, is_folder } => {
+                windows_actions::show_in_explorer(&path, is_folder)
+            }
+            shelf::ResolvedItemAction::CopyPath(path) => {
+                windows_actions::write_unicode_clipboard(windows::Win32::Foundation::HWND(owner as *mut _), &path)
+            }
+            shelf::ResolvedItemAction::CopyText(text) => {
+                windows_actions::write_unicode_clipboard(windows::Win32::Foundation::HWND(owner as *mut _), &text)
+            }
+        }
+    })
+    .await
+}
+
 fn fatal_startup_error(error: impl Display) -> ! {
     use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
     let message = windows::core::HSTRING::from(format!("Could not start DropCove:\n\n{error}"));
@@ -765,6 +796,7 @@ fn set_rail_transient_hold(
     let reason_enum = match reason.as_str() {
         "clear" => resident::RailTransientReason::ClearConfirmation,
         "batch-drag" => resident::RailTransientReason::BatchDragConfirmation,
+        "item-actions" => resident::RailTransientReason::ItemActions,
         _ => return Err(format!("unknown rail transient hold reason '{reason}'")),
     };
     if let Some(remaining) = app
@@ -932,7 +964,8 @@ pub fn run() {
                 && matches!(command, "dismiss_drop_shelf" | "prepare_shelf_move" | "start_shelf_resize"
                     | "start_item_drag" | "prepare_batch_drag" | "start_batch_drag" | "accept_drop"
                     | "remove_item" | "remove_batch" | "set_item_pinned" | "set_batch_pinned"
-                    | "open_manage_items" | "open_about" | "open_settings" | "save_size")
+                    | "open_manage_items" | "open_about" | "open_settings" | "save_size"
+                    | "perform_item_action")
             {
                 invoke.resolver.reject("Drop Shelf interaction is blocked while Clear confirmation is open");
                 return true;
@@ -993,6 +1026,7 @@ pub fn run() {
             invalidate_surface_visuals,
             cancel_shelf_visual,
             acknowledge_shelf_warning,
+            perform_item_action,
             ];
             handler(invoke)
         })

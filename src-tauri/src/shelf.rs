@@ -8,7 +8,7 @@ use std::{
 
 use crate::windows_paths::{self, ordinal_equal};
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Serialize)]
@@ -153,6 +153,34 @@ pub(crate) struct ShelfItem {
     pub(crate) is_folder: bool,
     pub(crate) is_pinned: bool,
     pub(crate) availability: Availability,
+    pub(crate) ownership: ItemOwnership,
+    pub(crate) managed_content_kind: Option<ManagedContentKind>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub(crate) enum ItemOwnership {
+    External,
+    Managed,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub(crate) enum ManagedContentKind {
+    Text,
+    Image,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize)]
+pub(crate) enum ItemActionKind {
+    ShowInExplorer,
+    CopyPath,
+    CopyText,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum ResolvedItemAction {
+    ShowInExplorer { path: String, is_folder: bool },
+    CopyPath(String),
+    CopyText(String),
 }
 
 #[derive(Debug, Error)]
@@ -214,6 +242,8 @@ pub(crate) enum ShelfError {
         backup_dir: std::path::PathBuf,
         details: String,
     },
+    #[error("action `{0:?}` is not valid for item `{1}`")]
+    InvalidItemAction(ItemActionKind, String),
 }
 
 pub(crate) fn days_to_ymd(days: i64) -> (i64, u32, u32) {
@@ -1060,11 +1090,11 @@ impl ShelfState {
         };
         let managed_store = crate::managed_files::ManagedStore::new(&store.profile_root);
         let full_path = managed_store.full_path(&relative_path).map_err(|source| ShelfError::FileSystem {
-            path: relative_path,
+            path: "managed text".to_string(),
             source,
         })?;
         fs::read_to_string(&full_path).map(Some).map_err(|source| ShelfError::FileSystem {
-            path: full_path.display().to_string(),
+            path: "managed text".to_string(),
             source,
         })
     }
@@ -1077,6 +1107,70 @@ impl ShelfState {
             |row| row.get(0),
         )?;
         Ok(exists)
+    }
+
+    pub(crate) fn resolve_item_action(
+        &self,
+        item_id: &str,
+        action: ItemActionKind,
+    ) -> Result<ResolvedItemAction, ShelfError> {
+        let store = self.store()?;
+        let item_info: Option<(String, bool, Option<String>, Option<String>)> = store
+            .connection
+            .query_row(
+                "SELECT si.path, si.is_folder, mf.state, mf.relative_path
+                 FROM shelf_items si
+                 LEFT JOIN managed_files mf ON mf.item_id = si.id
+                 WHERE si.id = ?1",
+                [item_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .optional()?;
+
+        let (path, is_folder, mf_state, mf_relative) =
+            item_info.ok_or_else(|| ShelfError::ItemNotFound(item_id.to_owned()))?;
+
+        if mf_state.as_deref() == Some("staged") {
+            return Err(ShelfError::InvalidItemAction(action, item_id.to_owned()));
+        }
+
+        let is_managed = mf_state.is_some();
+
+        if is_managed {
+            if mf_state.as_deref() != Some("ready") {
+                return Err(ShelfError::InvalidItemAction(action, item_id.to_owned()));
+            }
+            let rel = mf_relative.unwrap_or_default();
+            if !rel.ends_with(".txt") {
+                return Err(ShelfError::InvalidItemAction(action, item_id.to_owned()));
+            }
+            if action != ItemActionKind::CopyText {
+                return Err(ShelfError::InvalidItemAction(action, item_id.to_owned()));
+            }
+            let managed_store = crate::managed_files::ManagedStore::new(&store.profile_root);
+            let full_path = managed_store
+                .full_path(&rel)
+                .map_err(|source| ShelfError::FileSystem {
+                    path: "managed text".to_string(),
+                    source,
+                })?;
+            drop(store);
+            let text = fs::read_to_string(&full_path).map_err(|source| ShelfError::FileSystem {
+                path: "managed text".to_string(),
+                source,
+            })?;
+            Ok(ResolvedItemAction::CopyText(text))
+        } else {
+            match action {
+                ItemActionKind::ShowInExplorer => {
+                    Ok(ResolvedItemAction::ShowInExplorer { path, is_folder })
+                }
+                ItemActionKind::CopyPath => Ok(ResolvedItemAction::CopyPath(path)),
+                ItemActionKind::CopyText => {
+                    Err(ShelfError::InvalidItemAction(action, item_id.to_owned()))
+                }
+            }
+        }
     }
 
     fn store(&self) -> Result<ShelfStoreGuard<'_>, ShelfError> {
@@ -1377,12 +1471,14 @@ impl ShelfStore {
             warning: None,
         };
         let mut items_statement = connection.prepare(
-            "SELECT si.id, si.batch_id, si.position, si.path, si.name, si.is_folder, si.is_pinned
+            "SELECT si.id, si.batch_id, si.position, si.path, si.name, si.is_folder, si.is_pinned,
+                    mf.relative_path
              FROM shelf_items si
+             LEFT JOIN managed_files mf ON mf.item_id = si.id AND mf.state = 'ready'
              WHERE si.batch_id = ?1
                AND NOT EXISTS (
-                   SELECT 1 FROM managed_files mf
-                   WHERE mf.item_id = si.id AND mf.state = 'staged'
+                   SELECT 1 FROM managed_files mf_staged
+                   WHERE mf_staged.item_id = si.id AND mf_staged.state = 'staged'
                )
              ORDER BY si.position ASC",
         )?;
@@ -1394,6 +1490,18 @@ impl ShelfStore {
                         .get(&id)
                         .copied()
                         .unwrap_or(Availability::Unavailable);
+                    let managed_rel: Option<String> = row.get(7)?;
+                    let (ownership, managed_content_kind) = match managed_rel {
+                        Some(rel) => {
+                            let kind = if rel.ends_with(".txt") {
+                                ManagedContentKind::Text
+                            } else {
+                                ManagedContentKind::Image
+                            };
+                            (ItemOwnership::Managed, Some(kind))
+                        }
+                        None => (ItemOwnership::External, None),
+                    };
                     Ok(ShelfItem {
                         id,
                         batch_id: row.get(1)?,
@@ -1403,6 +1511,8 @@ impl ShelfStore {
                         is_folder: row.get(5)?,
                         is_pinned: row.get(6)?,
                         availability,
+                        ownership,
+                        managed_content_kind,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -2435,12 +2545,14 @@ impl ShelfStore {
             .ok_or_else(|| ShelfError::BatchNotFound(batch_id.to_owned()))?;
 
         let mut items_statement = self.connection.prepare(
-            "SELECT si.id, si.batch_id, si.position, si.path, si.name, si.is_folder, si.is_pinned
+            "SELECT si.id, si.batch_id, si.position, si.path, si.name, si.is_folder, si.is_pinned,
+                    mf.relative_path
              FROM shelf_items si
+             LEFT JOIN managed_files mf ON mf.item_id = si.id AND mf.state = 'ready'
              WHERE si.batch_id = ?1
                AND NOT EXISTS (
-                   SELECT 1 FROM managed_files mf
-                   WHERE mf.item_id = si.id AND mf.state = 'staged'
+                   SELECT 1 FROM managed_files mf_staged
+                   WHERE mf_staged.item_id = si.id AND mf_staged.state = 'staged'
                )
              ORDER BY si.position ASC",
         )?;
@@ -2449,6 +2561,18 @@ impl ShelfStore {
                 let id: String = row.get(0)?;
                 let path: String = row.get(3)?;
                 let availability = classifier(&path);
+                let managed_rel: Option<String> = row.get(7)?;
+                let (ownership, managed_content_kind) = match managed_rel {
+                    Some(rel) => {
+                        let kind = if rel.ends_with(".txt") {
+                            ManagedContentKind::Text
+                        } else {
+                            ManagedContentKind::Image
+                        };
+                        (ItemOwnership::Managed, Some(kind))
+                    }
+                    None => (ItemOwnership::External, None),
+                };
                 Ok(ShelfItem {
                     id,
                     batch_id: row.get(1)?,
@@ -2458,10 +2582,11 @@ impl ShelfStore {
                     is_folder: row.get(5)?,
                     is_pinned: row.get(6)?,
                     availability,
+                    ownership,
+                    managed_content_kind,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
-
         for item in &batch.items {
             if let Some(availability) = self.availability.get_mut(&item.id) {
                 *availability = item.availability;
@@ -5854,5 +5979,163 @@ mod tests {
         assert_eq!(prep_missing.available, 0);
         assert_eq!(prep_missing.unavailable, 0);
         assert!(state.snapshot().unwrap().batches.is_empty());
+    }
+
+    #[test]
+    fn item_action_resolution_and_classification_safety() {
+        use super::{ItemActionKind, ItemOwnership, ManagedContentKind, ResolvedItemAction};
+        let directory = TestDirectory::new("item-action-classification");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        let external_parent = directory.path().join("sources").join("managed");
+        fs::create_dir_all(&external_parent).unwrap();
+        let external_file = external_parent.join("external.txt");
+        fs::write(&external_file, b"external content").unwrap();
+        let ext_drop = state.accept_drop(vec![Some(external_file.to_str().unwrap().to_owned())]).unwrap();
+        let ext_item = &ext_drop.snapshot.as_ref().unwrap().batches[0].items[0];
+
+        assert_eq!(ext_item.ownership, ItemOwnership::External);
+        assert_eq!(ext_item.managed_content_kind, None);
+
+        let txt_drop = state.accept_text("managed text payload".into()).unwrap();
+        let txt_item = &txt_drop.snapshot.as_ref().unwrap().batches[0].items[0];
+
+        assert_eq!(txt_item.ownership, ItemOwnership::Managed);
+        assert_eq!(txt_item.managed_content_kind, Some(ManagedContentKind::Text));
+
+        let store = state.image_staging_store().unwrap();
+        let img_bytes = include_bytes!("fixtures/website-image.avif");
+        let img_rel = format!("staging/{}.tmp", "a".repeat(32));
+        store.stage_bytes(&img_rel, img_bytes).unwrap();
+        let img_drop = state.accept_image_files(vec![(img_rel, "photo.png".into())], 0).unwrap();
+        let img_item = &img_drop.snapshot.as_ref().unwrap().batches[0].items[0];
+
+        assert_eq!(img_item.ownership, ItemOwnership::Managed);
+        assert_eq!(img_item.managed_content_kind, Some(ManagedContentKind::Image));
+
+        // Action resolution for External Reference
+        let res_show = state.resolve_item_action(&ext_item.id, ItemActionKind::ShowInExplorer).unwrap();
+        assert_eq!(res_show, ResolvedItemAction::ShowInExplorer {
+            path: external_file.to_str().unwrap().to_owned(),
+            is_folder: false,
+        });
+        let res_path = state.resolve_item_action(&ext_item.id, ItemActionKind::CopyPath).unwrap();
+        assert_eq!(res_path, ResolvedItemAction::CopyPath(external_file.to_str().unwrap().to_owned()));
+        // External Reference rejects CopyText
+        assert!(state.resolve_item_action(&ext_item.id, ItemActionKind::CopyText).is_err());
+
+        // Action resolution for Managed Text
+        let res_text = state.resolve_item_action(&txt_item.id, ItemActionKind::CopyText).unwrap();
+        assert_eq!(res_text, ResolvedItemAction::CopyText("managed text payload".into()));
+        // Managed Text rejects ShowInExplorer and CopyPath
+        assert!(state.resolve_item_action(&txt_item.id, ItemActionKind::ShowInExplorer).is_err());
+        assert!(state.resolve_item_action(&txt_item.id, ItemActionKind::CopyPath).is_err());
+
+        // Managed Image rejects all actions
+        assert!(state.resolve_item_action(&img_item.id, ItemActionKind::ShowInExplorer).is_err());
+        assert!(state.resolve_item_action(&img_item.id, ItemActionKind::CopyPath).is_err());
+        assert!(state.resolve_item_action(&img_item.id, ItemActionKind::CopyText).is_err());
+
+        // Stale or missing item ID rejects
+        assert!(state.resolve_item_action("nonexistent-item-id", ItemActionKind::CopyPath).is_err());
+    }
+
+    #[test]
+    fn item_action_read_only_and_cached_availability_safety() {
+        use super::{Availability, ItemActionKind, ResolvedItemAction};
+        let directory = TestDirectory::new("item-action-read-only");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        // External reference
+        let ext_file = directory.path().join("external_readonly.txt");
+        fs::write(&ext_file, b"content").unwrap();
+        let ext_drop = state.accept_drop(vec![Some(ext_file.to_str().unwrap().to_owned())]).unwrap();
+        let ext_item_id = ext_drop.snapshot.as_ref().unwrap().batches[0].items[0].id.clone();
+
+        // Managed text
+        let txt_drop = state.accept_text("read-only managed text".into()).unwrap();
+        let txt_item_id = txt_drop.snapshot.as_ref().unwrap().batches[0].items[0].id.clone();
+        let txt_path_on_disk = txt_drop.snapshot.as_ref().unwrap().batches[0].items[0].path.clone();
+
+        // Capture snapshot before actions
+        let snap_before = state.snapshot().unwrap();
+        let snap_before_val = serde_json::to_value(&snap_before).unwrap();
+
+        // CopyPath
+        let res = state.resolve_item_action(&ext_item_id, ItemActionKind::CopyPath).unwrap();
+        assert_eq!(res, ResolvedItemAction::CopyPath(ext_file.to_str().unwrap().to_owned()));
+
+        // ShowInExplorer
+        let res = state.resolve_item_action(&ext_item_id, ItemActionKind::ShowInExplorer).unwrap();
+        assert_eq!(res, ResolvedItemAction::ShowInExplorer {
+            path: ext_file.to_str().unwrap().to_owned(),
+            is_folder: false,
+        });
+
+        // CopyText
+        let res = state.resolve_item_action(&txt_item_id, ItemActionKind::CopyText).unwrap();
+        assert_eq!(res, ResolvedItemAction::CopyText("read-only managed text".into()));
+
+        // Snapshot after actions must be completely identical (no mutation, no consumption, no pin change)
+        let snap_after = state.snapshot().unwrap();
+        let snap_after_val = serde_json::to_value(&snap_after).unwrap();
+        assert_eq!(snap_before_val, snap_after_val);
+
+        let text_batch_id = &txt_drop.snapshot.as_ref().unwrap().batches[0].id;
+        for cached in [Availability::Missing, Availability::Unavailable] {
+            let projection = state.management_batch_with(text_batch_id, |_| cached).unwrap();
+            assert_eq!(projection.items[0].availability, cached);
+            let before = serde_json::to_value(state.snapshot().unwrap()).unwrap();
+            assert_eq!(
+                state.resolve_item_action(&txt_item_id, ItemActionKind::CopyText).unwrap(),
+                ResolvedItemAction::CopyText("read-only managed text".into()),
+            );
+            assert_eq!(serde_json::to_value(state.snapshot().unwrap()).unwrap(), before);
+        }
+        let cached_snapshot = serde_json::to_value(state.snapshot().unwrap()).unwrap();
+
+        // Now test live read when cached availability differs:
+        // 1. Delete the managed text file on disk -> live read fails without mutating shelf
+        fs::remove_file(&txt_path_on_disk).unwrap();
+        let err = state.resolve_item_action(&txt_item_id, ItemActionKind::CopyText).unwrap_err();
+        assert!(!err.to_string().contains(&txt_path_on_disk)); // ensure no private path leakage
+        let snap_after_fail = state.snapshot().unwrap();
+        assert_eq!(serde_json::to_value(&snap_after_fail).unwrap(), cached_snapshot);
+
+        // 2. Restore file bytes -> live read succeeds immediately without any projection refresh
+        fs::write(&txt_path_on_disk, b"restored bytes").unwrap();
+        let res = state.resolve_item_action(&txt_item_id, ItemActionKind::CopyText).unwrap();
+        assert_eq!(res, ResolvedItemAction::CopyText("restored bytes".into()));
+    }
+
+    #[test]
+    fn item_action_rejects_staged_managed_file() {
+        use super::ItemActionKind;
+        let directory = TestDirectory::new("item-action-staged");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+
+        // Directly insert an uncommitted staged record into DB
+        let store = state.store().unwrap();
+        let conn = &store.connection;
+        conn.execute("INSERT INTO shelf_batches (id, created_at, position) VALUES ('b1', 100, 0)", []).unwrap();
+        conn.execute(
+            "INSERT INTO shelf_items (id, batch_id, position, path, name, is_folder, is_pinned)
+             VALUES ('item_staged', 'b1', 0, 'dummy', 'dummy', 0, 0)",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO managed_files (item_id, relative_path, state, staging_path)
+             VALUES ('item_staged', 'managed/item_staged/file.txt', 'staged', 'staging/item_staged.tmp')",
+            [],
+        ).unwrap();
+        drop(store);
+
+        // Staged record must be rejected for all actions
+        assert!(state.resolve_item_action("item_staged", ItemActionKind::CopyText).is_err());
+        assert!(state.resolve_item_action("item_staged", ItemActionKind::CopyPath).is_err());
+        assert!(state.resolve_item_action("item_staged", ItemActionKind::ShowInExplorer).is_err());
     }
 }

@@ -28,6 +28,10 @@ _Avoid_: Shelf, main window
 A transient menu on the Drop Shelf that exposes resident-level surfaces without changing Shelf state.
 _Avoid_: Settings menu, notification-area menu
 
+**Item Actions Menu**:
+A transient per-Shelf Item menu whose available actions follow that item's ownership and content kind.
+_Avoid_: Context menu, Batch Actions Menu
+
 **Settings**:
 The DropCove surface for reviewing and changing durable preferences through its Save and Cancel lifecycle.
 _Avoid_: Preferences page, configuration window
@@ -77,8 +81,12 @@ A user-chosen Drop Shelf height that remains fixed while Shelf content exists.
 _Avoid_: Fixed Shelf size, manual Shelf sizing
 
 **Shelf Item**:
-An individual filesystem path reference stored within a Shelf Batch. Its path can reference either an external filesystem object or a Managed File.
+An individual filesystem path occurrence stored within a Shelf Batch. It is either an External Reference or backed by a Managed File.
 _Avoid_: File copy, attachment, payload
+
+**External Reference**:
+A Shelf Item that refers to a filesystem object DropCove does not own.
+_Avoid_: Source copy, imported file, Managed File
 
 **Managed File**:
 A filesystem file created and owned by DropCove to represent accepted content that did not arrive as a filesystem object.

@@ -13,20 +13,21 @@ const renderer = createRenderer({
 test("Escape cancels availability confirmation, closes Manage Items, clears selection, then dismisses", async () => {
   const events = new Map();
   const callbacks = new Map();
+  const nativeEvents = new Map();
   const commands = [];
   let callbackId = 0;
   let activeManagement = null;
   let delayedManagement = null;
-  const batch = { id: "batch", createdAt: 0, position: 0, items: [{ id: "item", batchId: "batch", position: 0, path: "C:\\a.txt", name: "a.txt", isFolder: false, isPinned: false, availability: "Available" }] };
+  const batch = { id: "batch", createdAt: 0, position: 0, items: [{ id: "item", batchId: "batch", position: 0, path: "C:\\a.txt", name: "a.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null }] };
   const snapshot = { batches: [batch], preferredWidth: 191, height: 180 };
   globalThis.document = { addEventListener: (name, listener) => events.set(name, listener), removeEventListener: name => events.delete(name), querySelector: () => null };
   globalThis.window = {
     __TAURI_INTERNALS__: {
       metadata: { currentWindow: { label: "main" } },
       transformCallback: callback => { callbacks.set(++callbackId, callback); return callbackId; },
-      async invoke(command) {
+      async invoke(command, args) {
         commands.push(command);
-        if (command === "plugin:event|listen") return callbackId;
+        if (command === "plugin:event|listen") { nativeEvents.set(args.event, callbacks.get(args.handler)); return callbackId; }
         if (command === "plugin:event|unlisten") return;
         if (command === "get_shelf") return snapshot;
         if (command === "get_shelf_resizing" || command === "get_drop_shelf_clear_temporary_state") return false;
@@ -81,5 +82,8 @@ test("Escape cancels availability confirmation, closes Manage Items, clears sele
     releaseManagement(null);
     await oldEscape;
     assert.deepEqual(shelf.selection.ids.value, ["new-batch"], "an earlier asynchronous Escape must not clear a later selection");
+    shelf.activeItemActionsMenuId.value = "item";
+    nativeEvents.get("shelf-hidden")({ payload: null });
+    assert.equal(shelf.activeItemActionsMenuId.value, null, "native hiding must discard the item menu, not merely hide its pixels");
   } finally { app.unmount(); delete globalThis.window; delete globalThis.document; }
 });

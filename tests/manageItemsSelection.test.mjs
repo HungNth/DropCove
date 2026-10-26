@@ -232,9 +232,9 @@ test("ManageItems exposes multiselectable grid, keyboard selection, and Escape o
     createdAt: 0,
     position: 0,
     items: [
-      { id: "item1", batchId: "batch1", position: 0, path: "C:\\1.txt", name: "1.txt", isFolder: false, isPinned: false, availability: "Available" },
-      { id: "item2", batchId: "batch1", position: 1, path: "C:\\2.txt", name: "2.txt", isFolder: false, isPinned: false, availability: "Available" },
-      { id: "item3", batchId: "batch1", position: 2, path: "C:\\3.txt", name: "3.txt", isFolder: false, isPinned: false, availability: "Available" },
+      { id: "item1", batchId: "batch1", position: 0, path: "C:\\1.txt", name: "1.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
+      { id: "item2", batchId: "batch1", position: 1, path: "C:\\2.txt", name: "2.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
+      { id: "item3", batchId: "batch1", position: 2, path: "C:\\3.txt", name: "3.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
     ],
   };
 
@@ -252,6 +252,8 @@ test("ManageItems exposes multiselectable grid, keyboard selection, and Escape o
     gridTemplateColumns: "1fr",
   });
   globalThis.window = {
+    addEventListener() {},
+    removeEventListener() {},
     setTimeout: (cb, ms = 0) => setTimeout(cb, ms),
     clearTimeout: (id) => clearTimeout(id),
     __TAURI_INTERNALS__: {
@@ -367,9 +369,9 @@ test("2+ selected items mixed availability: direct confirmation drag, armed re-d
     createdAt: 0,
     position: 0,
     items: [
-      { id: "item1", batchId: "batch1", position: 0, path: "C:\\1.txt", name: "1.txt", isFolder: false, isPinned: false, availability: "Available" },
-      { id: "item2", batchId: "batch1", position: 1, path: "C:\\2.txt", name: "2.txt", isFolder: false, isPinned: false, availability: "Unavailable" },
-      { id: "item3", batchId: "batch1", position: 2, path: "C:\\3.txt", name: "3.txt", isFolder: false, isPinned: false, availability: "Available" },
+      { id: "item1", batchId: "batch1", position: 0, path: "C:\\1.txt", name: "1.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
+      { id: "item2", batchId: "batch1", position: 1, path: "C:\\2.txt", name: "2.txt", isFolder: false, isPinned: false, availability: "Unavailable", ownership: "External", managedContentKind: null },
+      { id: "item3", batchId: "batch1", position: 2, path: "C:\\3.txt", name: "3.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
     ],
   };
 
@@ -387,6 +389,8 @@ test("2+ selected items mixed availability: direct confirmation drag, armed re-d
     gridTemplateColumns: "1fr",
   });
   globalThis.window = {
+    addEventListener() {},
+    removeEventListener() {},
     setTimeout: (cb, ms = 0) => setTimeout(cb, ms),
     clearTimeout: (id) => clearTimeout(id),
     __TAURI_INTERNALS__: {

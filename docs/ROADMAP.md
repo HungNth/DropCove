@@ -1234,3 +1234,49 @@ Approved DAG: `01 → 02 → {03, 04} → 05 → 06`.
 |---|---:|---|
 | [DropCove-Setup-0.0.26.exe](../build/DropCove-Setup-0.0.26.exe) | 3,688,557 | `f02bd5ddbf3343a711ebe7aeb7ee3fb44b5848d387f952f923ce30704f2da78b` |
 | Exact installed executable | 15,243,264 | `ebb5aa4143a1a6bb901d699d63f4ba97cfff3fe0b8e67802e1ef2ab9eb3cc66d` |
+
+## 0.0.27 — Type-aware Item Actions
+
+**Status:** Completed — tickets 01–05 resolved; exact candidate 0.0.27 packaged, verified on Windows, and ready for human acceptance; changes uncommitted pending authorization.
+
+Design confirmation: approved by the user through `grill-with-docs` on 2026-10-26.
+
+Testing seam confirmation: approved by the user through `to-spec` on 2026-10-26.
+
+Ticket breakdown confirmation: approved by the user through `to-tickets` on 2026-10-26.
+
+Plan: [Specification](../.scratch/type-aware-context-actions/spec.md) · [Research notes](../.scratch/type-aware-context-actions/research/windows-item-actions.md).
+
+Requirements: [Product Specification](SPECIFICATION.md#94-item-actions-menu) · [Architecture](ARCHITECTURE.md#6-core-mutation-interfaces-and-invariants).
+
+### Scope
+
+- Add authoritative item classification (`ownership: External | Managed` and `managedContentKind: Text | Image | null`) to Core Shelf State snapshots and Manage Items projections without changing persistence schema.
+- Eliminate frontend path heuristics and remove private Profile Data paths from tooltips, ARIA labels, live announcements, and errors; External References retain their exact full path.
+- Add an Item Actions Menu with More button on eligible single-item Drop Shelf cards, expanded Edge Rail cards, and Manage Items rows; Managed Image and multi-item cards omit the menu.
+- Add native Unicode clipboard and File Explorer adapters: Copy Path writes exact path without quotes or newline; Copy Text reads live full text regardless of cached Missing/Unavailable state; Show in File Explorer selects existing objects in parent or opens filesystem roots.
+- Preserve target isolation, selection neutrality, no-activate Edge Rail foreground contracts, fixed non-clipping menu layout, and surface dismissal on scroll, drag, hide, and fullscreen transitions.
+
+### Implemented
+
+- Core Shelf State projection and read-only action resolution in `src-tauri/src/shelf.rs` and `lib.rs`.
+- Windows clipboard and Shell integration in `src-tauri/src/windows_actions.rs` with RAII ownership guards.
+- Native Rail transient hold reason `ItemActions` in `src-tauri/src/resident.rs`.
+- Shared Item Actions Menu in `src/components/shelf/ItemActionsMenu.vue` with fixed viewport clamping and keyboard/focus parity.
+- Drop Shelf, Manage Items, and Edge Rail integration in `src/components/shelf/DropShelf.vue`, `ShelfBatchCard.vue`, `ManageItems.vue`, `ShelfItemRow.vue`, and `src/components/rail/RailHandle.vue`.
+
+### Verification
+
+- Frontend test suite passed: **53/53 passed, 0 failed**. Production `vue-tsc` typecheck and Vite build succeeded.
+- Native Rust test suite passed: **189/189 passed, 0 failed** via cargo-xwin Windows x64 binary execution.
+- Cargo-xwin Windows release build and current-user NSIS packaging produced `build/DropCove-Setup-0.0.27.exe`.
+- Installed candidate proof verified embedded production assets at port 1420 disconnect, exact Unicode clipboard readback, File Explorer file/folder selection and root opening, missing-path safe error, selection neutrality in ordinary (3 items) and virtualized (65 items) collections, no-activate Rail foreground preservation, fullscreen menu dismissal, exact restart restore (76 items), reinstall/uninstall Profile Data preservation, and clean ambient registry/shortcut restoration. Ambient Run entry was restored to its canonical command from persisted user preferences rather than proven byte-exact to the pre-session state.
+- All changes remain uncommitted pending user approval.
+
+### Release evidence — 2026-10-26
+
+| Candidate artifact | Bytes | SHA-256 |
+|---|---:|---|
+| [DropCove-Setup-0.0.27.exe](../build/DropCove-Setup-0.0.27.exe) | 3,702,946 | `ec085e8bb64ab5df4aff7155f18d00b92f8373c1598f68c446d088c953324c04` |
+| Built Windows x64 executable | 15,287,296 | `598aa910c4420f0e567ddbf4106464730ecccd3d64781b321f0f533731154f40` |
+| Exact installed candidate `dropcove.exe` | 15,287,296 | `70f3245222e1ace33610ec9d159c1674dcecddd8fd86ac770bee8f6b1af02591` |

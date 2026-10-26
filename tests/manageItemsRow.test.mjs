@@ -70,6 +70,8 @@ test("ShelfItemRow preserves selected drag scope until threshold and exposes row
     isFolder: false,
     isPinned: false,
     availability: "Available",
+    ownership: "External",
+    managedContentKind: null,
   };
   const app = renderer.createApp({
     render: () =>
@@ -139,7 +141,7 @@ test("ShelfItemRow preserves selected drag scope until threshold and exposes row
     assert.deepEqual(actions, [["pin", "item1", true]], "pin button must not trigger row selection or drag");
 
     actions.length = 0;
-    const removeBtn = actionContainer.children[1];
+    const removeBtn = actionContainer.children.find(child => child.props?.class?.includes("remove"));
     removeBtn.props.onClick();
     assert.deepEqual(actions, [["remove", "item1"]], "remove button must not trigger row selection or drag");
 

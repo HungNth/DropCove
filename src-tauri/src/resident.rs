@@ -81,6 +81,7 @@ pub(crate) enum RailTransientReason {
     ClearConfirmation = 1 << 1,
     BatchDragConfirmation = 1 << 2,
     ActiveDrag = 1 << 3,
+    ItemActions = 1 << 4,
 }
 
 #[derive(Clone, Debug)]
@@ -2644,6 +2645,7 @@ mod tests {
         state
             .set_rail_transient_reason(RailTransientReason::BatchDragConfirmation, true)
             .unwrap();
+        state.set_rail_transient_reason(RailTransientReason::ItemActions, true).unwrap();
         assert!(state.has_rail_transient_hold().unwrap());
 
         // Releasing Clear confirmation while BatchDrag and Manage Items remain retains hold
@@ -2659,9 +2661,10 @@ mod tests {
         state.on_rail_pointer_leave(now).unwrap();
         assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, None);
 
-        // Releasing Manage Items hold while pointer is ALREADY OUTSIDE must arm collapse without synthetic pointer event
+        assert_eq!(state.set_rail_transient_reason(RailTransientReason::ManageItems, false).unwrap(), None);
+        assert_eq!(state.rail_presentation().unwrap().collapse_due_ms, None);
         let remaining = state
-            .set_rail_transient_reason(RailTransientReason::ManageItems, false)
+            .set_rail_transient_reason(RailTransientReason::ItemActions, false)
             .unwrap();
         assert_eq!(remaining, Some(RAIL_COLLAPSE_DELAY_MS));
         assert!(state.rail_presentation().unwrap().collapse_due_ms.is_some());

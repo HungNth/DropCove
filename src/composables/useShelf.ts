@@ -14,6 +14,8 @@ export interface ShelfItem {
   isFolder: boolean;
   isPinned: boolean;
   availability: "Available" | "Missing" | "Unavailable";
+  ownership: "External" | "Managed";
+  managedContentKind: "Text" | "Image" | null;
 }
 
 export interface ShelfBatch {
@@ -57,6 +59,7 @@ export function useShelf() {
   const resizing = shallowRef(false);
   const moving = shallowRef(false);
   const confirmingClearTemporary = shallowRef(false);
+  const activeItemActionsMenuId = shallowRef<string | null>(null);
   let pendingRecoveryWarning: string | null = null;
   const window = getCurrentWindow();
   const unlisteners: UnlistenFn[] = [];
@@ -180,6 +183,7 @@ export function useShelf() {
     document.addEventListener("keydown", onKeydown);
     try {
       await retainListener(window.listen("shelf-hidden", () => {
+        activeItemActionsMenuId.value = null;
         selection.clear();
         void batchDrag.cancel();
       }));
@@ -246,6 +250,7 @@ export function useShelf() {
 
   return {
     batches,
+    activeItemActionsMenuId,
     selection,
     selectBatch: (batchId: string, modifiers: SelectionModifiers) => {
       if (!busy.value && !resizing.value && !moving.value && !confirmingClearTemporary.value) selection.select(batchId, modifiers);

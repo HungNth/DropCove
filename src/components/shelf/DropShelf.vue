@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from "vue";
+import { nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from "vue";
 import { useResizeObserver } from "@vueuse/core";
 import { useAnnouncer } from "../../composables/useAnnouncer";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
@@ -11,8 +11,10 @@ import ShelfResizeHandles from "./ShelfResizeHandles.vue";
 import ActionIcon from "./ActionIcon.vue";
 import UtilityMenu from "./UtilityMenu.vue";
 import { invoke } from "@tauri-apps/api/core";
+import type { ShelfItemAction } from "./ItemActionsMenu.vue";
 const {
   batches,
+  activeItemActionsMenuId,
   selection,
   selectBatch,
   status,
@@ -38,6 +40,25 @@ const {
   dismissStatus,
 } = useShelf();
 
+async function handlePerformItemAction(itemId: string, action: ShelfItemAction) {
+  try {
+    await invoke("perform_item_action", { itemId, action });
+    activeItemActionsMenuId.value = null;
+    if (action === "CopyPath") {
+      announce("Path copied.");
+    } else if (action === "CopyText") {
+      announce("Text copied.");
+    }
+    if (action !== "ShowInExplorer") {
+      await nextTick();
+      const batch = batches.value.find(batch => batch.items.some(item => item.id === itemId));
+      if (batch) gridRef.value?.querySelector<HTMLButtonElement>(`[data-batch-id="${CSS.escape(batch.id)}"] .more`)?.focus();
+    }
+  } catch (error) {
+    activeItemActionsMenuId.value = null;
+    status.value = String(error);
+  }
+}
 async function openSettingsFromMenu() {
   try {
     await invoke("open_settings");
@@ -78,6 +99,10 @@ useResizeObserver(gridRef, () => {
 });
 const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4, () => Number(draggingOver.value));
 const focusedBatch = shallowRef<string | null>(null);
+
+watch([batches, busy, resizing, moving, pendingConfirmation, confirmingClearTemporary], () => {
+  activeItemActionsMenuId.value = null;
+});
 watch(() => `${selection.ids.value.join(',')}:${selection.itemCount.value}`, () => {
   const count = selection.ids.value.length;
   announce(count ? `${count} batches, ${selection.itemCount.value} items selected` : "Selection cleared");
@@ -157,7 +182,7 @@ watch(batches, async (current, previous) => {
         aria-label="Hide Drop Shelf"
         title="Hide Drop Shelf"
         @pointerdown.stop
-        @click="() => { dismissDropShelf(); announce('Hide Drop Shelf requested'); }"
+        @click="() => { activeItemActionsMenuId = null; dismissDropShelf(); announce('Hide Drop Shelf requested'); }"
       >
         <ActionIcon name="close" />
       </button>
@@ -171,9 +196,10 @@ watch(batches, async (current, previous) => {
         aria-label="Shelf batches"
         :aria-rowcount="batches.length"
         :style="virtual.enabled.value ? { position: 'relative' } : {}"
+        @scroll="activeItemActionsMenuId = null"
         @keydown="onGridKeydown"
         @focusin="event => { const id = (event.target as HTMLElement).closest<HTMLElement>('[data-batch-id]')?.dataset.batchId; if (id) focusedBatch = id; }"
-        @pointerup="event => { if (!busy && !resizing && !(event.target as HTMLElement).closest('.card')) selection.clear(); }"
+        @pointerup="event => { if (!busy && !resizing && !(event.target as HTMLElement).closest('.card, .item-actions-menu, .more')) selection.clear(); }"
       >
       <div v-if="virtual.enabled.value" :style="{ height: `${virtual.totalHeight.value}px`, width: '100%', pointerEvents: 'none' }" />
       <DropPlaceholder v-if="draggingOver" :style="virtual.leadingPosition.value" />
@@ -194,8 +220,12 @@ watch(batches, async (current, previous) => {
         @remove="(id) => { removeBatch(id); announce('Batch removed'); }"
         @pin-item="(id, p) => { setItemPinned(id, p); announce(p ? 'Item pinned' : 'Item unpinned'); }"
         @pin-batch="(id, p) => { setBatchPinned(id, p); announce(p ? 'Batch pinned' : 'Batch unpinned'); }"
-        @manage="openManageItems"
-        @drag-batch="startBatchDrag"
+        :menu-open-item-id="activeItemActionsMenuId"
+        @open-item-menu="id => activeItemActionsMenuId = id"
+        @close-item-menu="id => { if (activeItemActionsMenuId === id) activeItemActionsMenuId = null; }"
+        @item-action="handlePerformItemAction"
+        @manage="(id, a, k) => { activeItemActionsMenuId = null; openManageItems(id, a, k); }"
+        @drag-batch="id => { activeItemActionsMenuId = null; startBatchDrag(id); }"
       />
       </section>
     </div>
