@@ -56,7 +56,7 @@ The setup program:
 2. installs for the current user without elevation;
 3. defaults to `%LOCALAPPDATA%\Programs\DropCove`;
 4. remembers a previously selected install directory;
-5. always creates a Start Menu shortcut;
+5. offers an optional Start Menu shortcut, enabled by default;
 6. offers an optional Desktop shortcut, disabled by default;
 7. offers **Launch DropCove** on the Finish page, enabled by default.
 
@@ -66,8 +66,17 @@ Wizard sequence:
 Welcome → Directory → Shortcut options → Installation progress → Finish
 ```
 
-The installer does not configure **Start with Windows**. DropCove owns that setting after launch.
+Shortcut options contract:
 
+- **Create Start Menu shortcut** is interactive, enabled by default, and receives initial focus on the Shortcut options page.
+- Unchecking the Start Menu shortcut skips shortcut creation and bypasses the Start Menu conflict check, allowing setup to complete even if an unowned file or shortcut exists at the target path.
+- When Start Menu shortcut creation is enabled (default), setup verifies that any existing shortcut at the target path is an Installer-Owned Shortcut, aborting safely (`exit 2`) before writing program files if an unrelated shortcut collision occurs.
+- Silent (`/S`) and passive (`/P`) unattended installations create the Start Menu shortcut by default unless the `/NS` switch is passed.
+- Passing the `/NS` command-line switch disables both Start Menu and Desktop shortcut creation and bypasses shortcut conflict verification.
+- Updating or reinstalling with Start Menu shortcut creation unchecked preserves any pre-existing Start Menu shortcut without modifying or deleting it.
+- The Desktop shortcut remains optional and unchecked by default across interactive, silent, and passive runs.
+
+The installer does not configure **Start with Windows**. DropCove owns that setting after launch.
 The Brand Visual is shared by the application executable, setup and uninstaller executables and their window icons, Windows application-management entry, Installer-Owned Shortcuts, About Surface, native application windows, and notification-area icon. Preserve the existing mark and colors; generate Windows bundle icon assets from the canonical vector source. Installer Branding uses that same multi-resolution icon without adding custom sidebar or header artwork. Appearance Mode does not replace or recolor the Brand Visual.
 
 ### 3.2 First launch
@@ -109,11 +118,10 @@ The uninstaller requests the resident process to exit and aborts if it cannot cl
 Uninstall removes:
 
 - installed program files;
-- Start Menu and Desktop shortcuts created for DropCove;
+- Installer-Owned Shortcuts in the Start Menu and Desktop (the uninstaller verifies installer ownership before removal and completes cleanly when shortcuts are absent);
 - Installed Apps registration;
 - installer location registration;
 - the **Start with Windows** registration.
-
 Uninstall preserves:
 
 ```text

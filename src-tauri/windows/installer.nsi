@@ -85,6 +85,7 @@ Var NoShortcutMode
 Var OldMainBinaryName
 Var PreviousInstallDir
 Var StartMenuShortcutCheckbox
+Var StartMenuShortcutRequested
 Var DesktopShortcutCheckbox
 Var DesktopShortcutRequested
 
@@ -230,20 +231,20 @@ FunctionEnd
 
 Function ShortcutOptionsPageCreate
   ${IfThen} $PassiveMode = 1 ${|} Abort ${|}
-
   !insertmacro MUI_HEADER_TEXT "Shortcut options" "Choose how ${PRODUCTNAME} shortcuts are created."
   nsDialogs::Create 1018
   Pop $0
   ${IfThen} $0 == error ${|} Abort ${|}
   ${IfThen} $(^RTL) = 1 ${|} nsDialogs::SetRTL $(^RTL) ${|}
 
-  ${NSD_CreateLabel} 0 0 100% 24u "${PRODUCTNAME} always creates a Start Menu shortcut so the application remains discoverable. You can also create an optional Desktop shortcut."
+  ${NSD_CreateLabel} 0 0 100% 24u "Select the shortcuts you want Setup to create for ${PRODUCTNAME}:"
   Pop $0
 
-  ${NSD_CreateCheckbox} 0 32u 100% 12u "Create Start Menu shortcut (required)"
+  ${NSD_CreateCheckbox} 0 32u 100% 12u "Create Start Menu shortcut"
   Pop $StartMenuShortcutCheckbox
-  ${NSD_Check} $StartMenuShortcutCheckbox
-  EnableWindow $StartMenuShortcutCheckbox 0
+  ${If} $StartMenuShortcutRequested = 1
+    ${NSD_Check} $StartMenuShortcutCheckbox
+  ${EndIf}
 
   ${NSD_CreateCheckbox} 0 50u 100% 12u "$(createDesktop)"
   Pop $DesktopShortcutCheckbox
@@ -251,15 +252,27 @@ Function ShortcutOptionsPageCreate
     ${NSD_Check} $DesktopShortcutCheckbox
   ${EndIf}
 
-  ${NSD_SetFocus} $DesktopShortcutCheckbox
+  ${NSD_SetFocus} $StartMenuShortcutCheckbox
   nsDialogs::Show
 FunctionEnd
 
 Function ShortcutOptionsPageLeave
+  ${NSD_GetState} $StartMenuShortcutCheckbox $0
+  ${If} $0 == ${BST_CHECKED}
+    StrCpy $StartMenuShortcutRequested 1
+  ${Else}
+    StrCpy $StartMenuShortcutRequested 0
+  ${EndIf}
+
   ${NSD_GetState} $DesktopShortcutCheckbox $0
   ${If} $0 == ${BST_CHECKED}
     StrCpy $DesktopShortcutRequested 1
   ${Else}
+    StrCpy $DesktopShortcutRequested 0
+  ${EndIf}
+
+  ${If} $NoShortcutMode = 1
+    StrCpy $StartMenuShortcutRequested 0
     StrCpy $DesktopShortcutRequested 0
   ${EndIf}
 FunctionEnd
@@ -282,6 +295,7 @@ FunctionEnd
 {{/each}}
 
 Function .onInit
+  StrCpy $StartMenuShortcutRequested 1
   StrCpy $DesktopShortcutRequested 0
 
   ${GetOptions} $CMDLINE "/P" $PassiveMode
@@ -292,6 +306,8 @@ Function .onInit
   ${GetOptions} $CMDLINE "/NS" $NoShortcutMode
   ${IfNot} ${Errors}
     StrCpy $NoShortcutMode 1
+    StrCpy $StartMenuShortcutRequested 0
+    StrCpy $DesktopShortcutRequested 0
   ${EndIf}
 
   ${GetOptions} $CMDLINE "/UPDATE" $UpdateMode
@@ -975,17 +991,20 @@ Function IsShortcutOwnedByInstaller
 FunctionEnd
 
 Function VerifyStartMenuShortcutOwnership
-  ${If} ${FileExists} "${STARTMENUSHORTCUT}"
-    StrCpy $R9 "${STARTMENUSHORTCUT}"
-    Call IsShortcutOwnedByInstaller
-    ${If} $0 <> 1
-      DetailPrint "Conflicting Start Menu shortcut detected: ${STARTMENUSHORTCUT}"
-      SetErrorLevel 2
-      ${IfNot} ${Silent}
-        MessageBox MB_ICONSTOP|MB_OK \
-          "Setup cannot continue because an existing Start Menu shortcut at:$\r$\n${STARTMENUSHORTCUT}$\r$\npoints to an unrelated target and will not be overwritten."
+  ${If} $StartMenuShortcutRequested = 1
+  ${AndIf} $NoShortcutMode <> 1
+    ${If} ${FileExists} "${STARTMENUSHORTCUT}"
+      StrCpy $R9 "${STARTMENUSHORTCUT}"
+      Call IsShortcutOwnedByInstaller
+      ${If} $0 <> 1
+        DetailPrint "Conflicting Start Menu shortcut detected: ${STARTMENUSHORTCUT}"
+        SetErrorLevel 2
+        ${IfNot} ${Silent}
+          MessageBox MB_ICONSTOP|MB_OK \
+            "Setup cannot continue because an existing Start Menu shortcut at:$\r$\n${STARTMENUSHORTCUT}$\r$\npoints to an unrelated target and will not be overwritten."
+        ${EndIf}
+        Abort
       ${EndIf}
-      Abort
     ${EndIf}
   ${EndIf}
 FunctionEnd
@@ -1006,6 +1025,7 @@ FunctionEnd
 
 Function CreateOrUpdateStartMenuShortcut
   ${If} $NoShortcutMode = 1
+  ${OrIf} $StartMenuShortcutRequested <> 1
     Return
   ${EndIf}
 
