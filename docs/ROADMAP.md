@@ -1298,3 +1298,92 @@ Requirements: [Product Specification](SPECIFICATION.md#94-item-actions-menu) · 
 - Exact installed candidate passed ordinary/mixed and 65-item virtualized row suppression, selection retention, keyboard/contextmenu exclusions, Managed Text Copy Text menu preservation, Managed Image exclusion, exact Explorer selection, and Rail-origin no-activation smoke. Install/uninstall returned 0; owned smoke resources were removed and captured registry state restored.
 - Installer: **3,703,520 bytes**, SHA-256 `44844f2796553c39b265d7ea9c418ab92eba97d42968757553d87f1d540932dd`. Built executable: **15,287,296 bytes**, SHA-256 `49de31f0c2517cbe858ed78e5c6a252376f9cd1d003aeebfef6f464e4fc390cf`. Installed executable: **15,287,296 bytes**, SHA-256 `9e6cab2508abc71a8bcd2f9b175c3d303d11abc92326fd0bc143a208de86068a`.
 - **Remaining gate:** Copy Path and Copy Text report Windows clipboard access denied (`0x80070005`); independent clipboard probes fail too. Safe local error/retention was observed, but successful real clipboard readback is unverified for the amended candidate. Ticket 06 stays ready-for-human and Ticket 05 acceptance stays blocked until that proof is supplied. Full evidence and observation limits are recorded in Ticket 06; historical clipboard proof is not substituted.
+- **Implementation-gate override — 2026-10-27:** In response to the `implement` gate question, the user chose to proceed (`Đã chấp thuận, tiến hành`) and authorized `0.0.28` implementation of tickets 01–06, with a commit after review. This is an explicit user override of the `0.0.28` start gate only. It does not mark `0.0.27` accepted, adds no clipboard readback evidence, and leaves the `0.0.27` status and the limits above unchanged.
+
+## 0.0.28 — Selection Actions
+
+**Status:** Completed — tickets 01–06 resolved; release candidate 0.0.28 packaged and verified on Windows x64 for human acceptance. Commit follows human authorization.
+
+Design confirmation: approved by the user through `grill-with-docs` on 2026-10-27.
+
+Testing seam confirmation: approved by the user through `to-spec` on 2026-10-27 — one exact installed Windows Resident Instance across Drop Shelf, expanded Edge Rail, and Manage Items from both origins, supported by mounted Vue interaction/accessibility tests and Core Shelf State temporary SQLite/filesystem regressions.
+
+Plan: [Specification](../.scratch/selection-actions/spec.md).
+
+### Product-contract dependency
+
+- [Product Specification](SPECIFICATION.md) now permits selection-scoped Pin/Unpin/Remove and defines the approved menu, confirmation, lifecycle, accessibility, ownership-safety, and no-activate contracts.
+- `to-spec` completed the permanent product-contract amendment and testing-seam approval. `to-tickets` completed the six-ticket delivery breakdown and user approval recorded below.
+- Do not start implementation from this roadmap entry, specification, or ready-for-agent ticket status alone.
+
+### Version boundary
+
+- Ship selection-scoped Pin/Unpin and Remove with parity across Drop Shelf, expanded Edge Rail, and Manage Items in one version. Do not ship a one-surface intermediate workflow.
+- Keep the existing selection domains: Drop Shelf and Edge Rail operate on Batch Selection; Manage Items operates on Item Selection within its active Shelf Batch. Do not introduce cross-batch Item Selection.
+
+### Scope
+
+- Add a distinct Selection Actions Menu without changing the ownership-aware Item Actions Menu. Secondary-clicking a selected member preserves the current selection; secondary-clicking an unselected member replaces the selection with that member before opening the menu. Secondary-button modifiers do not extend or toggle selection, and card/row action controls retain their isolated behavior.
+- Define singular and plural behavior by selection unit, not affected-item count. One selected Shelf Batch remains singular even when it contains multiple Shelf Items; one selected Manage Items row is one Item Selection member.
+- On Drop Shelf and Edge Rail, one selected single-item batch exposes Pin Item/Unpin Item and Remove Batch; one selected multi-item batch exposes Pin All Items/Unpin All Items and Remove Batch. Multiple selected batches expose Pin Selected/Unpin Selected and Remove Selected, with Pinning applied to every contained Shelf Item and removal applied to the selected Shelf Batches.
+- In Manage Items, one selected Shelf Item exposes Pin Item/Unpin Item and Remove Item. Multiple selected Shelf Items expose Pin Selected/Unpin Selected and Remove Selected and remain scoped to the active Shelf Batch.
+- Reuse tri-state Bulk Pinning semantics: an all-Pinned target offers Unpin, while a None or Mixed target offers Pin. Apply the complete target set atomically; success retains selection and failure preserves both selection and prior Pin states.
+- Keep singleton Remove behavior immediate. Removing multiple selection units requires confirmation with selection-unit and affected-item counts plus ownership-aware source-safety copy: External sources remain, while selected DropCove-created files are permanently deleted or recorded for existing pending-deletion retry. Logical removal and pending-deletion records commit atomically; stale targets or persistence failure produce no partial Shelf mutation.
+- Bind confirmation to an immutable target snapshot and block competing selection, drag, Pin, Remove, and Clear mutations on the originating surface until confirmation closes. Success removes the targets from selection; cancel or failure retains selection. Manage Items closes only when its active Shelf Batch becomes empty.
+- On focus-capable Drop Shelf and Manage Items origins, support the Context Menu key and `Shift+F10`, focus the menu, use established menu keyboard navigation, and restore focus to the invoking card or row. Escape closes an open Selection Actions Menu and retains selection; when removal confirmation is open, Escape cancels it and retains selection; otherwise the existing selection/surface Escape lifecycle resumes. Tab closes the menu and resumes the existing Tab order.
+- Preserve Edge Rail and Rail-origin Manage Items as pointer-only/no-activate surfaces. Their Selection Actions Menu and inline removal confirmation must hold the transient surface open without taking foreground focus. Drop Shelf and Drop-Shelf-origin Manage Items use focus-capable modal confirmation on their owning surface.
+- Preserve current Batch Selection and Item Selection drag-out behavior, virtualization stability, Managed File privacy, external-source safety, occurrence identity, Item Actions Menu capability rules, and Edge Rail foreground contracts.
+
+### Approved delivery tickets
+
+1. [Drop Shelf Batch Selection Pin/Unpin round trip](../.scratch/selection-actions/issues/01-drop-shelf-batch-selection-pin-unpin.md) — no numbered Selection Actions blocker; external delivery gate is `0.0.27` final acceptance.
+2. [Drop Shelf ownership-safe Remove Selected](../.scratch/selection-actions/issues/02-drop-shelf-remove-selected.md) — blocked by Ticket 01; adds authoritative batch removal confirmation, ownership safety, atomic cleanup, and rollback.
+3. [Manage Items Item Selection Pin/Unpin](../.scratch/selection-actions/issues/03-manage-items-item-selection-pin-unpin.md) — blocked by Ticket 01; adds focus-capable item-domain Pin/Unpin through ordinary and virtualized Manage Items.
+4. [Manage Items ownership-safe Remove Selected](../.scratch/selection-actions/issues/04-manage-items-remove-selected.md) — blocked by Tickets 02 and 03; adds item removal confirmation, cleanup, popup lifetime, and focus recovery.
+5. [Edge Rail and Rail-origin Selection Actions parity](../.scratch/selection-actions/issues/05-edge-rail-selection-actions-parity.md) — blocked by Ticket 04; adds pointer-only/no-activate parity and transient ownership.
+6. [Release DropCove 0.0.28](../.scratch/selection-actions/issues/06-release-dropcove-0.0.28.md) — blocked by Ticket 05; owns integration, version synchronization, exact packaging, installed proof, and human candidate acceptance.
+
+Approved feature DAG: `01 → {02, 03} → 04 → 05 → 06`. The `0.0.27` final-acceptance requirement is an external delivery gate on Ticket 01, not a numbered Selection Actions technical edge.
+
+Ticket breakdown confirmation: approved by the user through `to-tickets` on 2026-10-27.
+
+### Required planning workflow
+
+1. `to-spec` completed on 2026-10-27 with the amended product contract and approved testing seam.
+2. `to-tickets` completed on 2026-10-27 with the approved six-ticket DAG above.
+3. Complete `0.0.27` acceptance, then obtain separate implementation authorization before beginning Ticket 01.
+
+### Planned verification
+
+- Exercise ordinary and virtualized selections on all three surfaces: selected and unselected secondary-click targets, ignored secondary-button modifiers, singular/plural labels, action-control isolation, menu dismissal, and selection retention.
+- Prove None, Mixed, and all-Pinned transitions across single and multiple batches/items, including stale-target and persistence-failure rollback with no partial Pin changes.
+- Prove singleton immediate removal and multi-selection confirmation for all-External, mixed-ownership, and all-Managed targets; verify exact counts, external-source safety, Managed File deletion or durable retry, empty-batch pruning, and final Manage Items closure.
+- Inspect focus restoration, menu keyboard navigation, Tab and Escape precedence, confirmation mutation blocking, accessibility names/states, and Dark/Light/Windows Contrast presentation.
+- Verify Edge Rail and Rail-origin Manage Items remain no-activate and foreground-safe while menus and confirmations are open. Run focused frontend/native regressions plus actual Windows installed smoke after implementation approval.
+
+### Deferred
+
+- Persistent or cross-surface selection, cross-batch Item Selection, named selections, selection mode UI, a selection toolbar, always-visible checkboxes, item reordering, undo, Recycle Bin deletion, keyboard activation of Edge Rail, and non-Windows behavior.
+
+
+### Observed implementation and release evidence — 2026-10-27
+
+| Final Retained Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `build/DropCove-Setup-0.0.28.exe` | 3,782,092 | `21003ba66da912e9ab33076c42148af9e1f0bd3a11c98d35245517024d857e64` |
+| Built Windows x64 executable | 15,764,992 | `f76b924f255ca72454a8b594be80cd21deda8c7e297cfe77262dfaee535a5085` |
+
+- Independent standards and spec review principles applied: atomic core transactions with complete pre-validation before writes, domain separation (Batch Selection vs Item Selection), length-prefixed opaque tokens, native transient hold separation (`selection-actions` vs `item-actions`), and no-activate Rail/popup preservation.
+- Full test suites passed: **198/198 native tests**, **88/88 frontend tests**, Vue production build, and cargo-xwin NSIS packaging.
+- Real Windows OLE / WebView2 smoke verified on the installed release candidate (`0.0.28`):
+  1. Drop Shelf secondary-click on a multi-item batch opened Selection Actions Menu with `Pin All Items` / `Remove Batch`.
+  2. Selection Pin persisted both items as pinned; real `Shift+F10` inverted the label to `Unpin All Items`.
+  3. Two-batch selection removal opened modal confirmation with exact authoritative text (`Remove 2 batches · 2 items? Source files and folders will not be deleted.`) and initial `Cancel` focus.
+  4. Cancel retained both batches; Confirm atomically removed both batches and emptied the Shelf.
+  5. Virtualized 65-item Manage Items popup measured `240 × 480` with `10` mounted rows. `Ctrl+A` selected all 65 rows; secondary-click opened `Pin Selected` / `Remove Selected`; Pin atomically pinned all 65 items across the virtualization boundary.
+  6. Manage Items Remove Selected opened confirmation (`Remove 65 items?`); Cancel retained all 65 items.
+  7. Edge Rail docked normally, opened Selection Actions Menu with `Unpin All Items`, survived pointer leave via transient hold, and atomically unpinned all 65 items.
+  8. Native foreground observation confirmed HWND **1376314** remained foreground before, during, and after Rail selection menu open and execution.
+  9. Silent NSIS installation (`/S /NS /D=...`) and silent uninstallation verified with exit code `0`.
+  10. Owned test processes, registry snapshots, and temporary fixtures cleaned without touching ambient user profile.
+- Limits: physical multi-monitor DPI transitions and Narrator speech output were not separately observed. Ambient workstation Run registry value was verified and restored.

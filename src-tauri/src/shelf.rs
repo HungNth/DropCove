@@ -183,6 +183,18 @@ pub(crate) enum ResolvedItemAction {
     CopyText(String),
 }
 
+/// Authoritative scope of a selection removal. Counts and the membership token come from
+/// persisted state, never from the caller. The token is opaque to the frontend, which echoes it
+/// back on confirm; `remove_batches` recomputes it from persisted state and rejects any change.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RemovalPreview {
+    pub(crate) batches: usize,
+    pub(crate) items: usize,
+    pub(crate) managed_files: usize,
+    pub(crate) token: String,
+}
+
 #[derive(Debug, Error)]
 pub(crate) enum ShelfError {
     #[error("database error: {0}")]
@@ -217,6 +229,8 @@ pub(crate) enum ShelfError {
     EmptyItemSelection,
     #[error("item selection contains a duplicate item: {0}")]
     DuplicateItemSelection(String),
+    #[error("the selection changed since removal was previewed; nothing was removed")]
+    StaleRemovalTarget,
     #[error("prepared drag is no longer active")]
     InvalidPreparedDrag,
     #[error("system clock is before the Unix epoch")]
@@ -948,6 +962,72 @@ impl ShelfState {
         pinned: bool,
     ) -> Result<ShelfSnapshot, ShelfError> {
         self.store()?.set_batch_pinned(batch_id, pinned)
+    }
+    pub(crate) fn set_batches_pinned(
+        &self,
+        batch_ids: &[String],
+        pinned: bool,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        validate_unique_batches(batch_ids)?;
+        self.store()?.set_batches_pinned(batch_ids, pinned)
+    }
+    pub(crate) fn set_items_pinned(
+        &self,
+        batch_id: &str,
+        item_ids: &[String],
+        pinned: bool,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        validate_unique_items(item_ids)?;
+        self.store()?.set_items_pinned(batch_id, item_ids, pinned)
+    }
+
+    pub(crate) fn prepare_batch_removal(&self, batch_ids: &[String]) -> Result<RemovalPreview, ShelfError> {
+        validate_unique_batches(batch_ids)?;
+        self.store()?.prepare_batch_removal(batch_ids)
+    }
+
+
+    /// Confirms a previewed removal from only identities plus the opaque token. Counts are recomputed
+    /// from persisted state; a forged or outdated token is stale. Only a vanished target is translated
+    /// to stale, so database and validation failures keep their real error.
+    pub(crate) fn confirm_batch_removal(
+        &self,
+        batch_ids: &[String],
+        token: &str,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        validate_unique_batches(batch_ids)?;
+        let current = match self.store()?.prepare_batch_removal(batch_ids) {
+            Ok(current) => current,
+            Err(ShelfError::BatchNotFound(_)) => return Err(ShelfError::StaleRemovalTarget),
+            Err(other) => return Err(other),
+        };
+        let preview = RemovalPreview { token: token.to_owned(), ..current };
+        self.store()?.remove_batches(batch_ids, &preview)
+    }
+
+    pub(crate) fn prepare_item_removal(
+        &self,
+        batch_id: &str,
+        item_ids: &[String],
+    ) -> Result<RemovalPreview, ShelfError> {
+        validate_unique_items(item_ids)?;
+        self.store()?.prepare_item_removal(batch_id, item_ids)
+    }
+
+    pub(crate) fn confirm_item_removal(
+        &self,
+        batch_id: &str,
+        item_ids: &[String],
+        token: &str,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        validate_unique_items(item_ids)?;
+        let current = match self.store()?.prepare_item_removal(batch_id, item_ids) {
+            Ok(current) => current,
+            Err(ShelfError::BatchNotFound(_) | ShelfError::ItemNotFound(_)) => return Err(ShelfError::StaleRemovalTarget),
+            Err(other) => return Err(other),
+        };
+        let preview = RemovalPreview { token: token.to_owned(), ..current };
+        self.store()?.remove_items(batch_id, item_ids, &preview)
     }
 
 
@@ -2639,6 +2719,242 @@ impl ShelfStore {
         transaction.commit()?;
         Ok(snapshot)
     }
+    fn set_batches_pinned(
+        &mut self,
+        batch_ids: &[String],
+        pinned: bool,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        let transaction = self.connection.transaction()?;
+        for batch_id in batch_ids {
+            let exists: bool = transaction.query_row(
+                "SELECT EXISTS (SELECT 1 FROM shelf_batches WHERE id = ?1)",
+                [batch_id],
+                |row| row.get(0),
+            )?;
+            if !exists {
+                return Err(ShelfError::BatchNotFound(batch_id.clone()));
+            }
+        }
+        for batch_id in batch_ids {
+            transaction.execute(
+                "UPDATE shelf_items SET is_pinned = ?1
+                 WHERE batch_id = ?2
+                   AND NOT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = shelf_items.id AND mf.state = 'staged')",
+                params![pinned, batch_id],
+            )?;
+        }
+        let snapshot =
+            Self::read_snapshot(&transaction, self.width, self.height, &self.availability)?;
+        transaction.commit()?;
+        Ok(snapshot)
+    }
+
+    fn set_items_pinned(
+        &mut self,
+        batch_id: &str,
+        item_ids: &[String],
+        pinned: bool,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        let transaction = self.connection.transaction()?;
+        let batch_exists: bool = transaction.query_row(
+            "SELECT EXISTS (SELECT 1 FROM shelf_batches WHERE id = ?1)",
+            [batch_id],
+            |row| row.get(0),
+        )?;
+        if !batch_exists {
+            return Err(ShelfError::BatchNotFound(batch_id.to_owned()));
+        }
+        // Validate every identity against the declared batch before any write.
+        for item_id in item_ids {
+            let member: bool = transaction.query_row(
+                "SELECT EXISTS (
+                     SELECT 1 FROM shelf_items si
+                     WHERE si.id = ?1 AND si.batch_id = ?2
+                       AND NOT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = si.id AND mf.state = 'staged')
+                 )",
+                params![item_id, batch_id],
+                |row| row.get(0),
+            )?;
+            if !member {
+                return Err(ShelfError::ItemNotFound(item_id.clone()));
+            }
+        }
+        for item_id in item_ids {
+            transaction.execute("UPDATE shelf_items SET is_pinned = ?1 WHERE id = ?2", params![pinned, item_id])?;
+        }
+        let snapshot =
+            Self::read_snapshot(&transaction, self.width, self.height, &self.availability)?;
+        transaction.commit()?;
+        Ok(snapshot)
+    }
+
+    /// Counts and membership token for a batch removal, read from persisted rows in one pass.
+    fn removal_scope(
+        connection: &Connection,
+        batch_ids: &[String],
+    ) -> Result<RemovalPreview, ShelfError> {
+        let mut items = 0usize;
+        let mut managed_files = 0usize;
+        let mut token = String::new();
+        for batch_id in batch_ids {
+            let exists: bool = connection.query_row(
+                "SELECT EXISTS (SELECT 1 FROM shelf_batches WHERE id = ?1)",
+                [batch_id],
+                |row| row.get(0),
+            )?;
+            if !exists {
+                return Err(ShelfError::BatchNotFound(batch_id.clone()));
+            }
+            push_token_field(&mut token, batch_id);
+            let mut stmt = connection.prepare(
+                "SELECT si.id, EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = si.id)
+                 FROM shelf_items si
+                 WHERE si.batch_id = ?1
+                   AND NOT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = si.id AND mf.state = 'staged')
+                 ORDER BY si.position, si.id",
+            )?;
+            let mut rows = stmt.query([batch_id])?;
+            while let Some(row) = rows.next()? {
+                let item_id: String = row.get(0)?;
+                let managed: bool = row.get(1)?;
+                items += 1;
+                managed_files += usize::from(managed);
+                push_token_field(&mut token, &item_id);
+                token.push(if managed { 'm' } else { 'e' });
+            }
+            token.push(';');
+        }
+        Ok(RemovalPreview { batches: batch_ids.len(), items, managed_files, token })
+    }
+
+    fn prepare_batch_removal(&mut self, batch_ids: &[String]) -> Result<RemovalPreview, ShelfError> {
+        Self::removal_scope(&self.connection, batch_ids)
+    }
+
+    fn item_removal_scope(
+        connection: &Connection,
+        batch_id: &str,
+        item_ids: &[String],
+    ) -> Result<RemovalPreview, ShelfError> {
+        let batch_exists: bool = connection.query_row(
+            "SELECT EXISTS (SELECT 1 FROM shelf_batches WHERE id = ?1)",
+            [batch_id],
+            |row| row.get(0),
+        )?;
+        if !batch_exists {
+            return Err(ShelfError::BatchNotFound(batch_id.to_owned()));
+        }
+        let mut managed_files = 0usize;
+        let mut token = String::new();
+        push_token_field(&mut token, batch_id);
+        for item_id in item_ids {
+            let managed: Option<bool> = connection
+                .query_row(
+                    "SELECT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = si.id)
+                     FROM shelf_items si
+                     WHERE si.id = ?1 AND si.batch_id = ?2
+                       AND NOT EXISTS (SELECT 1 FROM managed_files mf WHERE mf.item_id = si.id AND mf.state = 'staged')",
+                    params![item_id, batch_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            let managed = managed.ok_or_else(|| ShelfError::ItemNotFound(item_id.clone()))?;
+            managed_files += usize::from(managed);
+            push_token_field(&mut token, item_id);
+            token.push(if managed { 'm' } else { 'e' });
+        }
+        Ok(RemovalPreview { batches: 1, items: item_ids.len(), managed_files, token })
+    }
+
+    fn prepare_item_removal(&mut self, batch_id: &str, item_ids: &[String]) -> Result<RemovalPreview, ShelfError> {
+        Self::item_removal_scope(&self.connection, batch_id, item_ids)
+    }
+
+    fn remove_items(
+        &mut self,
+        batch_id: &str,
+        item_ids: &[String],
+        preview: &RemovalPreview,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        let transaction = self.connection.transaction()?;
+        match Self::item_removal_scope(&transaction, batch_id, item_ids) {
+            Ok(current) if current == *preview => {}
+            Ok(_) | Err(ShelfError::BatchNotFound(_) | ShelfError::ItemNotFound(_)) => return Err(ShelfError::StaleRemovalTarget),
+            Err(other) => return Err(other),
+        }
+        Self::queue_managed_deletions_for_items(&transaction, item_ids.iter().map(String::as_str))?;
+        for item_id in item_ids {
+            transaction.execute("DELETE FROM shelf_items WHERE id = ?1", [item_id])?;
+        }
+        transaction.execute(
+            "DELETE FROM shelf_batches WHERE NOT EXISTS (SELECT 1 FROM shelf_items WHERE batch_id = shelf_batches.id)",
+            [],
+        )?;
+        clear_sizing_when_empty(&transaction)?;
+        let empty = !transaction.query_row("SELECT EXISTS (SELECT 1 FROM shelf_items)", [], |row| row.get::<_, bool>(0))?;
+        let snapshot = Self::read_snapshot(&transaction, if empty { 191.0 } else { self.width }, if empty { 180.0 } else { self.height }, &self.availability)?;
+        transaction.commit()?;
+        if empty {
+            self.width = 191.0;
+            self.height = 180.0;
+            self.pending_manual_height = None;
+        } else {
+            self.width = snapshot.preferred_width;
+            self.height = snapshot.height;
+        }
+        self.record_snapshot(&snapshot);
+        self.process_pending_managed_deletions()?;
+        self.snapshot()
+    }
+
+    fn remove_batches(
+        &mut self,
+        batch_ids: &[String],
+        preview: &RemovalPreview,
+    ) -> Result<ShelfSnapshot, ShelfError> {
+        let transaction = self.connection.transaction()?;
+        // Revalidate inside the transaction so a competing mutation cannot slip between check and delete.
+        // A target that disappeared since the preview is stale, not an unknown identity.
+        match Self::removal_scope(&transaction, batch_ids) {
+            Ok(current) if current == *preview => {}
+            Ok(_) | Err(ShelfError::BatchNotFound(_)) => return Err(ShelfError::StaleRemovalTarget),
+            Err(other) => return Err(other),
+        }
+        for batch_id in batch_ids {
+            Self::queue_managed_deletions_for_batch(&transaction, batch_id)?;
+            transaction.execute("DELETE FROM shelf_batches WHERE id = ?1", [batch_id])?;
+        }
+        clear_sizing_when_empty(&transaction)?;
+        let empty = !transaction.query_row(
+            "SELECT EXISTS (
+                SELECT 1 FROM shelf_items si
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM managed_files mf
+                    WHERE mf.item_id = si.id AND mf.state = 'staged'
+                )
+            )",
+            [],
+            |row| row.get::<_, bool>(0),
+        )?;
+        let snapshot = Self::read_snapshot(
+            &transaction,
+            if empty { 191.0 } else { self.width },
+            if empty { 180.0 } else { self.height },
+            &self.availability,
+        )?;
+        transaction.commit()?;
+        if empty {
+            self.width = 191.0;
+            self.height = 180.0;
+            self.pending_manual_height = None;
+        } else {
+            self.width = snapshot.preferred_width;
+            self.height = snapshot.height;
+        }
+        self.record_snapshot(&snapshot);
+        self.process_pending_managed_deletions()?;
+        self.snapshot()
+    }
 
     fn save_size(
         &mut self,
@@ -2709,6 +3025,39 @@ impl ShelfStore {
 
 fn random_id(transaction: &Transaction<'_>) -> Result<String, rusqlite::Error> {
     transaction.query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0))
+}
+
+fn validate_unique_batches(batch_ids: &[String]) -> Result<(), ShelfError> {
+    if batch_ids.is_empty() {
+        return Err(ShelfError::EmptyBatchSelection);
+    }
+    let mut seen = HashSet::with_capacity(batch_ids.len());
+    for id in batch_ids {
+        if !seen.insert(id.as_str()) {
+            return Err(ShelfError::DuplicateBatchSelection(id.clone()));
+        }
+    }
+    Ok(())
+}
+
+fn validate_unique_items(item_ids: &[String]) -> Result<(), ShelfError> {
+    if item_ids.is_empty() {
+        return Err(ShelfError::EmptyItemSelection);
+    }
+    let mut seen = HashSet::with_capacity(item_ids.len());
+    for id in item_ids {
+        if !seen.insert(id.as_str()) {
+            return Err(ShelfError::DuplicateItemSelection(id.clone()));
+        }
+    }
+    Ok(())
+}
+
+// Length-delimited so no identity, whatever characters it contains, can collide with another.
+fn push_token_field(token: &mut String, field: &str) {
+    token.push_str(&field.len().to_string());
+    token.push(':');
+    token.push_str(field);
 }
 
 fn clear_sizing_when_empty(transaction: &Transaction<'_>) -> Result<(), rusqlite::Error> {
@@ -3696,6 +4045,101 @@ mod tests {
             serde_json::to_value(reopened.snapshot().unwrap()).unwrap(),
             serde_json::to_value(&before).unwrap()
         );
+    }
+
+    #[test]
+    fn set_batches_pinned_changes_every_selected_item_atomically_and_rejects_invalid_targets() {
+        let directory = TestDirectory::new("batches-pin");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let files: Vec<String> = ["a", "b", "c", "d"]
+            .iter()
+            .map(|name| {
+                let path = directory.0.join(format!("{name}.txt"));
+                fs::write(&path, name).unwrap();
+                path.to_string_lossy().into_owned()
+            })
+            .collect();
+        state.accept_drop(vec![Some(files[0].clone()), Some(files[1].clone())]).unwrap();
+        state.accept_drop(vec![Some(files[2].clone())]).unwrap();
+        let initial = state.accept_drop(vec![Some(files[3].clone())]).unwrap().snapshot.unwrap();
+        let ids: Vec<String> = initial.batches.iter().map(|batch| batch.id.clone()).collect();
+
+        let pinned = state.set_batches_pinned(&ids[..2], true).unwrap();
+        let pins: Vec<Vec<bool>> = pinned.batches.iter().map(|batch| batch.items.iter().map(|item| item.is_pinned).collect()).collect();
+        assert_eq!(pins, vec![vec![true], vec![true], vec![false, false]]);
+
+        assert!(matches!(state.set_batches_pinned(&[], true), Err(super::ShelfError::EmptyBatchSelection)));
+        assert!(matches!(
+            state.set_batches_pinned(&[ids[0].clone(), ids[0].clone()], false),
+            Err(super::ShelfError::DuplicateBatchSelection(_))
+        ));
+        let before = serde_json::to_value(state.snapshot().unwrap()).unwrap();
+        assert!(matches!(
+            state.set_batches_pinned(&[ids[0].clone(), "absent".into()], false),
+            Err(super::ShelfError::BatchNotFound(_))
+        ));
+        assert_eq!(serde_json::to_value(state.snapshot().unwrap()).unwrap(), before, "a stale target must change nothing");
+
+        let item_id = pinned.batches[2].items[1].id.clone();
+        state.store().unwrap().connection.execute_batch(&format!(
+            "CREATE TEMP TRIGGER fail_halfway BEFORE UPDATE OF is_pinned ON shelf_items WHEN NEW.id = '{item_id}'
+             BEGIN SELECT RAISE(ABORT, 'forced failure'); END;"
+        )).unwrap();
+        assert!(state.set_batches_pinned(&ids, true).is_err());
+        assert_eq!(serde_json::to_value(state.snapshot().unwrap()).unwrap(), before, "persistence failure must change nothing");
+        drop(state);
+        let reopened = ShelfState::open(&database).unwrap();
+        assert_eq!(serde_json::to_value(reopened.snapshot().unwrap()).unwrap(), before);
+    }
+
+    #[test]
+    fn set_items_pinned_changes_exactly_the_selected_items_and_rejects_cross_batch_and_invalid_targets() {
+        let directory = TestDirectory::new("items-pin");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let files: Vec<String> = ["a", "b", "c", "d"]
+            .iter()
+            .map(|name| {
+                let path = directory.0.join(format!("{name}.txt"));
+                fs::write(&path, name).unwrap();
+                path.to_string_lossy().into_owned()
+            })
+            .collect();
+        state.accept_drop(vec![Some(files[0].clone()), Some(files[1].clone()), Some(files[2].clone())]).unwrap();
+        let initial = state.accept_drop(vec![Some(files[3].clone())]).unwrap().snapshot.unwrap();
+        let multi = initial.batches.iter().find(|batch| batch.items.len() == 3).unwrap().clone();
+        let other = initial.batches.iter().find(|batch| batch.items.len() == 1).unwrap().clone();
+        let ids: Vec<String> = multi.items.iter().map(|item| item.id.clone()).collect();
+
+        let pinned = state.set_items_pinned(&multi.id, &[ids[0].clone(), ids[2].clone()], true).unwrap();
+        let after = pinned.batches.iter().find(|batch| batch.id == multi.id).unwrap();
+        let flags: Vec<bool> = after.items.iter().map(|item| item.is_pinned).collect();
+        assert_eq!(flags, vec![true, false, true], "only the selected items change, in source order");
+        assert!(pinned.batches.iter().find(|batch| batch.id == other.id).unwrap().items.iter().all(|item| !item.is_pinned));
+
+        assert!(matches!(state.set_items_pinned(&multi.id, &[], true), Err(super::ShelfError::EmptyItemSelection)));
+        assert!(matches!(
+            state.set_items_pinned(&multi.id, &[ids[0].clone(), ids[0].clone()], false),
+            Err(super::ShelfError::DuplicateItemSelection(_))
+        ));
+        let before = serde_json::to_value(state.snapshot().unwrap()).unwrap();
+        assert!(matches!(
+            state.set_items_pinned(&multi.id, &[ids[0].clone(), other.items[0].id.clone()], false),
+            Err(super::ShelfError::ItemNotFound(_))
+        ), "an item from another batch must reject the whole operation");
+        assert!(matches!(state.set_items_pinned("absent", &[ids[0].clone()], false), Err(super::ShelfError::BatchNotFound(_))));
+        assert_eq!(serde_json::to_value(state.snapshot().unwrap()).unwrap(), before, "a rejected target must change nothing");
+
+        state.store().unwrap().connection.execute_batch(&format!(
+            "CREATE TEMP TRIGGER fail_item_pin BEFORE UPDATE OF is_pinned ON shelf_items WHEN NEW.id = '{}'
+             BEGIN SELECT RAISE(ABORT, 'forced failure'); END;",
+            ids[2]
+        )).unwrap();
+        assert!(state.set_items_pinned(&multi.id, &ids, false).is_err());
+        assert_eq!(serde_json::to_value(state.snapshot().unwrap()).unwrap(), before, "persistence failure must change nothing");
+        drop(state);
+        assert_eq!(serde_json::to_value(ShelfState::open(&database).unwrap().snapshot().unwrap()).unwrap(), before);
     }
 
     #[test]
@@ -5028,6 +5472,135 @@ mod tests {
     }
 
     #[test]
+    fn batch_removal_preview_reports_authoritative_counts_and_remove_is_atomic_and_source_safe() {
+        let directory = TestDirectory::new("batches-remove");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let external = directory.path().join("external_source.txt");
+        fs::write(&external, b"safe external bytes").unwrap();
+        state.accept_drop(vec![Some(external.display().to_string())]).unwrap();
+        let text = state.accept_text("managed bytes".into()).unwrap().snapshot.unwrap();
+        let managed_path = PathBuf::from(&text.batches[0].items[0].path);
+        let kept = directory.path().join("kept.txt");
+        fs::write(&kept, b"kept").unwrap();
+        let initial = state.accept_drop(vec![Some(kept.display().to_string())]).unwrap().snapshot.unwrap();
+        let ids: Vec<String> = initial.batches.iter().map(|batch| batch.id.clone()).collect();
+        assert_eq!(ids.len(), 3);
+        let removing = [ids[1].clone(), ids[2].clone()];
+
+        let preview = state.prepare_batch_removal(&removing).unwrap();
+        assert_eq!((preview.batches, preview.items, preview.managed_files), (2, 2, 1));
+
+        assert!(matches!(state.prepare_batch_removal(&[]), Err(super::ShelfError::EmptyBatchSelection)));
+        assert!(matches!(state.prepare_batch_removal(&["absent".into()]), Err(super::ShelfError::BatchNotFound(_))));
+
+        let lock = {
+            use std::os::windows::fs::OpenOptionsExt;
+            fs::OpenOptions::new().read(true).share_mode(3).open(&managed_path).unwrap()
+        };
+        let after = state.confirm_batch_removal(&removing, &preview.token).unwrap();
+        assert_eq!(after.batches.len(), 1);
+        assert_eq!(after.batches[0].id, ids[0]);
+        assert!(managed_path.exists(), "a locked Managed File stays until durable retry succeeds");
+        assert_eq!(after.warning.as_deref(), Some("1 DropCove-created file is pending deletion."));
+        assert_eq!(fs::read(&external).unwrap(), b"safe external bytes");
+        assert_eq!(fs::read(&kept).unwrap(), b"kept", "External sources are never modified");
+        drop(lock);
+        drop(state);
+        let restored = ShelfState::open(&database).unwrap();
+        assert!(!managed_path.exists(), "startup retry must finish the durable cleanup");
+        assert!(restored.snapshot().unwrap().warning.is_none());
+    }
+
+    #[test]
+    fn stale_removal_target_rejects_the_whole_operation() {
+        let directory = TestDirectory::new("batches-remove-stale");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let a = directory.path().join("a.txt");
+        let b = directory.path().join("b.txt");
+        let c = directory.path().join("c.txt");
+        for (path, bytes) in [(&a, b"a"), (&b, b"b"), (&c, b"c")] {
+            fs::write(path, bytes).unwrap();
+        }
+        state.accept_drop(vec![Some(a.display().to_string()), Some(b.display().to_string())]).unwrap();
+        let initial = state.accept_drop(vec![Some(c.display().to_string())]).unwrap().snapshot.unwrap();
+        let ids: Vec<String> = initial.batches.iter().map(|batch| batch.id.clone()).collect();
+        let preview = state.prepare_batch_removal(&ids).unwrap();
+        // Shrinking a two-item batch keeps the batch but changes its membership after the preview.
+        let shrunk = initial.batches.iter().find(|batch| batch.items.len() == 2).unwrap();
+        state.remove_item(&shrunk.items[0].id).unwrap();
+        let before = serde_json::to_value(state.snapshot().unwrap()).unwrap();
+        assert!(matches!(state.confirm_batch_removal(&ids, &preview.token), Err(super::ShelfError::StaleRemovalTarget)));
+        assert_eq!(serde_json::to_value(state.snapshot().unwrap()).unwrap(), before, "a stale target must remove nothing");
+    }
+
+    #[test]
+    fn confirming_after_a_previewed_batch_disappears_is_stale_not_not_found() {
+        let directory = TestDirectory::new("batches-remove-vanished");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let a = directory.path().join("a.txt");
+        let b = directory.path().join("b.txt");
+        fs::write(&a, b"a").unwrap();
+        fs::write(&b, b"b").unwrap();
+        state.accept_drop(vec![Some(a.display().to_string())]).unwrap();
+        let initial = state.accept_drop(vec![Some(b.display().to_string())]).unwrap().snapshot.unwrap();
+        let ids: Vec<String> = initial.batches.iter().map(|batch| batch.id.clone()).collect();
+        let preview = state.prepare_batch_removal(&ids).unwrap();
+        state.remove_batch(&ids[0]).unwrap();
+        let before = serde_json::to_value(state.snapshot().unwrap()).unwrap();
+        assert!(matches!(state.confirm_batch_removal(&ids, &preview.token), Err(super::ShelfError::StaleRemovalTarget)));
+        assert_eq!(serde_json::to_value(state.snapshot().unwrap()).unwrap(), before, "a vanished target must remove nothing");
+        assert!(matches!(state.prepare_batch_removal(&ids), Err(super::ShelfError::BatchNotFound(_))), "a fresh invalid request still reports BatchNotFound");
+    }
+
+    #[test]
+    fn confirm_with_a_caller_supplied_token_rejects_a_forged_token_and_keeps_real_errors() {
+        let directory = TestDirectory::new("batches-remove-token");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let a = directory.path().join("a.txt");
+        let b = directory.path().join("b.txt");
+        fs::write(&a, b"a").unwrap();
+        fs::write(&b, b"b").unwrap();
+        state.accept_drop(vec![Some(a.display().to_string())]).unwrap();
+        let initial = state.accept_drop(vec![Some(b.display().to_string())]).unwrap().snapshot.unwrap();
+        let ids: Vec<String> = initial.batches.iter().map(|batch| batch.id.clone()).collect();
+        let real = state.prepare_batch_removal(&ids).unwrap();
+        let before = serde_json::to_value(state.snapshot().unwrap()).unwrap();
+
+        assert!(matches!(state.confirm_batch_removal(&ids, "forged"), Err(super::ShelfError::StaleRemovalTarget)));
+        assert_eq!(serde_json::to_value(state.snapshot().unwrap()).unwrap(), before, "a forged token must remove nothing");
+        assert!(matches!(state.confirm_batch_removal(&[], &real.token), Err(super::ShelfError::EmptyBatchSelection)), "validation errors stay real, not stale");
+
+        let after = state.confirm_batch_removal(&ids, &real.token).unwrap();
+        assert!(after.batches.is_empty());
+    }
+
+    #[test]
+    fn failed_batch_removal_commit_leaves_every_target_in_place() {
+        let directory = TestDirectory::new("batches-remove-rollback");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let a = directory.path().join("a.txt");
+        let b = directory.path().join("b.txt");
+        fs::write(&a, b"a").unwrap();
+        fs::write(&b, b"b").unwrap();
+        state.accept_drop(vec![Some(a.display().to_string())]).unwrap();
+        let initial = state.accept_drop(vec![Some(b.display().to_string())]).unwrap().snapshot.unwrap();
+        let ids: Vec<String> = initial.batches.iter().map(|batch| batch.id.clone()).collect();
+        let preview = state.prepare_batch_removal(&ids).unwrap();
+        let before = serde_json::to_value(state.snapshot().unwrap()).unwrap();
+        let last = initial.batches[1].id.clone();
+        state.store().unwrap().connection.execute_batch(&format!(
+            "CREATE TEMP TRIGGER fail_remove BEFORE DELETE ON shelf_batches WHEN OLD.id = '{last}'
+             BEGIN SELECT RAISE(ABORT, 'forced removal failure'); END;"
+        )).unwrap();
+        assert!(state.confirm_batch_removal(&ids, &preview.token).is_err());
+        assert_eq!(serde_json::to_value(state.snapshot().unwrap()).unwrap(), before);
+        drop(state);
+        assert_eq!(serde_json::to_value(ShelfState::open(&database).unwrap().snapshot().unwrap()).unwrap(), before);
+    }
+
+    #[test]
     fn pending_cleanup_warning_survives_snapshot_and_restart() {
         use std::os::windows::fs::OpenOptionsExt;
         let directory = TestDirectory::new("managed-pending-snapshot");
@@ -5098,6 +5671,36 @@ mod tests {
         assert!(!managed_path.exists(), "managed file deleted");
         assert!(external.exists(), "external source object preserved");
         assert_eq!(state.snapshot().unwrap().batches.len(), 1);
+    }
+
+    #[test]
+    fn item_removal_preview_and_confirm_are_atomic_and_prune_empty_batch() {
+        let directory = TestDirectory::new("items-remove");
+        let database = directory.path().join("shelf.db");
+        let state = ShelfState::open(&database).unwrap();
+        let external = directory.path().join("external.txt");
+        fs::write(&external, b"safe").unwrap();
+        state.accept_drop(vec![Some(external.display().to_string()), Some(external.display().to_string())]).unwrap();
+        let text = state.accept_text("managed item".into()).unwrap().snapshot.unwrap();
+        let multi = state.accept_drop(vec![Some(external.display().to_string()), Some(directory.source_file().display().to_string())]).unwrap().snapshot.unwrap();
+        let target_batch = multi.batches.iter().find(|batch| batch.items.len() == 2).unwrap().clone();
+        let ids: Vec<String> = target_batch.items.iter().map(|item| item.id.clone()).collect();
+
+        let preview = state.prepare_item_removal(&target_batch.id, &[ids[0].clone()]).unwrap();
+        assert_eq!((preview.batches, preview.items, preview.managed_files), (1, 1, 0));
+
+        let after_partial = state.confirm_item_removal(&target_batch.id, &[ids[0].clone()], &preview.token).unwrap();
+        let survivor_batch = after_partial.batches.iter().find(|batch| batch.id == target_batch.id).unwrap();
+        assert_eq!(survivor_batch.items.len(), 1);
+        assert_eq!(survivor_batch.items[0].id, ids[1], "one-item survivor popup requirement");
+
+        assert!(matches!(state.confirm_item_removal(&target_batch.id, &[ids[1].clone()], "forged"), Err(super::ShelfError::StaleRemovalTarget)));
+        assert!(matches!(state.prepare_item_removal(&target_batch.id, &[]), Err(super::ShelfError::EmptyItemSelection)));
+        assert!(matches!(state.prepare_item_removal(&target_batch.id, &[text.batches[0].items[0].id.clone()]), Err(super::ShelfError::ItemNotFound(_))));
+
+        let second_preview = state.prepare_item_removal(&target_batch.id, &[ids[1].clone()]).unwrap();
+        let after_empty = state.confirm_item_removal(&target_batch.id, &[ids[1].clone()], &second_preview.token).unwrap();
+        assert!(!after_empty.batches.iter().any(|batch| batch.id == target_batch.id), "removing the final item prunes the batch");
     }
 
     #[test]
@@ -5843,6 +6446,20 @@ mod tests {
         assert_eq!(transfer.participants[0].id, batch1.items[0].id);
         assert_eq!(transfer.participants[1].id, batch1.items[2].id);
         assert_eq!(transfer.paths, [paths[0].clone(), paths[2].clone()]);
+    }
+
+    #[test]
+    fn selection_pin_invalidates_an_armed_batch_drag_token() {
+        let directory = TestDirectory::new("selection-pin-invalidates-token");
+        let state = ShelfState::open(directory.path().join("shelf.db")).unwrap();
+        let snapshot = state.accept_drop(vec![Some("C:\\available.txt".into())]).unwrap().snapshot.unwrap();
+        let ids = [snapshot.batches[0].id.clone()];
+        let prepared = state.prepare_batch_drag_with(&ids, |_| super::Availability::Available).unwrap();
+        state.set_batches_pinned(&ids, true).unwrap();
+        assert!(
+            state.begin_batch_drag(prepared.token.as_deref().unwrap()).is_err(),
+            "a successful selection pin must invalidate a token armed against the older Shelf snapshot"
+        );
     }
 
     #[test]

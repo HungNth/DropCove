@@ -171,3 +171,33 @@ test("ShelfItemRow preserves selected drag scope until threshold and exposes row
     app.unmount();
   }
 });
+
+test("ShelfItemRow secondary-click on the selection region requests the menu at the pointer; controls and keyboard origin behave as specified", () => {
+  const requests = [];
+  const item = { id: "i1", batchId: "b", position: 0, name: "a.txt", path: "C:\\a.txt", isPinned: false, isFolder: false, availability: "Available", ownership: "External", managedContentKind: null };
+  const app = renderer.createApp({ render: () => h(ShelfItemRow, { item, busy: false, selectionTabindex: 0, onSelectionMenu: (...args) => requests.push(args) }) });
+  const root = node("root");
+  app.mount(root);
+  try {
+    const row = root.children[0];
+    const drag = row.children[0];
+    const secondary = (target, modifiers = {}) => ({ button: 2, clientX: 30, clientY: 9, ctrlKey: false, shiftKey: false, target, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...modifiers });
+    const event = secondary(drag, { ctrlKey: true, shiftKey: true });
+    row.props.onContextmenu(event);
+    assert.equal(event.defaultPrevented, true, "the WebView browser menu stays suppressed");
+    assert.deepEqual(requests, [["i1", { x: 30, y: 9 }, false]], "modifiers are ignored; only identity and anchor are sent");
+    const control = secondary({ closest: selector => (selector.includes(".item-actions") ? {} : null) });
+    row.props.onContextmenu(control);
+    assert.equal(control.defaultPrevented, true, "the browser menu is still suppressed over a control");
+    assert.equal(requests.length, 1, "a secondary-click on an action control must not open Selection Actions");
+    const keyboard = { button: 0, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+    row.props.onContextmenu(keyboard);
+    assert.equal(keyboard.defaultPrevented, false, "keyboard-origin contextmenu is left unchanged");
+    const key = (name, shiftKey = false) => ({ key: name, shiftKey, preventDefault() {}, stopPropagation() {} });
+    drag.props.onKeydown(key("ContextMenu"));
+    drag.props.onKeydown(key("F10", true));
+    drag.props.onKeydown(key("F10", false));
+    assert.equal(requests.length, 3, "Context Menu key and Shift+F10 each request the menu once; plain F10 does not");
+    assert.equal(requests[1][2], true);
+  } finally { app.unmount(); }
+});

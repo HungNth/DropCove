@@ -4,6 +4,7 @@ use tauri::{Manager, State};
 
 mod about;
 mod clear_confirmation;
+mod selection_confirmation;
 mod edge_rail;
 mod manage_items;
 pub(crate) mod managed_files;
@@ -394,6 +395,120 @@ async fn set_batch_pinned(
         publish_shelf(&app, snapshot)
     })
     .await
+}
+
+#[tauri::command]
+async fn set_batches_pinned(
+    batch_ids: Vec<String>,
+    pinned: bool,
+    app: tauri::AppHandle,
+    state: State<'_, ShelfState>,
+) -> Result<ShelfSnapshot, String> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let snapshot = state
+            .set_batches_pinned(&batch_ids, pinned)
+            .map_err(|error| error.to_string())?;
+        publish_shelf(&app, snapshot)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn set_items_pinned(
+    batch_id: String,
+    item_ids: Vec<String>,
+    pinned: bool,
+    app: tauri::AppHandle,
+    state: State<'_, ShelfState>,
+) -> Result<ShelfSnapshot, String> {
+    let state = state.inner().clone();
+    run_blocking(move || {
+        let snapshot = state
+            .set_items_pinned(&batch_id, &item_ids, pinned)
+            .map_err(|error| error.to_string())?;
+        publish_shelf(&app, snapshot)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn prepare_batches_removal(
+    batch_ids: Vec<String>,
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    state: State<'_, ShelfState>,
+) -> Result<shelf::RemovalPreview, String> {
+    let caller = window.label().to_owned();
+    selection_confirmation::begin(&app, &caller)?;
+    let state = state.inner().clone();
+    let result = run_blocking(move || state.prepare_batch_removal(&batch_ids).map_err(|error| error.to_string())).await;
+    if result.is_err() { selection_confirmation::cancel(&app, &caller)?; }
+    result
+}
+
+#[tauri::command]
+async fn prepare_items_removal(
+    batch_id: String,
+    item_ids: Vec<String>,
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    state: State<'_, ShelfState>,
+) -> Result<shelf::RemovalPreview, String> {
+    let caller = window.label().to_owned();
+    selection_confirmation::begin(&app, &caller)?;
+    let state = state.inner().clone();
+    let result = run_blocking(move || state.prepare_item_removal(&batch_id, &item_ids).map_err(|error| error.to_string())).await;
+    if result.is_err() { selection_confirmation::cancel(&app, &caller)?; }
+    result
+}
+
+#[tauri::command]
+fn cancel_selection_removal(window: tauri::WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    selection_confirmation::cancel(&app, window.label())
+}
+
+#[tauri::command]
+async fn remove_items(
+    batch_id: String,
+    item_ids: Vec<String>,
+    token: String,
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    state: State<'_, ShelfState>,
+) -> Result<ShelfSnapshot, String> {
+    let caller = window.label().to_owned();
+    let release_app = app.clone();
+    let state = state.inner().clone();
+    let result = run_blocking(move || {
+        let snapshot = state
+            .confirm_item_removal(&batch_id, &item_ids, &token)
+            .map_err(|error| error.to_string())?;
+        publish_shelf(&app, snapshot)
+    }).await;
+    selection_confirmation::cancel(&release_app, &caller)?;
+    result
+}
+
+#[tauri::command]
+async fn remove_batches(
+    batch_ids: Vec<String>,
+    token: String,
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    state: State<'_, ShelfState>,
+) -> Result<ShelfSnapshot, String> {
+    let caller = window.label().to_owned();
+    let release_app = app.clone();
+    let state = state.inner().clone();
+    let result = run_blocking(move || {
+        let snapshot = state
+            .confirm_batch_removal(&batch_ids, &token)
+            .map_err(|error| error.to_string())?;
+        publish_shelf(&app, snapshot)
+    }).await;
+    selection_confirmation::cancel(&release_app, &caller)?;
+    result
 }
 
 fn storage_drag_on_window_thread(
@@ -797,6 +912,7 @@ fn set_rail_transient_hold(
         "clear" => resident::RailTransientReason::ClearConfirmation,
         "batch-drag" => resident::RailTransientReason::BatchDragConfirmation,
         "item-actions" => resident::RailTransientReason::ItemActions,
+        "selection-actions" => resident::RailTransientReason::SelectionActions,
         _ => return Err(format!("unknown rail transient hold reason '{reason}'")),
     };
     if let Some(remaining) = app
@@ -884,6 +1000,7 @@ pub fn run() {
             app.manage(shelf_resize::ResizeState::default());
             app.manage(resident::ResidentState::default());
             app.manage(clear_confirmation::ClearConfirmationState::default());
+            app.manage(selection_confirmation::SelectionConfirmations::default());
             app.manage(windows_shake::ShakeRuntimeState::default());
             app.manage(windows_visuals::ShellVisualState::new());
             let window = app.get_webview_window("main").ok_or_else(|| {
@@ -963,14 +1080,28 @@ pub fn run() {
             if label == "main" && clear_confirmation::is_modal_active(webview.app_handle())
                 && matches!(command, "dismiss_drop_shelf" | "prepare_shelf_move" | "start_shelf_resize"
                     | "start_item_drag" | "prepare_batch_drag" | "start_batch_drag" | "accept_drop"
-                    | "remove_item" | "remove_batch" | "set_item_pinned" | "set_batch_pinned"
+                    | "remove_item" | "remove_batch" | "set_item_pinned" | "set_batch_pinned" | "set_batches_pinned"
+                    | "prepare_batches_removal" | "remove_batches" | "set_items_pinned"
+                    | "prepare_items_removal" | "remove_items"
                     | "open_manage_items" | "open_about" | "open_settings" | "save_size"
                     | "perform_item_action")
             {
                 invoke.resolver.reject("Drop Shelf interaction is blocked while Clear confirmation is open");
                 return true;
             }
+            if selection_confirmation::blocks(webview.app_handle(), label)
+                && matches!(command, "dismiss_drop_shelf" | "prepare_shelf_move" | "start_shelf_resize"
+                    | "start_item_drag" | "prepare_item_drag" | "prepare_batch_drag" | "start_batch_drag" | "accept_drop"
+                    | "remove_item" | "remove_batch" | "set_item_pinned" | "set_batch_pinned" | "set_batches_pinned"
+                    | "set_items_pinned" | "prepare_batches_removal" | "prepare_items_removal"
+                    | "open_manage_items" | "close_manage_items" | "open_about" | "open_settings" | "save_size"
+                    | "perform_item_action" | "clear_temporary" | "request_drop_shelf_clear_temporary")
+            {
+                invoke.resolver.reject("Interaction is blocked while selection removal confirmation is open");
+                return true;
+            }
             let handler: fn(tauri::ipc::Invoke) -> bool = tauri::generate_handler![
+            cancel_selection_removal,
             request_drop_shelf_clear_temporary,
             get_drop_shelf_clear_temporary_state,
             confirm_drop_shelf_clear_temporary,
@@ -997,6 +1128,12 @@ pub fn run() {
             prepare_shelf_move,
             set_item_pinned,
             set_batch_pinned,
+            set_batches_pinned,
+            prepare_batches_removal,
+            remove_batches,
+            set_items_pinned,
+            prepare_items_removal,
+            remove_items,
             remove_item,
             clear_temporary,
             open_manage_items,

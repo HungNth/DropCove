@@ -82,6 +82,7 @@ pub(crate) enum RailTransientReason {
     BatchDragConfirmation = 1 << 2,
     ActiveDrag = 1 << 3,
     ItemActions = 1 << 4,
+    SelectionActions = 1 << 5,
 }
 
 #[derive(Clone, Debug)]

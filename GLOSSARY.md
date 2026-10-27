@@ -32,6 +32,10 @@ _Avoid_: Settings menu, notification-area menu
 A transient per-Shelf Item menu whose available actions follow that item's ownership and content kind.
 _Avoid_: Context menu, Batch Actions Menu
 
+**Selection Actions Menu**:
+A transient menu that applies lifecycle actions to the current Batch Selection or Item Selection.
+_Avoid_: Context menu, Item Actions Menu, Batch Actions Menu
+
 **Settings**:
 The DropCove surface for reviewing and changing durable preferences through its Save and Cancel lifecycle.
 _Avoid_: Preferences page, configuration window
@@ -61,11 +65,11 @@ A grouping of Shelf Items accepted from one drop operation.
 _Avoid_: Drop group, file list, collection
 
 **Batch Selection**:
-The transient, surface-local set of Shelf Batches chosen for one multi-batch drag-out.
+The transient, surface-local set of Shelf Batches treated as one target by a multi-batch operation.
 _Avoid_: Selected Shelf, persistent selection, batch group
 
 **Item Selection**:
-The transient set of Shelf Items chosen within one Shelf Batch through Manage Items for one multi-item drag-out.
+The transient set of Shelf Items chosen within one Shelf Batch through Manage Items and treated as one target by a multi-item operation.
 _Avoid_: Cross-batch selection, persistent item selection, bulk action group
 
 **Drop Placeholder**:

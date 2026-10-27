@@ -26,6 +26,7 @@ const emit = defineEmits<{
   openItemMenu: [itemId: string];
   closeItemMenu: [itemId: string];
   itemAction: [itemId: string, action: ShelfItemAction];
+  selectionMenu: [batchId: string, anchor: { x: number; y: number }, keyboard: boolean];
 }>();
 let pointerStart: { id: number; x: number; y: number; ctrlKey: boolean; shiftKey: boolean } | undefined;
 const singleItem = computed(() => props.batch.items.length === 1 ? props.batch.items[0] : undefined);
@@ -117,6 +118,25 @@ function onKeydown(event: KeyboardEvent) {
   if (["Shift", "Control", "Alt", "Meta"].includes(event.key)) return;
   pointerFocus.value = false;
 }
+
+// Only the selection region opens Selection Actions; independent controls stay isolated.
+function onContextmenu(event: MouseEvent) {
+  if (event.button !== 2) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest?.(".card-actions, .item-actions-menu, input, textarea")) return;
+  event.preventDefault();
+  if (props.busy) return;
+  emit("selectionMenu", props.batch.id, { x: event.clientX, y: event.clientY }, false);
+}
+
+function onSelectionMenuKey(event: KeyboardEvent) {
+  if (!(event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey))) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (props.busy) return;
+  const bounds = card.value?.getBoundingClientRect();
+  if (bounds) emit("selectionMenu", props.batch.id, { x: bounds.x, y: bounds.bottom }, true);
+}
 </script>
 
 <template>
@@ -126,6 +146,7 @@ function onKeydown(event: KeyboardEvent) {
     :data-batch-id="batch.id"
     :data-selected="selected || undefined"
     :aria-selected="selectionTabindex !== undefined ? Boolean(selected) : undefined"
+    @contextmenu="onContextmenu"
   >
     <div
       class="card-drag flex flex-1 min-w-0 items-center gap-[4px] h-full box-border p-[5px] cursor-grab select-none touch-none active:cursor-grabbing"
@@ -136,7 +157,7 @@ function onKeydown(event: KeyboardEvent) {
       :tabindex="selectionTabindex"
       @focus="emit('focusBatch', batch.id)"
       @blur="onBlur"
-      @keydown="onKeydown"
+      @keydown="event => { onSelectionMenuKey(event); onKeydown(event); }"
       @pointerenter="loadFullText"
       @pointerdown="pointerDown"
       @pointermove="pointerMove"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from "vue";
 import { useResizeObserver } from "@vueuse/core";
 import { useAnnouncer } from "../../composables/useAnnouncer";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
@@ -10,11 +10,21 @@ import BatchDragConfirmation from "./BatchDragConfirmation.vue";
 import ShelfResizeHandles from "./ShelfResizeHandles.vue";
 import ActionIcon from "./ActionIcon.vue";
 import UtilityMenu from "./UtilityMenu.vue";
+import SelectionActionsMenu from "./SelectionActionsMenu.vue";
+import SelectionRemovalConfirmation from "./SelectionRemovalConfirmation.vue";
+import { batchSelectionPinAction } from "../../composables/selectionActions";
 import { invoke } from "@tauri-apps/api/core";
 import type { ShelfItemAction } from "./ItemActionsMenu.vue";
 const {
   batches,
   activeItemActionsMenuId,
+  selectionMenu,
+  openSelectionMenu,
+  pinSelection,
+  removeSelection,
+  removalConfirmation,
+  confirmRemoval,
+  cancelRemoval,
   selection,
   selectBatch,
   status,
@@ -102,7 +112,62 @@ const focusedBatch = shallowRef<string | null>(null);
 
 watch([batches, busy, resizing, moving, pendingConfirmation, confirmingClearTemporary], () => {
   activeItemActionsMenuId.value = null;
+  selectionMenu.value = null;
 });
+
+const selectionMenuBatches = computed(() => batches.value.filter(batch => selectionMenu.value?.batchIds.includes(batch.id)));
+const selectionMenuPin = computed(() => batchSelectionPinAction(selectionMenuBatches.value));
+// Singular wording follows the selection unit, not the affected item count.
+const selectionMenuActions = computed(() => [
+  { id: "pin", label: selectionMenuPin.value.label },
+  { id: "remove", label: selectionMenuBatches.value.length > 1 ? "Remove Selected" : "Remove Batch", danger: true },
+]);
+
+function focusOrigin(origin: string | undefined) {
+  if (origin) gridRef.value?.querySelector<HTMLElement>(`[data-batch-id="${CSS.escape(origin)}"] .card-drag`)?.focus();
+}
+
+async function onSelectionMenuAction(id: string) {
+  const origin = selectionMenu.value?.originId;
+  if (id === "pin") {
+    const pinned = selectionMenuPin.value.pinned;
+    const committed = await pinSelection(pinned);
+    if (committed) announce(pinned ? "Selection pinned" : "Selection unpinned");
+  } else if (id === "remove") {
+    const several = selectionMenuBatches.value.length > 1;
+    const committed = await removeSelection();
+    if (committed && !several) announce("Batch removed");
+    if (several) return;
+  } else {
+    return;
+  }
+  await nextTick();
+  focusOrigin(origin);
+}
+
+async function onRemovalConfirm() {
+  const origin = removalConfirmation.value?.originId;
+  const committed = await confirmRemoval();
+  if (committed) announce("Selection removed");
+  await nextTick();
+  focusOrigin(origin);
+}
+
+async function onRemovalCancel() {
+  const origin = removalConfirmation.value?.originId;
+  await cancelRemoval();
+  await nextTick();
+  focusOrigin(origin);
+}
+
+async function closeSelectionMenu(restoreFocus: boolean) {
+  const origin = selectionMenu.value?.originId;
+  selectionMenu.value = null;
+  if (restoreFocus && origin) {
+    await nextTick();
+    gridRef.value?.querySelector<HTMLElement>(`[data-batch-id="${CSS.escape(origin)}"] .card-drag`)?.focus();
+  }
+}
 watch(() => `${selection.ids.value.join(',')}:${selection.itemCount.value}`, () => {
   const count = selection.ids.value.length;
   announce(count ? `${count} batches, ${selection.itemCount.value} items selected` : "Selection cleared");
@@ -178,7 +243,7 @@ watch(batches, async (current, previous) => {
       <button
         type="button"
         class="dismiss-action absolute top-[4px] right-[4px] z-[3] inline-flex items-center justify-center size-[24px] box-border p-0 border border-transparent rounded-[4px] bg-transparent text-dc-text-secondary cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary focus-visible:outline-2 focus-visible:outline-dc-focus disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText]"
-        :disabled="busy || resizing || moving"
+        :disabled="busy || resizing || moving || removalConfirmation !== null"
         aria-label="Hide Drop Shelf"
         title="Hide Drop Shelf"
         @pointerdown.stop
@@ -196,7 +261,7 @@ watch(batches, async (current, previous) => {
         aria-label="Shelf batches"
         :aria-rowcount="batches.length"
         :style="virtual.enabled.value ? { position: 'relative' } : {}"
-        @scroll="activeItemActionsMenuId = null"
+        @scroll="() => { activeItemActionsMenuId = null; selectionMenu = null; }"
         @keydown="onGridKeydown"
         @focusin="event => { const id = (event.target as HTMLElement).closest<HTMLElement>('[data-batch-id]')?.dataset.batchId; if (id) focusedBatch = id; }"
         @pointerup="event => { if (!busy && !resizing && !(event.target as HTMLElement).closest('.card, .item-actions-menu, .more')) selection.clear(); }"
@@ -207,7 +272,7 @@ watch(batches, async (current, previous) => {
         v-for="entry in virtual.entries.value"
         :key="entry.item.id"
         :batch="entry.item"
-        :busy="busy || resizing"
+        :busy="busy || resizing || removalConfirmation !== null"
         :selected="selection.selected.value.has(entry.item.id)"
         :selection-tabindex="(focusedBatch ?? batches[0]?.id) === entry.item.id ? 0 : -1"
         @select="selectBatch"
@@ -224,6 +289,7 @@ watch(batches, async (current, previous) => {
         @open-item-menu="id => activeItemActionsMenuId = id"
         @close-item-menu="id => { if (activeItemActionsMenuId === id) activeItemActionsMenuId = null; }"
         @item-action="handlePerformItemAction"
+        @selection-menu="(id, anchor, keyboard) => { activeItemActionsMenuId = null; openSelectionMenu(id, anchor, keyboard); }"
         @manage="(id, a, k) => { activeItemActionsMenuId = null; openManageItems(id, a, k); }"
         @drag-batch="id => { activeItemActionsMenuId = null; startBatchDrag(id); }"
       />
@@ -233,13 +299,28 @@ watch(batches, async (current, previous) => {
       <ActionIcon class="size-[28px]! text-dc-accent" name="down" />
       <p class="mt-[8px] mb-0 text-[13px] text-dc-text-primary">Drop here</p>
     </section>
+    <SelectionActionsMenu
+      v-if="selectionMenu"
+      :actions="selectionMenuActions"
+      :anchor="selectionMenu.anchor"
+      :keyboard="selectionMenu.keyboard"
+      label="Selection actions"
+      @action="onSelectionMenuAction"
+      @close="closeSelectionMenu"
+    />
+    <SelectionRemovalConfirmation
+      :preview="removalConfirmation?.preview ?? null"
+      domain="batches"
+      @confirm="onRemovalConfirm"
+      @cancel="onRemovalCancel"
+    />
     <BatchDragConfirmation :pending="pendingConfirmation" @confirm="confirmBatchDrag" @cancel="cancelBatchDrag" @drag="dragConfirmedBatch" />
     <footer class="flex flex-none items-center justify-between mt-auto pt-0 px-[8px] pb-[8px]">
       <button
         v-if="hasTemporaryItems"
         type="button"
         class="clear-temporary-action inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-transparent rounded-[4px] bg-transparent text-dc-danger cursor-pointer [&:hover:not(:disabled)]:border-dc-danger-border [&:hover:not(:disabled)]:bg-dc-danger-surface [&:hover:not(:disabled)]:text-dc-danger aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:border-[ButtonText] forced-colors:text-dc-danger forced-colors:[&:hover:not(:disabled)]:border-dc-danger-border forced-colors:[&:hover:not(:disabled)]:bg-dc-danger-surface forced-colors:[&:hover:not(:disabled)]:text-dc-danger forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
-        :disabled="busy || resizing || pendingConfirmation !== null || confirmingClearTemporary"
+        :disabled="busy || resizing || pendingConfirmation !== null || confirmingClearTemporary || removalConfirmation !== null"
         aria-label="Clear Temporary Items"
         title="Clear temporary items and DropCove-created files; pinned items and external sources stay"
         @click="() => { requestClearTemporary(); announce('Clear temporary items requested'); }"
@@ -249,7 +330,7 @@ watch(batches, async (current, previous) => {
       <div v-else class="size-[24px] flex-none" aria-hidden="true" />
       <span v-if="selection.ids.value.length" class="min-w-0 flex-1 px-[4px] text-center text-[10px] text-dc-text-secondary" aria-hidden="true">{{ selection.ids.value.length }} batches · {{ selection.itemCount.value }} items</span>
       <UtilityMenu
-        :disabled="busy || resizing || pendingConfirmation !== null || confirmingClearTemporary"
+        :disabled="busy || resizing || pendingConfirmation !== null || confirmingClearTemporary || removalConfirmation !== null"
         @open-settings="openSettingsFromMenu"
         @open-about="openAboutFromMenu"
       />
@@ -261,7 +342,7 @@ watch(batches, async (current, previous) => {
     <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
       {{ announcement }}
     </div>
-    <ShelfResizeHandles :disabled="busy || resizing || moving" @resize="startResize" />
+    <ShelfResizeHandles :disabled="busy || resizing || moving || removalConfirmation !== null" @resize="startResize" />
   </main>
 </template>
 

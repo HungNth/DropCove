@@ -35,6 +35,7 @@ function node(type) {
     type, props: {}, children: [], parent: null, clientWidth: 280, clientHeight: 280, scrollTop: 0,
     setPointerCapture() {}, releasePointerCapture() {}, focus() { focusCalls++; },
     addEventListener() {}, removeEventListener() {}, querySelectorAll: () => [],
+    getBoundingClientRect: () => ({ x: 10, y: 20, width: 164, height: 48, top: 20, bottom: 68, left: 10, right: 174 }),
     close() { this.open = false; }, showModal() { this.open = true; },
   });
 }
@@ -105,6 +106,47 @@ for (const count of [1, 2]) {
   });
 }
 
+test("card selection region secondary-click emits a menu request at the pointer and suppresses the browser menu; action controls do not", () => {
+  const requests = [];
+  const batch = { id: "batch", items: [{ id: "i", name: "a.txt", path: "C:\\a.txt", isPinned: false, isFolder: false, ownership: "External", managedContentKind: null, availability: "Available" }] };
+  const app = renderer.createApp({ render: () => h(ShelfBatchCard, { batch, busy: false, onSelectionMenu: (...args) => requests.push(args) }) });
+  const root = node("root");
+  app.mount(root);
+  try {
+    const article = root.children[0];
+    const context = (target, modifiers = {}) => ({ button: 2, clientX: 40, clientY: 12, ctrlKey: false, shiftKey: false, target, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...modifiers });
+    const drag = article.children[0];
+    const event = context(drag, { ctrlKey: true, shiftKey: true });
+    article.props.onContextmenu(event);
+    assert.equal(event.defaultPrevented, true, "the WebView browser menu must be suppressed");
+    assert.deepEqual(requests, [["batch", { x: 40, y: 12 }, false]], "modifiers are ignored and the request carries only identity and anchor");
+    const actionButton = article.children[1].children.find(child => child.type === "button");
+    const control = context(actionButton);
+    actionButton.parent = article.children[1];
+    article.props.onContextmenu({ ...control, target: { closest: selector => selector.includes(".card-actions") ? actionButton : null } });
+    assert.equal(requests.length, 1, "secondary-click on an action control must not open Selection Actions");
+  } finally { app.unmount(); }
+});
+
+test("Context Menu key and Shift+F10 on the focused drag region request the menu at the card; other keys do not", () => {
+  const requests = [];
+  const batch = { id: "batch", items: [{ id: "i", name: "a.txt", path: "C:\\a.txt", isPinned: false, isFolder: false, ownership: "External", managedContentKind: null, availability: "Available" }] };
+  const app = renderer.createApp({ render: () => h(ShelfBatchCard, { batch, busy: false, selectionTabindex: 0, onSelectionMenu: (...args) => requests.push(args) }) });
+  const root = node("root");
+  app.mount(root);
+  try {
+    const drag = root.children[0].children[0];
+    const key = (name, shiftKey = false) => ({ key: name, shiftKey, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {} });
+    const contextKey = key("ContextMenu");
+    drag.props.onKeydown(contextKey);
+    assert.equal(contextKey.defaultPrevented, true);
+    drag.props.onKeydown(key("F10", true));
+    drag.props.onKeydown(key("F10", false));
+    drag.props.onKeydown(key("ArrowDown"));
+    assert.deepEqual(requests, [["batch", { x: 10, y: 68 }, true], ["batch", { x: 10, y: 68 }, true]]);
+  } finally { app.unmount(); }
+});
+
 test("Rail pointer selection and visible errors never add focus or live announcements", async () => {
   const callbacks = new Map();
   const listeners = new Map();
@@ -142,6 +184,13 @@ test("Rail pointer selection and visible errors never add focus or live announce
     assert.equal(card.props["data-selected"], true);
     assert.equal(focusCalls, 0);
     assert.equal(drag.props.tabindex, undefined);
+    card.props.onContextmenu({ button: 2, clientX: 8, clientY: 8, target: drag, preventDefault() {} });
+    await nextTick();
+    const selectionMenu = descendants(root).find(element => element.props.role === "menu");
+    assert.ok(selectionMenu, "Rail secondary-click must expose Selection Actions");
+    assert.equal(focusCalls, 0, "Rail menu must not acquire focus");
+    assert.ok(descendants(selectionMenu).some(element => element.text === "Pin Item"));
+    assert.ok(descendants(selectionMenu).some(element => element.text === "Remove Batch"));
     listeners.get("shelf-error")({ payload: "Visible Rail failure" });
     await nextTick();
     assert.ok(descendants(root).some(element => element.text === "Visible Rail failure"));

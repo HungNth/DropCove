@@ -1,6 +1,6 @@
 [package]
 name = "dropcove"
-version = "0.0.27"
+version = "0.0.28"
 description = "A resident Windows utility providing a temporary drag-and-drop workspace for file and folder references."
 authors = ["HungNth"]
 repository = "https://github.com/HungNth/DropCove"

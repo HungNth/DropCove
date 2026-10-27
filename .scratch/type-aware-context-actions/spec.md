@@ -1,6 +1,6 @@
 # DropCove 0.0.27 — Type-aware Item Actions
 
-Status: amendment implemented 2026-10-27 — frontend regressions, production build, isolated NSIS installation, and installed row/Explorer smoke pass; candidate acceptance remains blocked on successful real clipboard verification in an interactive Windows session
+Status: resolved — amendment implemented 2026-10-27; frontend regressions, production build, isolated NSIS installation, installed smoke, and interactive Windows clipboard operations verified by user
 Original design confirmation: approved by the user through `grill-with-docs` on 2026-10-26
 Testing seam: confirmed by the user through `to-spec` on 2026-10-26 — one exact installed Windows Resident Instance exercising Item Actions Menu behavior on Drop Shelf, Edge Rail, and Manage Items surfaces with real clipboard and File Explorer effects, supported by frontend interaction/accessibility tests and Core Shelf State temporary SQLite/Profile Data regressions
 Original ticket breakdown confirmation: approved by the user through `to-tickets` on 2026-10-26
@@ -335,4 +335,4 @@ Managed File internal paths are removed from user-facing tooltip and accessibili
 - `GLOSSARY.md` now defines **External Reference** and **Item Actions Menu**.
 - The approved design deliberately distinguishes user-facing external paths from DropCove-owned Profile Data paths.
 - A future Managed Image export feature should be designed separately because Copy Image and Save As require format, alpha, animation, filename, overwrite, and lifecycle decisions not present here.
-- Tickets 01–05 and their original DAG remain the approved, resolved pre-amendment implementation record. Ticket 06 records the implemented 2026-10-27 amendment and its outstanding clipboard acceptance limit; human candidate acceptance, Git commits, publishing, and deployment remain separate explicit gates.
+- Tickets 01–05 and their original DAG remain the approved, resolved pre-amendment implementation record. Ticket 06 records the implemented 2026-10-27 amendment, with interactive clipboard functionality verified by the user; Git commits, publishing, and deployment remain separate explicit gates.

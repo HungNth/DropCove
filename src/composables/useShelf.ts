@@ -4,6 +4,7 @@ import { currentMonitor, getCurrentWindow, LogicalSize, PhysicalPosition } from 
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { useSelection } from "./useSelection.ts";
 import { usePreparedDrag } from "./usePreparedDrag.ts";
+import type { RemovalPreview } from "./selectionActions.ts";
 
 export interface ShelfItem {
   id: string;
@@ -58,8 +59,10 @@ export function useShelf() {
   const draggingOver = shallowRef(false);
   const resizing = shallowRef(false);
   const moving = shallowRef(false);
+  const removalConfirmation = shallowRef<{ batchIds: string[]; originId: string; preview: RemovalPreview } | null>(null);
   const confirmingClearTemporary = shallowRef(false);
   const activeItemActionsMenuId = shallowRef<string | null>(null);
+  const selectionMenu = shallowRef<{ batchIds: string[]; anchor: { x: number; y: number }; keyboard: boolean; originId: string } | null>(null);
   let pendingRecoveryWarning: string | null = null;
   const window = getCurrentWindow();
   const unlisteners: UnlistenFn[] = [];
@@ -98,7 +101,7 @@ export function useShelf() {
   }
 
   async function requestClearTemporary() {
-    if (busy.value || pendingConfirmation.value || !hasTemporaryItems.value) return;
+    if (busy.value || pendingConfirmation.value || removalConfirmation.value || !hasTemporaryItems.value) return;
     try {
       await invoke("request_drop_shelf_clear_temporary");
     } catch (error) {
@@ -118,11 +121,13 @@ export function useShelf() {
       }
     }
   }
-  async function runAction(command: string, arguments_: Record<string, unknown> = {}) {
+  async function runAction(command: string, arguments_: Record<string, unknown> = {}): Promise<boolean> {
     const control = document.activeElement?.closest(".card-actions") ? document.activeElement as HTMLElement : null;
     busy.value = true;
+    let succeeded = false;
     try {
       await invoke<ShelfSnapshot>(command, arguments_);
+      succeeded = true;
       await refresh();
       if (!disposed) status.value = pendingRecoveryWarning ?? "";
     } catch (error) {
@@ -134,10 +139,11 @@ export function useShelf() {
         if (control?.isConnected && document.activeElement === document.body) control.focus();
       }
     }
+    return succeeded;
   }
 
   async function perform(command: string, arguments_: Record<string, unknown> = {}) {
-    if (busy.value) return;
+    if (busy.value || removalConfirmation.value) return;
     await runAction(command, arguments_);
   }
 
@@ -149,6 +155,14 @@ export function useShelf() {
 
   async function onKeydown(event: KeyboardEvent) {
     if (event.key !== "Escape" || event.defaultPrevented || event.repeat) return;
+    if (selectionMenu.value) {
+      selectionMenu.value = null;
+      return;
+    }
+    if (removalConfirmation.value) {
+      await cancelRemoval();
+      return;
+    }
     if (batchDrag.hasPrepared()) {
       await batchDrag.cancel();
       return;
@@ -184,6 +198,9 @@ export function useShelf() {
     try {
       await retainListener(window.listen("shelf-hidden", () => {
         activeItemActionsMenuId.value = null;
+        selectionMenu.value = null;
+        if (removalConfirmation.value) void cancelRemoval();
+        removalConfirmation.value = null;
         selection.clear();
         void batchDrag.cancel();
       }));
@@ -248,12 +265,74 @@ export function useShelf() {
     for (const unlisten of unlisteners) unlisten();
   });
 
+  // Secondary-click keeps a selected target set; an unselected target replaces selection first.
+  function openSelectionMenu(batchId: string, anchor: { x: number; y: number }, keyboard: boolean) {
+    if (busy.value || resizing.value || moving.value || confirmingClearTemporary.value || pendingConfirmation.value || removalConfirmation.value) return;
+    if (!batches.value.some(batch => batch.id === batchId)) return;
+    if (!selection.selected.value.has(batchId)) selection.select(batchId, {});
+    activeItemActionsMenuId.value = null;
+    selectionMenu.value = { batchIds: [...selection.ids.value], anchor, keyboard, originId: batchId };
+  }
+
+  // Resolves true only when the core mutation committed; failures surface through status.
+  async function pinSelection(pinned: boolean): Promise<boolean> {
+    const target = selectionMenu.value;
+    selectionMenu.value = null;
+    if (!target || busy.value || removalConfirmation.value) return false;
+    return runAction("set_batches_pinned", { batchIds: target.batchIds, pinned });
+  }
+
+  // One selected batch removes immediately; several always pass through an authoritative confirmation.
+  async function removeSelection() {
+    const target = selectionMenu.value;
+    selectionMenu.value = null;
+    if (!target || busy.value || removalConfirmation.value) return false;
+    if (target.batchIds.length === 1) return runAction("remove_batch", { batchId: target.batchIds[0] });
+    busy.value = true;
+    try {
+      const preview = await invoke<RemovalPreview>("prepare_batches_removal", { batchIds: target.batchIds });
+      if (disposed || JSON.stringify(selection.ids.value) !== JSON.stringify(target.batchIds)) {
+        await invoke("cancel_selection_removal");
+        return false;
+      }
+      removalConfirmation.value = { batchIds: target.batchIds, originId: target.originId, preview };
+      return true;
+    } catch (error) {
+      if (!disposed) status.value = String(error);
+      return false;
+    } finally {
+      if (!disposed) busy.value = false;
+    }
+  }
+
+  async function confirmRemoval() {
+    const target = removalConfirmation.value;
+    if (!target || busy.value) return false;
+    removalConfirmation.value = null;
+    return runAction("remove_batches", { batchIds: target.batchIds, token: target.preview.token });
+  }
+
+  async function cancelRemoval() {
+    if (!removalConfirmation.value) return;
+    try {
+      await invoke("cancel_selection_removal");
+      removalConfirmation.value = null;
+    } catch (error) { if (!disposed) status.value = String(error); }
+  }
+
   return {
     batches,
     activeItemActionsMenuId,
+    selectionMenu,
+    openSelectionMenu,
+    pinSelection,
+    removeSelection,
+    removalConfirmation,
+    confirmRemoval,
+    cancelRemoval,
     selection,
     selectBatch: (batchId: string, modifiers: SelectionModifiers) => {
-      if (!busy.value && !resizing.value && !moving.value && !confirmingClearTemporary.value) selection.select(batchId, modifiers);
+      if (!busy.value && !resizing.value && !moving.value && !confirmingClearTemporary.value && !removalConfirmation.value) selection.select(batchId, modifiers);
     },
     status,
     busy,
@@ -261,7 +340,7 @@ export function useShelf() {
     resizing,
     moving,
     startResize: async (edge: ResizeEdge) => {
-      if (busy.value || resizing.value || moving.value) return;
+      if (busy.value || resizing.value || moving.value || removalConfirmation.value) return;
       try { await invoke("start_shelf_resize", { edge }); }
       catch (error) { if (!disposed) status.value = String(error); }
     },
@@ -271,6 +350,7 @@ export function useShelf() {
         busy.value ||
         resizing.value ||
         moving.value ||
+        removalConfirmation.value ||
         pendingConfirmation.value ||
         confirmingClearTemporary.value ||
         draggingOver.value
@@ -298,14 +378,17 @@ export function useShelf() {
     setItemPinned: (itemId: string, pinned: boolean) => perform("set_item_pinned", { itemId, pinned }),
     setBatchPinned: (batchId: string, pinned: boolean) => perform("set_batch_pinned", { batchId, pinned }),
     openManageItems: async (batchId: string, anchor: ShelfAnchor, keyboard = false) => {
-      if (busy.value) return;
+      if (busy.value || removalConfirmation.value) return;
       try { await invoke("open_manage_items", { batchId, anchor, keyboard }); }
       catch (error) { if (!disposed) status.value = String(error); }
     },
     startItemDrag: (itemId: string) => perform("start_item_drag", { itemId }),
-    startBatchDrag: (batchId: string) => batchDrag.start(selection.dragIds(batchId)),
+    startBatchDrag: async (batchId: string) => {
+      if (removalConfirmation.value) return;
+      await batchDrag.start(selection.dragIds(batchId));
+    },
     dismissDropShelf: async () => {
-      if (busy.value) return;
+      if (busy.value || removalConfirmation.value) return;
       try {
         await invoke("dismiss_drop_shelf");
       } catch (error) {

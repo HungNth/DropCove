@@ -242,6 +242,7 @@ for (const itemCount of [3, 65]) test(`ManageItems ${itemCount} items preserves 
   for (let index = 3; index < itemCount; index++) {
     activeBatch.items.push({ ...activeBatch.items[0], id: `item${index + 1}`, position: index, path: `C:\\${index + 1}.txt`, name: `${index + 1}.txt` });
   }
+  globalThis.CSS = { escape: value => value };
 
   globalThis.document = {
     addEventListener: (name, listener) => events.set(name, listener),
@@ -335,26 +336,28 @@ for (const itemCount of [3, 65]) test(`ManageItems ${itemCount} items preserves 
 
     const selectedIds = () => grid.children.filter(c => c.props?.["aria-selected"] === true).map(c => c.props["data-item-id"]);
     const beforeCommands = commands.length;
-    for (const id of ["item1", "item3"]) {
-      const row = grid.children.find(c => c.props?.["data-item-id"] === id);
-      const drag = row.children[0];
-      const pointer = { button: 2, buttons: 2, pointerId: 2, clientX: 0, clientY: 0, currentTarget: drag, ctrlKey: false, shiftKey: false };
-      drag.props.onPointerdown(pointer);
-      drag.props.onPointermove({ ...pointer, clientX: 20 });
-      const context = new Event("contextmenu", { cancelable: true, bubbles: true });
-      Object.defineProperty(context, "button", { value: 2 });
-      row.props.onContextmenu?.(context);
-      drag.props.onPointerup({ ...pointer, buttons: 0 });
-      await nextTick();
-      assert.equal(context.defaultPrevented, true, "row right-click must suppress the WebView menu");
-      const keyboardContext = new Event("contextmenu", { cancelable: true });
-      Object.defineProperty(keyboardContext, "button", { value: 0 });
-      row.props.onContextmenu?.(keyboardContext);
-      assert.equal(keyboardContext.defaultPrevented, false, "keyboard context-menu invocation remains unchanged");
-      assert.deepEqual(selectedIds(), ["item1", "item2"]);
-      assert.equal(main.querySelector('[role="menu"]'), null);
-    }
+    // 0.0.28 supersedes the 0.0.27 suppression-only contract: a secondary-click on a selected row keeps the
+    // selection and anchor, still suppresses the WebView menu, and opens the Selection Actions Menu.
+    const row = grid.children.find(c => c.props?.["data-item-id"] === "item1");
+    const drag = row.children[0];
+    const pointer = { button: 2, buttons: 2, pointerId: 2, clientX: 0, clientY: 0, currentTarget: drag, ctrlKey: false, shiftKey: false };
+    drag.props.onPointerdown(pointer);
+    drag.props.onPointermove({ ...pointer, clientX: 20 });
+    const context = new Event("contextmenu", { cancelable: true, bubbles: true });
+    Object.defineProperty(context, "button", { value: 2 });
+    row.props.onContextmenu?.(context);
+    drag.props.onPointerup({ ...pointer, buttons: 0 });
+    await nextTick();
+    assert.equal(context.defaultPrevented, true, "row right-click must suppress the WebView menu");
+    const keyboardContext = new Event("contextmenu", { cancelable: true });
+    Object.defineProperty(keyboardContext, "button", { value: 0 });
+    row.props.onContextmenu?.(keyboardContext);
+    assert.equal(keyboardContext.defaultPrevented, false, "keyboard context-menu invocation remains unchanged");
+    assert.deepEqual(selectedIds(), ["item1", "item2"], "right-click on a selected row preserves the selection");
     assert.equal(commands.length, beforeCommands, "right-click must not dispatch a native action or drag");
+    await events.get("keydown")({ key: "Escape", stopPropagation() {}, preventDefault() {} });
+    await nextTick();
+    assert.deepEqual(selectedIds(), ["item1", "item2"], "the first Escape closes the menu and retains selection");
     const backgroundContext = new Event("contextmenu", { cancelable: true });
     main.props.onContextmenu?.(backgroundContext);
     grid.props.onContextmenu?.(backgroundContext);

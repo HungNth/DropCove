@@ -443,6 +443,7 @@ pub(crate) fn close(app: &AppHandle) -> Result<(), String> {
         app.state::<ManageItemsState>().lock()?.pending_close = true;
         return Ok(());
     }
+    crate::selection_confirmation::cancel(app, LABEL)?;
     app.state::<ShelfState>()
         .cancel_prepared_item_drag()
         .map_err(|error| error.to_string())?;

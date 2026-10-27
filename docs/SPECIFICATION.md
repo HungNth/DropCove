@@ -316,7 +316,7 @@ The Drop Shelf is a borderless, topmost, resizable floating window.
 - The Utility Menu uses a stronger border token than Shelf batch cards and an elevated shadow to remain distinct from the Drop Shelf in Dark and Light themes. Windows Contrast retains a system-color border even when shadows are suppressed.
 - Status messages can be dismissed independently.
 - Foreground application changes reassert topmost z-order without activating the shelf.
-- `Esc` cancels an active batch availability confirmation and its prepared token first. While Manage Items is open, that popup consumes `Esc` according to section 10.4 before it closes. Once no management popup remains, a later `Esc` clears non-empty Batch Selection, then a later press dismisses the shelf. Existing Utility Menu and Clear confirmation cancellation remain authoritative while those surfaces are open.
+- `Esc` closes an open Selection Actions Menu first, then cancels an open selection-removal confirmation; both retain selection. With no Selection Actions transient, it cancels an active batch availability confirmation and its prepared token. While Manage Items is open, that popup consumes `Esc` according to section 10.4 before it closes. Once no management popup remains, a later `Esc` clears non-empty Batch Selection, then a later press dismisses the shelf. Existing Utility Menu, Item Actions Menu, and Clear confirmation cancellation remain authoritative while those surfaces are open.
 
 ### 8.2 Responsive batch grid
 
@@ -418,7 +418,7 @@ Batch Selection is transient presentation state owned by the current surface. It
 - `Shift+click` replaces the current selection with the inclusive range from the anchor to the target in complete displayed newest-first row-major order, including virtualized batches outside the viewport. Shift does not move a valid anchor. With no valid anchor it selects only the target and establishes it as anchor. `Ctrl+Shift` has the same replacement-range behavior in `0.0.25`.
 - Plain pointer press on an already selected card delays collapse until release below the established drag threshold. Crossing the threshold uses the pre-press selection: dragging a selected card drags the complete Batch Selection, while dragging an unselected card drags only that batch.
 - The card rule applies to one-item and multi-item Shelf Batches. Direct one-item drag remains available only from Manage Items.
-- Pin/Unpin, Bulk Pinning, Manage Items, and accepted drop-in do not change selection. Remove and confirmed-Missing cleanup remove only identities that disappear; surviving selected batches remain selected, item counts update, and a removed anchor becomes absent without selecting a replacement.
+- Independent Pin/Unpin, Bulk Pinning, Manage Items, and accepted drop-in do not change selection. Selection Actions Pin/Unpin also retain selection. Remove, Remove Selected, and confirmed-Missing cleanup prune only identities that disappear; surviving selected batches remain selected, item counts update, and a removed anchor becomes absent without selecting a replacement.
 - Rejected or canceled drag-out retains selection when no separate clear trigger occurs. Successful Drag-Out, empty collection-space click, `Escape`, surface hide, surface switch, or restart clears it. Hide or surface switch remains authoritative if a native drag is already active; its prepared participants complete independently and rejection does not restore hidden selection.
 - Selected cards use the accent border and accent-subtle surface, with Windows Highlight resources in Contrast Themes. The footer on each surface reports `N batches · M items`, where `M` counts current Shelf Item occurrences in the selected batches before availability preparation. No selection toolbar, mode, checkbox, or per-card count badge is added.
 
@@ -452,7 +452,32 @@ Only one item menu is open per surface. It closes on action, dismissal, another 
 
 Managed File internal paths are not shown or copied by item actions, tooltips, accessibility labels, status, or announcements. Managed Text uses its user-visible name and content preview; Managed Image uses its name and `DropCove-created image`. External References retain their full user-facing path.
 
-In Manage Items only, the complete secondary-button sequence on a Shelf Item row remains selection-neutral and action-neutral, and its `contextmenu` event is consumed so the embedded WebView does not show its default browser menu. It does not open the Item Actions Menu, change Item Selection or its anchor, start drag, or dispatch an Item Action; More remains the sole entry point. Existing primary-button row/control behavior and More keyboard interaction remain unchanged. This suppression does not apply to input or textarea editing menus, the Manage Items background, the Drop Shelf, or the Edge Rail.
+In Manage Items, secondary-button input never opens the Item Actions Menu; More remains its sole entry point. A secondary-click on the row selection region follows the Selection Actions Menu contract in section 9.5. Secondary-clicks on independent row controls, inputs, and textareas do not retarget Item Selection or open Selection Actions, and the WebView default browser menu remains suppressed on Shelf Item row boundaries.
+
+### 9.5 Selection Actions Menu
+
+The **Selection Actions Menu** applies lifecycle actions to the current Batch Selection on the Drop Shelf or expanded Edge Rail and to the current Item Selection in Manage Items. It remains distinct from the ownership-aware Item Actions Menu and never contains Show in File Explorer, Copy Path, or Copy Text.
+
+- Secondary-clicking a selected card or row preserves the current selection and targets the complete selection. Secondary-clicking an unselected card or row replaces selection with that member before opening the menu. Secondary-button `Ctrl`, `Shift`, and `Ctrl+Shift` modifiers do not extend, toggle, or range-select.
+- Only the card or row selection region opens the menu. Pin, More, Manage, Remove, confirmation controls, inputs, and textareas remain isolated and do not retarget selection.
+- Pointer invocation anchors the menu at the invocation point; keyboard invocation anchors it to the focused card or row. The popover remains within its owning surface without resizing it.
+- At most one Selection Actions Menu is open per surface. Opening it closes an Item Actions Menu and vice versa. Projection replacement, target disappearance or unmount, scroll, drag, resize, movement, confirmation, busy mutation, surface hide/close, Rail collapse, fullscreen transition, or display transition closes it.
+
+| Selection domain and cardinality | Lifecycle action | Removal action |
+|---|---|---|
+| One selected single-item Shelf Batch | Pin Item or Unpin Item | Remove Batch |
+| One selected multi-item Shelf Batch | Pin All Items or Unpin All Items | Remove Batch |
+| Two or more selected Shelf Batches | Pin Selected or Unpin Selected | Remove Selected |
+| One selected Manage Items row | Pin Item or Unpin Item | Remove Item |
+| Two or more selected Manage Items rows | Pin Selected or Unpin Selected | Remove Selected |
+
+Cardinality follows the selection domain, not affected Shelf Item count. One selected multi-item Shelf Batch is one Batch Selection member. All-Pinned targets offer Unpin; None or Mixed targets offer Pin. Batch Selection Pin/Unpin includes every Shelf Item in every selected batch, while Item Selection Pin/Unpin includes exactly the selected Shelf Item identities in the active batch.
+
+Pin and Unpin validate and mutate the complete target atomically, retain selection on success, and preserve selection plus prior Pin states on validation or persistence failure. Singleton Remove remains immediate. Remove Selected follows the confirmation and ownership-safety contract in section 13.4.
+
+On the Drop Shelf and Drop-Shelf-origin Manage Items, the Context Menu key and `Shift+F10` open the menu for the focused card or row. Opening focuses the first item; Arrow Up/Down, Home/End, Enter/Space, `Escape`, and Tab follow the established menu contract. Keyboard invocation on an unselected focused member selects only that member first. Dismissal restores focus to the invoking member when it still exists.
+
+The Edge Rail and Rail-origin Manage Items remain pointer-only/no-activate. Their menu uses transient ownership to prevent collapse without activating DropCove, claiming keyboard focus, or adding a live-announcement owner.
 
 
 ## 10. Manage Items
@@ -501,8 +526,8 @@ Item Selection is transient presentation state owned by the current Manage Items
 - `Shift+click` replaces selection with the inclusive source-order range from the anchor to the target, including virtualized items outside the viewport. Shift preserves a valid anchor; without one it selects only the target and establishes that item as anchor. `Ctrl+Shift` uses the same replacement-range behavior.
 - Plain pointer press on an already selected row delays collapse until release below the established drag threshold. Crossing the threshold on a selected row drags the complete Item Selection; crossing it on an unselected row drags only that Shelf Item without first replacing the visible selection.
 - Selected rows use the existing accent border and accent-subtle surface, with Windows Highlight resources in Contrast Themes. The header summary reports `S selected · X/N pinned`. No toolbar, checkbox, selection mode, or per-row count badge is added.
-- Per-item Pin/Unpin and Remove continue to affect only their own Shelf Item. Bulk Pinning continues to affect the complete Shelf Batch. These actions do not retarget themselves to Item Selection.
-- Pinning does not change selection. Remove and confirmed-Missing cleanup remove only identities that disappear; surviving selected items remain selected, and a removed anchor becomes absent without selecting a replacement. Newly added items are not selected.
+- Independent per-item Pin/Unpin and Remove controls continue to affect only their own Shelf Item. Bulk Pinning continues to affect the complete Shelf Batch. The Selection Actions Menu defined in section 9.5 explicitly targets Item Selection and does not change the scope of those existing controls.
+- Independent and selection-scoped Pinning retain selection. Remove, Remove Selected, and confirmed-Missing cleanup prune only identities that disappear; surviving selected items remain selected, and a removed anchor becomes absent without selecting a replacement. Newly added items are not selected.
 - Rejected or canceled drag-out retains Item Selection unless a separate clear trigger occurs. Successful Drag-Out, empty collection-space click, `Escape`, explicit popup close, opening another batch, popup closure caused by its owner, or restart clears it.
 - The popup remains open while its Shelf Batch exists, including when only one Shelf Item remains. It closes when the batch disappears.
 
@@ -515,7 +540,8 @@ Item Selection is transient presentation state owned by the current Manage Items
 - `Tab` and `Shift+Tab` cycle through Bulk Pinning, Close, the grid's primary drag-region stop, then item Pin/Unpin, eligible More, and Remove controls in source order. Virtualized targets are mounted and scrolled into view before focus moves.
 - If the focused item disappears while the batch survives, focus moves to the item now at the same source index, otherwise the previous item, otherwise Bulk Pinning. Selection changes use the existing polite announcement channel with coalesced selected-item counts or `Selection cleared`.
 - Explicit close restores focus to the originating Manage Items control when it still exists. If the batch has become a one-item card, focus returns to that card's drag region. If the batch disappeared, the Drop Shelf recovers to the batch now at the same displayed index, otherwise the previous batch, otherwise More. A pointer-opened Edge Rail origin does not receive focus.
-- `Esc` cancels an active item availability confirmation or native item drag first, then clears non-empty Item Selection, then closes Manage Items on a later press.
+- `Esc` closes an open Selection Actions Menu, then cancels an open selection-removal confirmation, then cancels an active item availability confirmation or native item drag. Later presses clear non-empty Item Selection and close Manage Items.
+- On a focus-capable Drop-Shelf origin, the Context Menu key and `Shift+F10` open Selection Actions for the focused row and return focus there after dismissal when it survives. A pointer-opened Edge Rail origin remains pointer-only/no-activate and adds no keyboard menu path.
 - Opening another batch replaces the existing popup. The popup closes when its batch is removed, the shelf hides, shelf resizing begins, or whole-batch or Batch Selection drag starts.
 - Item Selection drag keeps Manage Items open while its batch remains. A hide or close request during an active native drag becomes pending; the recorded transfer completes independently, then the popup closes without restoring discarded selection.
 
@@ -684,10 +710,14 @@ For multi-item batches:
 
 Bulk Pinning includes Available, Missing, and Unavailable references still present in the batch. It changes lifecycle state only; it does not change path availability, ordering, source files, or shelf sizing.
 
+Selection Actions reuse this tri-state rule. An all-Pinned target becomes Temporary; a None or Mixed target becomes Pinned. Multi-target Pin/Unpin validates the complete Batch Selection or Item Selection identity set and commits one transaction; partial lifecycle changes are not permitted.
+
 ### 13.4 Removal actions
 
 - **Remove Item** removes one Shelf Item and prunes its batch when empty.
 - **Remove Batch** removes every Shelf Item in that Shelf Batch.
+- **Remove Selected** on Batch Selection removes every selected Shelf Batch and every contained Shelf Item.
+- **Remove Selected** on Item Selection removes exactly the selected Shelf Items from the active Manage Items batch and prunes the batch when empty.
 - **Clear Temporary Items** requires confirmation, removes Temporary Items across all batches, and preserves Pinned Items.
 - Removing an external reference never deletes, moves, renames, or overwrites its source filesystem object.
 - Removing a Managed File-backed item permanently deletes the app-owned file rather than sending it to the Recycle Bin.
@@ -695,6 +725,20 @@ Bulk Pinning includes Available, Missing, and Unavailable references still prese
 Reference removal and a required Pending Managed File Deletion record commit atomically. DropCove attempts deletion immediately; a sharing, antivirus, or other filesystem failure leaves the item removed, reports how many app-owned files remain pending, and retries through event-driven cleanup and later startup. Best-effort deletion without durable retry is not permitted.
 
 If persistence fails, the visible and durable Shelf state remain unchanged and no Managed File becomes unowned.
+
+Singleton Remove Item and Remove Batch remain immediate. Removing two or more Batch Selection or Item Selection members always requires confirmation, including all-External selections. Batch confirmation reports `N batches · M items`; Manage Items confirmation reports `N items`.
+
+Confirmation copy follows authoritative ownership counts:
+
+- all External References: source files and folders will not be deleted;
+- mixed External References and Managed Files: External sources stay and the exact number of DropCove-created files to be permanently deleted is reported;
+- all Managed Files: the exact number of DropCove-created files to be permanently deleted is reported.
+
+The confirmation target is an immutable authoritative identity snapshot with selection-unit, item, and ownership counts. The caller does not supply trusted counts or ownership. Confirm revalidates the complete target and rejects stale, missing, duplicate, wrong-domain, or cross-batch identities without partial mutation. Reference removal and required Pending Managed File Deletion records commit in one transaction; filesystem deletion failure retains durable retry responsibility without restoring removed Shelf Items.
+
+While confirmation is open, the originating surface blocks selection changes, drag start, Pin/Unpin, Remove, Clear Temporary Items, accepted drop-in mutation, movement, resize, and competing Shelf mutations. Success prunes removed identities from selection; Cancel, `Escape`, setup failure, stale-target failure, or persistence failure retains selection.
+
+Drop Shelf and Drop-Shelf-origin Manage Items use focus-capable modal confirmation on their owning surface with **Cancel** focused initially and focus restoration to the invoking member when it survives. Edge Rail and Rail-origin Manage Items use inline pointer confirmation plus transient hold without foreground activation or keyboard focus. Fullscreen, owner destruction, Cooperative Shutdown, and Exit retain higher teardown authority and cancel an unconfirmed transient without mutation.
 
 The Drop Shelf Clear confirmation opens in its own decorated, fixed-size `360 × 130`-logical-pixel, taskbar-hidden, always-on-top window centered within the Drop Shelf monitor work area. Its heading is **Clear temporary items?**, its explanation is **Pinned items stay. External sources stay. DropCove-created temporary files are permanently deleted.**, and its actions are **Cancel** and **Clear**. Cancel is focused initially; `Escape` and the window close action cancel without mutation.
 
@@ -964,6 +1008,8 @@ Top and bottom Edge Rail docking are not supported.
 - Item Selection count changes are announced politely and coalesced. Pointer opening, including from the Edge Rail, does not activate or focus the popup; keyboard opening from the Drop Shelf focuses the grid.
 - The Drop Shelf batch collection uses `role="grid"` with `aria-multiselectable="true"`; selected batch rows expose `aria-selected`, batch drag regions use roving focus with arrow/Home/End navigation, and `Space`, `Ctrl+Space`, `Shift+Space`, `Ctrl+A`, and `Escape` operate the Batch Selection contract in section 9.3.
 - Batch Selection count changes are announced politely and coalesced on the Drop Shelf. The Edge Rail remains pointer-only/no-activate and exposes only the visible selected treatment and footer count.
+- Selection Actions Menu uses menu/menuitem semantics and ownership-safe accessible names. Focus-capable Drop Shelf and Manage Items origins support the Context Menu key and `Shift+F10`, standard menu navigation, `Escape` dismissal, Tab exit, and focus restoration. Edge Rail and Rail-origin Manage Items remain pointer-only/no-activate.
+- Remove Selected confirmation exposes exact selection-unit/item scope and ownership consequences. Focus-capable confirmation is modal with Cancel initially focused; pointer-only Rail confirmation does not claim focus or a live region. Selection Actions use existing semantic menu, danger, focus, and Windows system-color resources.
 - External Reference full paths and drag instructions remain available through tooltips and accessibility text when visual text is shortened or omitted. Managed Files never expose Profile Data paths there; use user-visible names, text previews, or `DropCove-created image` instead.
 - The resolved Appearance Mode drives Light or Dark semantic resources and matching native frames. Windows Contrast Theme bypasses the application palette and uses Windows system colors, explicit borders, and visible focus indicators.
 - Drop Placeholders use the drag-hover semantic colors in Dark and Light appearances and Windows system colors in Contrast Themes.
@@ -997,7 +1043,7 @@ Primary actions use `#2B63EB` with white text. Dark accent text and icons use `#
 - Drag-out is Copy-only.
 - Cross-integrity drag-and-drop is not guaranteed.
 - Batch Selection is surface-local and session-only; it is not persisted or shared between the Drop Shelf and Edge Rail.
-- Additive `Ctrl+Shift` ranges, named selections, selection mode UI, persistent or cross-batch Item Selection, arbitrary item selection outside the current Manage Items batch, and selection-scoped Pin/Remove actions are not supported.
+- Additive `Ctrl+Shift` ranges, named selections, selection mode UI, persistent or cross-batch Item Selection, and arbitrary item selection outside the current Manage Items batch are not supported.
 - Edge Rail supports only Left and Right docking and remains pointer-only/no-activate.
 - No automatic updater.
 - No clipboard history, accounts, cloud sync, plugins, named shelves, file synchronization, or arbitrary application-owned copies of ordinary filesystem drops.

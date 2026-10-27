@@ -11,11 +11,21 @@ import { useAnnouncer } from "../../composables/useAnnouncer";
 import { useVirtualCollection } from "../../composables/useVirtualCollection";
 import ActionIcon from "./ActionIcon.vue";
 import type { ShelfItemAction } from "./ItemActionsMenu.vue";
+import SelectionActionsMenu from "./SelectionActionsMenu.vue";
+import SelectionRemovalConfirmation from "./SelectionRemovalConfirmation.vue";
+import { itemSelectionPinAction } from "../../composables/selectionActions";
 
 const {
   batch,
   status,
   busy,
+  selectionMenu,
+  openSelectionMenu,
+  pinSelection,
+  removeSelection,
+  removalConfirmation,
+  confirmRemoval,
+  cancelRemoval,
   refresh,
   setItemPinned,
   setBatchPinned,
@@ -85,7 +95,61 @@ watch(
 );
 watch([itemsList, busy, pendingConfirmation], () => {
   activeItemMenuId.value = null;
+  selectionMenu.value = null;
 });
+
+const selectionMenuItems = computed(() => itemsList.value.filter(item => selectionMenu.value?.itemIds.includes(item.id)));
+const selectionMenuPin = computed(() => itemSelectionPinAction(selectionMenuItems.value));
+const selectionMenuActions = computed(() => [
+  { id: "pin", label: selectionMenuPin.value.label },
+  { id: "remove", label: selectionMenuItems.value.length > 1 ? "Remove Selected" : "Remove Item", danger: true },
+]);
+
+function focusRow(itemId: string | undefined) {
+  if (itemId && !isRailOrigin.value) itemsContainerRef.value?.querySelector<HTMLElement>(`[data-item-id="${CSS.escape(itemId)}"] .item-drag`)?.focus();
+}
+
+async function onSelectionMenuAction(id: string) {
+  const origin = selectionMenu.value?.originId;
+  if (id === "pin") {
+    const pinned = selectionMenuPin.value.pinned;
+    const committed = await pinSelection(pinned);
+    if (committed && !isRailOrigin.value) announce(pinned ? "Selection pinned" : "Selection unpinned");
+  } else if (id === "remove") {
+    const several = selectionMenuItems.value.length > 1;
+    const committed = await removeSelection();
+    if (committed && !several && !isRailOrigin.value) announce("Item removed");
+    if (several) return;
+  } else {
+    return;
+  }
+  await nextTick();
+  focusRow(origin);
+}
+
+async function onRemovalConfirm() {
+  const origin = removalConfirmation.value?.originId;
+  const committed = await confirmRemoval();
+  if (committed && !isRailOrigin.value) announce("Selection removed");
+  await nextTick();
+  focusRow(origin);
+}
+
+async function onRemovalCancel() {
+  const origin = removalConfirmation.value?.originId;
+  await cancelRemoval();
+  await nextTick();
+  focusRow(origin);
+}
+
+async function closeSelectionMenu(restoreFocus: boolean) {
+  const origin = selectionMenu.value?.originId;
+  selectionMenu.value = null;
+  if (restoreFocus) {
+    await nextTick();
+    focusRow(origin);
+  }
+}
 
 async function handlePerformItemAction(itemId: string, action: ShelfItemAction) {
   try {
@@ -129,6 +193,19 @@ async function focusInitialControl() {
 
 
 async function onKeydown(event: KeyboardEvent) {
+  if (selectionMenu.value && event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    await closeSelectionMenu(true);
+    return;
+  }
+  if (removalConfirmation.value && event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    await onRemovalCancel();
+    return;
+  }
+  if (removalConfirmation.value) return;
   if (activeItemMenuId.value) {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -331,13 +408,13 @@ onUnmounted(() => {
         <BulkPinning
           v-if="batch"
           :batch="batch"
-          :busy="busy"
+          :busy="busy || removalConfirmation !== null"
           @pin="(id, pinned) => setBatchPinned(id, pinned)"
         />
         <button
           class="close inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-transparent rounded-[4px] bg-transparent text-dc-text-secondary cursor-pointer [&:hover:not(:disabled)]:border-dc-border-hover [&:hover:not(:disabled)]:bg-dc-surface-hover [&:hover:not(:disabled)]:text-dc-text-primary aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
           type="button"
-          :disabled="busy"
+          :disabled="busy || removalConfirmation !== null"
           aria-label="Close Manage Items"
           title="Close Manage Items"
           @click="close"
@@ -353,7 +430,7 @@ onUnmounted(() => {
         :aria-label="`Batch items (${batch.items.length})`"
         :aria-rowcount="batch.items.length"
         :style="virtual.enabled.value ? { position: 'relative' } : {}"
-        @scroll="activeItemMenuId = null"
+        @scroll="() => { activeItemMenuId = null; selectionMenu = null; }"
         @keydown="onGridKeydown"
         @focusin="(event) => { const id = (event.target as HTMLElement).closest<HTMLElement>('[data-item-id]')?.dataset.itemId; if (id) focusedItem = id; }"
         @pointerup="(event) => { if (!busy && !(event.target as HTMLElement).closest('.item-row, .item-actions-menu, .more')) clearSelection(); }"
@@ -363,7 +440,7 @@ onUnmounted(() => {
         v-for="entry in virtual.entries.value"
         :key="entry.item.id"
         :item="entry.item"
-        :busy="busy"
+        :busy="busy || removalConfirmation !== null"
         :selected="selection.selected.value.has(entry.item.id)"
         :selection-tabindex="(focusedItem ?? itemsList[0]?.id) === entry.item.id ? 0 : -1"
         :menu-open="activeItemMenuId === entry.item.id"
@@ -378,12 +455,30 @@ onUnmounted(() => {
         @pin="(id, p) => { setItemPinned(id, p); if (!isRailOrigin) announce(p ? 'Item pinned' : 'Item unpinned'); }"
         @remove="(id) => { removeItem(id); if (!isRailOrigin) announce('Item removed'); }"
         @drag="startItemDrag"
-        @open-menu="id => activeItemMenuId = id"
+        @open-menu="id => { selectionMenu = null; activeItemMenuId = id; }"
         @close-menu="id => { if (activeItemMenuId === id) activeItemMenuId = null; }"
         @action="handlePerformItemAction"
+        @selection-menu="(id, anchor, keyboard) => { if (isRailOrigin && keyboard) return; activeItemMenuId = null; openSelectionMenu(id, anchor, keyboard); }"
       />
       </ul>
     </div>
+    <SelectionActionsMenu
+      v-if="selectionMenu"
+      :actions="selectionMenuActions"
+      :anchor="selectionMenu.anchor"
+      :keyboard="selectionMenu.keyboard"
+      :no-activate="isRailOrigin"
+      label="Selection actions"
+      @action="onSelectionMenuAction"
+      @close="closeSelectionMenu"
+    />
+    <SelectionRemovalConfirmation
+      :preview="removalConfirmation?.preview ?? null"
+      domain="items"
+      :no-activate="isRailOrigin"
+      @confirm="onRemovalConfirm"
+      @cancel="onRemovalCancel"
+    />
     <BatchDragConfirmation :pending="pendingConfirmation" @confirm="confirmItemDrag" @cancel="cancelPreparedDrag" @drag="dragConfirmedItem" />
     <div v-if="status" class="status flex [align-items:start] gap-[4px] shrink-0 mt-auto mx-[7px] mb-[7px] p-[6px] border border-dc-warning-border bg-dc-warning-surface text-dc-warning-text rounded-[5px] text-[11px] [overflow-wrap:anywhere]" role="alert">
       <span>{{ status }}</span>

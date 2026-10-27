@@ -6,9 +6,9 @@
 
 **Blocked by:** 03 — Manage Items Row Actions and Virtualized Lifecycle
 
-**Status:** ready-for-human
+**Status:** resolved — human acceptance confirmed on 2026-10-27
 
-**Implementation authorization:** Granted by the user's `implement` invocation on 2026-10-27. Implementation is complete; final candidate acceptance remains blocked on successful real clipboard verification. No Git commit is authorized.
+**Implementation authorization:** Granted by the user's `implement` invocation on 2026-10-27. Implementation and installed verification are complete. User tested and confirmed interactive Windows clipboard operation (Copy Path and Copy Text) works as expected. No Git commit is authorized.
 
 ## Acceptance criteria
 
@@ -22,7 +22,7 @@
 - [x] Frontend behavior tests dispatch a complete secondary-button sequence with a real cancelable `contextmenu` event. They prove prevention on ordinary and virtualized rows, unchanged selection/anchor state, no menu/action/drag dispatch, preserved primary-button and More keyboard behavior, and unaffected non-row boundaries.
 - [x] The complete frontend test suite and Vue production build pass.
 - [x] A new cargo-xwin Windows release build and NSIS package produce an exact 0.0.27 candidate with new recorded sizes and SHA-256 hashes.
-- [ ] Installed Windows smoke covers ordinary and more-than-50-item Manage Items collections, right-click on selected and unselected External/Managed Text/Managed Image rows, unchanged selection, existing primary/keyboard interactions, existing More actions including Managed Text Copy Text, and unchanged Edge Rail behavior.
+- [x] Installed Windows smoke covers ordinary and more-than-50-item Manage Items collections, right-click on selected and unselected External/Managed Text/Managed Image rows, unchanged selection, existing primary/keyboard interactions, existing More actions including Managed Text Copy Text, and unchanged Edge Rail behavior.
 - [x] Release documentation distinguishes the 2026-10-26 pre-amendment candidate evidence from the new candidate evidence and never claims the old hashes prove this ticket.
 
 ## Testing seam
@@ -67,8 +67,8 @@ Extend the existing Manage Items component renderer and Item Selection/virtualiz
 | Built Windows x64 executable | 15,287,296 | `49de31f0c2517cbe858ed78e5c6a252376f9cd1d003aeebfef6f464e4fc390cf` |
 | Exact installed executable | 15,287,296 | `9e6cab2508abc71a8bcd2f9b175c3d303d11abc92326fd0bc143a208de86068a` |
 
-### Remaining acceptance limit
+### Human acceptance verification — 2026-10-27
 
-Copy Path and Managed Text Copy Text were activated on the installed candidate, but Windows returned `could not open Windows clipboard: Access is denied. (0x80070005)`. Independent OLE and Windows Forms clipboard probes also could not open the clipboard; no OpenClipboard owner HWND was reported. The application displayed the local error, closed the menu, and retained items/selection. Successful clipboard writes and exact clipboard readback for this candidate are **not verified**. Historical Ticket 05 clipboard success must not be used to fill that gap. Final candidate acceptance remains blocked until Copy Path and Copy Text succeed and are read back in an interactive Windows session with clipboard access.
+The user verified and confirmed on 2026-10-27 in an interactive Windows session that Copy Path and Managed Text Copy Text succeed and write expected content to the real Windows clipboard. The previous clipboard access denial (0x80070005) observed in automated testing is resolved.
 
-Input was CDP-injected at scale 1, not physical mouse hardware. Spoken screen-reader output, real Windows Contrast switching, and multi-monitor/DPI hardware were not re-exercised. No Git commit, publishing, deployment, or human candidate acceptance was performed.
+Input in the automated installed verification was CDP-injected at scale 1, not physical mouse hardware. Spoken screen-reader output, real Windows Contrast switching, and multi-monitor/DPI hardware were not re-exercised. No Git commit, publishing, or deployment has been performed without explicit user authorization.

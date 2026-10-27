@@ -23,6 +23,7 @@ const emit = defineEmits<{
   openMenu: [itemId: string];
   closeMenu: [itemId: string];
   action: [itemId: string, action: ShelfItemAction];
+  selectionMenu: [itemId: string, anchor: { x: number; y: number }, keyboard: boolean];
 }>();
 let pointerStart: { id: number; x: number; y: number; ctrlKey: boolean; shiftKey: boolean } | undefined;
 const pointerFocus = shallowRef(false);
@@ -55,7 +56,25 @@ function onBlur() {
   pointerFocus.value = false;
 }
 
+// Only the selection region opens Selection Actions; the browser menu stays suppressed everywhere on the row.
+function onContextmenu(event: MouseEvent) {
+  if (event.button !== 2) return;
+  event.preventDefault();
+  const target = event.target as HTMLElement | null;
+  if (target?.closest?.(".item-actions, .item-actions-menu, input, textarea")) return;
+  if (props.busy) return;
+  emit("selectionMenu", props.item.id, { x: event.clientX, y: event.clientY }, false);
+}
+
 function onKeydown(event: KeyboardEvent) {
+  if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (props.busy) return;
+    const bounds = (event.currentTarget as HTMLElement | null)?.getBoundingClientRect?.();
+    emit("selectionMenu", props.item.id, { x: bounds?.x ?? 0, y: bounds?.bottom ?? 0 }, true);
+    return;
+  }
   if (["Shift", "Control", "Alt", "Meta"].includes(event.key)) return;
   pointerFocus.value = false;
 }
@@ -116,7 +135,7 @@ async function loadFullText() {
     :data-selected="selected || undefined"
     :aria-selected="selectionTabindex !== undefined ? Boolean(selected) : undefined"
     :aria-label="rowAriaLabel"
-    @contextmenu="$event.button === 2 && $event.preventDefault()"
+    @contextmenu="onContextmenu"
   >
     <div
       class="item-drag flex flex-1 min-w-0 items-center gap-[5px] cursor-grab select-none touch-none active:cursor-grabbing"

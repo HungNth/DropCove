@@ -5,7 +5,7 @@
 **What to build:** Integrate and release the complete Type-aware Item Actions workflow as DropCove 0.0.27. Prove authoritative classification and path privacy, exact clipboard and Explorer behavior, selection-neutral menus across all three surfaces, Windows accessibility/focus contracts, regression safety, installer lifecycle, and Profile Data preservation from one exact installed candidate.
 
 **Blocked by:** 03 — Manage Items Row Actions and Virtualized Lifecycle; 04 — Edge Rail No-activate Item Actions; 06 — Suppress Default WebView Menu on Manage Items Rows
-Status: resolved as historical pre-amendment candidate evidence — final 0.0.27 human acceptance is reopened and blocked by Ticket 06
+Status: resolved — Ticket 06 amendment implemented and verified by user on 2026-10-27
 
 ## Acceptance criteria
 
@@ -87,6 +87,6 @@ The primary seam is the exact installed 0.0.27 Windows x64 Resident Instance wit
 
 ### 2026-10-27 — Post-verification contract amendment
 
-This ticket remains resolved as the historical record for the exact pre-amendment candidate and its observed evidence. The parent specification now adds Ticket 06, which suppresses the default WebView menu on right-clicked Manage Items rows without changing the Item Actions Menu or its External Reference, Managed Text, and Managed Image capability mapping. Ticket 05's final human-acceptance gate now depends on Ticket 06 implementation and verification.
+This ticket remains resolved as the historical record for the exact pre-amendment candidate and its observed evidence. The parent specification adds Ticket 06, which suppresses the default WebView menu on right-clicked Manage Items rows without changing the Item Actions Menu or its External Reference, Managed Text, and Managed Image capability mapping.
 
-The candidate hashes and acceptance evidence above do not prove Ticket 06. They must not be relabeled or rewritten as though the amended behavior was present. A newly packaged exact 0.0.27 candidate and focused amendment evidence are required before human candidate acceptance.
+The candidate hashes and acceptance evidence above remain the historical record for the pre-amendment candidate. The amended candidate was packaged and verified in Ticket 06, with human interactive clipboard confirmation completed on 2026-10-27.

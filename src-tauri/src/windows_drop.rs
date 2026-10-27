@@ -317,8 +317,9 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         let own_drag = self.window.state::<DragSession>().is_active();
         let payload = data.as_ref().map(evaluate_data_payload);
         let supported = payload.as_ref().is_some_and(EvaluatedPayload::is_supported);
-        let modal_active = self.window.label() == "main"
-            && crate::clear_confirmation::is_modal_active(self.window.app_handle());
+        let modal_active = (self.window.label() == "main"
+            && crate::clear_confirmation::is_modal_active(self.window.app_handle()))
+            || crate::selection_confirmation::blocks(self.window.app_handle(), self.window.label());
         if !own_drag && !modal_active && matches!(payload, Some(EvaluatedPayload::InvalidUnicodeText)) {
             let _ = self.window.app_handle().emit("shelf-error", INVALID_TEXT_DROP_MESSAGE);
         }
@@ -405,8 +406,9 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
     ) -> Result<()> {
         // SAFETY: OLE provides this output pointer for this callback only.
         let effect = unsafe { requested_effect(effect)? };
-        if self.window.label() == "main"
-            && crate::clear_confirmation::is_modal_active(self.window.app_handle())
+        if (self.window.label() == "main"
+            && crate::clear_confirmation::is_modal_active(self.window.app_handle()))
+            || crate::selection_confirmation::blocks(self.window.app_handle(), self.window.label())
         {
             *effect = DROPEFFECT_NONE;
             self.can_copy.set(false);
