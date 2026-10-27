@@ -12,12 +12,10 @@ import ActionIcon from "./ActionIcon.vue";
 import UtilityMenu from "./UtilityMenu.vue";
 import SelectionActionsMenu from "./SelectionActionsMenu.vue";
 import SelectionRemovalConfirmation from "./SelectionRemovalConfirmation.vue";
-import { batchSelectionPinAction } from "../../composables/selectionActions";
+import { batchContextActions, batchSelectionPinAction } from "../../composables/selectionActions";
 import { invoke } from "@tauri-apps/api/core";
-import type { ShelfItemAction } from "./ItemActionsMenu.vue";
 const {
   batches,
-  activeItemActionsMenuId,
   selectionMenu,
   openSelectionMenu,
   pinSelection,
@@ -50,25 +48,6 @@ const {
   dismissStatus,
 } = useShelf();
 
-async function handlePerformItemAction(itemId: string, action: ShelfItemAction) {
-  try {
-    await invoke("perform_item_action", { itemId, action });
-    activeItemActionsMenuId.value = null;
-    if (action === "CopyPath") {
-      announce("Path copied.");
-    } else if (action === "CopyText") {
-      announce("Text copied.");
-    }
-    if (action !== "ShowInExplorer") {
-      await nextTick();
-      const batch = batches.value.find(batch => batch.items.some(item => item.id === itemId));
-      if (batch) gridRef.value?.querySelector<HTMLButtonElement>(`[data-batch-id="${CSS.escape(batch.id)}"] .more`)?.focus();
-    }
-  } catch (error) {
-    activeItemActionsMenuId.value = null;
-    status.value = String(error);
-  }
-}
 async function openSettingsFromMenu() {
   try {
     await invoke("open_settings");
@@ -111,17 +90,17 @@ const virtual = useVirtualCollection(batches, gridRef, columns, 48, 4, () => Num
 const focusedBatch = shallowRef<string | null>(null);
 
 watch([batches, busy, resizing, moving, pendingConfirmation, confirmingClearTemporary], () => {
-  activeItemActionsMenuId.value = null;
   selectionMenu.value = null;
 });
 
 const selectionMenuBatches = computed(() => batches.value.filter(batch => selectionMenu.value?.batchIds.includes(batch.id)));
 const selectionMenuPin = computed(() => batchSelectionPinAction(selectionMenuBatches.value));
-// Singular wording follows the selection unit, not the affected item count.
-const selectionMenuActions = computed(() => [
-  { id: "pin", label: selectionMenuPin.value.label },
-  { id: "remove", label: selectionMenuBatches.value.length > 1 ? "Remove Selected" : "Remove Batch", danger: true },
-]);
+const selectionMenuActions = computed(() => batchContextActions(selectionMenuBatches.value));
+
+function openBatchContextMenu(batchId: string, anchor: { x: number; y: number }, keyboard: boolean) {
+  openSelectionMenu(batchId, anchor, keyboard);
+  if (selectionMenu.value && selectionMenuActions.value.length === 0) selectionMenu.value = null;
+}
 
 function focusOrigin(origin: string | undefined) {
   if (origin) gridRef.value?.querySelector<HTMLElement>(`[data-batch-id="${CSS.escape(origin)}"] .card-drag`)?.focus();
@@ -129,6 +108,26 @@ function focusOrigin(origin: string | undefined) {
 
 async function onSelectionMenuAction(id: string) {
   const origin = selectionMenu.value?.originId;
+  if (id === "ShowInExplorer" || id === "CopyPath" || id === "CopyText") {
+    const batch = selectionMenuBatches.value[0];
+    const item = batch?.items.length === 1 ? batch.items[0] : undefined;
+    selectionMenu.value = null;
+    if (!item) return;
+    try {
+      await invoke("perform_item_action", { itemId: item.id, action: id });
+      if (id === "CopyPath") announce("Path copied.");
+      else if (id === "CopyText") announce("Text copied.");
+      if (id !== "ShowInExplorer") {
+        await nextTick();
+        focusOrigin(origin);
+      }
+    } catch (error) {
+      status.value = String(error);
+      await nextTick();
+      focusOrigin(origin);
+    }
+    return;
+  }
   if (id === "pin") {
     const pinned = selectionMenuPin.value.pinned;
     const committed = await pinSelection(pinned);
@@ -247,7 +246,7 @@ watch(batches, async (current, previous) => {
         aria-label="Hide Drop Shelf"
         title="Hide Drop Shelf"
         @pointerdown.stop
-        @click="() => { activeItemActionsMenuId = null; dismissDropShelf(); announce('Hide Drop Shelf requested'); }"
+        @click="() => { dismissDropShelf(); announce('Hide Drop Shelf requested'); }"
       >
         <ActionIcon name="close" />
       </button>
@@ -261,10 +260,10 @@ watch(batches, async (current, previous) => {
         aria-label="Shelf batches"
         :aria-rowcount="batches.length"
         :style="virtual.enabled.value ? { position: 'relative' } : {}"
-        @scroll="() => { activeItemActionsMenuId = null; selectionMenu = null; }"
+        @scroll="selectionMenu = null"
         @keydown="onGridKeydown"
         @focusin="event => { const id = (event.target as HTMLElement).closest<HTMLElement>('[data-batch-id]')?.dataset.batchId; if (id) focusedBatch = id; }"
-        @pointerup="event => { if (!busy && !resizing && !(event.target as HTMLElement).closest('.card, .item-actions-menu, .more')) selection.clear(); }"
+        @pointerup="event => { if (!busy && !resizing && !(event.target as HTMLElement).closest('.card')) selection.clear(); }"
       >
       <div v-if="virtual.enabled.value" :style="{ height: `${virtual.totalHeight.value}px`, width: '100%', pointerEvents: 'none' }" />
       <DropPlaceholder v-if="draggingOver" :style="virtual.leadingPosition.value" />
@@ -285,13 +284,9 @@ watch(batches, async (current, previous) => {
         @remove="(id) => { removeBatch(id); announce('Batch removed'); }"
         @pin-item="(id, p) => { setItemPinned(id, p); announce(p ? 'Item pinned' : 'Item unpinned'); }"
         @pin-batch="(id, p) => { setBatchPinned(id, p); announce(p ? 'Batch pinned' : 'Batch unpinned'); }"
-        :menu-open-item-id="activeItemActionsMenuId"
-        @open-item-menu="id => activeItemActionsMenuId = id"
-        @close-item-menu="id => { if (activeItemActionsMenuId === id) activeItemActionsMenuId = null; }"
-        @item-action="handlePerformItemAction"
-        @selection-menu="(id, anchor, keyboard) => { activeItemActionsMenuId = null; openSelectionMenu(id, anchor, keyboard); }"
-        @manage="(id, a, k) => { activeItemActionsMenuId = null; openManageItems(id, a, k); }"
-        @drag-batch="id => { activeItemActionsMenuId = null; startBatchDrag(id); }"
+        @selection-menu="openBatchContextMenu"
+        @manage="openManageItems"
+        @drag-batch="startBatchDrag"
       />
       </section>
     </div>

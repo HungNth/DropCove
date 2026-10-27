@@ -235,8 +235,8 @@ for (const itemCount of [3, 65]) test(`ManageItems ${itemCount} items preserves 
     position: 0,
     items: [
       { id: "item1", batchId: "batch1", position: 0, path: "C:\\1.txt", name: "1.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
-      { id: "item2", batchId: "batch1", position: 1, path: "C:\\2.txt", name: "2.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
-      { id: "item3", batchId: "batch1", position: 2, path: "C:\\3.txt", name: "3.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
+      { id: "item2", batchId: "batch1", position: 1, path: "C:\\private\\2.txt", name: "2.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "Managed", managedContentKind: "Text" },
+      { id: "item3", batchId: "batch1", position: 2, path: "C:\\private\\3.png", name: "3.png", isFolder: false, isPinned: false, availability: "Available", ownership: "Managed", managedContentKind: "Image" },
     ],
   };
   for (let index = 3; index < itemCount; index++) {
@@ -273,6 +273,7 @@ for (const itemCount of [3, 65]) test(`ManageItems ${itemCount} items preserves 
         if (command === "get_manage_items_origin") return "main";
         if (command === "get_manage_items_keyboard") return true;
         if (command === "close_manage_items") return;
+        if (command === "perform_item_action") return;
         if (command === "prepare_item_drag") {
           preparedToken = "item_token_1";
           return { token: preparedToken, available: 1, unavailable: 1, snapshot: { batches: [activeBatch] } };
@@ -309,9 +310,52 @@ for (const itemCount of [3, 65]) test(`ManageItems ${itemCount} items preserves 
     assert.ok(grid, "item list must expose role='grid'");
     assert.equal(grid.props["aria-multiselectable"], "true");
 
-    // Initial keyboard open focused first item drag region
+    // Initial keyboard open focused first item drag region.
     assert.ok(focusedNode, "keyboard open must focus the first item drag region");
     assert.equal(focusedNode.props["aria-label"], "Drag C:\\1.txt to copy");
+
+    const rowFor = id => grid.children.find(child => child.props?.["data-item-id"] === id);
+    const menu = () => main.querySelector(".selection-actions-menu");
+    const menuLabels = () => menu().children.filter(child => child.props?.role === "menuitem").map(child => child.text);
+    const rightClick = async id => {
+      const row = rowFor(id);
+      const context = new Event("contextmenu", { cancelable: true, bubbles: true });
+      Object.defineProperty(context, "button", { value: 2 });
+      Object.defineProperty(context, "clientX", { value: 7 });
+      Object.defineProperty(context, "clientY", { value: 9 });
+      Object.defineProperty(context, "target", { value: row.children[0] });
+      row.props.onContextmenu(context);
+      await nextTick(); await settle(); await nextTick();
+      assert.equal(context.defaultPrevented, true);
+    };
+
+    assert.equal(main.querySelectorAll(".more").length, 0, "Manage Items rows must not render the redundant More trigger");
+    await rightClick("item1");
+    assert.deepEqual(menuLabels(), ["Show in File Explorer", "Copy Path"]);
+    focusedNode = null;
+    menu().children.filter(child => child.props?.role === "menuitem")[1].props.onClick({ stopPropagation() {} });
+    await settle(); await nextTick(); await settle(); await nextTick();
+    assert.deepEqual(commands.find(([name]) => name === "perform_item_action"), ["perform_item_action", { itemId: "item1", action: "CopyPath" }]);
+    assert.equal(focusedNode?.props?.["aria-label"], "Drag C:\\1.txt to copy", "Copy Path restores focus to the invoking row");
+    focusedNode = null;
+    const contextKey = { key: "ContextMenu", shiftKey: false, defaultPrevented: false, currentTarget: rowFor("item1").children[0], preventDefault() { this.defaultPrevented = true; }, stopPropagation() {} };
+    rowFor("item1").children[0].props.onKeydown(contextKey);
+    await nextTick(); await settle(); await nextTick();
+    assert.equal(contextKey.defaultPrevented, true);
+    assert.deepEqual(menuLabels(), ["Show in File Explorer", "Copy Path"]);
+    assert.ok(focusedNode === menu().children.find(child => child.props?.role === "menuitem"), "keyboard invocation focuses the first action");
+    focusedNode = null;
+    menu().props.onKeydown({ key: "Escape", preventDefault() {}, stopPropagation() {} });
+    await nextTick(); await settle(); await nextTick();
+    assert.equal(menu(), null);
+    assert.equal(focusedNode?.props?.["aria-label"], "Drag C:\\1.txt to copy", "Escape restores focus to the invoking row");
+    await rightClick("item2");
+    assert.deepEqual(menuLabels(), ["Copy Text"]);
+    await rightClick("item3");
+    assert.equal(menu(), null, "Managed Image rows expose no internal-path menu");
+    grid.props.onPointerup({ target: { closest: () => null } });
+    await nextTick();
+    rowFor("item1").children[0].focus();
 
     // Up / Down / Space selection
     const gridKeydown = grid.props.onKeydown;
@@ -354,10 +398,19 @@ for (const itemCount of [3, 65]) test(`ManageItems ${itemCount} items preserves 
     row.props.onContextmenu?.(keyboardContext);
     assert.equal(keyboardContext.defaultPrevented, false, "keyboard context-menu invocation remains unchanged");
     assert.deepEqual(selectedIds(), ["item1", "item2"], "right-click on a selected row preserves the selection");
+    assert.deepEqual(menuLabels(), ["Pin All Selected", "Remove All Selected"]);
     assert.equal(commands.length, beforeCommands, "right-click must not dispatch a native action or drag");
     await events.get("keydown")({ key: "Escape", stopPropagation() {}, preventDefault() {} });
     await nextTick();
     assert.deepEqual(selectedIds(), ["item1", "item2"], "the first Escape closes the menu and retains selection");
+    const shiftF10 = { key: "F10", shiftKey: true, defaultPrevented: false, currentTarget: drag, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {} };
+    drag.props.onKeydown(shiftF10);
+    await nextTick(); await settle(); await nextTick();
+    assert.equal(shiftF10.defaultPrevented, true);
+    assert.deepEqual(menuLabels(), ["Pin All Selected", "Remove All Selected"]);
+    assert.deepEqual(selectedIds(), ["item1", "item2"], "keyboard menu preserves the complete Item Selection");
+    await events.get("keydown")({ key: "Escape", stopPropagation() {}, preventDefault() {} });
+    await nextTick();
     const backgroundContext = new Event("contextmenu", { cancelable: true });
     main.props.onContextmenu?.(backgroundContext);
     grid.props.onContextmenu?.(backgroundContext);
@@ -392,6 +445,91 @@ for (const itemCount of [3, 65]) test(`ManageItems ${itemCount} items preserves 
     await events.get("keydown")(escape);
     await settle();
     assert.ok(commands.some(([cmd]) => cmd === "close_manage_items"), "Escape closes Manage Items once selection is empty");
+  } finally {
+    app.unmount();
+    delete globalThis.window;
+    delete globalThis.document;
+    delete globalThis.getComputedStyle;
+  }
+});
+
+test("Rail-origin Manage Items context actions remain pointer-only and no-activate", async () => {
+  const callbacks = new Map();
+  const commands = [];
+  let callbackId = 0;
+  const activeBatch = {
+    id: "batch1",
+    createdAt: 0,
+    position: 0,
+    items: [
+      { id: "item1", batchId: "batch1", position: 0, path: "C:\\1.txt", name: "1.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
+      { id: "item2", batchId: "batch1", position: 1, path: "C:\\2.txt", name: "2.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
+    ],
+  };
+  globalThis.document = {
+    addEventListener() {}, removeEventListener() {}, querySelector: () => null, activeElement: null,
+  };
+  globalThis.getComputedStyle = () => ({ paddingLeft: "0", paddingRight: "0", paddingTop: "0", paddingBottom: "0", gridTemplateColumns: "1fr" });
+  globalThis.window = {
+    addEventListener() {}, removeEventListener() {}, setTimeout, clearTimeout,
+    __TAURI_INTERNALS__: {
+      metadata: { currentWindow: { label: "manage-items" } },
+      transformCallback(callback) { callbacks.set(++callbackId, callback); return callbackId; },
+      async invoke(command, args) {
+        commands.push([command, args]);
+        if (command === "plugin:event|listen") return callbackId;
+        if (command === "plugin:event|unlisten") return;
+        if (command === "get_manage_items") return activeBatch;
+        if (command === "get_manage_items_origin") return "edge-rail";
+        if (command === "get_manage_items_keyboard") return false;
+        if (command === "perform_item_action" || command === "close_manage_items") return;
+        throw Error(`Unexpected invoke command: ${command}`);
+      },
+    },
+    __TAURI_EVENT_PLUGIN_INTERNALS__: { unregisterListener() {} },
+  };
+  focusedNode = null;
+  const root = node("root");
+  const app = renderer.createApp(ManageItems);
+  app.mount(root);
+  try {
+    await settle(); await nextTick(); await settle();
+    const main = root.children[0];
+    const grid = main.querySelector('[role="grid"]');
+    const row = grid.children.find(child => child.props?.["data-item-id"] === "item1");
+    const context = new Event("contextmenu", { cancelable: true, bubbles: true });
+    Object.defineProperty(context, "button", { value: 2 });
+    Object.defineProperty(context, "clientX", { value: 7 });
+    Object.defineProperty(context, "clientY", { value: 9 });
+    Object.defineProperty(context, "target", { value: row.children[0] });
+    row.props.onContextmenu(context);
+    await nextTick(); await settle(); await nextTick();
+    const menu = main.querySelector(".selection-actions-menu");
+    const actions = menu.children.filter(child => child.props?.role === "menuitem");
+    assert.deepEqual(actions.map(action => action.text), ["Show in File Explorer", "Copy Path"]);
+    assert.equal(focusedNode, null, "Rail-origin menu must not acquire focus");
+    actions[1].props.onClick({ stopPropagation() {} });
+    await settle(); await nextTick();
+    assert.deepEqual(commands.find(([name]) => name === "perform_item_action"), ["perform_item_action", { itemId: "item1", action: "CopyPath" }]);
+    assert.equal(focusedNode, null, "Rail-origin Copy Path must not activate or focus the popup");
+    const row2 = grid.children.find(child => child.props?.["data-item-id"] === "item2");
+    const drag2 = row2.children[0];
+    const addPointer = { button: 0, buttons: 1, pointerId: 2, clientX: 0, clientY: 0, ctrlKey: true, shiftKey: false, currentTarget: drag2, preventDefault() {} };
+    drag2.props.onPointerdown(addPointer);
+    drag2.props.onPointerup({ ...addPointer, buttons: 0 });
+    await nextTick();
+    const multiContext = new Event("contextmenu", { cancelable: true, bubbles: true });
+    Object.defineProperty(multiContext, "button", { value: 2 });
+    Object.defineProperty(multiContext, "clientX", { value: 7 });
+    Object.defineProperty(multiContext, "clientY", { value: 9 });
+    Object.defineProperty(multiContext, "target", { value: row.children[0] });
+    row.props.onContextmenu(multiContext);
+    await nextTick(); await settle(); await nextTick();
+    const multiMenu = main.querySelector(".selection-actions-menu");
+    const multiActions = multiMenu.children.filter(child => child.props?.role === "menuitem");
+    assert.deepEqual(multiActions.map(action => action.text), ["Pin All Selected", "Remove All Selected"]);
+    assert.deepEqual(grid.children.filter(child => child.props?.["aria-selected"] === true).map(child => child.props["data-item-id"]), ["item1", "item2"]);
+    assert.equal(focusedNode, null, "Rail-origin multi-selection menu must remain no-activate");
   } finally {
     app.unmount();
     delete globalThis.window;

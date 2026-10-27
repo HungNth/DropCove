@@ -72,6 +72,8 @@ const item = (id, batchId, isPinned) => ({ id, batchId, position: 0, path: `C:\\
 const fixture = () => [
   { id: "a", createdAt: 0, position: 0, items: [item("a1", "a", false)] },
   { id: "b", createdAt: 0, position: 1, items: [item("b1", "b", false), item("b2", "b", false)] },
+  { id: "c", createdAt: 0, position: 2, items: [{ ...item("c1", "c", false), ownership: "Managed", managedContentKind: "Text" }] },
+  { id: "d", createdAt: 0, position: 3, items: [{ ...item("d1", "d", false), ownership: "Managed", managedContentKind: "Image" }] },
 ];
 
 async function mount() {
@@ -98,6 +100,7 @@ async function mount() {
         if (command === "get_shelf_resizing" || command === "get_drop_shelf_clear_temporary_state") return false;
         if (command === "get_manage_items") return null;
         if (command === "close_manage_items") return;
+        if (command === "perform_item_action") return;
         if (command === "plugin:window|current_monitor") return null;
         if (command === "plugin:window|scale_factor") return 1;
         if (command.endsWith("inner_size") || command.endsWith("outer_size")) return { width: 600, height: 400 };
@@ -129,22 +132,53 @@ const menu = root => find(root, ".selection-actions-menu")[0] ?? null;
 const menuItems = root => (menu(root)?.children ?? []).filter(child => child.props?.role === "menuitem");
 const labels = root => menuItems(root).map(button => button.text);
 const contextmenu = (card, x = 5, y = 6) => card.props.onContextmenu({ button: 2, clientX: x, clientY: y, target: card, preventDefault() {}, stopPropagation() {} });
+const menuKey = (key, shiftKey = false) => ({
+  key,
+  shiftKey,
+  defaultPrevented: false,
+  preventDefault() { this.defaultPrevented = true; },
+  stopPropagation() {},
+});
 
-test("mounted Drop Shelf: secondary-click opens a scope-labelled menu; multi-item batch is singular", async () => {
-  const { root, close } = await mount();
+test("mounted Drop Shelf: one-item batch secondary-click uses type-aware Item Actions; ambiguous batches have no menu", async () => {
+  const { root, commands, close } = await mount();
   try {
-    const [first, second] = cards(root);
-    assert.ok(first && second, "both cards render");
-    contextmenu(first);
+    const [external, multi, text, image] = cards(root);
+    assert.ok(external && multi && text && image, "all card classifications render");
+    contextmenu(external);
     await nextTick();
-    assert.deepEqual(labels(root), ["Pin Item", "Remove Batch"], "single-item batch uses item wording");
-    contextmenu(second);
+    assert.deepEqual(labels(root), ["Show in File Explorer", "Copy Path"]);
+    focused = [];
+    menuItems(root)[1].props.onClick({ stopPropagation() {} });
+    await settle(); await nextTick();
+    assert.deepEqual(commands.find(([name]) => name === "perform_item_action"), ["perform_item_action", { itemId: "a1", action: "CopyPath" }]);
+    assert.equal(menu(root), null, "an activated Item Action closes the menu");
+    assert.equal(focused.at(-1)?.props?.["data-batch-id"], "a", "Copy Path restores focus to the invoking card");
+    focused = [];
+    const contextKey = menuKey("ContextMenu");
+    external.children[0].props.onKeydown(contextKey);
+    await nextTick(); await settle(); await nextTick();
+    assert.equal(contextKey.defaultPrevented, true);
+    assert.deepEqual(labels(root), ["Show in File Explorer", "Copy Path"], "keyboard invocation resolves the same singleton Item Actions");
+    assert.ok(focused.at(-1) === menuItems(root)[0], "keyboard invocation focuses the first action");
+    focused = [];
+    menu(root).props.onKeydown({ key: "Escape", preventDefault() {}, stopPropagation() {} });
     await nextTick();
-    assert.deepEqual(labels(root), ["Pin All Items", "Remove Batch"], "one multi-item batch is one selection unit");
+    assert.equal(menu(root), null);
+    assert.equal(focused.at(-1)?.props?.["data-batch-id"], "a", "Escape restores focus to the invoking card");
+    contextmenu(text);
+    await nextTick();
+    assert.deepEqual(labels(root), ["Copy Text"]);
+    contextmenu(multi);
+    await nextTick();
+    assert.equal(menu(root), null, "a multi-item batch has no unambiguous Item Action target");
+    contextmenu(image);
+    await nextTick();
+    assert.equal(menu(root), null, "Managed Image paths remain private");
   } finally { close(); }
 });
 
-test("mounted Drop Shelf: Remove Selected on several batches opens a Cancel-first dialog and removes nothing until confirmed", async () => {
+test("mounted Drop Shelf: keyboard-opened Remove All Selected uses the full Batch Selection and confirms before removal", async () => {
   const { root, commands, close } = await mount();
   try {
     const [first, second] = cards(root);
@@ -157,9 +191,11 @@ test("mounted Drop Shelf: Remove Selected on several batches opens a Cancel-firs
       drag.props.onPointerup(ev);
     }
     await nextTick();
-    contextmenu(first);
+    const shiftF10 = menuKey("F10", true);
+    second.children[0].props.onKeydown(shiftF10);
     await nextTick();
-    assert.deepEqual(labels(root), ["Pin Selected", "Remove Selected"]);
+    assert.equal(shiftF10.defaultPrevented, true);
+    assert.deepEqual(labels(root), ["Pin All Selected", "Remove All Selected"]);
     const remove = menuItems(root)[1];
     focused = [];
     remove.props.onClick({ stopPropagation() {} });

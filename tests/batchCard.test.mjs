@@ -147,10 +147,20 @@ test("Context Menu key and Shift+F10 on the focused drag region request the menu
   } finally { app.unmount(); }
 });
 
-test("Rail pointer selection and visible errors never add focus or live announcements", async () => {
+test("Rail batch context actions are type-aware, multi-selection-aware, and never acquire focus", async () => {
   const callbacks = new Map();
   const listeners = new Map();
   let nextCallback = 0;
+  const item = (id, batchId, ownership = "External", managedContentKind = null) => ({
+    id, batchId, name: `${id}.txt`, path: `C:\\${id}.txt`, isFolder: false, isPinned: false,
+    ownership, managedContentKind, availability: "Available",
+  });
+  const railBatches = [
+    { id: "external", items: [item("external-item", "external")] },
+    { id: "text", items: [item("text-item", "text", "Managed", "Text")] },
+    { id: "image", items: [item("image-item", "image", "Managed", "Image")] },
+    { id: "multi", items: [item("multi-1", "multi"), item("multi-2", "multi")] },
+  ];
   globalThis.document = { title: "" };
   globalThis.getComputedStyle = () => ({ paddingLeft: "0", paddingRight: "0" });
   globalThis.window = {
@@ -161,7 +171,7 @@ test("Rail pointer selection and visible errors never add focus or live announce
       async invoke(command, args) {
         if (command === "plugin:event|listen") { listeners.set(args.event, callbacks.get(args.handler)); return nextCallback; }
         if (command === "get_rail") return { edge: "Right", expanded: true, width: 280, height: 280 };
-        if (command === "get_shelf") return { batches: [{ id: "batch", items: [{ id: "item", name: "a.txt", path: "C:\\a.txt", isFolder: false, isPinned: false, ownership: "External", managedContentKind: null, availability: "Available" }] }], preferredWidth: 191, height: 180 };
+        if (command === "get_shelf") return { batches: railBatches, preferredWidth: 191, height: 180 };
         if (["plugin:event|unlisten", "set_rail_transient_hold", "invalidate_surface_visuals"].includes(command)) return;
         throw Error(command);
       },
@@ -171,26 +181,41 @@ test("Rail pointer selection and visible errors never add focus or live announce
   const root = node("root");
   const app = renderer.createApp(RailHandle);
   app.mount(root);
-  function descendants(parent) { return [parent, ...parent.children.flatMap(descendants)]; }
-  try {
-    await settle(); await nextTick();
-    const card = descendants(root).find(element => element.props["data-batch-id"] === "batch");
-    assert.ok(card);
-    const drag = card.children[0];
-    focusCalls = 0;
-    const pointer = { button: 0, buttons: 1, pointerId: 1, clientX: 0, clientY: 0, ctrlKey: false, shiftKey: false, currentTarget: drag, preventDefault() {} };
+  const descendants = parent => [parent, ...parent.children.flatMap(descendants)];
+  const card = id => descendants(root).find(element => element.props["data-batch-id"] === id);
+  const menu = () => descendants(root).find(element => element.props.role === "menu");
+  const labels = () => descendants(menu()).filter(element => element.props.role === "menuitem").map(element => element.text);
+  const rightClick = async target => {
+    target.props.onContextmenu({ button: 2, clientX: 8, clientY: 8, target: target.children[0], preventDefault() {} });
+    await nextTick();
+  };
+  const select = async (target, ctrlKey = false) => {
+    const drag = target.children[0];
+    const pointer = { button: 0, buttons: 1, pointerId: 1, clientX: 0, clientY: 0, ctrlKey, shiftKey: false, currentTarget: drag, preventDefault() {} };
     drag.props.onPointerdown(pointer); drag.props.onPointerup(pointer);
     await nextTick();
-    assert.equal(card.props["data-selected"], true);
-    assert.equal(focusCalls, 0);
-    assert.equal(drag.props.tabindex, undefined);
-    card.props.onContextmenu({ button: 2, clientX: 8, clientY: 8, target: drag, preventDefault() {} });
-    await nextTick();
-    const selectionMenu = descendants(root).find(element => element.props.role === "menu");
-    assert.ok(selectionMenu, "Rail secondary-click must expose Selection Actions");
-    assert.equal(focusCalls, 0, "Rail menu must not acquire focus");
-    assert.ok(descendants(selectionMenu).some(element => element.text === "Pin Item"));
-    assert.ok(descendants(selectionMenu).some(element => element.text === "Remove Batch"));
+  };
+  try {
+    await settle(); await nextTick();
+    focusCalls = 0;
+    await rightClick(card("external"));
+    assert.deepEqual(labels(), ["Show in File Explorer", "Copy Path"]);
+    assert.equal(focusCalls, 0, "Rail External menu must not acquire focus");
+    await rightClick(card("text"));
+    assert.deepEqual(labels(), ["Copy Text"]);
+    assert.equal(focusCalls, 0, "Rail Managed Text menu must not acquire focus");
+    await rightClick(card("image"));
+    assert.equal(menu(), undefined, "Rail Managed Image must not expose an internal path action");
+    await rightClick(card("multi"));
+    assert.equal(menu(), undefined, "one multi-item Rail batch has no unambiguous Item Action target");
+
+    await select(card("external"));
+    await select(card("text"), true);
+    await rightClick(card("external"));
+    assert.deepEqual(labels(), ["Pin All Selected", "Remove All Selected"]);
+    assert.equal(focusCalls, 0, "Rail multi-batch menu must remain no-activate");
+    assert.deepEqual(railBatches.filter(batch => card(batch.id).props["data-selected"]).map(batch => batch.id), ["external", "text"]);
+
     listeners.get("shelf-error")({ payload: "Visible Rail failure" });
     await nextTick();
     assert.ok(descendants(root).some(element => element.text === "Visible Rail failure"));

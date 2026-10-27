@@ -5,15 +5,12 @@ import type { ShelfAnchor, ShelfBatch } from "../../composables/useShelf";
 import BulkPinning from "./BulkPinning.vue";
 import ShellVisual from "./ShellVisual.vue";
 import ActionIcon from "./ActionIcon.vue";
-import ItemActionsMenu, { type ShelfItemAction } from "./ItemActionsMenu.vue";
 
 const props = defineProps<{
   batch: ShelfBatch;
   busy: boolean;
   selected?: boolean;
   selectionTabindex?: number;
-  menuOpenItemId?: string | null;
-  noActivate?: boolean;
 }>();
 const emit = defineEmits<{
   remove: [batchId: string];
@@ -23,9 +20,6 @@ const emit = defineEmits<{
   pinItem: [itemId: string, pinned: boolean];
   pinBatch: [batchId: string, pinned: boolean];
   manage: [batchId: string, anchor: ShelfAnchor, keyboard: boolean];
-  openItemMenu: [itemId: string];
-  closeItemMenu: [itemId: string];
-  itemAction: [itemId: string, action: ShelfItemAction];
   selectionMenu: [batchId: string, anchor: { x: number; y: number }, keyboard: boolean];
 }>();
 let pointerStart: { id: number; x: number; y: number; ctrlKey: boolean; shiftKey: boolean } | undefined;
@@ -35,7 +29,6 @@ const title = computed(() => props.batch.items.length === 1 ? props.batch.items[
 const fullText = shallowRef<string | null>(null);
 const isManagedText = computed(() => singleItem.value?.ownership === "Managed" && singleItem.value?.managedContentKind === "Text");
 const isManagedImage = computed(() => singleItem.value?.ownership === "Managed" && singleItem.value?.managedContentKind === "Image");
-const hasItemActions = computed(() => singleItem.value && (singleItem.value.ownership === "External" || isManagedText.value));
 
 const hoverTitle = computed(() => {
   if (props.batch.items.length !== 1 || !singleItem.value) return title.value;
@@ -123,7 +116,7 @@ function onKeydown(event: KeyboardEvent) {
 function onContextmenu(event: MouseEvent) {
   if (event.button !== 2) return;
   const target = event.target as HTMLElement | null;
-  if (target?.closest?.(".card-actions, .item-actions-menu, input, textarea")) return;
+  if (target?.closest?.(".card-actions, input, textarea")) return;
   event.preventDefault();
   if (props.busy) return;
   emit("selectionMenu", props.batch.id, { x: event.clientX, y: event.clientY }, false);
@@ -201,16 +194,6 @@ function onSelectionMenuKey(event: KeyboardEvent) {
       :title="singleItem.isPinned ? 'Make temporary; consumed after successful Copy' : 'Keep this reference after successful Copy'"
       @click="emit('pinItem', singleItem.id, !singleItem.isPinned)"
     ><ActionIcon name="pin" :filled="singleItem.isPinned" /></button>
-    <ItemActionsMenu
-      v-if="singleItem && hasItemActions"
-      :item="singleItem"
-      :disabled="busy"
-      :is-open="menuOpenItemId === singleItem.id"
-      :no-activate="noActivate"
-      @open="emit('openItemMenu', singleItem.id)"
-      @close="emit('closeItemMenu', singleItem.id)"
-      @action="singleItem && emit('itemAction', singleItem.id, $event)"
-    />
     <template v-if="!singleItem">
       <BulkPinning
         :batch="batch"

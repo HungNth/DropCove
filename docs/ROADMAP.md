@@ -1387,3 +1387,16 @@ Ticket breakdown confirmation: approved by the user through `to-tickets` on 2026
   9. Silent NSIS installation (`/S /NS /D=...`) and silent uninstallation verified with exit code `0`.
   10. Owned test processes, registry snapshots, and temporary fixtures cleaned without touching ambient user profile.
 - Limits: physical multi-monitor DPI transitions and Narrator speech output were not separately observed. Ambient workstation Run registry value was verified and restored.
+
+### Authorized batch-card context-actions amendment
+
+- [Ticket 07](../.scratch/selection-actions/issues/07-batch-card-context-actions-amendment.md) supersedes only the prior batch-card menu entry point and batch-card singleton labels; the historical `0.0.27` and `0.0.28` candidate evidence above remains unchanged.
+- Eligible single-item Shelf Batch cards now open type-aware Item Actions through secondary-click: External References expose **Show in File Explorer** then **Copy Path**, Managed Text exposes **Copy Text**, and Managed Images expose no menu. One multi-item batch exposes no menu because it has no unambiguous item target.
+- Shelf Batch cards no longer render More/ellipsis. Manage Items rows retain More and their established Item Actions behavior.
+- Two or more selected Shelf Batches expose **Pin All Selected** or **Unpin All Selected**, followed by **Remove All Selected**. Existing atomic selection mutation, removal confirmation, Managed File cleanup, source safety, keyboard, and Edge Rail no-activate contracts remain in force.
+
+### Authorized Manage Items context-actions amendment
+
+- [Ticket 08](../.scratch/selection-actions/issues/08-manage-items-context-actions-amendment.md) supersedes the earlier requirement that Manage Items retain More and singleton lifecycle actions; historical `0.0.27`/`0.0.28` evidence above remains unchanged.
+- Manage Items rows no longer render More/ellipsis. One External Reference row exposes **Show in File Explorer** then **Copy Path**, Managed Text exposes **Copy Text**, and Managed Image exposes no menu through secondary-click or the focus-capable keyboard menu keys.
+- Two or more selected rows expose **Pin All Selected** or **Unpin All Selected**, followed by **Remove All Selected**. Existing atomic mutation, ownership-safe confirmation, Managed File cleanup, virtualization, focus restoration, and Rail-origin no-activate contracts remain in force.

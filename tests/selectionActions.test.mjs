@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { batchSelectionPinAction, itemSelectionPinAction, removalConfirmationCopy } from "../src/composables/selectionActions.ts";
+import { batchContextActions, batchSelectionPinAction, itemSelectionPinAction, removalConfirmationCopy } from "../src/composables/selectionActions.ts";
 
 const item = (id, isPinned) => ({ id, isPinned });
 const batch = (id, ...items) => ({ id, items });
@@ -22,6 +22,17 @@ test("several selected batches use Selected labels and Mixed or None offer Pin",
   assert.deepEqual(batchSelectionPinAction(none), { label: "Pin Selected", pinned: true });
   assert.deepEqual(batchSelectionPinAction(mixed), { label: "Pin Selected", pinned: true });
   assert.deepEqual(batchSelectionPinAction(all), { label: "Unpin Selected", pinned: false });
+});
+
+test("batch context actions are type-aware for one item and lifecycle-scoped for several batches", () => {
+  const external = { ...item("1", false), ownership: "External", managedContentKind: null };
+  const text = { ...item("2", false), ownership: "Managed", managedContentKind: "Text" };
+  const image = { ...item("3", false), ownership: "Managed", managedContentKind: "Image" };
+  assert.deepEqual(batchContextActions([batch("a", external)]).map(action => action.label), ["Show in File Explorer", "Copy Path"]);
+  assert.deepEqual(batchContextActions([batch("a", text)]).map(action => action.label), ["Copy Text"]);
+  assert.deepEqual(batchContextActions([batch("a", image)]), []);
+  assert.deepEqual(batchContextActions([batch("a", external, text)]), []);
+  assert.deepEqual(batchContextActions([batch("a", external), batch("b", text)]).map(action => action.label), ["Pin All Selected", "Remove All Selected"]);
 });
 
 test("removal copy reports exact batch and item scope", () => {

@@ -61,7 +61,6 @@ export function useShelf() {
   const moving = shallowRef(false);
   const removalConfirmation = shallowRef<{ batchIds: string[]; originId: string; preview: RemovalPreview } | null>(null);
   const confirmingClearTemporary = shallowRef(false);
-  const activeItemActionsMenuId = shallowRef<string | null>(null);
   const selectionMenu = shallowRef<{ batchIds: string[]; anchor: { x: number; y: number }; keyboard: boolean; originId: string } | null>(null);
   let pendingRecoveryWarning: string | null = null;
   const window = getCurrentWindow();
@@ -197,7 +196,6 @@ export function useShelf() {
     document.addEventListener("keydown", onKeydown);
     try {
       await retainListener(window.listen("shelf-hidden", () => {
-        activeItemActionsMenuId.value = null;
         selectionMenu.value = null;
         if (removalConfirmation.value) void cancelRemoval();
         removalConfirmation.value = null;
@@ -270,7 +268,6 @@ export function useShelf() {
     if (busy.value || resizing.value || moving.value || confirmingClearTemporary.value || pendingConfirmation.value || removalConfirmation.value) return;
     if (!batches.value.some(batch => batch.id === batchId)) return;
     if (!selection.selected.value.has(batchId)) selection.select(batchId, {});
-    activeItemActionsMenuId.value = null;
     selectionMenu.value = { batchIds: [...selection.ids.value], anchor, keyboard, originId: batchId };
   }
 
@@ -322,7 +319,6 @@ export function useShelf() {
 
   return {
     batches,
-    activeItemActionsMenuId,
     selectionMenu,
     openSelectionMenu,
     pinSelection,

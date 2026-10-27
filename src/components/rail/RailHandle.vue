@@ -8,14 +8,13 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import type { ShelfAnchor, ShelfBatch } from "../../composables/useShelf";
 import ShelfBatchCard from "../shelf/ShelfBatchCard.vue";
-import type { ShelfItemAction } from "../shelf/ItemActionsMenu.vue";
 import DropPlaceholder from "../shelf/DropPlaceholder.vue";
 import BatchDragConfirmation from "../shelf/BatchDragConfirmation.vue";
 import ClearTemporaryConfirmation from "../shelf/ClearTemporaryConfirmation.vue";
 import ActionIcon from "../shelf/ActionIcon.vue";
 import SelectionActionsMenu from "../shelf/SelectionActionsMenu.vue";
 import SelectionRemovalConfirmation from "../shelf/SelectionRemovalConfirmation.vue";
-import { batchSelectionPinAction, type RemovalPreview } from "../../composables/selectionActions";
+import { batchContextActions, batchSelectionPinAction, type RemovalPreview } from "../../composables/selectionActions";
 
 interface ShelfSnapshot {
   batches: ShelfBatch[];
@@ -39,15 +38,11 @@ const status = shallowRef("");
 const busy = shallowRef(false);
 const draggingOver = shallowRef(false);
 const confirmingClearTemporary = shallowRef(false);
-const activeItemActionsMenuId = shallowRef<string | null>(null);
 const selectionMenu = shallowRef<{ batchIds: string[]; anchor: { x: number; y: number } } | null>(null);
 const removalConfirmation = shallowRef<{ batchIds: string[]; preview: RemovalPreview } | null>(null);
 const selectionMenuBatches = computed(() => batches.value.filter(batch => selectionMenu.value?.batchIds.includes(batch.id)));
 const selectionPin = computed(() => batchSelectionPinAction(selectionMenuBatches.value));
-const selectionActions = computed(() => [
-  { id: "pin", label: selectionPin.value.label },
-  { id: "remove", label: selectionMenuBatches.value.length > 1 ? "Remove Selected" : "Remove Batch", danger: true },
-]);
+const selectionActions = computed(() => batchContextActions(selectionMenuBatches.value));
 const feedbackNotice = shallowRef<string | null>(null);
 let feedbackTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -59,28 +54,12 @@ function showLocalFeedback(message: string) {
   }, 3000);
 }
 
-async function handlePerformItemAction(itemId: string, action: ShelfItemAction) {
-  try {
-    await invoke("perform_item_action", { itemId, action });
-    activeItemActionsMenuId.value = null;
-    if (action === "CopyPath") {
-      showLocalFeedback("Path copied.");
-    } else if (action === "CopyText") {
-      showLocalFeedback("Text copied.");
-    }
-  } catch (error) {
-    activeItemActionsMenuId.value = null;
-    status.value = String(error);
-  }
-}
 
-watch(() => Boolean(activeItemActionsMenuId.value), active => { void setRailTransientHold(active, "item-actions"); });
 watch(() => Boolean(selectionMenu.value || removalConfirmation.value), active => { void setRailTransientHold(active, "selection-actions"); });
 const selection = useSelection(batches);
 const batchDrag = usePreparedDrag("batch", batches, selection.ids, busy, status, refreshBatches, selection.clear, active => setRailTransientHold(active, "batch-drag"));
 const pendingConfirmation = batchDrag.pending;
 watch([batches, busy, confirmingClearTemporary, pendingConfirmation], () => {
-  activeItemActionsMenuId.value = null;
   selectionMenu.value = null;
 });
 let unlistenRail: UnlistenFn | undefined;
@@ -98,26 +77,38 @@ const hasTemporaryItems = computed(() =>
 function openSelectionMenu(batchId: string, anchor: { x: number; y: number }, keyboard: boolean) {
   if (keyboard || busy.value || confirmingClearTemporary.value || pendingConfirmation.value || removalConfirmation.value) return;
   if (!selection.selected.value.has(batchId)) selection.select(batchId, {});
-  activeItemActionsMenuId.value = null;
-  selectionMenu.value = { batchIds: [...selection.ids.value], anchor };
+  const batchIds = [...selection.ids.value];
+  const targets = batches.value.filter(batch => batchIds.includes(batch.id));
+  selectionMenu.value = batchContextActions(targets).length ? { batchIds, anchor } : null;
 }
 
 async function selectionAction(action: string) {
   const target = selectionMenu.value;
   const pinned = selectionPin.value.pinned;
+  const item = selectionMenuBatches.value[0]?.items.length === 1 ? selectionMenuBatches.value[0].items[0] : undefined;
   if (!target) return;
+  selectionMenu.value = null;
+  if (action === "ShowInExplorer" || action === "CopyPath" || action === "CopyText") {
+    if (!item) return;
+    try {
+      await invoke("perform_item_action", { itemId: item.id, action });
+      if (action === "CopyPath") showLocalFeedback("Path copied.");
+      else if (action === "CopyText") showLocalFeedback("Text copied.");
+    } catch (error) {
+      if (!disposed) status.value = String(error);
+    }
+    return;
+  }
   if (action === "remove" && target.batchIds.length > 1) {
     busy.value = true;
     try {
       const preview = await invoke<RemovalPreview>("prepare_batches_removal", { batchIds: target.batchIds });
       if (!disposed) removalConfirmation.value = { batchIds: target.batchIds, preview };
     } catch (error) { if (!disposed) status.value = String(error); }
-    finally { selectionMenu.value = null; if (!disposed) busy.value = false; }
+    finally { if (!disposed) busy.value = false; }
     return;
   }
-  selectionMenu.value = null;
   if (action === "pin") await runAction("set_batches_pinned", { batchIds: target.batchIds, pinned });
-  else if (action === "remove") await runAction("remove_batch", { batchId: target.batchIds[0] });
 }
 
 async function confirmRemoval() {
@@ -180,7 +171,6 @@ async function onButtonPointerEnter() {
 }
 
 async function onPointerLeave() {
-  activeItemActionsMenuId.value = null;
   try {
     await invoke("on_rail_pointer_leave");
   } catch (error) {
@@ -188,7 +178,7 @@ async function onPointerLeave() {
   }
 }
 
-async function setRailTransientHold(active: boolean, reason: "clear" | "batch-drag" | "item-actions" | "selection-actions"): Promise<boolean> {
+async function setRailTransientHold(active: boolean, reason: "clear" | "batch-drag" | "selection-actions"): Promise<boolean> {
   try {
     await invoke("set_rail_transient_hold", { active, reason });
     return true;
@@ -231,7 +221,6 @@ async function openManageItems(batchId: string, anchor: ShelfAnchor, keyboard = 
 }
 
 async function openShelf() {
-  activeItemActionsMenuId.value = null;
   try {
     await invoke("open_shelf_from_rail");
   } catch (error) {
@@ -266,7 +255,6 @@ onMounted(async () => {
         edge.value = payload.edge;
         expanded.value = payload.expanded;
         if (!payload.expanded) {
-          activeItemActionsMenuId.value = null;
           selectionMenu.value = null;
           await cancelRemoval();
           removalConfirmation.value = null;
@@ -281,7 +269,6 @@ onMounted(async () => {
     });
     unlistenTransientsClosed = await getCurrentWindow().listen("rail-transients-closed", async () => {
       if (disposed) return;
-      activeItemActionsMenuId.value = null;
       selectionMenu.value = null;
       await cancelRemoval();
       removalConfirmation.value = null;
@@ -304,7 +291,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (feedbackTimeout) clearTimeout(feedbackTimeout);
-  if (activeItemActionsMenuId.value) void setRailTransientHold(false, "item-actions");
   if (selectionMenu.value || removalConfirmation.value) void setRailTransientHold(false, "selection-actions");
   batchDrag.dispose();
   disposed = true;
@@ -382,8 +368,8 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => N
           ref="railListRef"
           class="batch-list flex flex-col gap-[4px] pt-0 px-[6px] pb-[8px] overflow-y-auto flex-1 min-h-0 [&_.card]:h-[48px] [&_.card]:flex-[0_0_48px] [&_.card]:box-border [&_.card]:border [&_.card]:border-dc-border-subtle [&_.card]:rounded-[6px] [&_.card]:bg-dc-card [&_.card]:text-dc-text-primary forced-colors:[&_.card]:border-[ButtonText] forced-colors:[&_.card]:bg-[Canvas] forced-colors:[&_.card]:text-[CanvasText] [&_.card-drag]:min-h-full [&_.card-drag]:h-full [&_.card-drag]:box-border"
           :style="railVirtual.enabled.value ? { position: 'relative' } : {}"
-          @scroll="() => { activeItemActionsMenuId = null; selectionMenu = null; }"
-          @pointerup="event => { if (!busy && !(event.target as HTMLElement).closest('.card, .item-actions-menu, .more')) selection.clear(); }"
+          @scroll="selectionMenu = null"
+          @pointerup="event => { if (!busy && !(event.target as HTMLElement).closest('.card')) selection.clear(); }"
         >
         <div v-if="railVirtual.enabled.value" :style="{ height: `${railVirtual.totalHeight.value}px`, flex: 'none', width: '100%', pointerEvents: 'none' }" />
         <DropPlaceholder v-if="draggingOver" class="rounded-[6px]" :style="railVirtual.leadingPosition.value" />
@@ -393,8 +379,6 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => N
           :batch="entry.item"
           :busy="busy || removalConfirmation !== null"
           :selected="selection.selected.value.has(entry.item.id)"
-          :menu-open-item-id="activeItemActionsMenuId"
-          :no-activate="true"
           @select="(id, modifiers) => { if (!busy && !confirmingClearTemporary && !removalConfirmation) selection.select(id, modifiers); }"
           :data-virtual-index="entry.index"
           :data-virtual-id="entry.item.id"
@@ -405,11 +389,8 @@ const railVirtual = useVirtualCollection(batches, railListRef, 1, 48, 4, () => N
           @remove="(id) => runAction('remove_batch', { batchId: id })"
           @pin-item="(id, pinned) => runAction('set_item_pinned', { itemId: id, pinned })"
           @pin-batch="(id, pinned) => runAction('set_batch_pinned', { batchId: id, pinned })"
-          @manage="(id, a, k) => { activeItemActionsMenuId = null; openManageItems(id, a, k); }"
-          @drag-batch="id => { activeItemActionsMenuId = null; startBatchDrag(id); }"
-          @open-item-menu="id => { selectionMenu = null; activeItemActionsMenuId = id; }"
-          @close-item-menu="id => { if (activeItemActionsMenuId === id) activeItemActionsMenuId = null; }"
-          @item-action="handlePerformItemAction"
+          @manage="openManageItems"
+          @drag-batch="startBatchDrag"
           @selection-menu="openSelectionMenu"
         />
         </div>

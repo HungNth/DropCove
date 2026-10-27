@@ -4,15 +4,12 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ShelfItem } from "../../composables/useShelf";
 import ShellVisual from "./ShellVisual.vue";
 import ActionIcon from "./ActionIcon.vue";
-import ItemActionsMenu, { type ShelfItemAction } from "./ItemActionsMenu.vue";
 
 const props = defineProps<{
   item: ShelfItem;
   busy: boolean;
   selected?: boolean;
   selectionTabindex?: number;
-  menuOpen?: boolean;
-  noActivate?: boolean;
 }>();
 const emit = defineEmits<{
   pin: [itemId: string, pinned: boolean];
@@ -20,9 +17,6 @@ const emit = defineEmits<{
   drag: [itemId: string];
   select: [itemId: string, modifiers: { ctrlKey: boolean; shiftKey: boolean }];
   focusItem: [itemId: string];
-  openMenu: [itemId: string];
-  closeMenu: [itemId: string];
-  action: [itemId: string, action: ShelfItemAction];
   selectionMenu: [itemId: string, anchor: { x: number; y: number }, keyboard: boolean];
 }>();
 let pointerStart: { id: number; x: number; y: number; ctrlKey: boolean; shiftKey: boolean } | undefined;
@@ -61,7 +55,7 @@ function onContextmenu(event: MouseEvent) {
   if (event.button !== 2) return;
   event.preventDefault();
   const target = event.target as HTMLElement | null;
-  if (target?.closest?.(".item-actions, .item-actions-menu, input, textarea")) return;
+  if (target?.closest?.(".item-actions, input, textarea")) return;
   if (props.busy) return;
   emit("selectionMenu", props.item.id, { x: event.clientX, y: event.clientY }, false);
 }
@@ -81,7 +75,6 @@ function onKeydown(event: KeyboardEvent) {
 const fullText = shallowRef<string | null>(null);
 const isManagedText = computed(() => props.item.ownership === "Managed" && props.item.managedContentKind === "Text");
 const isManagedImage = computed(() => props.item.ownership === "Managed" && props.item.managedContentKind === "Image");
-const hasItemActions = computed(() => props.item.ownership === "External" || isManagedText.value);
 
 const rowAriaLabel = computed(() => {
   if (props.item.ownership === "External") {
@@ -176,16 +169,6 @@ async function loadFullText() {
         :title="item.isPinned ? 'Make temporary; consumed after successful Copy' : 'Keep this reference after successful Copy'"
         @click="emit('pin', item.id, !item.isPinned)"
       ><ActionIcon name="pin" :filled="item.isPinned" /></button>
-      <ItemActionsMenu
-        v-if="hasItemActions"
-        :item="item"
-        :disabled="busy"
-        :is-open="menuOpen"
-        :no-activate="noActivate"
-        @open="emit('openMenu', item.id)"
-        @close="emit('closeMenu', item.id)"
-        @action="a => emit('action', item.id, a)"
-      />
       <button
         class="action remove inline-flex items-center justify-center flex-none size-[24px] box-border p-0 border border-transparent rounded-[4px] bg-transparent text-dc-text-secondary cursor-pointer [&.remove:hover:not(:disabled)]:border-dc-danger-border [&:hover:not(:disabled)]:bg-dc-surface-hover [&.remove:hover:not(:disabled)]:text-dc-danger aria-pressed:border-dc-accent aria-pressed:text-dc-accent aria-checked:border-dc-accent aria-checked:text-dc-accent aria-[checked=mixed]:border-dc-warning-border aria-[checked=mixed]:text-dc-warning disabled:opacity-[var(--dc-disabled-opacity)] disabled:cursor-default forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText] forced-colors:border-[ButtonText] forced-colors:[&:hover:not(:disabled)]:bg-[Highlight] forced-colors:[&:hover:not(:disabled)]:text-[HighlightText] forced-colors:aria-pressed:text-[Highlight] forced-colors:aria-pressed:border-[Highlight] forced-colors:aria-checked:text-[Highlight] forced-colors:aria-checked:border-[Highlight] forced-colors:aria-[checked=mixed]:text-[LinkText] forced-colors:aria-[checked=mixed]:border-[LinkText]"
         type="button"

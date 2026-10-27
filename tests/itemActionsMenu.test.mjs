@@ -5,7 +5,6 @@ import { registerHooks } from "node:module";
 import { parse, compileScript, compileTemplate } from "vue/compiler-sfc";
 import ts from "typescript";
 import { createRenderer, h, markRaw, nextTick, shallowRef } from "vue";
-import { setImmediate as settle } from "node:timers/promises";
 
 const hooks = registerHooks({
   resolve(specifier, context, nextResolve) {
@@ -27,14 +26,12 @@ const hooks = registerHooks({
 });
 const { default: ShelfItemRow } = await import("../src/components/shelf/ShelfItemRow.vue");
 const { default: ShelfBatchCard } = await import("../src/components/shelf/ShelfBatchCard.vue");
-const { default: ItemActionsMenu } = await import("../src/components/shelf/ItemActionsMenu.vue");
 hooks.deregister();
 
-let focusCalls = [];
 function node(type) {
   return markRaw({
     type, props: {}, children: [], parent: null, clientWidth: 280, clientHeight: 280, scrollTop: 0,
-    setPointerCapture() {}, releasePointerCapture() {}, focus() { focusCalls.push(this); },
+    setPointerCapture() {}, releasePointerCapture() {}, focus() {},
     addEventListener() {}, removeEventListener() {}, querySelectorAll: () => [],
     close() { this.open = false; }, showModal() { this.open = true; },
     getBoundingClientRect: () => ({ x: 0, y: 0, width: 100, height: 24, top: 0, bottom: 24, left: 0, right: 100 }),
@@ -74,59 +71,26 @@ function findByClass(root, className) {
   return matches;
 }
 
-test("ItemActionsMenu capabilities: External -> Show in Explorer then Copy Path; Managed Text -> Copy Text; Managed Image -> none", async () => {
-  const externalItem = { id: "ext1", name: "test.txt", path: "C:\\test.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null };
-  const textItem = { id: "txt1", name: "managed.txt", path: "C:\\managed\\txt1.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "Managed", managedContentKind: "Text" };
-  const imageItem = { id: "img1", name: "image.png", path: "C:\\managed\\img1.png", isFolder: false, isPinned: false, availability: "Available", ownership: "Managed", managedContentKind: "Image" };
-
-  // External row has More button and actions
-  const extApp = renderer.createApp({
-    render: () => h(ShelfItemRow, { item: externalItem, busy: false, menuOpen: true }),
-  });
-  const extRoot = node("root");
-  extApp.mount(extRoot);
-  try {
-    const moreButtons = findByClass(extRoot, "more");
-    assert.equal(moreButtons.length, 1, "external item must render More button");
-    const menuItems = findByRole(extRoot, "menuitem");
-    assert.equal(menuItems.length, 2);
-    assert.equal(menuItems[0].text, "Show in File Explorer");
-    assert.equal(menuItems[1].text, "Copy Path");
-  } finally {
-    extApp.unmount();
-  }
-
-  // Managed text row has More button and only Copy Text
-  const txtApp = renderer.createApp({
-    render: () => h(ShelfItemRow, { item: textItem, busy: false, menuOpen: true }),
-  });
-  const txtRoot = node("root");
-  txtApp.mount(txtRoot);
-  try {
-    const moreButtons = findByClass(txtRoot, "more");
-    assert.equal(moreButtons.length, 1, "managed text item must render More button");
-    const menuItems = findByRole(txtRoot, "menuitem");
-    assert.equal(menuItems.length, 1);
-    assert.equal(menuItems[0].text, "Copy Text");
-  } finally {
-    txtApp.unmount();
-  }
-
-  // Managed image row has NO More button
-  const imgApp = renderer.createApp({
-    render: () => h(ShelfItemRow, { item: imageItem, busy: false, menuOpen: true }),
-  });
-  const imgRoot = node("root");
-  imgApp.mount(imgRoot);
-  try {
-    const moreButtons = findByClass(imgRoot, "more");
-    assert.equal(moreButtons.length, 0, "managed image item must NOT render More button");
-  } finally {
-    imgApp.unmount();
+test("ShelfItemRow omits More for every authoritative item classification", async () => {
+  const items = [
+    { id: "ext1", name: "test.txt", path: "C:\\test.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
+    { id: "txt1", name: "managed.txt", path: "C:\\managed\\txt1.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "Managed", managedContentKind: "Text" },
+    { id: "img1", name: "image.png", path: "C:\\managed\\img1.png", isFolder: false, isPinned: false, availability: "Available", ownership: "Managed", managedContentKind: "Image" },
+  ];
+  for (const item of items) {
+    const app = renderer.createApp({ render: () => h(ShelfItemRow, { item, busy: false }) });
+    const root = node("root");
+    app.mount(root);
+    try {
+      assert.equal(findByClass(root, "more").length, 0, "Manage Items rows must not render More");
+      assert.equal(findByRole(root, "menuitem").length, 0, "row Item Actions open through secondary-click");
+    } finally {
+      app.unmount();
+    }
   }
 });
 
-test("ShelfBatchCard single-item cards expose More button; multi-item cards omit More button", async () => {
+test("ShelfBatchCard omits More for single-item and multi-item batches", async () => {
   const singleExternalBatch = {
     id: "b1",
     items: [{ id: "item1", name: "a.txt", path: "C:\\a.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null }],
@@ -139,32 +103,16 @@ test("ShelfBatchCard single-item cards expose More button; multi-item cards omit
     ],
   };
 
-  const app1 = renderer.createApp({
-    render: () => h(ShelfBatchCard, { batch: singleExternalBatch, busy: false, menuOpenItemId: "item1" }),
-  });
-  const root1 = node("root");
-  app1.mount(root1);
-  try {
-    const moreButtons = findByClass(root1, "more");
-    assert.equal(moreButtons.length, 1, "single item card must render More button");
-    const menuItems = findByRole(root1, "menuitem");
-    assert.equal(menuItems.length, 2);
-    assert.equal(menuItems[0].text, "Show in File Explorer");
-    assert.equal(menuItems[1].text, "Copy Path");
-  } finally {
-    app1.unmount();
-  }
-
-  const app2 = renderer.createApp({
-    render: () => h(ShelfBatchCard, { batch: multiBatch, busy: false }),
-  });
-  const root2 = node("root");
-  app2.mount(root2);
-  try {
-    const moreButtons = findByClass(root2, "more");
-    assert.equal(moreButtons.length, 0, "multi item card must NOT render More button");
-  } finally {
-    app2.unmount();
+  for (const batch of [singleExternalBatch, multiBatch]) {
+    const app = renderer.createApp({ render: () => h(ShelfBatchCard, { batch, busy: false }) });
+    const root = node("root");
+    app.mount(root);
+    try {
+      assert.equal(findByClass(root, "more").length, 0, "batch cards must not render the redundant More trigger");
+      assert.equal(findByRole(root, "menuitem").length, 0, "batch Item Actions open only through secondary-click");
+    } finally {
+      app.unmount();
+    }
   }
 });
 
@@ -182,101 +130,22 @@ test("Managed Image single-item cards retain only item Pin and Remove, never bat
   } finally { app.unmount(); }
 });
 
-test("ItemActionsMenu keyboard navigation: ArrowDown, ArrowUp, Home, End, Escape, Enter/Space", async () => {
-  const actionsDispatched = [];
-  let closedWithRestore = null;
-  const item = { id: "ext1", name: "test.txt", path: "C:\\test.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null };
 
-  const isOpen = shallowRef(true);
-  const app = renderer.createApp({
-    render: () => h(ItemActionsMenu, {
-      item,
-      isOpen: isOpen.value,
-      onAction: a => actionsDispatched.push(a),
-      onClose: (restore = true) => { closedWithRestore = restore; isOpen.value = false; },
-    }),
-  });
+test("ShelfItemRow action control order is Pin, Remove", async () => {
+  const item = { id: "ext1", name: "test.txt", path: "C:\\test.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null };
+  const app = renderer.createApp({ render: () => h(ShelfItemRow, { item, busy: false }) });
   const root = node("root");
   app.mount(root);
   try {
-    const menu = findByRole(root, "menu")[0];
-    assert.ok(menu);
-
-    // Escape closes menu with focus restored
-    menu.props.onKeydown({ key: "Escape", preventDefault() {}, stopPropagation() {} });
-    await nextTick();
-    assert.equal(isOpen.value, false);
-
-    // Reopen and test Enter activation
-    isOpen.value = true;
-    await nextTick();
-    const menu2 = findByRole(root, "menu")[0];
-    menu2.props.onKeydown({ key: "Enter", preventDefault() {}, stopPropagation() {} });
-    await nextTick();
-    assert.deepEqual(actionsDispatched, ["ShowInExplorer"]);
-
-    // Arrow down moves to next item
-    isOpen.value = true;
-    actionsDispatched.length = 0;
-    await nextTick();
-    const menu3 = findByRole(root, "menu")[0];
-    menu3.props.onKeydown({ key: "ArrowDown", preventDefault() {}, stopPropagation() {} });
-    menu3.props.onKeydown({ key: "Enter", preventDefault() {}, stopPropagation() {} });
-    await nextTick();
-    assert.deepEqual(actionsDispatched, ["CopyPath"]);
+    const actions = root.children[0].children[1].children;
+    assert.equal(actions.length, 2);
+    assert.ok(actions[0].props.class.includes("pin"));
+    assert.ok(actions[1].props.class.includes("remove"));
   } finally {
     app.unmount();
   }
 });
 
-test("ShelfItemRow action control order is Pin, More, Remove", async () => {
-  const item = { id: "ext1", name: "test.txt", path: "C:\\test.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null };
-  const app = renderer.createApp({
-    render: () => h(ShelfItemRow, { item, busy: false }),
-  });
-  const root = node("root");
-  app.mount(root);
-  try {
-    const row = root.children[0];
-    const actionsContainer = row.children[1];
-    const pinBtn = actionsContainer.children[0];
-    const moreMenu = actionsContainer.children[1];
-    const removeBtn = actionsContainer.children[2];
-
-    assert.ok(pinBtn.props.class.includes("pin"));
-    assert.ok(moreMenu.children.some(c => c.props.class?.includes("more")));
-    assert.ok(removeBtn.props.class.includes("remove"));
-  } finally {
-    app.unmount();
-  }
-});
-
-test("Clicking More button or invoking action targets only that row and leaves selection unchanged", async () => {
-  const item = { id: "ext1", name: "test.txt", path: "C:\\test.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null };
-  const selections = [];
-  const actions = [];
-
-  const app = renderer.createApp({
-    render: () => h(ShelfItemRow, {
-      item,
-      busy: false,
-      selected: true,
-      onSelect: (...args) => selections.push(args),
-      onAction: (id, action) => actions.push([id, action]),
-    }),
-  });
-  const root = node("root");
-  app.mount(root);
-  try {
-    const moreBtn = findByClass(root, "more")[0];
-    assert.ok(moreBtn);
-    moreBtn.props.onClick({ stopPropagation() {} });
-    await nextTick();
-    assert.deepEqual(selections, [], "More click must not emit row select event");
-  } finally {
-    app.unmount();
-  }
-});
 
 for (const [Component, dragClass] of [[ShelfItemRow, "item-drag"], [ShelfBatchCard, "card-drag"]]) {
   test(`${Component.__name} discards a loaded text preview when the target item changes`, async () => {
@@ -316,22 +185,3 @@ for (const [Component, dragClass] of [[ShelfItemRow, "item-drag"], [ShelfBatchCa
 }
 
 
-test("ItemActionsMenu in noActivate mode suppresses focus acquisition on open and navigate", async () => {
-  focusCalls = [];
-  const item = { id: "ext1", name: "test.txt", path: "C:\\test.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null };
-  const isOpen = shallowRef(false);
-  const app = renderer.createApp({
-    render: () => h(ItemActionsMenu, { item, isOpen: isOpen.value, noActivate: true }),
-  });
-  const root = node("root");
-  app.mount(root);
-  try {
-    const moreBtn = findByClass(root, "more")[0];
-    assert.ok(moreBtn);
-    isOpen.value = true;
-    await nextTick();
-    assert.equal(focusCalls.length, 0, "noActivate mode must not focus menu items on open");
-  } finally {
-    app.unmount();
-  }
-});

@@ -82,8 +82,9 @@ test("Escape cancels availability confirmation, closes Manage Items, clears sele
     releaseManagement(null);
     await oldEscape;
     assert.deepEqual(shelf.selection.ids.value, ["new-batch"], "an earlier asynchronous Escape must not clear a later selection");
-    shelf.activeItemActionsMenuId.value = "item";
+    shelf.openSelectionMenu("new-batch", { x: 0, y: 0 }, false);
+    assert.ok(shelf.selectionMenu.value);
     nativeEvents.get("shelf-hidden")({ payload: null });
-    assert.equal(shelf.activeItemActionsMenuId.value, null, "native hiding must discard the item menu, not merely hide its pixels");
+    assert.equal(shelf.selectionMenu.value, null, "native hiding must discard the batch context menu, not merely hide its pixels");
   } finally { app.unmount(); delete globalThis.window; delete globalThis.document; }
 });

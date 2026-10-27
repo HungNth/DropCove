@@ -390,10 +390,9 @@ A single-item card displays:
 - truncated display name;
 - direct card drag-out;
 - compact Pin/Unpin icon action;
-- compact More icon action when its Shelf Item has Item Actions;
 - compact Remove Batch icon action.
 
-It does not show Manage Items because its only Shelf Item is already directly accessible. The trailing controls are Pin/Unpin, More when eligible, and Remove. A Managed Image retains only Pin/Unpin and Remove.
+It does not show Manage Items because its only Shelf Item is already directly accessible. The trailing controls are Pin/Unpin and Remove; Shelf Batch cards do not render a More/ellipsis action.
 
 ### 9.2 Multi-item batch
 
@@ -430,52 +429,49 @@ The no-activate Edge Rail exposes the same pointer gestures, selected visual, an
 
 ### 9.4 Item Actions Menu
 
-The per-item **More** button opens one transient **Item Actions Menu**. It appears on eligible single-item cards in the Drop Shelf and expanded Edge Rail and eligible rows in Manage Items. A multi-item card has no item menu; use Manage Items to target a specific Shelf Item.
+An eligible single-item Shelf Batch card or single selected Manage Items row opens the transient **Item Actions Menu** through secondary-click. Focus-capable Drop Shelf and Manage Items origins also support the Context Menu key and `Shift+F10`. A multi-item card has no item menu because it has no unambiguous Shelf Item target; use Manage Items to target a specific Shelf Item.
 
 | Authoritative classification | Menu actions, in order |
 |---|---|
 | External Reference, file or folder | Show in File Explorer; Copy Path |
 | Plain-text Managed File | Copy Text |
-| Image Managed File | No More button or Item Actions Menu |
+| Image Managed File | No Item Actions Menu |
 
 Core Shelf State supplies ownership and Managed content kind; presentation never infers them from path substrings or extensions. Requests contain only the Shelf Item identity and requested action, not a caller-provided path or text payload.
 
 - **Copy Path** replaces the Windows clipboard with the exact retained absolute External Reference path as Unicode text, without quotes, newline, normalization, or existence requirement.
 - **Copy Text** replaces the clipboard with the full original Managed Text, preserving Unicode and line endings rather than copying a truncated preview. The menu remains available for cached Available, Missing, and Unavailable items. Invocation requires a committed `ready` Managed File record and attempts a live read; `ready` is not an availability classification. Read failure retains the item without cleanup or availability mutation.
 - **Show in File Explorer** checks the current External Reference path, selects the file or non-root folder in its parent, and opens a filesystem root directly. Missing/inaccessible paths report an error without mutation. Explicit reveal may activate Explorer; Copy actions never activate the Edge Rail.
-- Every action targets only the item whose More button opened it. Batch Selection, Item Selection, anchors, Pin state, Temporary/Pinned lifecycle, ordering, sizing, and display state remain unchanged. Clipboard Copy is not Successful Drag-Out and never consumes a Temporary Item.
+- Every action targets only the single Shelf Item represented by the invoking card or Manage Items row. Batch Selection, Item Selection, anchors, Pin state, Temporary/Pinned lifecycle, ordering, sizing, and display state remain unchanged. Clipboard Copy is not Successful Drag-Out and never consumes a Temporary Item.
 - Copy success reports `Path copied.` or `Text copied.` locally; failures identify the operation locally. No Windows toast is emitted, and successful Explorer reveal needs no duplicate banner.
 
-The menu follows the Utility Menu keyboard contract: menu/menuitem semantics, Arrow Up/Down, Home/End, Enter/Space, Escape, Tab exit, outside-click dismissal, and focus restoration to the originating More button. Explorer activation is not followed by forced DropCove focus. The Edge Rail and its pointer-opened management popup remain no-activate and do not claim keyboard/live-announcement ownership.
+On the Drop Shelf and focus-capable Manage Items popup, secondary-click, the Context Menu key, and `Shift+F10` use the standard menu contract: menu/menuitem semantics, Arrow Up/Down, Home/End, Enter/Space, Escape, Tab exit, outside-click dismissal, and focus restoration to the invoking card or row. Explorer activation is not followed by forced DropCove focus. The Edge Rail and its pointer-opened management popup remain no-activate and do not claim keyboard/live-announcement ownership.
 
-Only one item menu is open per surface. It closes on action, dismissal, another menu, projection replacement, target disappearance/unmount, scroll, drag/resize/movement, modal or busy ownership, surface hide/close, and Rail collapse/fullscreen/display transitions. The popover stays within its surface without resizing it. Rail menu lifetime uses a dedicated transient hold released on dismissal; leaving the Rail closes the menu and permits normal delayed collapse.
+Only one context-actions menu is open per owning surface. It closes on action, dismissal, projection replacement, target disappearance/unmount, scroll, drag/resize/movement, modal or busy ownership, surface hide/close, and Rail collapse/fullscreen/display transitions. The popover stays within its surface without resizing it. Rail context-menu lifetime shares the selection-actions transient hold so pointer leave cannot collapse the target mid-action.
 
 Managed File internal paths are not shown or copied by item actions, tooltips, accessibility labels, status, or announcements. Managed Text uses its user-visible name and content preview; Managed Image uses its name and `DropCove-created image`. External References retain their full user-facing path.
 
-In Manage Items, secondary-button input never opens the Item Actions Menu; More remains its sole entry point. A secondary-click on the row selection region follows the Selection Actions Menu contract in section 9.5. Secondary-clicks on independent row controls, inputs, and textareas do not retarget Item Selection or open Selection Actions, and the WebView default browser menu remains suppressed on Shelf Item row boundaries.
+In Manage Items, a secondary-click on the row selection region resolves type-aware Item Actions for one eligible selected row, lifecycle Selection Actions for several selected rows, or no menu for a Managed Image singleton. Rows do not render More/ellipsis. Secondary-clicks on independent Pin/Unpin, Remove, confirmation controls, inputs, and textareas do not retarget Item Selection or open a menu, and the WebView default browser menu remains suppressed on Shelf Item row boundaries.
 
 ### 9.5 Selection Actions Menu
 
-The **Selection Actions Menu** applies lifecycle actions to the current Batch Selection on the Drop Shelf or expanded Edge Rail and to the current Item Selection in Manage Items. It remains distinct from the ownership-aware Item Actions Menu and never contains Show in File Explorer, Copy Path, or Copy Text.
+The **Selection Actions Menu** applies lifecycle actions to two or more selected Shelf Batches on the Drop Shelf or expanded Edge Rail and to two or more selected rows in Manage Items. A single eligible Shelf Batch or Manage Items row instead uses the ownership-aware Item Actions Menu in section 9.4; an unsupported singleton opens no menu.
 
-- Secondary-clicking a selected card or row preserves the current selection and targets the complete selection. Secondary-clicking an unselected card or row replaces selection with that member before opening the menu. Secondary-button `Ctrl`, `Shift`, and `Ctrl+Shift` modifiers do not extend, toggle, or range-select.
-- Only the card or row selection region opens the menu. Pin, More, Manage, Remove, confirmation controls, inputs, and textareas remain isolated and do not retarget selection.
+- Secondary-clicking a selected card or row preserves the current selection and targets the complete selection. Secondary-clicking an unselected card or row replaces selection with that member before resolving the applicable menu. Secondary-button `Ctrl`, `Shift`, and `Ctrl+Shift` modifiers do not extend, toggle, or range-select.
+- Only the card or row selection region resolves menu actions. Pin, Manage, Remove, confirmation controls, inputs, and textareas remain isolated and do not retarget selection.
 - Pointer invocation anchors the menu at the invocation point; keyboard invocation anchors it to the focused card or row. The popover remains within its owning surface without resizing it.
-- At most one Selection Actions Menu is open per surface. Opening it closes an Item Actions Menu and vice versa. Projection replacement, target disappearance or unmount, scroll, drag, resize, movement, confirmation, busy mutation, surface hide/close, Rail collapse, fullscreen transition, or display transition closes it.
+- At most one item or selection actions menu is open per surface. Projection replacement, target disappearance or unmount, scroll, drag, resize, movement, confirmation, busy mutation, surface hide/close, Rail collapse, fullscreen transition, or display transition closes it.
 
 | Selection domain and cardinality | Lifecycle action | Removal action |
 |---|---|---|
-| One selected single-item Shelf Batch | Pin Item or Unpin Item | Remove Batch |
-| One selected multi-item Shelf Batch | Pin All Items or Unpin All Items | Remove Batch |
-| Two or more selected Shelf Batches | Pin Selected or Unpin Selected | Remove Selected |
-| One selected Manage Items row | Pin Item or Unpin Item | Remove Item |
-| Two or more selected Manage Items rows | Pin Selected or Unpin Selected | Remove Selected |
+| Two or more selected Shelf Batches | Pin All Selected or Unpin All Selected | Remove All Selected |
+| Two or more selected Manage Items rows | Pin All Selected or Unpin All Selected | Remove All Selected |
 
-Cardinality follows the selection domain, not affected Shelf Item count. One selected multi-item Shelf Batch is one Batch Selection member. All-Pinned targets offer Unpin; None or Mixed targets offer Pin. Batch Selection Pin/Unpin includes every Shelf Item in every selected batch, while Item Selection Pin/Unpin includes exactly the selected Shelf Item identities in the active batch.
+All-Pinned targets offer Unpin; None or Mixed targets offer Pin. Multi-batch Pin/Unpin includes every Shelf Item in every selected batch, while multi-row Item Selection Pin/Unpin includes exactly the selected Shelf Item identities in the active batch.
 
-Pin and Unpin validate and mutate the complete target atomically, retain selection on success, and preserve selection plus prior Pin states on validation or persistence failure. Singleton Remove remains immediate. Remove Selected follows the confirmation and ownership-safety contract in section 13.4.
+Pin and Unpin validate and mutate the complete target atomically, retain selection on success, and preserve selection plus prior Pin states on validation or persistence failure. Direct Remove Batch and direct per-row Remove remain immediate. Multi-selection removal follows the confirmation and ownership-safety contract in section 13.4.
 
-On the Drop Shelf and Drop-Shelf-origin Manage Items, the Context Menu key and `Shift+F10` open the menu for the focused card or row. Opening focuses the first item; Arrow Up/Down, Home/End, Enter/Space, `Escape`, and Tab follow the established menu contract. Keyboard invocation on an unselected focused member selects only that member first. Dismissal restores focus to the invoking member when it still exists.
+On the Drop Shelf and focus-capable Manage Items popup, the Context Menu key and `Shift+F10` resolve the same singleton Item Action or multi-selection lifecycle mapping as secondary-click. Opening focuses the first item; Arrow Up/Down, Home/End, Enter/Space, `Escape`, and Tab follow the established menu contract. Keyboard invocation on an unselected focused member selects only that member first. Dismissal restores focus to the invoking member when it still exists.
 
 The Edge Rail and Rail-origin Manage Items remain pointer-only/no-activate. Their menu uses transient ownership to prevent collapse without activating DropCove, claiming keyboard focus, or adding a live-announcement owner.
 
@@ -512,7 +508,6 @@ Each `54`-logical-pixel row, separated by a `5`-pixel gap, exposes:
 - availability on the second text line as `Available`, `Unavailable`, or `Missing`, without a duplicate `Pinned ·` prefix;
 - External Reference full path through the drag-region tooltip and accessibility text, but not as visible row content; Managed Files use ownership-appropriate name/content descriptions without Profile Data paths;
 - compact Pin/Unpin icon action;
-- compact More icon action when eligible under section 9.4;
 - compact Remove Item icon action;
 - Item Selection-aware direct drag-out from the row drag region.
 
@@ -526,8 +521,8 @@ Item Selection is transient presentation state owned by the current Manage Items
 - `Shift+click` replaces selection with the inclusive source-order range from the anchor to the target, including virtualized items outside the viewport. Shift preserves a valid anchor; without one it selects only the target and establishes that item as anchor. `Ctrl+Shift` uses the same replacement-range behavior.
 - Plain pointer press on an already selected row delays collapse until release below the established drag threshold. Crossing the threshold on a selected row drags the complete Item Selection; crossing it on an unselected row drags only that Shelf Item without first replacing the visible selection.
 - Selected rows use the existing accent border and accent-subtle surface, with Windows Highlight resources in Contrast Themes. The header summary reports `S selected · X/N pinned`. No toolbar, checkbox, selection mode, or per-row count badge is added.
-- Independent per-item Pin/Unpin and Remove controls continue to affect only their own Shelf Item. Bulk Pinning continues to affect the complete Shelf Batch. The Selection Actions Menu defined in section 9.5 explicitly targets Item Selection and does not change the scope of those existing controls.
-- Independent and selection-scoped Pinning retain selection. Remove, Remove Selected, and confirmed-Missing cleanup prune only identities that disappear; surviving selected items remain selected, and a removed anchor becomes absent without selecting a replacement. Newly added items are not selected.
+- Independent per-item Pin/Unpin and Remove controls continue to affect only their own Shelf Item. Bulk Pinning continues to affect the complete Shelf Batch. Context actions use one selected row for type-aware Item Actions and two or more selected rows for lifecycle Selection Actions without changing the scope of those direct controls.
+- Independent and selection-scoped Pinning retain selection. Remove, Remove All Selected, and confirmed-Missing cleanup prune only identities that disappear; surviving selected items remain selected, and a removed anchor becomes absent without selecting a replacement. Newly added items are not selected.
 - Rejected or canceled drag-out retains Item Selection unless a separate clear trigger occurs. Successful Drag-Out, empty collection-space click, `Escape`, explicit popup close, opening another batch, popup closure caused by its owner, or restart clears it.
 - The popup remains open while its Shelf Batch exists, including when only one Shelf Item remains. It closes when the batch disappears.
 
@@ -537,11 +532,11 @@ Item Selection is transient presentation state owned by the current Manage Items
 - Keyboard opening from the Drop Shelf with `Enter` or `Space` focuses the current item drag region in the collection grid.
 - The item collection exposes `role="grid"` with `aria-multiselectable="true"`; rows expose `aria-selected`, one item drag region is the roving focus target, and Pin/Unpin and Remove remain independent buttons.
 - Up/Down moves item focus, Home/End moves to collection boundaries, `Space` selects one, `Ctrl+Space` toggles, `Shift+Space` replaces with the anchor range, and `Ctrl+A` selects every item without changing a valid anchor or creating an absent one.
-- `Tab` and `Shift+Tab` cycle through Bulk Pinning, Close, the grid's primary drag-region stop, then item Pin/Unpin, eligible More, and Remove controls in source order. Virtualized targets are mounted and scrolled into view before focus moves.
+- `Tab` and `Shift+Tab` cycle through Bulk Pinning, Close, the grid's primary drag-region stop, then item Pin/Unpin and Remove controls in source order. Virtualized targets are mounted and scrolled into view before focus moves.
 - If the focused item disappears while the batch survives, focus moves to the item now at the same source index, otherwise the previous item, otherwise Bulk Pinning. Selection changes use the existing polite announcement channel with coalesced selected-item counts or `Selection cleared`.
 - Explicit close restores focus to the originating Manage Items control when it still exists. If the batch has become a one-item card, focus returns to that card's drag region. If the batch disappeared, the Drop Shelf recovers to the batch now at the same displayed index, otherwise the previous batch, otherwise More. A pointer-opened Edge Rail origin does not receive focus.
-- `Esc` closes an open Selection Actions Menu, then cancels an open selection-removal confirmation, then cancels an active item availability confirmation or native item drag. Later presses clear non-empty Item Selection and close Manage Items.
-- On a focus-capable Drop-Shelf origin, the Context Menu key and `Shift+F10` open Selection Actions for the focused row and return focus there after dismissal when it survives. A pointer-opened Edge Rail origin remains pointer-only/no-activate and adds no keyboard menu path.
+- `Esc` closes an open Item or Selection Actions Menu, then cancels an open selection-removal confirmation, then cancels an active item availability confirmation or native item drag. Later presses clear non-empty Item Selection and close Manage Items.
+- On a focus-capable Drop-Shelf origin, the Context Menu key and `Shift+F10` resolve type-aware singleton actions or multi-row lifecycle actions for the focused row and return focus there after dismissal when it survives. A pointer-opened Edge Rail origin remains pointer-only/no-activate and adds no keyboard menu path.
 - Opening another batch replaces the existing popup. The popup closes when its batch is removed, the shelf hides, shelf resizing begins, or whole-batch or Batch Selection drag starts.
 - Item Selection drag keeps Manage Items open while its batch remains. A hide or close request during an active native drag becomes pending; the recorded transfer completes independently, then the popup closes without restoring discarded selection.
 
@@ -716,8 +711,8 @@ Selection Actions reuse this tri-state rule. An all-Pinned target becomes Tempor
 
 - **Remove Item** removes one Shelf Item and prunes its batch when empty.
 - **Remove Batch** removes every Shelf Item in that Shelf Batch.
-- **Remove Selected** on Batch Selection removes every selected Shelf Batch and every contained Shelf Item.
-- **Remove Selected** on Item Selection removes exactly the selected Shelf Items from the active Manage Items batch and prunes the batch when empty.
+- **Remove All Selected** on Batch Selection removes every selected Shelf Batch and every contained Shelf Item.
+- **Remove All Selected** on Item Selection removes exactly the selected Shelf Items from the active Manage Items batch and prunes the batch when empty.
 - **Clear Temporary Items** requires confirmation, removes Temporary Items across all batches, and preserves Pinned Items.
 - Removing an external reference never deletes, moves, renames, or overwrites its source filesystem object.
 - Removing a Managed File-backed item permanently deletes the app-owned file rather than sending it to the Recycle Bin.
@@ -1008,8 +1003,8 @@ Top and bottom Edge Rail docking are not supported.
 - Item Selection count changes are announced politely and coalesced. Pointer opening, including from the Edge Rail, does not activate or focus the popup; keyboard opening from the Drop Shelf focuses the grid.
 - The Drop Shelf batch collection uses `role="grid"` with `aria-multiselectable="true"`; selected batch rows expose `aria-selected`, batch drag regions use roving focus with arrow/Home/End navigation, and `Space`, `Ctrl+Space`, `Shift+Space`, `Ctrl+A`, and `Escape` operate the Batch Selection contract in section 9.3.
 - Batch Selection count changes are announced politely and coalesced on the Drop Shelf. The Edge Rail remains pointer-only/no-activate and exposes only the visible selected treatment and footer count.
-- Selection Actions Menu uses menu/menuitem semantics and ownership-safe accessible names. Focus-capable Drop Shelf and Manage Items origins support the Context Menu key and `Shift+F10`, standard menu navigation, `Escape` dismissal, Tab exit, and focus restoration. Edge Rail and Rail-origin Manage Items remain pointer-only/no-activate.
-- Remove Selected confirmation exposes exact selection-unit/item scope and ownership consequences. Focus-capable confirmation is modal with Cancel initially focused; pointer-only Rail confirmation does not claim focus or a live region. Selection Actions use existing semantic menu, danger, focus, and Windows system-color resources.
+- Item Actions and Selection Actions use menu/menuitem semantics and ownership-safe accessible names. Focus-capable Drop Shelf and Manage Items origins support secondary-click, Context Menu key/`Shift+F10`, standard menu navigation, `Escape` dismissal, Tab exit, and focus restoration. Edge Rail and Rail-origin Manage Items remain pointer-only/no-activate.
+- Remove All Selected confirmation exposes exact selection-unit/item scope and ownership consequences. Focus-capable confirmation is modal with Cancel initially focused; pointer-only Rail confirmation does not claim focus or a live region. Selection Actions use existing semantic menu, danger, focus, and Windows system-color resources.
 - External Reference full paths and drag instructions remain available through tooltips and accessibility text when visual text is shortened or omitted. Managed Files never expose Profile Data paths there; use user-visible names, text previews, or `DropCove-created image` instead.
 - The resolved Appearance Mode drives Light or Dark semantic resources and matching native frames. Windows Contrast Theme bypasses the application palette and uses Windows system colors, explicit borders, and visible focus indicators.
 - Drop Placeholders use the drag-hover semantic colors in Dark and Light appearances and Windows system colors in Contrast Themes.
