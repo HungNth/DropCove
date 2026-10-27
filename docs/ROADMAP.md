@@ -1237,13 +1237,17 @@ Approved DAG: `01 → 02 → {03, 04} → 05 → 06`.
 
 ## 0.0.27 — Type-aware Item Actions
 
-**Status:** Completed — tickets 01–05 resolved; exact candidate 0.0.27 packaged, verified on Windows, and ready for human acceptance; changes uncommitted pending authorization.
+**Status:** Amendment implemented 2026-10-27 — frontend regressions, production build, NSIS packaging/installation, and installed row/Explorer smoke pass. Ticket 06 and final candidate acceptance remain blocked on successful clipboard verification; the 2026-10-26 candidate remains historical evidence only.
 
 Design confirmation: approved by the user through `grill-with-docs` on 2026-10-26.
 
 Testing seam confirmation: approved by the user through `to-spec` on 2026-10-26.
 
 Ticket breakdown confirmation: approved by the user through `to-tickets` on 2026-10-26.
+
+Amendment confirmation: approved by the user through `grill-with-docs` on 2026-10-27.
+
+Amendment ticket: [06 — Suppress Default WebView Menu on Manage Items Rows](../.scratch/type-aware-context-actions/issues/06-suppress-manage-items-webview-menu.md). Implementation was authorized through `implement` on 2026-10-27; changes remain uncommitted.
 
 Plan: [Specification](../.scratch/type-aware-context-actions/spec.md) · [Research notes](../.scratch/type-aware-context-actions/research/windows-item-actions.md).
 
@@ -1257,7 +1261,13 @@ Requirements: [Product Specification](SPECIFICATION.md#94-item-actions-menu) · 
 - Add native Unicode clipboard and File Explorer adapters: Copy Path writes exact path without quotes or newline; Copy Text reads live full text regardless of cached Missing/Unavailable state; Show in File Explorer selects existing objects in parent or opens filesystem roots.
 - Preserve target isolation, selection neutrality, no-activate Edge Rail foreground contracts, fixed non-clipping menu layout, and surface dismissal on scroll, drag, hide, and fullscreen transitions.
 
-### Implemented
+### Amendment — 2026-10-27
+
+- Preserve the verified action matrix: External References expose Show in File Explorer then Copy Path; Managed Text exposes Copy Text; Managed Images expose no More action.
+- In Manage Items only, suppress the WebView default browser menu when a Shelf Item row is right-clicked. Do not open the Item Actions Menu, change Item Selection, or alter input/textarea, Drop Shelf, or Edge Rail behavior.
+- Keep the 2026-10-26 implementation and release evidence below as historical proof of the pre-amendment candidate. It does not prove this amendment; Ticket 06 requires a newly packaged candidate, new hashes, and focused Windows evidence before human acceptance.
+
+### Implemented — pre-amendment candidate
 
 - Core Shelf State projection and read-only action resolution in `src-tauri/src/shelf.rs` and `lib.rs`.
 - Windows clipboard and Shell integration in `src-tauri/src/windows_actions.rs` with RAII ownership guards.
@@ -1265,7 +1275,7 @@ Requirements: [Product Specification](SPECIFICATION.md#94-item-actions-menu) · 
 - Shared Item Actions Menu in `src/components/shelf/ItemActionsMenu.vue` with fixed viewport clamping and keyboard/focus parity.
 - Drop Shelf, Manage Items, and Edge Rail integration in `src/components/shelf/DropShelf.vue`, `ShelfBatchCard.vue`, `ManageItems.vue`, `ShelfItemRow.vue`, and `src/components/rail/RailHandle.vue`.
 
-### Verification
+### Verification — pre-amendment candidate
 
 - Frontend test suite passed: **53/53 passed, 0 failed**. Production `vue-tsc` typecheck and Vite build succeeded.
 - Native Rust test suite passed: **189/189 passed, 0 failed** via cargo-xwin Windows x64 binary execution.
@@ -1273,10 +1283,18 @@ Requirements: [Product Specification](SPECIFICATION.md#94-item-actions-menu) · 
 - Installed candidate proof verified embedded production assets at port 1420 disconnect, exact Unicode clipboard readback, File Explorer file/folder selection and root opening, missing-path safe error, selection neutrality in ordinary (3 items) and virtualized (65 items) collections, no-activate Rail foreground preservation, fullscreen menu dismissal, exact restart restore (76 items), reinstall/uninstall Profile Data preservation, and clean ambient registry/shortcut restoration. Ambient Run entry was restored to its canonical command from persisted user preferences rather than proven byte-exact to the pre-session state.
 - All changes remain uncommitted pending user approval.
 
-### Release evidence — 2026-10-26
+### Release evidence — 2026-10-26 pre-amendment candidate
 
 | Candidate artifact | Bytes | SHA-256 |
 |---|---:|---|
 | [DropCove-Setup-0.0.27.exe](../build/DropCove-Setup-0.0.27.exe) | 3,702,946 | `ec085e8bb64ab5df4aff7155f18d00b92f8373c1598f68c446d088c953324c04` |
 | Built Windows x64 executable | 15,287,296 | `598aa910c4420f0e567ddbf4106464730ecccd3d64781b321f0f533731154f40` |
 | Exact installed candidate `dropcove.exe` | 15,287,296 | `70f3245222e1ace33610ec9d159c1674dcecddd8fd86ac770bee8f6b1af02591` |
+
+### Amendment implementation evidence — 2026-10-27
+
+- Manage Items row suppression is conditional on secondary-button `contextmenu` only; keyboard-origin invocation remains unchanged. Existing selection/drag guards, More mapping, and Edge Rail cards are unchanged.
+- Final frontend suite: **54/54 passed**; Vue typecheck/production build, cargo-xwin Windows release build, and NSIS packaging passed. Independent Standards and Spec reviews reported no actionable findings.
+- Exact installed candidate passed ordinary/mixed and 65-item virtualized row suppression, selection retention, keyboard/contextmenu exclusions, Managed Text Copy Text menu preservation, Managed Image exclusion, exact Explorer selection, and Rail-origin no-activation smoke. Install/uninstall returned 0; owned smoke resources were removed and captured registry state restored.
+- Installer: **3,703,520 bytes**, SHA-256 `44844f2796553c39b265d7ea9c418ab92eba97d42968757553d87f1d540932dd`. Built executable: **15,287,296 bytes**, SHA-256 `49de31f0c2517cbe858ed78e5c6a252376f9cd1d003aeebfef6f464e4fc390cf`. Installed executable: **15,287,296 bytes**, SHA-256 `9e6cab2508abc71a8bcd2f9b175c3d303d11abc92326fd0bc143a208de86068a`.
+- **Remaining gate:** Copy Path and Copy Text report Windows clipboard access denied (`0x80070005`); independent clipboard probes fail too. Safe local error/retention was observed, but successful real clipboard readback is unverified for the amended candidate. Ticket 06 stays ready-for-human and Ticket 05 acceptance stays blocked until that proof is supplied. Full evidence and observation limits are recorded in Ticket 06; historical clipboard proof is not substituted.

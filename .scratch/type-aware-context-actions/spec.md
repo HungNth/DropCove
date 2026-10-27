@@ -1,16 +1,51 @@
 # DropCove 0.0.27 — Type-aware Item Actions
 
-Status: resolved — 0.0.27 candidate verified and ready for human acceptance; changes uncommitted
-Design confirmation: approved by the user through `grill-with-docs` on 2026-10-26
+Status: amendment implemented 2026-10-27 — frontend regressions, production build, isolated NSIS installation, and installed row/Explorer smoke pass; candidate acceptance remains blocked on successful real clipboard verification in an interactive Windows session
+Original design confirmation: approved by the user through `grill-with-docs` on 2026-10-26
 Testing seam: confirmed by the user through `to-spec` on 2026-10-26 — one exact installed Windows Resident Instance exercising Item Actions Menu behavior on Drop Shelf, Edge Rail, and Manage Items surfaces with real clipboard and File Explorer effects, supported by frontend interaction/accessibility tests and Core Shelf State temporary SQLite/Profile Data regressions
-Ticket breakdown confirmation: approved by the user through `to-tickets` on 2026-10-26
-Approved tickets: [01 — Authoritative Item Classification and Managed File Path Privacy](issues/01-authoritative-item-classification-path-privacy.md), [02 — Drop Shelf Item Actions Round Trip](issues/02-drop-shelf-item-actions-round-trip.md), [03 — Manage Items Row Actions and Virtualized Lifecycle](issues/03-manage-items-row-actions-virtualized-lifecycle.md), [04 — Edge Rail No-activate Item Actions](issues/04-edge-rail-no-activate-item-actions.md), and [05 — Release DropCove 0.0.27](issues/05-release-dropcove-0.0.27.md)
-Approved DAG: `01 → 02 → {03, 04} → 05`
-Implementation authorization: user invoked `implement` and explicitly selected the complete 0.0.27 specification on 2026-10-26. All five tickets are in scope; human candidate acceptance, Git commits, publishing, and deployment remain separate gates. No commit is authorized.
+Original ticket breakdown confirmation: approved by the user through `to-tickets` on 2026-10-26
+Original approved tickets: [01 — Authoritative Item Classification and Managed File Path Privacy](issues/01-authoritative-item-classification-path-privacy.md), [02 — Drop Shelf Item Actions Round Trip](issues/02-drop-shelf-item-actions-round-trip.md), [03 — Manage Items Row Actions and Virtualized Lifecycle](issues/03-manage-items-row-actions-virtualized-lifecycle.md), [04 — Edge Rail No-activate Item Actions](issues/04-edge-rail-no-activate-item-actions.md), and [05 — Release DropCove 0.0.27](issues/05-release-dropcove-0.0.27.md)
+Original approved DAG: `01 → 02 → {03, 04} → 05`
+Amended release DAG: `01 → 02 → {03, 04}`, `03 → 06`, and `{04, 06} → 05`. Ticket 05 preserves the pre-amendment candidate record but its final human-acceptance gate is reopened until Ticket 06 is implemented and verified.
+Original implementation authorization: user invoked `implement` and explicitly selected the complete original 0.0.27 specification on 2026-10-26. Tickets 01–05 were authorized and resolved; their candidate evidence remains unchanged.
+Amendment confirmation: approved by the user through `grill-with-docs` on 2026-10-27
+Amendment ticket: [06 — Suppress Default WebView Menu on Manage Items Rows](issues/06-suppress-manage-items-webview-menu.md)
+Amendment implementation authorization: granted by the user's `implement` invocation on 2026-10-27. Human candidate acceptance, Git commits, publishing, and deployment remain separate gates. No commit is authorized.
 Release assignment: 0.0.27
 Canonical behavior: [Product Specification](../../docs/SPECIFICATION.md), sections 4, 8, 9, 10, 11, 13, 15, 19, and 20
 Canonical architecture: [Architecture](../../docs/ARCHITECTURE.md), sections 2.3, 2.5, 2.7, 4, 6, 9, 14, 15, and 16
 Relevant architectural decision: [ADR-0006 — Materialize non-filesystem drops as app-owned Managed Files](../../docs/adr/0006-managed-files-and-durable-cleanup.md)
+
+## Contract Amendment — 2026-10-27
+
+The user rejected replacing the Item Actions Menu with a right-click menu. The existing **More** entry point and authoritative action matrix remain unchanged on every surface:
+
+| Shelf Item classification | Item Actions Menu |
+|---|---|
+| External Reference, file or folder | **Show in File Explorer**, then **Copy Path** |
+| Plain-text Managed File | **Copy Text** |
+| Image Managed File | No More button or Item Actions Menu |
+
+More remains visible on every eligible Manage Items row under the existing action-control styling. Menus contain only valid actions, target only the row whose More button opened the menu, and do not alter Item Selection.
+
+Manage Items gains one narrow right-click rule. The complete secondary-button sequence on a Shelf Item row, including `pointerdown` before `contextmenu`, remains selection-neutral and action-neutral; the `contextmenu` event is consumed so the embedded WebView does not show its default browser menu. The sequence does not open the Item Actions Menu, change Item Selection or its anchor, start drag, or dispatch an Item Action. More remains the sole Item Actions Menu entry point.
+
+The suppression applies only at the Shelf Item row boundary in Manage Items. It must not interfere with existing primary-button activation or keyboard operation of the row's drag region, Pin/Unpin, More, or Remove controls. It does not change input or textarea editing menus, the Manage Items background, the Drop Shelf, or the Edge Rail. No native Windows context menu, keyboard context-menu-key handling, batch action, or additional pointer shortcut is added.
+
+This amendment is the sole exception to the original statements that right-click/context-menu handling is not added and is out of scope. Those exclusions remain authoritative everywhere else.
+
+### Amendment acceptance criteria
+
+- The complete secondary-button sequence on any ordinary or virtualized Manage Items row, including `pointerdown`, `contextmenu`, and release, prevents the WebView default menu without triggering primary selection or drag behavior.
+- Right-click suppression never opens an Item Actions Menu, changes Item Selection or its anchor, targets an action, or dispatches Pin/Unpin, More, Remove, or drag behavior.
+- Existing primary-button row/control behavior and More keyboard opening, navigation, activation, and dismissal remain unchanged.
+- External Reference, Managed Text, and Managed Image More/action behavior remains exactly as specified and previously verified, including Managed Text **Copy Text**.
+- Right-click behavior outside Manage Items Shelf Item rows remains unchanged, including input/textarea editing behavior and the Edge Rail no-activate contract.
+- Frontend behavior tests exercise the complete secondary-button event sequence and prove WebView-menu prevention, unchanged selection/anchor state, absence of menu/action/drag dispatch, preserved primary/keyboard behavior, and unaffected non-row boundaries.
+- A newly packaged exact 0.0.27 candidate is smoke-tested on Windows for ordinary and virtualized Manage Items collections, existing More actions, Managed Text Copy Text, and the unchanged Edge Rail boundary.
+- The 2026-10-26 candidate evidence remains historical and must not be represented as proof of this amendment. New artifact hashes and amendment evidence are required before human candidate acceptance.
+
+No glossary change or ADR is required. **Item Actions Menu** remains the canonical term, **Context menu** remains avoided terminology for that product concept, and the amendment is a reversible presentation rule rather than an architectural choice.
 
 ## Problem Statement
 
@@ -154,7 +189,7 @@ Managed File internal paths are removed from user-facing tooltip and accessibili
 - At most one Item Actions Menu is open per presentation surface.
 - The menu closes after an action, on `Escape`, on outside pointer interaction, when another item menu opens, when the target item disappears, when projection ownership changes, when virtualization unmounts the target, when the surface scrolls the target away, or when the surface closes/hides.
 - The menu also closes when drag, resize, window movement, modal confirmation, prepared transfer, Clear Temporary Items, or another busy transaction takes presentation ownership.
-- Native right-click/context-menu handling is not added.
+- Right-click never opens the Item Actions Menu, and no native Windows context menu is added. The only `contextmenu` handling is the 2026-10-27 amendment's scoped suppression of the WebView default menu on Manage Items rows.
 
 ### Keyboard, focus, and accessibility
 
@@ -279,7 +314,7 @@ Managed File internal paths are removed from user-facing tooltip and accessibili
 - Depends on Windows Shell, clipboard, and window/foreground facilities already available through the project's Windows bindings.
 - Depends on completed 0.0.26 Item Selection behavior because Item Actions must remain target-local and selection-neutral.
 - No new dependency, Settings field, database migration, durable state, Managed File lifecycle, or ADR is required.
-- Ticket decomposition and full-spec implementation are authorized. Human candidate acceptance, Git commits, publishing, and deployment remain separate explicit gates.
+- Tickets 01–05 and the original full-spec implementation were authorized and resolved. Ticket 06 implementation is authorized and completed; remaining candidate acceptance limits are recorded in its evidence. Human candidate acceptance, Git commits, publishing, and deployment remain separate explicit gates.
 
 ## Out of Scope
 
@@ -300,4 +335,4 @@ Managed File internal paths are removed from user-facing tooltip and accessibili
 - `GLOSSARY.md` now defines **External Reference** and **Item Actions Menu**.
 - The approved design deliberately distinguishes user-facing external paths from DropCove-owned Profile Data paths.
 - A future Managed Image export feature should be designed separately because Copy Image and Save As require format, alpha, animation, filename, overwrite, and lifecycle decisions not present here.
-- The five tickets and DAG are approved and full implementation is authorized. Human candidate acceptance, Git commits, publishing, and deployment remain separate explicit gates; changes must remain uncommitted.
+- Tickets 01–05 and their original DAG remain the approved, resolved pre-amendment implementation record. Ticket 06 records the implemented 2026-10-27 amendment and its outstanding clipboard acceptance limit; human candidate acceptance, Git commits, publishing, and deployment remain separate explicit gates.

@@ -452,6 +452,8 @@ Only one item menu is open per surface. It closes on action, dismissal, another 
 
 Managed File internal paths are not shown or copied by item actions, tooltips, accessibility labels, status, or announcements. Managed Text uses its user-visible name and content preview; Managed Image uses its name and `DropCove-created image`. External References retain their full user-facing path.
 
+In Manage Items only, the complete secondary-button sequence on a Shelf Item row remains selection-neutral and action-neutral, and its `contextmenu` event is consumed so the embedded WebView does not show its default browser menu. It does not open the Item Actions Menu, change Item Selection or its anchor, start drag, or dispatch an Item Action; More remains the sole entry point. Existing primary-button row/control behavior and More keyboard interaction remain unchanged. This suppression does not apply to input or textarea editing menus, the Manage Items background, the Drop Shelf, or the Edge Rail.
+
 
 ## 10. Manage Items
 

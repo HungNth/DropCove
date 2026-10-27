@@ -116,6 +116,7 @@ async function loadFullText() {
     :data-selected="selected || undefined"
     :aria-selected="selectionTabindex !== undefined ? Boolean(selected) : undefined"
     :aria-label="rowAriaLabel"
+    @contextmenu="$event.button === 2 && $event.preventDefault()"
   >
     <div
       class="item-drag flex flex-1 min-w-0 items-center gap-[5px] cursor-grab select-none touch-none active:cursor-grabbing"

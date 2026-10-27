@@ -4,12 +4,12 @@
 
 **What to build:** Integrate and release the complete Type-aware Item Actions workflow as DropCove 0.0.27. Prove authoritative classification and path privacy, exact clipboard and Explorer behavior, selection-neutral menus across all three surfaces, Windows accessibility/focus contracts, regression safety, installer lifecycle, and Profile Data preservation from one exact installed candidate.
 
-**Blocked by:** 03 — Manage Items Row Actions and Virtualized Lifecycle; 04 — Edge Rail No-activate Item Actions
-Status: resolved — 0.0.27 candidate verified and ready for human acceptance; changes uncommitted
+**Blocked by:** 03 — Manage Items Row Actions and Virtualized Lifecycle; 04 — Edge Rail No-activate Item Actions; 06 — Suppress Default WebView Menu on Manage Items Rows
+Status: resolved as historical pre-amendment candidate evidence — final 0.0.27 human acceptance is reopened and blocked by Ticket 06
 
 ## Acceptance criteria
 
-- [x] Product Specification, Architecture, Roadmap, and release evidence describe the final 0.0.27 ownership, content-kind, Item Actions Menu, privacy, lifecycle, testing, and exclusion contracts.
+- [x] Product Specification, Architecture, Roadmap, and release evidence described the complete pre-amendment 0.0.27 ownership, content-kind, Item Actions Menu, privacy, lifecycle, testing, and exclusion contracts verified on 2026-10-26; the 2026-10-27 amendment is tracked separately by Ticket 06.
 - [x] Canonical version, package, crate, lockfile, Tauri, installer, built/installed executable, About Surface, and uninstall metadata all report 0.0.27.
 - [x] Complete frontend tests (53 passed, 0 failed) and Vue production build pass.
 - [x] A freshly cargo-xwin-compiled Windows native regression executable passes the full suite (189 passed, 0 failed).
@@ -82,3 +82,11 @@ The primary seam is the exact installed 0.0.27 Windows x64 Resident Instance wit
 - Contrast and reduced motion were inspected through active Chromium media emulation; the host Windows theme was not toggled globally.
 - Pre-session Run bytes were not captured before the initial development instance launched. Ambient Run restoration verified canonical command reconstruction from user settings rather than byte-exact preservation.
 - Do not commit without explicit user authorization.
+
+## Comments
+
+### 2026-10-27 — Post-verification contract amendment
+
+This ticket remains resolved as the historical record for the exact pre-amendment candidate and its observed evidence. The parent specification now adds Ticket 06, which suppresses the default WebView menu on right-clicked Manage Items rows without changing the Item Actions Menu or its External Reference, Managed Text, and Managed Image capability mapping. Ticket 05's final human-acceptance gate now depends on Ticket 06 implementation and verification.
+
+The candidate hashes and acceptance evidence above do not prove Ticket 06. They must not be relabeled or rewritten as though the amended behavior was present. A newly packaged exact 0.0.27 candidate and focused amendment evidence are required before human candidate acceptance.

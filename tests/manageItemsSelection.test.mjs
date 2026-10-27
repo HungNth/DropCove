@@ -39,6 +39,7 @@ let focusedNode = null;
 
 function matchesSelector(cur, sel) {
   if (!cur || !cur.props) return false;
+  if (sel.includes(",")) return sel.split(",").some(part => matchesSelector(cur, part.trim()));
   if (sel === "button:not(:disabled)") {
     return cur.type === "button" && !cur.props.disabled;
   }
@@ -105,6 +106,7 @@ function node(type) {
       return null;
     },
     querySelector(selector) {
+      if (selector.includes(",")) return selector.split(",").map(part => this.querySelector(part.trim())).find(Boolean) ?? null;
       const parts = selector.trim().split(/\s+/);
       let current = [this];
       for (const part of parts) {
@@ -221,7 +223,7 @@ function simulateDragGesture(target, dx = 10, dy = 10) {
   target.props.onPointerup?.(upEvent);
 }
 
-test("ManageItems exposes multiselectable grid, keyboard selection, and Escape ordering", async () => {
+for (const itemCount of [3, 65]) test(`ManageItems ${itemCount} items preserves selection, right-click boundaries, and Escape ordering`, async () => {
   const events = new Map();
   const callbacks = new Map();
   const commands = [];
@@ -237,6 +239,9 @@ test("ManageItems exposes multiselectable grid, keyboard selection, and Escape o
       { id: "item3", batchId: "batch1", position: 2, path: "C:\\3.txt", name: "3.txt", isFolder: false, isPinned: false, availability: "Available", ownership: "External", managedContentKind: null },
     ],
   };
+  for (let index = 3; index < itemCount; index++) {
+    activeBatch.items.push({ ...activeBatch.items[0], id: `item${index + 1}`, position: index, path: `C:\\${index + 1}.txt`, name: `${index + 1}.txt` });
+  }
 
   globalThis.document = {
     addEventListener: (name, listener) => events.set(name, listener),
@@ -317,7 +322,7 @@ test("ManageItems exposes multiselectable grid, keyboard selection, and Escape o
 
     // Check header summary displays "1 selected · 0/3 pinned"
     const summarySpan = main.children[0].children[0].children[1];
-    assert.equal(summarySpan.text, "1 selected · 0/3 pinned");
+    assert.equal(summarySpan.text, `1 selected · 0/${itemCount} pinned`);
 
     // ArrowDown moves focus to item 2
     await gridKeydown({ key: "ArrowDown", target: focusedNode, preventDefault() {} });
@@ -326,7 +331,41 @@ test("ManageItems exposes multiselectable grid, keyboard selection, and Escape o
     // Ctrl+Space on item 2 toggles item 2 into selection
     await gridKeydown({ key: " ", target: focusedNode, preventDefault() {}, ctrlKey: true, shiftKey: false });
     await nextTick();
-    assert.equal(summarySpan.text, "2 selected · 0/3 pinned");
+    assert.equal(summarySpan.text, `2 selected · 0/${itemCount} pinned`);
+
+    const selectedIds = () => grid.children.filter(c => c.props?.["aria-selected"] === true).map(c => c.props["data-item-id"]);
+    const beforeCommands = commands.length;
+    for (const id of ["item1", "item3"]) {
+      const row = grid.children.find(c => c.props?.["data-item-id"] === id);
+      const drag = row.children[0];
+      const pointer = { button: 2, buttons: 2, pointerId: 2, clientX: 0, clientY: 0, currentTarget: drag, ctrlKey: false, shiftKey: false };
+      drag.props.onPointerdown(pointer);
+      drag.props.onPointermove({ ...pointer, clientX: 20 });
+      const context = new Event("contextmenu", { cancelable: true, bubbles: true });
+      Object.defineProperty(context, "button", { value: 2 });
+      row.props.onContextmenu?.(context);
+      drag.props.onPointerup({ ...pointer, buttons: 0 });
+      await nextTick();
+      assert.equal(context.defaultPrevented, true, "row right-click must suppress the WebView menu");
+      const keyboardContext = new Event("contextmenu", { cancelable: true });
+      Object.defineProperty(keyboardContext, "button", { value: 0 });
+      row.props.onContextmenu?.(keyboardContext);
+      assert.equal(keyboardContext.defaultPrevented, false, "keyboard context-menu invocation remains unchanged");
+      assert.deepEqual(selectedIds(), ["item1", "item2"]);
+      assert.equal(main.querySelector('[role="menu"]'), null);
+    }
+    assert.equal(commands.length, beforeCommands, "right-click must not dispatch a native action or drag");
+    const backgroundContext = new Event("contextmenu", { cancelable: true });
+    main.props.onContextmenu?.(backgroundContext);
+    grid.props.onContextmenu?.(backgroundContext);
+    assert.equal(backgroundContext.defaultPrevented, false);
+    const item3Drag = grid.children.find(c => c.props?.["data-item-id"] === "item3").children[0];
+    await gridKeydown({ key: " ", target: item3Drag, preventDefault() {}, ctrlKey: false, shiftKey: true });
+    await nextTick();
+    assert.deepEqual(selectedIds(), ["item2", "item3"], "right-click must preserve the item2 range anchor");
+    await gridKeydown({ key: " ", target: item3Drag, preventDefault() {}, ctrlKey: true, shiftKey: false });
+    await gridKeydown({ key: " ", target: grid.children.find(c => c.props?.["data-item-id"] === "item1").children[0], preventDefault() {}, ctrlKey: true, shiftKey: false });
+    await nextTick();
 
     // Start item drag on item 1 with mixed availability to trigger confirmation
     const item1Row = grid.children.find(c => c.props?.["data-item-id"] === "item1");
@@ -339,12 +378,12 @@ test("ManageItems exposes multiselectable grid, keyboard selection, and Escape o
     await events.get("keydown")(escape);
     await settle(); await nextTick();
     assert.equal(preparedToken, null, "Escape cancels prepared confirmation first");
-    assert.equal(summarySpan.text, "2 selected · 0/3 pinned", "selection preserved when confirmation canceled");
+    assert.equal(summarySpan.text, `2 selected · 0/${itemCount} pinned`, "selection preserved when confirmation canceled");
 
     // Escape stage 2: clears non-empty Item Selection
     await events.get("keydown")(escape);
     await nextTick();
-    assert.equal(summarySpan.text, "0/3 pinned", "Escape clears non-empty Item Selection");
+    assert.equal(summarySpan.text, `0/${itemCount} pinned`, "Escape clears non-empty Item Selection");
 
     // Escape stage 3: closes Manage Items
     await events.get("keydown")(escape);
