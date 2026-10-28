@@ -1,32 +1,37 @@
 {
-  "name": "dropcove",
-  "private": true,
-  "version": "0.0.28",
-  "type": "module",
-  "engines": {
-    "node": ">=22"
-  },
-  "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc && vite build",
-    "preview": "vite preview",
-    "test": "node --test tests/*.test.mjs",
-    "tauri": "tauri"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "^2.12.3",
-    "@tauri-apps/plugin-opener": "^2.7.1",
-    "@vueuse/core": "^15.0.0",
-    "@lucide/vue": "^1.57.0",
-    "vue": "^3.5.44"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
-    "@tauri-apps/cli": "^2.12.2",
-    "@vitejs/plugin-vue": "^6.0.10",
-    "tailwindcss": "^4.3.3",
-    "typescript": "6.0.2",
-    "vite": "^8.3.4",
-    "vue-tsc": "^3.3.13"
-  }
+    "name": "dropcove",
+    "private": true,
+    "version": "0.0.28",
+    "author": {
+        "name": "HungNth",
+        "email": "thienhungdev@gmail.com",
+        "url": "https://github.com/HungNth"
+    },
+    "type": "module",
+    "engines": {
+        "node": ">=22"
+    },
+    "scripts": {
+        "dev": "vite",
+        "build": "vue-tsc && vite build",
+        "preview": "vite preview",
+        "test": "node --test tests/*.test.mjs",
+        "tauri": "tauri"
+    },
+    "dependencies": {
+        "@tauri-apps/api": "^2.12.3",
+        "@tauri-apps/plugin-opener": "^2.7.1",
+        "@vueuse/core": "^15.0.0",
+        "@lucide/vue": "^1.57.0",
+        "vue": "^3.5.44"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.3.3",
+        "@tauri-apps/cli": "^2.12.2",
+        "@vitejs/plugin-vue": "^6.0.10",
+        "tailwindcss": "^4.3.3",
+        "typescript": "6.0.2",
+        "vite": "^8.3.4",
+        "vue-tsc": "^3.3.13"
+    }
 }
