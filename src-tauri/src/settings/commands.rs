@@ -105,10 +105,10 @@ pub(crate) fn set_shake(
     window: tauri::WebviewWindow,
     app: tauri::AppHandle,
     enabled: bool,
-    sensitivity: super::store::ShakeSensitivity,
+    threshold: u8,
 ) -> Result<SettingsSnapshot, String> {
     if window.label() != super::SETTINGS_WINDOW_LABEL {
         return Err("Shake configuration is only available in Settings".into());
     }
-    super::set_shake(&app, enabled, sensitivity)
+    super::set_shake(&app, enabled, threshold)
 }

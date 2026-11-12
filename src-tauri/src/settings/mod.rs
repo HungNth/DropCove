@@ -10,7 +10,7 @@ use crate::{
     surfaces::placement::{self, InvocationContext},
     resident::startup::{RegistryValue, StartupRegistration},
 };
-use store::{AppearanceMode, HotKey, RailEdge, Settings, SettingsStore, ShakeSensitivity};
+use store::{AppearanceMode, HotKey, RailEdge, Settings, SettingsStore};
 use transaction::Integrations;
 use serde::Serialize;
 use std::{
@@ -38,7 +38,7 @@ pub(crate) struct SettingsSnapshot {
     pub(crate) rail_monitor_id: String,
     pub(crate) show_rail_over_fullscreen: bool,
     pub(crate) shake_enabled: bool,
-    pub(crate) shake_sensitivity: ShakeSensitivity,
+    pub(crate) shake_threshold: u8,
     pub(crate) appearance_mode: AppearanceMode,
     pub(crate) monitors: Vec<crate::surfaces::edge_rail::MonitorChoice>,
 }
@@ -151,7 +151,7 @@ pub(crate) fn get_snapshot(app: &AppHandle) -> Result<SettingsSnapshot, String> 
         rail_monitor_id: settings.rail_monitor_id.clone(),
         show_rail_over_fullscreen: settings.show_rail_over_fullscreen,
         shake_enabled: settings.shake_enabled,
-        shake_sensitivity: settings.shake_sensitivity,
+        shake_threshold: settings.shake_threshold,
         appearance_mode: settings.appearance_mode,
         monitors: crate::surfaces::edge_rail::choices()?,
     })
@@ -323,7 +323,7 @@ pub(crate) fn set_show_rail_over_fullscreen(
 pub(crate) fn set_shake(
     app: &AppHandle,
     enabled: bool,
-    sensitivity: ShakeSensitivity,
+    threshold: u8,
 ) -> Result<SettingsSnapshot, String> {
     if app.get_webview_window(SETTINGS_WINDOW_LABEL).is_none() {
         return Err("Settings window is not open".into());
@@ -334,9 +334,11 @@ pub(crate) fn set_shake(
         let session = session
             .as_mut()
             .ok_or("settings coordinator is not initialized")?;
-        let candidate = session.draft.get_or_insert_with(|| session.desired.clone());
+        let mut candidate = session.draft.as_ref().unwrap_or(&session.desired).clone();
         candidate.shake_enabled = enabled;
-        candidate.shake_sensitivity = sensitivity;
+        candidate.shake_threshold = threshold;
+        candidate.validate()?;
+        session.draft = Some(candidate);
     }
     emit_snapshot(app)
 }

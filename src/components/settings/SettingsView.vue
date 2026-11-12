@@ -4,7 +4,7 @@ import {
   useSettings,
   type AppearanceMode,
   type RailEdge,
-  type ShakeSensitivity,
+  type ShakeThreshold,
 } from "../../composables/useSettings";
 import RailPlacementFields from "./RailPlacementFields.vue";
 import ShakeSettingsFields from "./ShakeSettingsFields.vue";
@@ -99,11 +99,11 @@ async function onFullscreenChange(enabled: boolean, event: Event) {
   }
 }
 
-async function onShakeChange(enabled: boolean, sensitivity: ShakeSensitivity, event: Event) {
+async function onShakeChange(enabled: boolean, threshold: ShakeThreshold, event: Event) {
   const input = event.currentTarget;
-  await setShake(enabled, sensitivity);
+  await setShake(enabled, threshold);
   if (input instanceof HTMLInputElement) input.checked = Boolean(snapshot.value?.shakeEnabled);
-  if (input instanceof HTMLSelectElement) input.value = snapshot.value?.shakeSensitivity ?? "Normal";
+  if (input instanceof HTMLSelectElement) input.value = String(snapshot.value?.shakeThreshold ?? 5);
 }
 
 async function onAppearanceChange(mode: AppearanceMode, event: Event) {
@@ -236,7 +236,7 @@ async function onAppearanceChange(mode: AppearanceMode, event: Event) {
         :show-over-fullscreen="Boolean(snapshot.showRailOverFullscreen)"
         :monitors="monitors" :disabled="busy" @change="onPlacementChange" @fullscreen-change="onFullscreenChange" />
       <ShakeSettingsFields v-if="snapshot" :enabled="snapshot.shakeEnabled"
-        :sensitivity="snapshot.shakeSensitivity" :disabled="busy" @change="onShakeChange" />
+        :threshold="snapshot.shakeThreshold" :disabled="busy" @change="onShakeChange" />
     </div>
 
     <!-- Appearance Tab Panel -->

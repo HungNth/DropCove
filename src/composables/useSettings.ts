@@ -12,7 +12,7 @@ export interface HotKey {
 }
 
 export type RailEdge = "Left" | "Right";
-export type ShakeSensitivity = "Low" | "Normal" | "High";
+export type ShakeThreshold = 3 | 4 | 5 | 6 | 7 | 8;
 export interface MonitorChoice { id: string; label: string; connected: boolean }
 
 export type AppearanceMode = "System" | "Dark" | "Light";
@@ -26,7 +26,7 @@ export interface SettingsSnapshot {
   railMonitorId: string;
   showRailOverFullscreen: boolean;
   shakeEnabled: boolean;
-  shakeSensitivity: ShakeSensitivity;
+  shakeThreshold: ShakeThreshold;
   monitors: MonitorChoice[];
   appearanceMode: AppearanceMode;
 }
@@ -131,11 +131,11 @@ export function useSettings() {
     } finally { if (!disposed) busy.value = false; }
   }
 
-  async function setShake(enabled: boolean, sensitivity: ShakeSensitivity) {
+  async function setShake(enabled: boolean, threshold: ShakeThreshold) {
     if (busy.value || disposed) return;
     busy.value = true;
     try {
-      const next = await invoke<SettingsSnapshot>("set_shake", { enabled, sensitivity });
+      const next = await invoke<SettingsSnapshot>("set_shake", { enabled, threshold });
       if (!disposed) { snapshot.value = next; status.value = ""; }
     } catch (error) {
       if (!disposed) status.value = String(error);

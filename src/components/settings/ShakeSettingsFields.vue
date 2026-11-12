@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import type { ShakeSensitivity } from "../../composables/useSettings";
-const props = defineProps<{ enabled: boolean; sensitivity: ShakeSensitivity; disabled: boolean }>();
-const emit = defineEmits<{ change: [enabled: boolean, sensitivity: ShakeSensitivity, event: Event] }>();
+import type { ShakeThreshold } from "../../composables/useSettings";
+const props = defineProps<{ enabled: boolean; threshold: ShakeThreshold; disabled: boolean }>();
+const emit = defineEmits<{ change: [enabled: boolean, threshold: ShakeThreshold, event: Event] }>();
 function onEnabled(event: Event) {
   const input = event.currentTarget;
-  if (input instanceof HTMLInputElement) emit("change", input.checked, props.sensitivity, event);
+  if (input instanceof HTMLInputElement) emit("change", input.checked, props.threshold, event);
 }
-function onSensitivity(event: Event) {
+function onThreshold(event: Event) {
   const input = event.currentTarget;
-  if (input instanceof HTMLSelectElement && ["Low", "Normal", "High"].includes(input.value)) {
-    emit("change", props.enabled, input.value as ShakeSensitivity, event);
+  if (!(input instanceof HTMLSelectElement)) return;
+  const threshold = Number(input.value);
+  if ([3, 4, 5, 6, 7, 8].includes(threshold)) {
+    emit("change", props.enabled, threshold as ShakeThreshold, event);
   }
 }
 </script>
@@ -37,20 +39,25 @@ function onSensitivity(event: Event) {
 
     <div class="flex items-center justify-between pt-2 border-t border-dc-border-subtle/80 transition-opacity" :class="!enabled ? 'opacity-40 pointer-events-none' : ''">
       <div class="flex flex-col gap-0.5">
-        <span class="text-[12px] font-medium text-dc-text-primary">Shake sensitivity</span>
-        <span class="text-[11px] text-dc-text-muted">Threshold for gesture detection</span>
+        <label for="shake-threshold" class="text-[12px] font-medium text-dc-text-primary">Shake threshold</label>
+        <span id="shake-threshold-description" class="text-[11px] text-dc-text-muted">Number of back-and-forth movements required to trigger</span>
       </div>
-      <div class="relative w-28 shrink-0">
+      <div class="relative w-36 shrink-0">
         <select
-          name="shake-sensitivity"
+          id="shake-threshold"
+          name="shake-threshold"
+          aria-describedby="shake-threshold-description"
           class="w-full appearance-none py-1.5 pl-2.5 pr-7 border border-dc-border-default rounded-md bg-dc-surface-elevated text-dc-text-primary text-[12px] font-medium [font-family:inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-focus forced-colors:focus-visible:outline-[2px]! forced-colors:focus-visible:outline-[Highlight]! disabled:opacity-[var(--dc-disabled-opacity)] cursor-pointer hover:border-dc-border-hover transition-colors forced-colors:border-[ButtonText] forced-colors:bg-[ButtonFace] forced-colors:text-[ButtonText]"
-          :value="sensitivity"
+          :value="threshold"
           :disabled="disabled || !enabled"
-          @change="onSensitivity"
+          @change="onThreshold"
         >
-          <option value="Low">Low</option>
-          <option value="Normal">Normal</option>
-          <option value="High">High</option>
+          <option :value="3">3 shakes</option>
+          <option :value="4">4 shakes</option>
+          <option :value="5">5 shakes (Default)</option>
+          <option :value="6">6 shakes</option>
+          <option :value="7">7 shakes</option>
+          <option :value="8">8 shakes</option>
         </select>
         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-dc-text-muted">
           <svg class="size-3.5" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>

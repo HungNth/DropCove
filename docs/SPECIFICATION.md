@@ -274,18 +274,21 @@ If Windows rejects the new combination, Settings stays open, reports the conflic
 
 ### 7.2 Shake-to-open
 
-Shake-to-open is enabled by default. It observes event-driven low-level mouse movement while the left button is held and looks for rapid axis reversals.
+Shake-to-open is enabled by default. It observes event-driven low-level mouse movement while the left button is held and looks for deliberate back-and-forth movement strokes on one dominant axis.
 
-| Sensitivity | Minimum movement per accepted direction sample | Required reversals |
-| ----------- | ---------------------------------------------: | -----------------: |
-| Low         |                                          24 px |                  4 |
-| Normal      |                                          10 px |                  2 |
-| High        |                                           8 px |                  2 |
+| Rule | Value |
+| ---- | ----: |
+| Configurable movement strokes | `3` through `8` |
+| Default movement strokes | `5` |
+| Required reversals | `ShakeThreshold - 1` |
+| Minimum movement per accepted stroke | `18 px` |
+| Detection window | `max(800 ms, 250 ms × ShakeThreshold)` |
+| Trigger cooldown | `500 ms` |
+
+The first accepted stroke establishes direction. Each subsequent accepted stroke must reverse direction on the same dominant axis; an axis change starts a new reversal run. At the default threshold, four strokes do not trigger and the fifth accepted stroke does.
 
 Additional rules:
 
-- detection window: `600 ms`;
-- trigger cooldown: `500 ms`;
 - the hook does not prove that another application is performing a file drag;
 - the current `Hidden` or `EdgeDocked` state and placement are saved before showing near the cursor;
 - an accepted new Shelf Batch keeps the shelf visible near the cursor;
@@ -822,7 +825,7 @@ Settings presents two horizontal tabs below its title: **General** and **Appeara
 | Target monitor                    | Follow pointer         | Follow the pointer on fresh dismissal, or use a connected explicit display identifier | `0.0.5`    |
 | Show over fullscreen applications | Off                    | Controls Edge Rail fullscreen hiding                                | `0.0.5`    |
 | Enable shake gesture              | On                     | Installs/removes global pointer hook                                | `0.0.6`    |
-| Shake sensitivity                 | Normal                 | Low, Normal, High                                                   | `0.0.6`    |
+| Shake threshold                   | 5 movements            | 3 through 8 deliberate back-and-forth movement strokes             | `0.0.6`    |
 | Appearance mode                   | System                 | System, Dark, or Light; Windows Contrast Theme overrides rendering  | `0.0.19`   |
 
 There is no setting to disable the Edge Rail while retaining its standard non-empty dismissal behavior.
@@ -895,7 +898,7 @@ Serialized content in `0.0.5`:
 }
 ```
 
-Serialized content in `0.0.6`:
+Current serialized content after the configurable Shake Threshold cutover:
 
 ```json
 {
@@ -911,34 +914,12 @@ Serialized content in `0.0.6`:
     "RailMonitorId": "",
     "ShowRailOverFullscreen": false,
     "ShakeEnabled": true,
-    "ShakeSensitivity": "Normal"
-}
-```
-
-Serialized content in `0.0.19`:
-
-```json
-{
-    "HotKey": {
-        "Control": true,
-        "Alt": false,
-        "Shift": true,
-        "Windows": false,
-        "VirtualKey": 32
-    },
-    "StartWithWindows": true,
-    "RailEdge": "Right",
-    "RailMonitorId": "",
-    "ShowRailOverFullscreen": false,
-    "ShakeEnabled": true,
-    "ShakeSensitivity": "Normal",
+    "ShakeThreshold": 5,
     "AppearanceMode": "System"
 }
 ```
 
-Each schema extension (`0.0.5`, `0.0.6`, and `0.0.19`) is a clean cutover: all top-level fields for the active version are required and unknown fields remain rejected. Earlier-version settings files without the newer fields follow the normal malformed-settings path: preserve the original bytes, load active defaults in memory, warn, and replace the file only after a successful explicit Save.
-
-For the `0.0.19` cutover, a pre-feature file without `AppearanceMode` therefore resets every in-memory preference to the documented defaults, including the hotkey, startup, Rail, fullscreen, Shake, and `AppearanceMode: System` values. DropCove does not migrate that file, add compatibility fields, or create a second appearance store.
+Every top-level field for the active version is required and unknown fields remain rejected. Earlier settings files containing `ShakeSensitivity`, files missing `ShakeThreshold`, and files with a threshold outside `3..=8` follow the normal malformed-settings path: preserve the original bytes, load the complete active defaults in memory, warn, and replace the file only after a successful explicit Save. DropCove does not migrate the old field, add an alias, dual-write both forms, or create a second settings store.
 
 `RailEdge` and `RailMonitorId` are user preferences. An empty `RailMonitorId` selects Follow pointer for each fresh non-empty dismissal; a non-empty value takes precedence whenever that display is connected. The actual monitor used by the docked Edge Rail remains Shelf state for restoration and does not rewrite the preference.
 

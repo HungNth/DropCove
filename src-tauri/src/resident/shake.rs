@@ -22,7 +22,7 @@ use windows::Win32::{
     },
 };
 
-use crate::settings::store::{Settings, ShakeSensitivity};
+use crate::settings::store::Settings;
 
 const SUBCLASS_ID: usize = 0xDC11;
 const PROCESS_EVENTS: u32 = WM_APP + 0x31;
@@ -31,7 +31,9 @@ const SHAKE_TRIGGERED: u32 = WM_APP + 0x34;
 const LEFT_RELEASED: u32 = WM_APP + 0x35;
 const HOOK_FAILED: u32 = WM_APP + 0x36;
 const EVENT_CAPACITY: usize = 256;
-const DETECTION_WINDOW_MS: u32 = 600;
+const MINIMUM_MOVEMENT: u32 = 18;
+const MINIMUM_DETECTION_WINDOW_MS: u32 = 800;
+const DETECTION_MS_PER_STROKE: u32 = 250;
 const COOLDOWN_MS: u32 = 500;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -102,33 +104,9 @@ enum DetectorAction {
     Release,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct SensitivityProfile {
-    minimum_movement: u32,
-    required_reversals: u8,
-}
-
-impl ShakeSensitivity {
-    fn profile(self) -> SensitivityProfile {
-        match self {
-            Self::Low => SensitivityProfile {
-                minimum_movement: 24,
-                required_reversals: 4,
-            },
-            Self::Normal => SensitivityProfile {
-                minimum_movement: 10,
-                required_reversals: 2,
-            },
-            Self::High => SensitivityProfile {
-                minimum_movement: 8,
-                required_reversals: 2,
-            },
-        }
-    }
-}
 
 struct ShakeDetector {
-    sensitivity: ShakeSensitivity,
+    threshold: u8,
     left_down: bool,
     baseline: Option<(i32, i32)>,
     window_started_at: Option<u32>,
@@ -139,9 +117,10 @@ struct ShakeDetector {
 }
 
 impl ShakeDetector {
-    fn new(sensitivity: ShakeSensitivity) -> Self {
+    fn new(threshold: u8) -> Self {
+        debug_assert!((3..=8).contains(&threshold));
         Self {
-            sensitivity,
+            threshold,
             left_down: false,
             baseline: None,
             window_started_at: None,
@@ -193,9 +172,11 @@ impl ShakeDetector {
             self.baseline = Some(event.point());
             return None;
         };
+        let detection_window = (u32::from(self.threshold) * DETECTION_MS_PER_STROKE)
+            .max(MINIMUM_DETECTION_WINDOW_MS);
         if self
             .window_started_at
-            .is_some_and(|started| event.time_ms.wrapping_sub(started) > DETECTION_WINDOW_MS)
+            .is_some_and(|started| event.time_ms.wrapping_sub(started) > detection_window)
         {
             self.reset_sequence(Some(event.point()));
             return None;
@@ -205,13 +186,13 @@ impl ShakeDetector {
         let delta_y = event.y - baseline_y;
         let absolute_x = delta_x.unsigned_abs();
         let absolute_y = delta_y.unsigned_abs();
-        let profile = self.sensitivity.profile();
+
         let (axis, movement, direction) = if absolute_x >= absolute_y {
             (Axis::X, absolute_x, delta_x.signum() as i8)
         } else {
             (Axis::Y, absolute_y, delta_y.signum() as i8)
         };
-        if movement < profile.minimum_movement || direction == 0 {
+        if movement < MINIMUM_MOVEMENT || direction == 0 {
             return None;
         }
 
@@ -231,7 +212,7 @@ impl ShakeDetector {
             Some(_) if self.direction != direction => {
                 self.direction = direction;
                 self.reversals = self.reversals.saturating_add(1);
-                if self.reversals >= profile.required_reversals {
+                if self.reversals >= self.threshold - 1 {
                     self.last_trigger_at = Some(event.time_ms);
                     self.reset_sequence(Some(event.point()));
                     return Some(DetectorAction::Trigger);
@@ -347,7 +328,7 @@ fn process_events() {
 fn run_hook_thread(
     target: isize,
     generation: usize,
-    sensitivity: ShakeSensitivity,
+    threshold: u8,
     ready: mpsc::SyncSender<Result<u32, String>>,
 ) -> Result<(), String> {
     let thread_id = unsafe { GetCurrentThreadId() };
@@ -360,7 +341,7 @@ fn run_hook_thread(
             generation,
             thread_id,
             events: EventQueue::new(EVENT_CAPACITY),
-            detector: ShakeDetector::new(sensitivity),
+            detector: ShakeDetector::new(threshold),
             processing_posted: false,
         });
     });
@@ -444,7 +425,7 @@ struct Runtime {
     hwnd: isize,
     subclass_data: usize,
     hook: Option<HookThread>,
-    sensitivity: ShakeSensitivity,
+    threshold: u8,
     generation: usize,
 }
 
@@ -454,7 +435,7 @@ impl Default for Runtime {
             hwnd: 0,
             subclass_data: 0,
             hook: None,
-            sensitivity: ShakeSensitivity::Normal,
+            threshold: 5,
             generation: 0,
         }
     }
@@ -476,7 +457,7 @@ impl ShakeRuntimeState {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct RuntimeSnapshot {
     pub(crate) enabled: bool,
-    pub(crate) sensitivity: ShakeSensitivity,
+    pub(crate) threshold: u8,
 }
 
 fn verify_owner_thread(runtime: &Runtime) -> Result<HWND, String> {
@@ -493,14 +474,14 @@ fn verify_owner_thread(runtime: &Runtime) -> Result<HWND, String> {
 
 fn start_hook(
     hwnd: HWND,
-    sensitivity: ShakeSensitivity,
+    threshold: u8,
     generation: usize,
 ) -> Result<HookThread, String> {
     let (ready_sender, ready_receiver) = mpsc::sync_channel(1);
     let target = hwnd.0 as isize;
     let join = thread::Builder::new()
         .name("dropcove-shake-hook".into())
-        .spawn(move || run_hook_thread(target, generation, sensitivity, ready_sender))
+        .spawn(move || run_hook_thread(target, generation, threshold, ready_sender))
         .map_err(|error| format!("could not start Shake hook thread: {error}"))?;
     match ready_receiver.recv() {
         Ok(Ok(thread_id)) => Ok(HookThread { thread_id, join }),
@@ -538,7 +519,7 @@ fn stop_hook(runtime: &mut Runtime) -> Result<(), String> {
 fn apply_runtime(
     app: &AppHandle,
     enabled: bool,
-    sensitivity: ShakeSensitivity,
+    threshold: u8,
 ) -> Result<(), String> {
     // Native cancellation can re-enter the Shelf subclass, so never hold runtime state across it.
     if !enabled {
@@ -547,15 +528,15 @@ fn apply_runtime(
     let state = app.state::<ShakeRuntimeState>();
     let mut runtime = state.lock()?;
     let hwnd = verify_owner_thread(&runtime)?;
-    if !enabled || runtime.sensitivity != sensitivity {
+    if !enabled || runtime.threshold != threshold {
         stop_hook(&mut runtime)?;
         runtime.generation = runtime.generation.wrapping_add(1);
     }
     if enabled && runtime.hook.is_none() {
         runtime.generation = runtime.generation.wrapping_add(1);
-        runtime.hook = Some(start_hook(hwnd, sensitivity, runtime.generation)?);
+        runtime.hook = Some(start_hook(hwnd, threshold, runtime.generation)?);
     }
-    runtime.sensitivity = sensitivity;
+    runtime.threshold = threshold;
     Ok(())
 }
 
@@ -585,7 +566,7 @@ pub(crate) fn initialize(window: &WebviewWindow, settings: &Settings) -> Result<
             runtime.subclass_data = data;
         }
     }
-    apply_runtime(app, settings.shake_enabled, settings.shake_sensitivity)
+    apply_runtime(app, settings.shake_enabled, settings.shake_threshold)
 }
 
 pub(crate) fn snapshot(app: &AppHandle) -> Result<RuntimeSnapshot, String> {
@@ -593,19 +574,19 @@ pub(crate) fn snapshot(app: &AppHandle) -> Result<RuntimeSnapshot, String> {
     let runtime = state.lock()?;
     Ok(RuntimeSnapshot {
         enabled: runtime.hook.is_some(),
-        sensitivity: runtime.sensitivity,
+        threshold: runtime.threshold,
     })
 }
 
 pub(crate) fn restore(app: &AppHandle, previous: &RuntimeSnapshot) -> Result<(), String> {
-    apply_runtime(app, previous.enabled, previous.sensitivity)
+    apply_runtime(app, previous.enabled, previous.threshold)
 }
 
 pub(crate) fn description(app: &AppHandle) -> Result<String, String> {
     let snapshot = snapshot(app)?;
     Ok(format!(
-        "enabled={} sensitivity={:?}",
-        snapshot.enabled, snapshot.sensitivity
+        "enabled={} threshold={}",
+        snapshot.enabled, snapshot.threshold
     ))
 }
 
@@ -710,74 +691,111 @@ mod tests {
         }
     }
 
-    fn trigger(detector: &mut ShakeDetector, minimum: i32, start: u32) -> Option<DetectorAction> {
+    fn process_strokes(
+        detector: &mut ShakeDetector,
+        movement: i32,
+        strokes: u8,
+        start: u32,
+        interval: u32,
+    ) -> Vec<Option<DetectorAction>> {
         detector.process(event(PointerKind::LeftDown, 0, 0, start));
-        detector.process(event(PointerKind::Move, minimum, 0, start + 10));
-        detector.process(event(PointerKind::Move, 0, 0, start + 20));
-        detector.process(event(PointerKind::Move, minimum, 0, start + 30))
+        (0..strokes)
+            .map(|stroke| {
+                let x = if stroke % 2 == 0 { movement } else { 0 };
+                detector.process(event(
+                    PointerKind::Move,
+                    x,
+                    0,
+                    start + (u32::from(stroke) + 1) * interval,
+                ))
+            })
+            .collect()
     }
 
     #[test]
-    fn gestures_cover_profiles_left_button_requirement_and_axis_ties() {
-        let mut detector = ShakeDetector::new(ShakeSensitivity::Normal);
-        assert_eq!(detector.process(event(PointerKind::Move, 10, 0, 0)), None);
-        detector.process(event(PointerKind::LeftDown, 0, 0, 0));
-        detector.process(event(PointerKind::Move, 9, 9, 10));
-        detector.process(event(PointerKind::Move, 10, 10, 20));
-        assert_eq!(
-            (detector.axis, detector.baseline),
-            (Some(Axis::X), Some((10, 10)))
-        );
-        assert_eq!(
-            trigger(&mut ShakeDetector::new(ShakeSensitivity::High), 8, 0),
-            Some(DetectorAction::Trigger)
-        );
-        assert_eq!(
-            trigger(&mut detector, 10, 30),
-            Some(DetectorAction::Trigger)
-        );
+    fn default_threshold_rejects_four_strokes_and_triggers_on_fifth() {
+        let mut detector = ShakeDetector::new(5);
+        let actions = process_strokes(&mut detector, 18, 5, 0, 200);
+        assert_eq!(actions[..4], [None; 4]);
+        assert_eq!(actions[4], Some(DetectorAction::Trigger));
     }
 
     #[test]
-    fn low_profile_requires_four_full_reversals() {
-        let mut detector = ShakeDetector::new(ShakeSensitivity::Low);
-        detector.process(event(PointerKind::LeftDown, 0, 0, 0));
-        assert_eq!(detector.process(event(PointerKind::Move, 24, 0, 10)), None);
-        assert_eq!(detector.process(event(PointerKind::Move, 0, 0, 20)), None);
-        assert_eq!(detector.process(event(PointerKind::Move, 24, 0, 30)), None);
-        assert_eq!(detector.process(event(PointerKind::Move, 0, 0, 40)), None);
-        assert_eq!(
-            detector.process(event(PointerKind::Move, 24, 0, 50)),
-            Some(DetectorAction::Trigger)
-        );
+    fn threshold_boundaries_trigger_on_the_selected_stroke() {
+        for threshold in [3, 5, 8] {
+            let mut detector = ShakeDetector::new(threshold);
+            let actions = process_strokes(&mut detector, 18, threshold, 0, 200);
+            assert!(actions[..usize::from(threshold - 1)]
+                .iter()
+                .all(Option::is_none));
+            assert_eq!(
+                actions[usize::from(threshold - 1)],
+                Some(DetectorAction::Trigger)
+            );
+        }
+    }
+
+    #[test]
+    fn movement_requires_eighteen_pixels_and_left_button() {
+        let mut detector = ShakeDetector::new(3);
+        assert_eq!(detector.process(event(PointerKind::Move, 18, 0, 0)), None);
+        let ignored = process_strokes(&mut detector, 17, 3, 10, 100);
+        assert!(ignored.iter().all(Option::is_none));
+        let accepted = process_strokes(&mut detector, 18, 3, 400, 100);
+        assert_eq!(accepted[2], Some(DetectorAction::Trigger));
+    }
+
+    #[test]
+    fn threshold_scaled_windows_accept_boundary_and_reject_expired_sequences() {
+        for (threshold, window) in [(3, 800), (5, 1_250), (8, 2_000)] {
+            let mut boundary = ShakeDetector::new(threshold);
+            boundary.process(event(PointerKind::LeftDown, 0, 0, 0));
+            boundary.process(event(PointerKind::Move, 18, 0, 10));
+            for stroke in 1..threshold - 1 {
+                let x = if stroke % 2 == 0 { 18 } else { 0 };
+                boundary.process(event(PointerKind::Move, x, 0, 10 + u32::from(stroke) * 10));
+            }
+            let final_x = if (threshold - 1) % 2 == 0 { 18 } else { 0 };
+            assert_eq!(
+                boundary.process(event(PointerKind::Move, final_x, 0, 10 + window)),
+                Some(DetectorAction::Trigger)
+            );
+
+            let mut expired = ShakeDetector::new(threshold);
+            expired.process(event(PointerKind::LeftDown, 0, 0, 0));
+            expired.process(event(PointerKind::Move, 18, 0, 10));
+            assert_eq!(
+                expired.process(event(PointerKind::Move, 0, 0, 11 + window)),
+                None
+            );
+            assert_eq!(expired.reversals, 0);
+        }
     }
 
     #[test]
     fn axis_change_resets_the_reversal_run() {
-        let mut detector = ShakeDetector::new(ShakeSensitivity::Normal);
+        let mut detector = ShakeDetector::new(5);
         detector.process(event(PointerKind::LeftDown, 0, 0, 0));
-        detector.process(event(PointerKind::Move, 10, 0, 10));
-        detector.process(event(PointerKind::Move, 10, 10, 20));
-        detector.process(event(PointerKind::Move, 0, 10, 30));
+        detector.process(event(PointerKind::Move, 18, 0, 10));
+        detector.process(event(PointerKind::Move, 18, 18, 20));
+        detector.process(event(PointerKind::Move, 0, 18, 30));
         assert_eq!(detector.reversals, 0);
         assert_eq!(detector.axis, Some(Axis::X));
     }
 
     #[test]
-    fn expired_window_and_cooldown_reject_stale_sequences() {
-        let mut detector = ShakeDetector::new(ShakeSensitivity::Normal);
-        detector.process(event(PointerKind::LeftDown, 0, 0, 0));
-        detector.process(event(PointerKind::Move, 10, 0, 10));
-        assert_eq!(detector.process(event(PointerKind::Move, 0, 0, 611)), None);
-        assert_eq!(detector.reversals, 0);
+    fn cooldown_rejects_a_second_sequence_until_five_hundred_ms_elapsed() {
+        let mut detector = ShakeDetector::new(3);
         assert_eq!(
-            trigger(&mut detector, 10, 700),
+            process_strokes(&mut detector, 18, 3, 0, 10)[2],
             Some(DetectorAction::Trigger)
         );
-        detector.process(event(PointerKind::LeftUp, 10, 0, 731));
-        assert_eq!(trigger(&mut detector, 10, 800), None);
+        detector.process(event(PointerKind::LeftUp, 18, 0, 31));
+        assert!(process_strokes(&mut detector, 18, 3, 100, 10)
+            .iter()
+            .all(Option::is_none));
         assert_eq!(
-            trigger(&mut detector, 10, 1230),
+            process_strokes(&mut detector, 18, 3, 530, 10)[2],
             Some(DetectorAction::Trigger)
         );
     }

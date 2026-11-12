@@ -295,8 +295,8 @@ mod tests {
         }
         fn shake_description(&self) -> Result<String, String> {
             Ok(format!(
-                "{} {:?}",
-                self.shake.shake_enabled, self.shake.shake_sensitivity
+                "{} {}",
+                self.shake.shake_enabled, self.shake.shake_threshold
             ))
         }
         fn committed_appearance(&self) -> Result<AppearanceMode, String> {
@@ -373,7 +373,7 @@ mod tests {
             rail_edge: crate::settings::store::RailEdge::Left,
             rail_monitor_id: "other-display".into(),
             shake_enabled: false,
-            shake_sensitivity: crate::settings::store::ShakeSensitivity::High,
+            shake_threshold: 8,
             ..Settings::default()
         };
         let native = Native {
@@ -587,7 +587,7 @@ mod tests {
             .warning
             .as_ref()
             .unwrap()
-            .contains("Shake=false High"));
+            .contains("Shake=false 8"));
         assert_eq!(store.load().0, old);
     }
     #[test]

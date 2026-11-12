@@ -297,13 +297,6 @@ pub(crate) enum RailEdge {
     Right,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum ShakeSensitivity {
-    Low,
-    #[default]
-    Normal,
-    High,
-}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum AppearanceMode {
@@ -323,7 +316,7 @@ pub struct Settings {
     pub(crate) rail_monitor_id: String,
     pub(crate) show_rail_over_fullscreen: bool,
     pub(crate) shake_enabled: bool,
-    pub(crate) shake_sensitivity: ShakeSensitivity,
+    pub(crate) shake_threshold: u8,
     pub(crate) appearance_mode: AppearanceMode,
 }
 
@@ -336,7 +329,7 @@ impl Default for Settings {
             rail_monitor_id: String::new(),
             show_rail_over_fullscreen: false,
             shake_enabled: true,
-            shake_sensitivity: ShakeSensitivity::Normal,
+            shake_threshold: 5,
             appearance_mode: AppearanceMode::System,
         }
     }
@@ -348,6 +341,9 @@ impl Settings {
         if self.rail_monitor_id.contains('\0') || self.rail_monitor_id.encode_utf16().count() > 1024
         {
             return Err("invalid target monitor identifier".into());
+        }
+        if !(3..=8).contains(&self.shake_threshold) {
+            return Err("ShakeThreshold must be between 3 and 8".into());
         }
         Ok(())
     }
@@ -448,7 +444,7 @@ impl SettingsStore {
         if let Err(val_err) = settings.validate() {
             return (
                 Settings::default(),
-                Some(format!("Settings file contains invalid hotkey: {val_err}")),
+                Some(format!("Settings file contains invalid values: {val_err}")),
             );
         }
 
@@ -823,7 +819,7 @@ mod tests {
             "RailMonitorId",
             "ShowRailOverFullscreen",
             "ShakeEnabled",
-            "ShakeSensitivity",
+            "ShakeThreshold",
             "AppearanceMode",
         ] {
             let mut missing = value.clone();
@@ -839,10 +835,61 @@ mod tests {
     }
 
     #[test]
+    fn shake_threshold_defaults_and_validation_cover_three_through_eight() {
+        assert_eq!(Settings::default().shake_threshold, 5);
+        for threshold in [3, 5, 8] {
+            let settings = Settings {
+                shake_threshold: threshold,
+                ..Settings::default()
+            };
+            assert!(settings.validate().is_ok());
+        }
+        for threshold in [0, 1, 2, 9, u8::MAX] {
+            let settings = Settings {
+                shake_threshold: threshold,
+                ..Settings::default()
+            };
+            assert!(settings.validate().is_err());
+        }
+    }
+
+    #[test]
+    fn shake_threshold_clean_cutover_rejects_old_and_out_of_range_contracts() {
+        let temp = TempDir::new("shake-threshold-cutover");
+        let store = SettingsStore::new(&temp.path);
+        let old = br#"{"HotKey":{"Control":true,"Alt":true,"Shift":false,"Windows":false,"VirtualKey":75},"StartWithWindows":false,"RailEdge":"Left","RailMonitorId":"display","ShowRailOverFullscreen":true,"ShakeEnabled":false,"ShakeSensitivity":"High","AppearanceMode":"System"}"#;
+        fs::write(store.path(), old).unwrap();
+        let (loaded, warning) = store.load();
+        assert_eq!(loaded, Settings::default());
+        assert!(warning.is_some());
+        assert_eq!(store.read_raw().unwrap().as_deref(), Some(old.as_slice()));
+
+        let mut missing = serde_json::to_value(Settings::default()).unwrap();
+        missing.as_object_mut().unwrap().remove("ShakeThreshold");
+        let original = serde_json::to_vec(&missing).unwrap();
+        fs::write(store.path(), &original).unwrap();
+        let (loaded, warning) = store.load();
+        assert_eq!(loaded, Settings::default());
+        assert!(warning.is_some());
+        assert_eq!(store.read_raw().unwrap(), Some(original));
+
+        for threshold in [2, 9] {
+            let mut invalid = serde_json::to_value(Settings::default()).unwrap();
+            invalid["ShakeThreshold"] = threshold.into();
+            let original = serde_json::to_vec(&invalid).unwrap();
+            fs::write(store.path(), &original).unwrap();
+            let (loaded, warning) = store.load();
+            assert_eq!(loaded, Settings::default());
+            assert!(warning.is_some());
+            assert_eq!(store.read_raw().unwrap(), Some(original));
+        }
+    }
+
+    #[test]
     fn appearance_cutover_preserves_previous_configuration_until_explicit_save() {
         let temp = TempDir::new("appearance-cutover");
         let store = SettingsStore::new(&temp.path);
-        let previous = br#"{"HotKey":{"Control":true,"Alt":true,"Shift":false,"Windows":false,"VirtualKey":75},"StartWithWindows":false,"RailEdge":"Left","RailMonitorId":"display","ShowRailOverFullscreen":true,"ShakeEnabled":false,"ShakeSensitivity":"High"}"#;
+        let previous = br#"{"HotKey":{"Control":true,"Alt":true,"Shift":false,"Windows":false,"VirtualKey":75},"StartWithWindows":false,"RailEdge":"Left","RailMonitorId":"display","ShowRailOverFullscreen":true,"ShakeEnabled":false,"ShakeThreshold":5}"#;
         fs::write(store.path(), previous).unwrap();
 
         let (loaded, warning) = store.load();
@@ -917,7 +964,7 @@ mod tests {
         assert_eq!(fs::read_to_string(store.path()).unwrap(), old_format);
 
         // Write valid JSON with invalid HotKey (no modifiers)
-        let invalid_hk_json = r#"{"HotKey":{"Control":false,"Alt":false,"Shift":false,"Windows":false,"VirtualKey":65},"StartWithWindows":true,"RailEdge":"Right","RailMonitorId":"","ShowRailOverFullscreen":false,"ShakeEnabled":true,"ShakeSensitivity":"Normal","AppearanceMode":"System"}"#;
+        let invalid_hk_json = r#"{"HotKey":{"Control":false,"Alt":false,"Shift":false,"Windows":false,"VirtualKey":65},"StartWithWindows":true,"RailEdge":"Right","RailMonitorId":"","ShowRailOverFullscreen":false,"ShakeEnabled":true,"ShakeThreshold":5,"AppearanceMode":"System"}"#;
         fs::write(store.path(), invalid_hk_json).unwrap();
 
         let (settings2, warning2) = store.load();
