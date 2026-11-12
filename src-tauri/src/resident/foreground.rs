@@ -133,7 +133,7 @@ unsafe extern "system" fn foreground_changed(
         if let Err(error) = crate::resident::repair_topmost(&app) {
             report(&app, error);
         }
-        if let Err(error) = crate::resident::evaluate_fullscreen_coverage(&app) {
+        if let Err(error) = crate::resident::fullscreen::evaluate_fullscreen_coverage(&app) {
             report(&app, error);
         }
     }
@@ -163,7 +163,7 @@ unsafe extern "system" fn location_changed(
         Some(observer.app.clone())
     });
     if let Some(app) = app {
-        if let Err(error) = crate::resident::evaluate_fullscreen_coverage(&app) {
+        if let Err(error) = crate::resident::fullscreen::evaluate_fullscreen_coverage(&app) {
             report(&app, error);
         }
     }
@@ -186,7 +186,7 @@ unsafe extern "system" fn window_event(
                 // Existing frontend reflow uses current monitor/frame bounds, without showing or activating.
                 app.emit("shelf-changed", ())
                     .map_err(|error| error.to_string())
-                    .and_then(|()| crate::resident::reflow_rail(&app))
+                    .and_then(|()| crate::resident::rail::reflow_rail(&app))
             };
             if let Err(error) = result {
                 report(&app, error);

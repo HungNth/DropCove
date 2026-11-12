@@ -542,7 +542,7 @@ fn apply_runtime(
 ) -> Result<(), String> {
     // Native cancellation can re-enter the Shelf subclass, so never hold runtime state across it.
     if !enabled {
-        crate::resident::cancel_shake(app)?;
+        crate::resident::shake_session::cancel_shake(app)?;
     }
     let state = app.state::<ShakeRuntimeState>();
     let mut runtime = state.lock()?;
@@ -610,7 +610,7 @@ pub(crate) fn description(app: &AppHandle) -> Result<String, String> {
 }
 
 pub(crate) fn shutdown(app: &AppHandle) -> Result<(), String> {
-    crate::resident::cancel_shake(app)?;
+    crate::resident::shake_session::cancel_shake(app)?;
     let state = app.state::<ShakeRuntimeState>();
     let mut runtime = state.lock()?;
     if runtime.hwnd == 0 {
@@ -659,13 +659,13 @@ unsafe extern "system" fn receiver(
     }
     match message {
         SHAKE_TRIGGERED => {
-            if let Err(error) = crate::resident::begin_shake(&app) {
+            if let Err(error) = crate::resident::shake_session::begin_shake(&app) {
                 report(&app, error);
             }
             return LRESULT(0);
         }
         LEFT_RELEASED => {
-            if let Err(error) = crate::resident::release_shake(&app) {
+            if let Err(error) = crate::resident::shake_session::release_shake(&app) {
                 report(&app, error);
             }
             return LRESULT(0);
@@ -676,7 +676,7 @@ unsafe extern "system" fn receiver(
                 let _ = stop_hook(&mut runtime);
                 runtime.generation = runtime.generation.wrapping_add(1);
             }
-            let _ = crate::resident::cancel_shake(&app);
+            let _ = crate::resident::shake_session::cancel_shake(&app);
             report(
                 &app,
                 "Shake-to-open pointer hook stopped; tray, hotkey, Shelf and Edge Rail remain available"

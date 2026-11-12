@@ -10,12 +10,12 @@ pub(crate) async fn dismiss_drop_shelf(
     if window.label() != "main" {
         return Err("dismiss_drop_shelf is only permitted from the main Drop Shelf window".to_owned());
     }
-    crate::run_blocking(move || super::dismiss_shelf(&app)).await
+    crate::run_blocking(move || super::drop_shelf::dismiss_shelf(&app)).await
 }
 
 #[tauri::command]
 pub(crate) fn get_rail(app: tauri::AppHandle) -> Result<crate::surfaces::edge_rail::Projection, String> {
-    let edge = match super::rail_placement(&app)? {
+    let edge = match super::rail::rail_placement(&app)? {
         Some(placement) => placement.edge,
         None => crate::settings::active(&app)?.rail_edge,
     };
@@ -72,12 +72,12 @@ pub(crate) fn on_rail_pointer_leave(app: tauri::AppHandle) -> Result<(), String>
 
 #[tauri::command]
 pub(crate) fn tick_rail(app: tauri::AppHandle) -> Result<(), String> {
-    super::tick_rail(&app)
+    super::rail::tick_rail(&app)
 }
 
 #[tauri::command]
 pub(crate) fn open_shelf_from_rail(app: tauri::AppHandle) -> Result<(), String> {
-    super::open_shelf_from_rail(&app)
+    super::rail::open_shelf_from_rail(&app)
 }
 
 #[tauri::command]
@@ -87,10 +87,10 @@ pub(crate) fn set_rail_transient_hold(
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let reason_enum = match reason.as_str() {
-        "clear" => super::RailTransientReason::ClearConfirmation,
-        "batch-drag" => super::RailTransientReason::BatchDragConfirmation,
-        "item-actions" => super::RailTransientReason::ItemActions,
-        "selection-actions" => super::RailTransientReason::SelectionActions,
+        "clear" => super::rail::RailTransientReason::ClearConfirmation,
+        "batch-drag" => super::rail::RailTransientReason::BatchDragConfirmation,
+        "item-actions" => super::rail::RailTransientReason::ItemActions,
+        "selection-actions" => super::rail::RailTransientReason::SelectionActions,
         _ => return Err(format!("unknown rail transient hold reason '{reason}'")),
     };
     if let Some(remaining) = app

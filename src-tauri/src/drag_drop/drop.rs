@@ -332,7 +332,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         self.can_copy.set(can_copy);
         *effect = resolved_effect;
         if self.window.label() == "main" {
-            if let Err(error) = crate::resident::shake_drag_inside(self.window.app_handle(), true) {
+            if let Err(error) = crate::resident::shake_session::shake_drag_inside(self.window.app_handle(), true) {
                 let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
             }
         }
@@ -382,14 +382,14 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
     fn DragLeave(&self) -> Result<()> {
         self.can_copy.set(false);
         if self.window.label() == "main" {
-            if let Err(error) = crate::resident::shake_drag_inside(self.window.app_handle(), false)
+            if let Err(error) = crate::resident::shake_session::shake_drag_inside(self.window.app_handle(), false)
             {
                 let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
             }
         }
         if self.window.label() == crate::surfaces::edge_rail::LABEL {
             if let Err(error) =
-                crate::resident::reconcile_rail_pointer_after_drag(self.window.app_handle())
+                crate::resident::rail::reconcile_rail_pointer_after_drag(self.window.app_handle())
             {
                 let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
             }
@@ -417,7 +417,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         }
         let own_drag = self.window.state::<DragSession>().is_active();
         let shake_id = if self.window.label() == "main" {
-            crate::resident::shake_drop_started(self.window.app_handle())
+            crate::resident::shake_session::shake_drop_started(self.window.app_handle())
                 .map_err(|_| Error::from_hresult(E_FAIL))?
         } else {
             None
@@ -433,14 +433,14 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         let _ = self.window.emit("shelf-drag-over", false);
         if self.window.label() == crate::surfaces::edge_rail::LABEL {
             if let Err(error) =
-                crate::resident::reconcile_rail_pointer_after_drag(self.window.app_handle())
+                crate::resident::rail::reconcile_rail_pointer_after_drag(self.window.app_handle())
             {
                 let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
             }
         }
         if resolved_effect != DROPEFFECT_COPY {
             let _ =
-                crate::resident::complete_shake_drop(self.window.app_handle(), shake_id, false);
+                crate::resident::shake_session::complete_shake_drop(self.window.app_handle(), shake_id, false);
             if matches!(payload, EvaluatedPayload::InvalidUnicodeText) {
                 let _ = crate::resident::publish_warning(
                     self.window.app_handle(),
@@ -462,7 +462,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
             match prepared {
                 Ok(images) => Some(images),
                 Err(error) => {
-                    let _ = crate::resident::complete_shake_drop(window.app_handle(), shake_id, false);
+                    let _ = crate::resident::shake_session::complete_shake_drop(window.app_handle(), shake_id, false);
                     let _ = crate::resident::publish_warning(window.app_handle(), &error);
                     let _ = window.app_handle().emit("shelf-error", error);
                     return Ok(());
@@ -485,7 +485,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
             };
             match intake_result {
                 Ok(result) => {
-                    if let Err(error) = crate::resident::complete_shake_drop(
+                    if let Err(error) = crate::resident::shake_session::complete_shake_drop(
                         window.app_handle(),
                         shake_id,
                         result.snapshot.is_some(),
@@ -499,7 +499,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
                         )
                         .and_then(|()| crate::surfaces::manage_items::synchronize(window.app_handle()))
                         .and_then(|()| {
-                            crate::resident::update_rail_content(
+                            crate::resident::rail::update_rail_content(
                                 window.app_handle(),
                                 snapshot.batches.len(),
                             )
@@ -512,7 +512,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
                 }
                 Err(error) => {
                     let _ =
-                        crate::resident::complete_shake_drop(window.app_handle(), shake_id, false);
+                        crate::resident::shake_session::complete_shake_drop(window.app_handle(), shake_id, false);
                     let _ =
                         crate::resident::publish_warning(window.app_handle(), &error.to_string());
                     let _ = window.app_handle().emit("shelf-error", error.to_string());

@@ -284,7 +284,7 @@ pub(crate) fn open(
     }
     if owner_label == "edge-rail" {
         app.state::<crate::resident::ResidentState>()
-            .set_rail_transient_reason(crate::resident::RailTransientReason::ManageItems, true)?;
+            .set_rail_transient_reason(crate::resident::rail::RailTransientReason::ManageItems, true)?;
     }
     let (setup_sender, setup_receiver) = std::sync::mpsc::channel();
     let setup_popup = popup.clone();
@@ -337,7 +337,7 @@ pub(crate) fn open(
                 let _ = app
                     .state::<crate::resident::ResidentState>()
                     .set_rail_transient_reason(
-                        crate::resident::RailTransientReason::ManageItems,
+                        crate::resident::rail::RailTransientReason::ManageItems,
                         false,
                     );
             }
@@ -400,7 +400,7 @@ pub(crate) fn open(
                 let _ = app
                     .state::<crate::resident::ResidentState>()
                     .set_rail_transient_reason(
-                        crate::resident::RailTransientReason::ManageItems,
+                        crate::resident::rail::RailTransientReason::ManageItems,
                         false,
                     );
             }
@@ -463,7 +463,7 @@ pub(crate) fn close(app: &AppHandle) -> Result<(), String> {
     }
     if let Ok(Some(remaining)) = app
         .state::<crate::resident::ResidentState>()
-        .set_rail_transient_reason(crate::resident::RailTransientReason::ManageItems, false)
+        .set_rail_transient_reason(crate::resident::rail::RailTransientReason::ManageItems, false)
     {
         let _ = crate::surfaces::edge_rail::arm_rail_timer(app, remaining as u32);
     }
@@ -517,7 +517,7 @@ pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) {
                         let _ = app
                             .state::<crate::resident::ResidentState>()
                             .set_rail_transient_reason(
-                                crate::resident::RailTransientReason::ManageItems,
+                                crate::resident::rail::RailTransientReason::ManageItems,
                                 false,
                             );
                     }

@@ -121,7 +121,7 @@ unsafe extern "system" fn receive(
         if request.dwData == MAGIC && request.cbData == 0 {
             // Already on the UI thread: queueing and waiting here would deadlock its message pump.
             return LRESULT(isize::from(
-                crate::resident::show_shelf(&receiver.app).is_ok(),
+                crate::resident::drop_shelf::show_shelf(&receiver.app).is_ok(),
             ));
         }
         if request.dwData == SHUTDOWN_MAGIC && request.cbData == 0 {

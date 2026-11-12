@@ -374,9 +374,9 @@ pub(crate) fn handle_hotkey(app: &AppHandle, id: i32) -> Result<(), String> {
         return record_key(app, key);
     }
     match app.state::<resident::ResidentState>().visibility()? {
-        resident::Visibility::Visible => resident::dismiss_shelf(app),
+        resident::Visibility::Visible => resident::drop_shelf::dismiss_shelf(app),
         resident::Visibility::Hidden | resident::Visibility::EdgeDocked => {
-            resident::show_shelf(app)
+            resident::drop_shelf::show_shelf(app)
         }
     }
 }
@@ -389,13 +389,13 @@ impl Integrations for NativeIntegrations<'_> {
     type RailSnapshot = Option<crate::surfaces::edge_rail::Placement>;
     type ShakeSnapshot = crate::resident::shake::RuntimeSnapshot;
     fn rail_snapshot(&self) -> Result<Self::RailSnapshot, String> {
-        resident::rail_placement(self.app)
+        resident::rail::rail_placement(self.app)
     }
     fn rail_apply(&mut self, settings: &Settings) -> Result<(), String> {
-        resident::apply_rail_settings(self.app, settings)
+        resident::rail::apply_rail_settings(self.app, settings)
     }
     fn rail_restore(&mut self, previous: &Self::RailSnapshot) -> Result<(), String> {
-        resident::restore_rail(self.app, previous.as_ref())
+        resident::rail::restore_rail(self.app, previous.as_ref())
     }
     fn rail_description(&self) -> Result<String, String> {
         crate::surfaces::edge_rail::description(self.app)

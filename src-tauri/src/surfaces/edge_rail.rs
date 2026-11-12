@@ -1,6 +1,6 @@
 //! No-activate Rail Handle and persistent display identity; visibility belongs to ResidentState.
 use crate::{
-    resident::{PhysicalPlacement, WorkArea},
+    resident::window_ops::{PhysicalPlacement, WorkArea},
     settings::store::{RailEdge, Settings},
 };
 use serde::Serialize;
@@ -321,7 +321,7 @@ pub(crate) fn placement(app: &AppHandle, settings: &Settings) -> Result<Placemen
         .get_webview_window("main")
         .and_then(|shelf| shelf.current_monitor().ok().flatten());
     let device = shelf_monitor.as_ref().and_then(|m| m.name()).map(String::as_str);
-    let current = crate::resident::rail_placement(app)?;
+    let current = crate::resident::rail::rail_placement(app)?;
     reconcile(
         &monitors,
         settings,
@@ -377,7 +377,7 @@ unsafe extern "system" fn no_activate(
         // We clone the AppHandle before calling into resident functions to prevent use-after-free
         // in case a reentrant message (e.g. WM_NCDESTROY) deallocates subclass_data.
         let app = unsafe { (*(subclass_data as *const AppHandle)).clone() };
-        if let Err(error) = crate::resident::tick_rail(&app) {
+        if let Err(error) = crate::resident::rail::tick_rail(&app) {
             let _ = crate::resident::publish_warning(&app, &error);
         }
         return LRESULT(0);

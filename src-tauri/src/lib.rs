@@ -105,7 +105,7 @@ pub fn run() {
                     resident::publish_warning(app.handle(), msg)
                 });
             if !launch.autostart {
-                resident::show_shelf(app.handle()).map_err(std::io::Error::other)?;
+                resident::drop_shelf::show_shelf(app.handle()).map_err(std::io::Error::other)?;
             }
             lease.register(&window).map_err(std::io::Error::other)?;
             app.manage(lease);
@@ -117,7 +117,7 @@ pub fn run() {
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
-                    if let Err(error) = resident::dismiss_shelf(window.app_handle()) {
+                    if let Err(error) = resident::drop_shelf::dismiss_shelf(window.app_handle()) {
                         use tauri::Emitter;
                         let _ = window.emit("shelf-error", error);
                     }
@@ -131,7 +131,7 @@ pub fn run() {
                             eprintln!("display reflow failed: {error}; warning delivery failed: {warning}");
                         }
                     }
-                    if let Err(error) = resident::reflow_rail(window.app_handle()) {
+                    if let Err(error) = resident::rail::reflow_rail(window.app_handle()) {
                         let _ = resident::publish_warning(window.app_handle(), &error);
                     }
                 }
@@ -143,7 +143,7 @@ pub fn run() {
                 }
             }
             if window.label() == surfaces::edge_rail::LABEL && matches!(event, tauri::WindowEvent::ScaleFactorChanged { .. }) {
-                if let Err(error) = resident::reflow_rail(window.app_handle()) {
+                if let Err(error) = resident::rail::reflow_rail(window.app_handle()) {
                     let _ = resident::publish_warning(window.app_handle(), &error);
                 }
             }

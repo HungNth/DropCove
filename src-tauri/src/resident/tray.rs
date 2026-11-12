@@ -21,7 +21,7 @@ pub(crate) const WARNING_TITLE: &str = "DropCove warning";
 /// Registers the primary notification-area tray icon and its context menu.
 ///
 /// Context menu exposes "Exit DropCove" (id "exit-dropcove").
-/// Left-click and double-left-click route through coordinator `resident::show_shelf`.
+/// Left-click and double-left-click route through coordinator `resident::drop_shelf::show_shelf`.
 /// Menu Exit DropCove routes through coordinator `resident::exit`.
 pub(crate) fn register(app: &AppHandle) -> Result<(), String> {
     if app.tray_by_id(TRAY_ID).is_some() {
@@ -54,7 +54,7 @@ pub(crate) fn register(app: &AppHandle) -> Result<(), String> {
             button: MouseButton::Left,
             ..
         } => {
-            if let Err(e) = crate::resident::show_shelf(&app_handle) {
+            if let Err(e) = crate::resident::drop_shelf::show_shelf(&app_handle) {
                 if let Err(warning) = crate::resident::publish_warning(&app_handle, &e) {
                     eprintln!("{e}; warning delivery failed: {warning}");
                 }

@@ -7,7 +7,7 @@ pub(crate) fn publish_shelf(app: &tauri::AppHandle, snapshot: ShelfSnapshot) -> 
     crate::surfaces::clear_confirmation::synchronize(app)?;
     crate::surfaces::manage_items::synchronize(app)?;
     crate::resident::synchronize(app, !snapshot.batches.is_empty())?;
-    let _ = crate::resident::update_rail_content(app, snapshot.batches.len());
+    let _ = crate::resident::rail::update_rail_content(app, snapshot.batches.len());
     if let Some(warning) = snapshot.warning.as_deref() {
         let _ = crate::resident::publish_warning(app, warning);
     }
@@ -42,7 +42,7 @@ pub(crate) async fn accept_drop(
         if let Some(snapshot) = result.snapshot.as_ref() {
             crate::resident::synchronize(&app, !snapshot.batches.is_empty())?;
             crate::surfaces::manage_items::synchronize(&app)?;
-            let _ = crate::resident::update_rail_content(&app, snapshot.batches.len());
+            let _ = crate::resident::rail::update_rail_content(&app, snapshot.batches.len());
             use tauri::Emitter;
             let _ = app.emit("shelf-changed", ());
         }
