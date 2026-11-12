@@ -813,7 +813,7 @@ A new Settings window is centered within the invoking monitor's work area: the D
 
 Opening Settings from the notification area does not show, move, or change the Drop Shelf or Edge Rail. Hiding the Drop Shelf does not hide Settings.
 
-Settings presents two horizontal tabs below its title: **General** and **Appearance**. General contains every setting introduced before `0.0.19`; Appearance contains the application-wide appearance selector. A newly created or reopened Settings window starts on General, tab selection is not persisted, switching tabs retains the shared draft, and one Save/Cancel footer governs both tabs.
+Settings presents two horizontal tabs below its title: **General** and **Appearance**. General contains the resident, Edge Rail, and Shake controls; Appearance contains the application-wide appearance selector. A newly created or reopened Settings window starts on General, tab selection is not persisted, switching tabs retains the shared draft, and one Save/Cancel footer governs both tabs.
 
 ### 16.1 Available settings and defaults
 
@@ -825,7 +825,7 @@ Settings presents two horizontal tabs below its title: **General** and **Appeara
 | Target monitor                    | Follow pointer         | Follow the pointer on fresh dismissal, or use a connected explicit display identifier | `0.0.5`    |
 | Show over fullscreen applications | Off                    | Controls Edge Rail fullscreen hiding                                | `0.0.5`    |
 | Enable shake gesture              | On                     | Installs/removes global pointer hook                                | `0.0.6`    |
-| Shake threshold                   | 5 movements            | 3 through 8 deliberate back-and-forth movement strokes             | `0.0.6`    |
+| Shake threshold                   | 5 movements            | 3 through 8 deliberate back-and-forth movement strokes             | `0.1.0`    |
 | Appearance mode                   | System                 | System, Dark, or Light; Windows Contrast Theme overrides rendering  | `0.0.19`   |
 
 There is no setting to disable the Edge Rail while retaining its standard non-empty dismissal behavior.
@@ -898,7 +898,7 @@ Serialized content in `0.0.5`:
 }
 ```
 
-Current serialized content after the configurable Shake Threshold cutover:
+Serialized content in `0.1.0` (current):
 
 ```json
 {
