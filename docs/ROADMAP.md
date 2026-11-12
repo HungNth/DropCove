@@ -1400,3 +1400,35 @@ Ticket breakdown confirmation: approved by the user through `to-tickets` on 2026
 - [Ticket 08](../.scratch/selection-actions/issues/08-manage-items-context-actions-amendment.md) supersedes the earlier requirement that Manage Items retain More and singleton lifecycle actions; historical `0.0.27`/`0.0.28` evidence above remains unchanged.
 - Manage Items rows no longer render More/ellipsis. One External Reference row exposes **Show in File Explorer** then **Copy Path**, Managed Text exposes **Copy Text**, and Managed Image exposes no menu through secondary-click or the focus-capable keyboard menu keys.
 - Two or more selected rows expose **Pin All Selected** or **Unpin All Selected**, followed by **Remove All Selected**. Existing atomic mutation, ownership-safe confirmation, Managed File cleanup, virtualization, focus restoration, and Rail-origin no-activate contracts remain in force.
+
+## 0.1.0 — Native modularization and configurable Shake Threshold
+
+**Status:** Completed — user-authorized `0.1.0` milestone synchronized across manifests (`b27f372`) and packaged on Windows x64.
+
+Plans: [Rust Module Layout](../.scratch/rust-module-layout/spec.md) · [Large File Split](../.scratch/large-file-split/spec.md) · [Configurable Shake Threshold](../.scratch/shake-threshold/spec.md).
+
+### Scope
+
+- Regroup flat native Rust sources under `src-tauri/src/` into feature directories (`settings/`, `resident/`, `shelf/`, `drag_drop/`, `surfaces/`), extract per-feature IPC `commands.rs`, and split oversized `shelf/mod.rs` and `resident/mod.rs` into responsibility-named submodules with dedicated `tests/` directories and shared error-plumbing helpers.
+- Replace abstract `ShakeSensitivity` (`Low`, `Normal`, `High`) with a direct numeric `ShakeThreshold` (`3..=8` accepted movement strokes, default `5` strokes / `4` reversals, `18 px` minimum stroke distance, `max(800 ms, 250 ms × threshold)` detection window, `500 ms` cooldown) across the native detector, clean-cutover `SettingsStore` contract, Settings UI, and [SPECIFICATION.md](SPECIFICATION.md).
+- Include post-`0.0.28` type-aware batch-card and Manage Items context-actions amendments (`473b20a`), unified Tauri/NSIS publisher and copyright metadata (`696bbba`), and repository `README.md` plus `Apache-2.0` `LICENSE` (`89b0c5a`).
+- Synchronize version `0.1.0` across `VERSION`, `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json` with explicit user approval, and build the Windows x64 current-user NSIS installer.
+
+### Implemented
+
+- Native feature-directory layout (`9381142`), responsibility submodules and relocated unit test suites for `shelf/` and `resident/` (`228013d`), deduplicated `ResidentState::lock_presentation()` and `ShelfError::fs()` helpers (`6122b67`), and narrowed submodule visibility with explicit imports (`8b4e242`), keeping `lib.rs` as the composition root without compatibility `pub use` shims.
+- Configurable `ShakeThreshold` (`a5c7ea8`) across `src-tauri/src/resident/shake.rs`, `src-tauri/src/settings/`, `src/composables/useSettings.ts`, `src/components/settings/ShakeSettingsFields.vue`, `src/components/settings/SettingsView.vue`, and [SPECIFICATION.md](SPECIFICATION.md), enforcing `3..=8` validation and clean-cutover default reset on legacy `ShakeSensitivity` or out-of-range persisted files.
+- Context-actions card/row menu cutover (`473b20a`), unified publisher/copyright packaging metadata (`696bbba`), `README.md` and `Apache-2.0` license (`89b0c5a`), and `0.1.0` manifest synchronization (`b27f372`).
+
+### Verification
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| [DropCove-Setup-0.1.0.exe](../build/DropCove-Setup-0.1.0.exe) | 3,783,399 | `fb0890b2aa1e32d604c5b594579f9b899aa6d0bb767cb8378f50990dedeb5549` |
+| Built Windows x64 executable (`dropcove.exe`) | 15,705,088 | `98630c07d2b0589ffe902c7da12b8bfaff0e40d874e8d2f4fc59a366f4a7d75d` |
+
+- Native Windows x64 regression suite passed **202/202** (`0` failed), covering all relocated `shelf` and `resident` suites plus `ShakeDetector` stroke/distance/window boundaries (`3`, `5`, `8` strokes; `17`/`18 px`; `800`/`1250`/`2000 ms`) and `SettingsStore` clean-cutover/range validation.
+- Frontend `vue-tsc` typecheck and Vite production build passed; Node regression suite passed **87/87** (`0` failed).
+- Chromium Settings UI inspection verified the accessible `Shake threshold` combobox (`<label for>` and `aria-describedby`), options `3 shakes` through `8 shakes` with `5 shakes (Default)`, numeric `set_shake` IPC payloads, and disabled state when Shake is turned off.
+- Independent two-axis Spec and Standards reviews passed with zero hard violations across the native modularization stages and configurable Shake Threshold delivery.
+- User bumped manifests to `0.1.0` (`b27f372`) and produced the release build above; agent-driven silent-install smoke and physical pointer shake calibration on `DropCove-Setup-0.1.0.exe` were not separately executed.
