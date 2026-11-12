@@ -15,7 +15,7 @@ mod tests;
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Mutex,
+    Mutex, MutexGuard,
 };
 
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
@@ -200,25 +200,24 @@ pub(crate) fn synchronize(app: &AppHandle, has_content: bool) -> Result<(), Stri
 }
 
 impl ResidentState {
-    pub(crate) fn visibility(&self) -> Result<Visibility, String> {
+    fn lock_presentation(&self) -> Result<MutexGuard<'_, Presentation>, String> {
         self.presentation
             .lock()
+            .map_err(|_| "resident presentation lock is poisoned".to_owned())
+    }
+
+    pub(crate) fn visibility(&self) -> Result<Visibility, String> {
+        self.lock_presentation()
             .map(|v| v.visibility)
-            .map_err(|_| "resident coordinator state lock is poisoned".to_owned())
     }
 
     fn placement(&self) -> Result<Option<crate::surfaces::edge_rail::Placement>, String> {
-        self.presentation
-            .lock()
+        self.lock_presentation()
             .map(|value| value.rail_placement.clone())
-            .map_err(|_| "resident presentation lock is poisoned".into())
     }
 
     fn set_visibility(&self, next: Visibility) -> Result<(), String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| "resident coordinator state lock is poisoned".to_owned())?;
+        let mut guard = self.lock_presentation()?;
         guard.visibility = next;
         guard.shake_session = None;
         if next != Visibility::EdgeDocked {

@@ -231,10 +231,7 @@ impl ShelfStore {
         created_at: i64,
     ) -> Result<ShelfSnapshot, ShelfError> {
         let store = crate::shelf::managed_files::ManagedStore::new(&self.profile_root);
-        store.init_directories().map_err(|source| ShelfError::FileSystem {
-            path: self.profile_root.display().to_string(),
-            source,
-        })?;
+        store.init_directories().map_err(|source| ShelfError::fs(self.profile_root.display(), source))?;
 
         // Generate display snippet from text content
         let display_name = Self::generate_text_snippet(bytes);
@@ -271,16 +268,11 @@ impl ShelfStore {
         };
         let staging_rel = crate::shelf::managed_files::ManagedStore::staging_rel_path(&item_id);
         let final_rel = crate::shelf::managed_files::ManagedStore::final_rel_path(&item_id, &filename);
-        let final_path_str = store.full_path(&final_rel).map_err(|source| ShelfError::FileSystem {
-            path: final_rel.clone(), source,
-        })?.display().to_string();
+        let final_path_str = store.full_path(&final_rel).map_err(|source| ShelfError::fs(&final_rel, source))?.display().to_string();
 
         // Step 1: Stage bytes to disk with flush
         let stage_full = store.stage_bytes(&staging_rel, bytes).map_err(|source| {
-            ShelfError::FileSystem {
-                path: staging_rel.clone(),
-                source,
-            }
+            ShelfError::fs(&staging_rel, source)
         })?;
 
         // Step 2: Commit batch, item, and managed_files as 'staged'
@@ -331,10 +323,7 @@ impl ShelfStore {
             let _ = store.delete_managed_target(&staging_rel);
             let _ = store.delete_managed_target(&final_rel);
             let _ = self.process_pending_managed_deletions();
-            return Err(ShelfError::FileSystem {
-                path: final_rel,
-                source: promote_err,
-            });
+            return Err(ShelfError::fs(final_rel, promote_err));
         }
 
         // Step 4: Commit 'ready'
@@ -369,10 +358,7 @@ impl ShelfStore {
         created_at: i64,
     ) -> Result<ShelfSnapshot, ShelfError> {
         let store = crate::shelf::managed_files::ManagedStore::new(&self.profile_root);
-        store.init_directories().map_err(|source| ShelfError::FileSystem {
-            path: self.profile_root.display().to_string(),
-            source,
-        })?;
+        store.init_directories().map_err(|source| ShelfError::fs(self.profile_root.display(), source))?;
 
         struct PreparedItem {
             item_id: String,
@@ -395,10 +381,7 @@ impl ShelfStore {
                 _ => return Err(ShelfError::InvalidPath),
             };
             let final_rel = crate::shelf::managed_files::ManagedStore::final_rel_path(&item_id, &filename);
-            let final_path_str = store.full_path(&final_rel).map_err(|source| ShelfError::FileSystem {
-                path: final_rel.clone(),
-                source,
-            })?.display().to_string();
+            let final_path_str = store.full_path(&final_rel).map_err(|source| ShelfError::fs(&final_rel, source))?.display().to_string();
             prepared.push(PreparedItem {
                 item_id,
                 position: pos as i64,
@@ -452,10 +435,7 @@ impl ShelfStore {
         let mut first_promote_err = None;
         for item in &prepared {
             if let Err(err) = store.promote_staged(&item.staging_rel, &item.final_rel) {
-                first_promote_err = Some(ShelfError::FileSystem {
-                    path: item.final_rel.clone(),
-                    source: err,
-                });
+                first_promote_err = Some(ShelfError::fs(&item.final_rel, err));
                 break;
             }
         }

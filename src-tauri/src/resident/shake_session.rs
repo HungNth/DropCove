@@ -244,10 +244,7 @@ pub(crate) fn cancel_shake(app: &AppHandle) -> Result<(), String> {
 
 impl ResidentState {
     pub(super) fn shake_candidate(&self) -> Result<Option<ShakeSession>, String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+        let mut guard = self.lock_presentation()?;
         if guard.shake_session.is_some()
             || guard.visibility == Visibility::Visible
             || self.exiting.load(Ordering::Acquire)
@@ -268,10 +265,7 @@ impl ResidentState {
     }
 
     pub(super) fn commit_shake(&self, session: ShakeSession) -> Result<(), String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+        let mut guard = self.lock_presentation()?;
         if guard.shake_session.is_some() || guard.visibility != session.previous_visibility {
             return Err("Shelf presentation changed while Shake-to-open was starting".into());
         }
@@ -285,10 +279,7 @@ impl ResidentState {
     }
 
     pub(super) fn mark_shake_drag_inside(&self, inside: bool) -> Result<bool, String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+        let mut guard = self.lock_presentation()?;
         let Some(session) = guard.shake_session.as_mut() else {
             return Ok(false);
         };
@@ -297,10 +288,7 @@ impl ResidentState {
     }
 
     pub(super) fn mark_shake_drop_pending(&self) -> Result<Option<u64>, String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+        let mut guard = self.lock_presentation()?;
         let Some(session) = guard.shake_session.as_mut() else {
             return Ok(None);
         };
@@ -310,10 +298,7 @@ impl ResidentState {
     }
 
     pub(super) fn mark_shake_released(&self) -> Result<bool, String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+        let mut guard = self.lock_presentation()?;
         let Some(session) = guard.shake_session.as_mut() else {
             return Ok(false);
         };
@@ -326,10 +311,7 @@ impl ResidentState {
         session_id: Option<u64>,
         accepted: bool,
     ) -> Result<ShakeDropResolution, String> {
-        let guard = self
-            .presentation
-            .lock()
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+        let guard = self.lock_presentation()?;
         let Some(session) = guard
             .shake_session
             .as_ref()
@@ -344,10 +326,7 @@ impl ResidentState {
     }
 
     pub(super) fn finish_shake_restore(&self, session: &ShakeSession) -> Result<(), String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+        let mut guard = self.lock_presentation()?;
         if !guard
             .shake_session
             .as_ref()
@@ -364,10 +343,7 @@ impl ResidentState {
     }
 
     pub(super) fn finish_shake_promote(&self, session_id: Option<u64>) -> Result<(), String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+        let mut guard = self.lock_presentation()?;
         if !guard
             .shake_session
             .as_ref()
@@ -382,9 +358,7 @@ impl ResidentState {
     }
 
     pub(super) fn active_shake_session(&self) -> Result<Option<ShakeSession>, String> {
-        self.presentation
-            .lock()
+        self.lock_presentation()
             .map(|guard| guard.shake_session.clone())
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())
     }
 }

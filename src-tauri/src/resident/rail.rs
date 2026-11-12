@@ -60,9 +60,7 @@ pub(super) fn set_rail_placement(
     placement: Option<crate::surfaces::edge_rail::Placement>,
 ) -> Result<(), String> {
     app.state::<ResidentState>()
-        .presentation
-        .lock()
-        .map_err(|_| "resident presentation lock is poisoned")?
+        .lock_presentation()?
         .rail_placement = placement;
     Ok(())
 }
@@ -109,10 +107,7 @@ pub(crate) fn coordinate_apply_rail_settings(
                 .map_err(|e| e.to_string())?;
             persisted_changed = true;
         }
-        let mut presentation = state
-            .presentation
-            .lock()
-            .map_err(|_| "resident presentation lock is poisoned")?;
+        let mut presentation = state.lock_presentation()?;
         presentation.rail_placement = Some(placement.clone());
         Ok::<(), String>(())
     })();
@@ -127,13 +122,9 @@ pub(crate) fn coordinate_apply_rail_settings(
             Ok(())
         };
         let rollback_live = {
-            match state.presentation.lock() {
-                Ok(mut pres) => {
-                    pres.rail_placement = prior_placement.clone();
-                    Ok(())
-                }
-                Err(_) => Err("resident presentation lock is poisoned".to_string()),
-            }
+            state.lock_presentation().map(|mut pres| {
+                pres.rail_placement = prior_placement.clone();
+            })
         };
         let mut rollback_errors = Vec::new();
         if let Err(e) = rollback_native {
@@ -331,10 +322,7 @@ impl ResidentState {
         active: bool,
     ) -> Result<Option<u64>, String> {
         let now = now_monotonic_ms();
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+        let mut guard = self.lock_presentation()?;
         let mask = reason as u8;
         if active {
             guard.transient_holds |= mask;
@@ -358,10 +346,8 @@ impl ResidentState {
 
     #[cfg(test)]
     pub(crate) fn has_rail_transient_hold(&self) -> Result<bool, String> {
-        self.presentation
-            .lock()
+        self.lock_presentation()
             .map(|p| p.transient_holds != 0)
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())
     }
 
     pub(crate) fn set_rail_drag_active(&self, active: bool) -> Result<Option<u64>, String> {
@@ -370,49 +356,36 @@ impl ResidentState {
 
     #[cfg(test)]
     pub(crate) fn rail_drag_active(&self) -> Result<bool, String> {
-        self.presentation
-            .lock()
+        self.lock_presentation()
             .map(|p| (p.transient_holds & (RailTransientReason::ActiveDrag as u8)) != 0)
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())
     }
 
     #[cfg(test)]
     pub(crate) fn is_fullscreen_occluded(&self) -> Result<bool, String> {
-        self.presentation
-            .lock()
+        self.lock_presentation()
             .map(|p| p.fullscreen_occluded)
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())
     }
 
     #[cfg(test)]
     pub(crate) fn has_transient_reason(&self, reason: RailTransientReason) -> Result<bool, String> {
-        self.presentation
-            .lock()
+        self.lock_presentation()
             .map(|p| (p.transient_holds & (reason as u8)) != 0)
-            .map_err(|_| "resident presentation lock is poisoned".to_owned())
     }
 
     pub(crate) fn rail_presentation(&self) -> Result<RailPresentation, String> {
-        self.presentation
-            .lock()
+        self.lock_presentation()
             .map(|p| p.rail)
-            .map_err(|_| String::from("resident presentation lock is poisoned"))
     }
 
     pub(crate) fn set_rail_presentation(&self, rail: RailPresentation) -> Result<(), String> {
-        self.presentation
-            .lock()
+        self.lock_presentation()
             .map(|mut p| {
                 p.rail = rail;
             })
-            .map_err(|_| String::from("resident presentation lock is poisoned"))
     }
 
     pub(crate) fn on_rail_pointer_enter(&self, now_ms: u64) -> Result<RailPresentation, String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+        let mut guard = self.lock_presentation()?;
         guard.pointer_inside = true;
         if guard.visibility != Visibility::EdgeDocked {
             return Ok(guard.rail);
@@ -425,10 +398,7 @@ impl ResidentState {
     }
 
     pub(crate) fn on_rail_button_pointer_enter(&self) -> Result<RailPresentation, String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+        let mut guard = self.lock_presentation()?;
         guard.pointer_inside = true;
         if guard.visibility != Visibility::EdgeDocked {
             return Ok(guard.rail);
@@ -462,10 +432,7 @@ impl ResidentState {
     }
 
     pub(crate) fn on_rail_pointer_leave(&self, now_ms: u64) -> Result<RailPresentation, String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+        let mut guard = self.lock_presentation()?;
         guard.pointer_inside = false;
         if guard.visibility != Visibility::EdgeDocked {
             return Ok(guard.rail);
@@ -483,10 +450,7 @@ impl ResidentState {
         now_ms: u64,
         batch_count: usize,
     ) -> Result<Option<RailPresentation>, String> {
-        let guard = self
-            .presentation
-            .lock()
-            .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+        let guard = self.lock_presentation()?;
         if guard.visibility != Visibility::EdgeDocked || batch_count == 0 {
             return Ok(None);
         }
@@ -527,17 +491,11 @@ impl ResidentState {
     ) -> Result<Option<RailPresentation>, String> {
         let planned = self.plan_tick_rail(now_ms, batch_count)?;
         if let Some(next) = planned {
-            let mut guard = self
-                .presentation
-                .lock()
-                .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+            let mut guard = self.lock_presentation()?;
             guard.rail = next;
             Ok(Some(next))
         } else {
-            let mut guard = self
-                .presentation
-                .lock()
-                .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+            let mut guard = self.lock_presentation()?;
             if guard.visibility != Visibility::EdgeDocked || batch_count == 0 {
                 guard.rail.expand_due_ms = None;
                 guard.rail.collapse_due_ms = None;
@@ -550,10 +508,7 @@ impl ResidentState {
         &self,
         batch_count: usize,
     ) -> Result<Option<RailPresentation>, String> {
-        let mut guard = self
-            .presentation
-            .lock()
-            .map_err(|_| String::from("resident presentation lock is poisoned"))?;
+        let mut guard = self.lock_presentation()?;
         if guard.visibility != Visibility::EdgeDocked {
             return Ok(None);
         }

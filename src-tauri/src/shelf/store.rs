@@ -95,10 +95,7 @@ impl ShelfStore {
 
     pub(super) fn open_internal(path: &Path, run_integrity: bool) -> Result<Self, ShelfError> {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|source| ShelfError::FileSystem {
-                path: parent.display().to_string(),
-                source,
-            })?;
+            fs::create_dir_all(parent).map_err(|source| ShelfError::fs(parent.display(), source))?;
         }
 
         let connection = Connection::open(path)?;

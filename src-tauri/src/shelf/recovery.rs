@@ -65,10 +65,7 @@ pub(super) fn is_recoverable_error(err: &ShelfError) -> bool {
 }
 
 pub(super) fn stage_shm_file(shm_path: &Path) -> Result<std::path::PathBuf, ShelfError> {
-    let mut source_file = fs::File::open(shm_path).map_err(|source| ShelfError::FileSystem {
-        path: shm_path.display().to_string(),
-        source,
-    })?;
+    let mut source_file = fs::File::open(shm_path).map_err(|source| ShelfError::fs(shm_path.display(), source))?;
     let pid = std::process::id();
     let mut attempt = 0u64;
     let (mut stage_file, stage_path) = loop {
@@ -85,10 +82,7 @@ pub(super) fn stage_shm_file(shm_path: &Path) -> Result<std::path::PathBuf, Shel
                 attempt += 1;
             }
             Err(source) => {
-                return Err(ShelfError::FileSystem {
-                    path: candidate.display().to_string(),
-                    source,
-                });
+                return Err(ShelfError::fs(candidate.display(), source));
             }
         }
     };
@@ -97,10 +91,7 @@ pub(super) fn stage_shm_file(shm_path: &Path) -> Result<std::path::PathBuf, Shel
     {
         drop(stage_file);
         let _ = fs::remove_file(&stage_path);
-        return Err(ShelfError::FileSystem {
-            path: stage_path.display().to_string(),
-            source,
-        });
+        return Err(ShelfError::fs(stage_path.display(), source));
     }
     Ok(stage_path)
 }
@@ -138,14 +129,8 @@ pub(super) fn restore_staged_shm(shm_path: &Path, stage_path: &Path) -> Result<(
 
 pub(super) fn validate_existing_database(path: &Path, shm_path: &Path) -> Result<(), ShelfError> {
     use std::io::Read;
-    let mut file = fs::File::open(path).map_err(|source| ShelfError::FileSystem {
-        path: path.display().to_string(),
-        source,
-    })?;
-    let metadata = file.metadata().map_err(|source| ShelfError::FileSystem {
-        path: path.display().to_string(),
-        source,
-    })?;
+    let mut file = fs::File::open(path).map_err(|source| ShelfError::fs(path.display(), source))?;
+    let metadata = file.metadata().map_err(|source| ShelfError::fs(path.display(), source))?;
     if metadata.len() == 0 {
         return Ok(());
     }
@@ -162,10 +147,7 @@ pub(super) fn validate_existing_database(path: &Path, shm_path: &Path) -> Result
             ));
         }
         Err(err) => {
-            return Err(ShelfError::FileSystem {
-                path: path.display().to_string(),
-                source: err,
-            });
+            return Err(ShelfError::fs(path.display(), err));
         }
     }
     drop(file);
@@ -311,10 +293,7 @@ impl ShelfState {
             }
             Err(err) if is_recoverable_error(&err) => {
                 let recovery_area = parent.join("recovery");
-                fs::create_dir_all(&recovery_area).map_err(|source| ShelfError::FileSystem {
-                    path: recovery_area.display().to_string(),
-                    source,
-                })?;
+                fs::create_dir_all(&recovery_area).map_err(|source| ShelfError::fs(recovery_area.display(), source))?;
 
                 let timestamp = format_utc_timestamp(now);
                 let base_name = format!("shelf-corrupt-{timestamp}");
@@ -331,10 +310,7 @@ impl ShelfState {
                             suffix += 1;
                         }
                         Err(source) => {
-                            return Err(ShelfError::FileSystem {
-                                path: candidate.display().to_string(),
-                                source,
-                            });
+                            return Err(ShelfError::fs(candidate.display(), source));
                         }
                     }
                 };

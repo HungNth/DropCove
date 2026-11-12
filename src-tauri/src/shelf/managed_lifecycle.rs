@@ -104,10 +104,7 @@ impl ShelfStore {
         let meta = match fs::metadata(path) {
             Ok(m) => m,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-            Err(e) => return Err(ShelfError::FileSystem {
-                path: path.display().to_string(),
-                source: e,
-            }),
+            Err(e) => return Err(ShelfError::fs(path.display(), e)),
         };
         if !meta.is_file() {
             return Ok(false);
@@ -118,10 +115,7 @@ impl ShelfStore {
                 let bytes = match fs::read(path) {
                     Ok(b) => b,
                     Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-                    Err(e) => return Err(ShelfError::FileSystem {
-                        path: path.display().to_string(),
-                        source: e,
-                    }),
+                    Err(e) => return Err(ShelfError::fs(path.display(), e)),
                 };
                 return Ok(std::str::from_utf8(&bytes).is_ok());
             }
@@ -134,10 +128,7 @@ impl ShelfStore {
                     if e.kind() == std::io::ErrorKind::NotFound {
                         Ok(false)
                     } else {
-                        Err(ShelfError::FileSystem {
-                            path: path.display().to_string(),
-                            source: e,
-                        })
+                        Err(ShelfError::fs(path.display(), e))
                     }
                 }
             }
@@ -233,10 +224,7 @@ impl ShelfStore {
                             promotion_ok = false;
                             break;
                         }
-                        let final_path = store.full_path(&item.final_rel).map_err(|e| ShelfError::FileSystem {
-                            path: item.final_rel.clone(),
-                            source: e,
-                        })?;
+                        let final_path = store.full_path(&item.final_rel).map_err(|e| ShelfError::fs(&item.final_rel, e))?;
                         if !Self::validate_managed_file(&final_path)? {
                             promotion_ok = false;
                             break;

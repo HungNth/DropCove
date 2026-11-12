@@ -223,6 +223,12 @@ pub(crate) enum ShelfError {
     InvalidItemAction(ItemActionKind, String),
 }
 
+impl ShelfError {
+    pub(super) fn fs(path: impl std::fmt::Display, source: std::io::Error) -> Self {
+        Self::FileSystem { path: path.to_string(), source }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct ShelfState {
     store: Arc<Mutex<Option<ShelfStore>>>,

@@ -11,10 +11,7 @@ pub(crate) fn coordinate_fullscreen(
     mut hide_or_show_rail: impl FnMut() -> Result<(), String>,
     close_transients: impl FnOnce() -> Result<(), String>,
 ) -> Result<(), String> {
-    let mut guard = state
-        .presentation
-        .lock()
-        .map_err(|_| "resident presentation lock is poisoned".to_owned())?;
+    let mut guard = state.lock_presentation()?;
 
     if show_over_fullscreen {
         return Ok(());

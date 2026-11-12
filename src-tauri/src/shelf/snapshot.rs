@@ -61,14 +61,8 @@ impl ShelfState {
             return Ok(None);
         };
         let managed_store = crate::shelf::managed_files::ManagedStore::new(&store.profile_root);
-        let full_path = managed_store.full_path(&relative_path).map_err(|source| ShelfError::FileSystem {
-            path: "managed text".to_string(),
-            source,
-        })?;
-        fs::read_to_string(&full_path).map(Some).map_err(|source| ShelfError::FileSystem {
-            path: "managed text".to_string(),
-            source,
-        })
+        let full_path = managed_store.full_path(&relative_path).map_err(|source| ShelfError::fs("managed text", source))?;
+        fs::read_to_string(&full_path).map(Some).map_err(|source| ShelfError::fs("managed text", source))
     }
 
     pub(crate) fn is_item_managed(&self, item_id: &str) -> Result<bool, ShelfError> {
@@ -122,15 +116,9 @@ impl ShelfState {
             let managed_store = crate::shelf::managed_files::ManagedStore::new(&store.profile_root);
             let full_path = managed_store
                 .full_path(&rel)
-                .map_err(|source| ShelfError::FileSystem {
-                    path: "managed text".to_string(),
-                    source,
-                })?;
+                .map_err(|source| ShelfError::fs("managed text", source))?;
             drop(store);
-            let text = fs::read_to_string(&full_path).map_err(|source| ShelfError::FileSystem {
-                path: "managed text".to_string(),
-                source,
-            })?;
+            let text = fs::read_to_string(&full_path).map_err(|source| ShelfError::fs("managed text", source))?;
             Ok(ResolvedItemAction::CopyText(text))
         } else {
             match action {

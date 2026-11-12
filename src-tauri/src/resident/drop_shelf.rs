@@ -154,10 +154,7 @@ pub(super) fn coordinate_dock(
             .map_err(|e| e.to_string())?;
         ops.hide_window()?;
         shelf_hidden = true;
-        let mut presentation = state
-            .presentation
-            .lock()
-            .map_err(|_| "resident presentation lock is poisoned")?;
+        let mut presentation = state.lock_presentation()?;
         presentation.visibility = Visibility::EdgeDocked;
         presentation.rail_placement = Some(placement.clone());
         presentation.shake_session = None;
