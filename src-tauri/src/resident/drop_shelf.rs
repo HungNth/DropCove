@@ -1,6 +1,9 @@
 //! Show, hide, dock, and dismiss the Drop Shelf.
 
-use super::*;
+use tauri::{AppHandle, Emitter, Manager};
+use crate::shelf::ShelfState;
+use std::sync::atomic::{AtomicBool, Ordering};
+use super::{ResidentState, SHELF_WINDOW_LABEL, Visibility};
 use super::window_ops::{NativeWindowOps, WindowOps, calculate_placement};
 use super::rail::{rail_placement, restore_rail};
 use super::fullscreen::{evaluate_fullscreen_coverage};

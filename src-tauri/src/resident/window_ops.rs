@@ -1,6 +1,10 @@
 //! Drop Shelf placement geometry and the native window operations abstraction.
 
-use super::*;
+use tauri::{Emitter, WebviewWindow};
+use windows::Win32::Foundation::{HWND, POINT, RECT};
+use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MONITORINFO, MONITOR_DEFAULTTONEAREST, MonitorFromPoint};
+use windows::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForWindow};
+use windows::Win32::UI::WindowsAndMessaging::{GetClientRect, GetCursorPos, GetWindowRect, HWND_TOPMOST, IsWindowVisible, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW, SetWindowPos};
 
 /// Native geometry calculation inputs and outcome for placement.
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -13,27 +13,10 @@ pub(crate) mod window_ops;
 #[cfg(test)]
 mod tests;
 
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Mutex, MutexGuard,
-};
-
-use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
-
-use windows::Win32::{
-    Foundation::{HWND, POINT, RECT},
-    Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST},
-    UI::{
-        HiDpi::{GetDpiForMonitor, GetDpiForWindow},
-        WindowsAndMessaging::{
-            GetClientRect, GetCursorPos, GetWindowRect, IsWindowVisible, SetWindowPos,
-            HWND_TOPMOST, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
-            SWP_SHOWWINDOW,
-        },
-    },
-};
-
-use crate::{settings::store::Settings, shelf::ShelfState};
+use crate::shelf::ShelfState;
+use std::sync::{Mutex, MutexGuard};
+use std::sync::atomic::{AtomicBool, Ordering};
+use tauri::{AppHandle, Emitter, Manager};
 use window_ops::{NativeWindowOps, WindowOps};
 use rail::{RailPresentation, RailTransientReason};
 use shake_session::ShakeSession;

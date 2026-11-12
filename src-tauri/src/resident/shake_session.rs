@@ -1,6 +1,9 @@
 //! Shake-to-open presentation session: begin, restore, and promote on an accepted drop.
 
-use super::*;
+use tauri::{AppHandle, Emitter, Manager};
+use crate::shelf::ShelfState;
+use std::sync::atomic::{AtomicBool, Ordering};
+use super::{ResidentState, SHELF_WINDOW_LABEL, Visibility};
 use super::window_ops::{NativeWindowOps, WindowOps};
 use super::drop_shelf::place_shelf;
 use super::rail::{RailPresentation, RailTransientReason};
@@ -96,7 +99,7 @@ pub(super) fn coordinate_shake_promote(
     show
 }
 
-pub(super) fn show_saved_shake_rail(app: &AppHandle, session: &ShakeSession) -> Result<(), String> {
+fn show_saved_shake_rail(app: &AppHandle, session: &ShakeSession) -> Result<(), String> {
     let placement = session
         .previous_placement
         .as_ref()
@@ -110,7 +113,7 @@ pub(super) fn show_saved_shake_rail(app: &AppHandle, session: &ShakeSession) -> 
     )
 }
 
-pub(super) fn restore_shake_on_window_thread(app: &AppHandle) -> Result<(), String> {
+fn restore_shake_on_window_thread(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<ResidentState>();
     let Some(session) = state.active_shake_session()? else {
         return Ok(());
@@ -180,7 +183,7 @@ pub(crate) fn shake_drop_started(app: &AppHandle) -> Result<Option<u64>, String>
     app.state::<ResidentState>().mark_shake_drop_pending()
 }
 
-pub(super) fn complete_shake_drop_on_window_thread(
+fn complete_shake_drop_on_window_thread(
     app: &AppHandle,
     session_id: Option<u64>,
     accepted: bool,
@@ -243,7 +246,7 @@ pub(crate) fn cancel_shake(app: &AppHandle) -> Result<(), String> {
 }
 
 impl ResidentState {
-    pub(super) fn shake_candidate(&self) -> Result<Option<ShakeSession>, String> {
+    fn shake_candidate(&self) -> Result<Option<ShakeSession>, String> {
         let mut guard = self.lock_presentation()?;
         if guard.shake_session.is_some()
             || guard.visibility == Visibility::Visible
@@ -264,7 +267,7 @@ impl ResidentState {
         }))
     }
 
-    pub(super) fn commit_shake(&self, session: ShakeSession) -> Result<(), String> {
+    fn commit_shake(&self, session: ShakeSession) -> Result<(), String> {
         let mut guard = self.lock_presentation()?;
         if guard.shake_session.is_some() || guard.visibility != session.previous_visibility {
             return Err("Shelf presentation changed while Shake-to-open was starting".into());
@@ -325,7 +328,7 @@ impl ResidentState {
         Ok(ShakeDropResolution::Restore(session.clone()))
     }
 
-    pub(super) fn finish_shake_restore(&self, session: &ShakeSession) -> Result<(), String> {
+    fn finish_shake_restore(&self, session: &ShakeSession) -> Result<(), String> {
         let mut guard = self.lock_presentation()?;
         if !guard
             .shake_session
@@ -342,7 +345,7 @@ impl ResidentState {
         Ok(())
     }
 
-    pub(super) fn finish_shake_promote(&self, session_id: Option<u64>) -> Result<(), String> {
+    fn finish_shake_promote(&self, session_id: Option<u64>) -> Result<(), String> {
         let mut guard = self.lock_presentation()?;
         if !guard
             .shake_session

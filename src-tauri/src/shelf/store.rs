@@ -1,6 +1,12 @@
 //! Persistent Shelf store: database open, schema, sizing, and shared helpers.
 
-use super::*;
+use rusqlite::OptionalExtension;
+use rusqlite::{Connection, Transaction, params};
+use std::fs;
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
+use std::time::Duration;
+use super::{Availability, PreparedDrag, ShelfError, ShelfSnapshot, ShelfState};
 
 pub(super) struct ShelfStore {
     pub(super) connection: Connection,

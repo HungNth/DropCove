@@ -1,6 +1,8 @@
 //! Pinning of Shelf Items and Shelf Batches.
 
-use super::*;
+use rusqlite::params;
+use super::store::ShelfStore;
+use super::{ShelfError, ShelfSnapshot, ShelfState};
 use super::store::{validate_unique_batches, validate_unique_items};
 
 impl ShelfState {

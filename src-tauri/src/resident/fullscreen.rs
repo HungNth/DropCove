@@ -1,6 +1,7 @@
 //! Edge Rail hiding and restoration under fullscreen coverage.
 
-use super::*;
+use tauri::{AppHandle, Emitter, Manager};
+use super::{ResidentState, Visibility};
 use super::window_ops::{WorkArea};
 use super::rail::{RailPresentation, RailTransientReason, rail_placement};
 
@@ -67,7 +68,7 @@ pub(crate) fn evaluate_fullscreen_coverage(app: &AppHandle) -> Result<(), String
     )
 }
 
-pub(super) fn is_monitor_occluded_by_foreground(monitor_rect: &WorkArea) -> bool {
+fn is_monitor_occluded_by_foreground(monitor_rect: &WorkArea) -> bool {
     use windows::Win32::Foundation::RECT;
     use windows::Win32::System::Threading::GetCurrentProcessId;
     use windows::Win32::UI::WindowsAndMessaging::{

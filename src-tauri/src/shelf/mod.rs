@@ -14,17 +14,9 @@ mod store;
 #[cfg(test)]
 mod tests;
 
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-    path::Path,
-    sync::{Arc, Mutex, MutexGuard},
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
-
-use paths::ordinal_equal;
-use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
+use std::path::Path;
+use std::sync::{Arc, Mutex, MutexGuard};
 use store::ShelfStore;
 use thiserror::Error;
 

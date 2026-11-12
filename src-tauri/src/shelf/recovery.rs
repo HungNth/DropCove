@@ -1,8 +1,15 @@
 //! Recovery Backup: database validation, SHM staging, and open-or-recover.
 
-use super::*;
+use rusqlite::OptionalExtension;
+use rusqlite::Connection;
+use std::fs;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use super::store::ShelfStore;
+use super::{ShelfError, ShelfState};
 
-pub(crate) fn days_to_ymd(days: i64) -> (i64, u32, u32) {
+fn days_to_ymd(days: i64) -> (i64, u32, u32) {
     let z = days + 719468;
     let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
     let doe = (z - era * 146097) as u32;
@@ -16,7 +23,7 @@ pub(crate) fn days_to_ymd(days: i64) -> (i64, u32, u32) {
     (y, m, d)
 }
 
-pub(super) fn format_utc_timestamp(time: SystemTime) -> String {
+fn format_utc_timestamp(time: SystemTime) -> String {
     let dur = time.duration_since(UNIX_EPOCH).unwrap_or_default();
     let secs = dur.as_secs();
     let days = (secs / 86400) as i64;
@@ -28,7 +35,7 @@ pub(super) fn format_utc_timestamp(time: SystemTime) -> String {
     format!("{year:04}{month:02}{day:02}T{hour:02}{min:02}{sec:02}Z")
 }
 
-pub(super) fn is_recoverable_error(err: &ShelfError) -> bool {
+fn is_recoverable_error(err: &ShelfError) -> bool {
     match err {
         ShelfError::DatabaseCorrupt(_) => true,
         ShelfError::Database(rusqlite_err) => match rusqlite_err {
@@ -64,7 +71,7 @@ pub(super) fn is_recoverable_error(err: &ShelfError) -> bool {
     }
 }
 
-pub(super) fn stage_shm_file(shm_path: &Path) -> Result<std::path::PathBuf, ShelfError> {
+fn stage_shm_file(shm_path: &Path) -> Result<std::path::PathBuf, ShelfError> {
     let mut source_file = fs::File::open(shm_path).map_err(|source| ShelfError::fs(shm_path.display(), source))?;
     let pid = std::process::id();
     let mut attempt = 0u64;
@@ -96,7 +103,7 @@ pub(super) fn stage_shm_file(shm_path: &Path) -> Result<std::path::PathBuf, Shel
     Ok(stage_path)
 }
 
-pub(super) fn restore_staged_shm(shm_path: &Path, stage_path: &Path) -> Result<(), ShelfError> {
+fn restore_staged_shm(shm_path: &Path, stage_path: &Path) -> Result<(), ShelfError> {
     if fs::rename(stage_path, shm_path).is_ok() {
         return Ok(());
     }
@@ -127,7 +134,7 @@ pub(super) fn restore_staged_shm(shm_path: &Path, stage_path: &Path) -> Result<(
     }
 }
 
-pub(super) fn validate_existing_database(path: &Path, shm_path: &Path) -> Result<(), ShelfError> {
+fn validate_existing_database(path: &Path, shm_path: &Path) -> Result<(), ShelfError> {
     use std::io::Read;
     let mut file = fs::File::open(path).map_err(|source| ShelfError::fs(path.display(), source))?;
     let metadata = file.metadata().map_err(|source| ShelfError::fs(path.display(), source))?;

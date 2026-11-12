@@ -1,6 +1,9 @@
 //! Removal of Shelf Items and Shelf Batches, Clear Temporary, and removal previews.
 
-use super::*;
+use rusqlite::OptionalExtension;
+use rusqlite::{Connection, params};
+use super::store::ShelfStore;
+use super::{RemovalPreview, ShelfError, ShelfSnapshot, ShelfState};
 use super::store::{clear_sizing_when_empty, push_token_field, validate_unique_batches, validate_unique_items};
 
 impl ShelfState {
@@ -176,7 +179,7 @@ impl ShelfStore {
     }
 
     /// Counts and membership token for a batch removal, read from persisted rows in one pass.
-    pub(super) fn removal_scope(
+    fn removal_scope(
         connection: &Connection,
         batch_ids: &[String],
     ) -> Result<RemovalPreview, ShelfError> {
@@ -218,7 +221,7 @@ impl ShelfStore {
         Self::removal_scope(&self.connection, batch_ids)
     }
 
-    pub(super) fn item_removal_scope(
+    fn item_removal_scope(
         connection: &Connection,
         batch_id: &str,
         item_ids: &[String],

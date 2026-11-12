@@ -1,6 +1,10 @@
 //! Pending Managed File Deletion, cleanup, and startup reconciliation of Managed Files.
 
-use super::*;
+use rusqlite::Transaction;
+use std::fs;
+use std::path::Path;
+use super::store::ShelfStore;
+use super::ShelfError;
 use super::store::{clear_sizing_when_empty};
 
 impl ShelfStore {
@@ -100,7 +104,7 @@ impl ShelfStore {
         Ok(())
     }
 
-    pub(super) fn validate_managed_file(path: &Path) -> Result<bool, ShelfError> {
+    fn validate_managed_file(path: &Path) -> Result<bool, ShelfError> {
         let meta = match fs::metadata(path) {
             Ok(m) => m,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),

@@ -1,6 +1,12 @@
 //! Read side of the Shelf: snapshots, Manage Items batch, Shell Visual targets, and item actions.
 
-use super::*;
+use rusqlite::OptionalExtension;
+use super::paths;
+use rusqlite::Connection;
+use std::fs;
+use std::collections::{HashMap, HashSet};
+use super::store::ShelfStore;
+use super::{Availability, ItemActionKind, ItemOwnership, ManagedContentKind, ResolvedItemAction, ShelfBatch, ShelfError, ShelfItem, ShelfSnapshot, ShelfState};
 use super::store::{automatic_height};
 
 impl ShelfState {

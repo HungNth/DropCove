@@ -1,9 +1,15 @@
 //! Intake of dropped paths, text, and images into a new Shelf Batch.
 
-use super::*;
+use rusqlite::params;
+use std::fs;
+use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
+use super::paths::{self, ordinal_equal};
+use super::store::ShelfStore;
+use super::{Availability, DropResult, ShelfError, ShelfSnapshot, ShelfState};
 use super::store::{clear_sizing_when_empty, random_id};
 
-pub(super) struct IncomingItem {
+struct IncomingItem {
     path: String,
     ordinal_path: Vec<u16>,
     availability: Availability,
@@ -151,7 +157,7 @@ impl ShelfState {
 }
 
 impl ShelfStore {
-    pub(super) fn insert_batch(
+    fn insert_batch(
         &mut self,
         mut items: Vec<IncomingItem>,
         created_at: i64,
@@ -206,7 +212,7 @@ impl ShelfStore {
         Ok(snapshot)
     }
 
-    pub(super) fn generate_text_snippet(bytes: &[u8]) -> String {
+    fn generate_text_snippet(bytes: &[u8]) -> String {
         let text = std::str::from_utf8(bytes).unwrap_or("");
         let collapsed: String = text
             .split_whitespace()
@@ -224,7 +230,7 @@ impl ShelfStore {
         }
     }
 
-    pub(super) fn insert_managed_text(
+    fn insert_managed_text(
         &mut self,
         bytes: &[u8],
         timestamp_str: &str,
@@ -352,7 +358,7 @@ impl ShelfStore {
         Ok(snapshot)
     }
 
-    pub(super) fn insert_managed_images(
+    fn insert_managed_images(
         &mut self,
         candidates: Vec<(String, String)>,
         created_at: i64,

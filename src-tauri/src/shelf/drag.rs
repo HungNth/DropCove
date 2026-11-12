@@ -1,9 +1,14 @@
 //! Batch and Item drag-out: preparation, start, completion, and occurrence consumption.
 
-use super::*;
+use rusqlite::OptionalExtension;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use super::paths::{self, ordinal_equal};
+use super::store::ShelfStore;
+use super::{Availability, BatchPreparation, DragDomain, DragOutcome, DragParticipant, ItemPreparation, PreparedDrag, PreparedTransfer, ShelfError, ShelfItem, ShelfSnapshot, ShelfState};
 use super::store::{clear_sizing_when_empty, random_id};
 
-pub(super) struct PreparedCandidateItems<'a> {
+struct PreparedCandidateItems<'a> {
     participants: Vec<DragParticipant>,
     paths: Vec<String>,
     missing: Vec<&'a str>,
@@ -11,7 +16,7 @@ pub(super) struct PreparedCandidateItems<'a> {
     classifications: Vec<(&'a str, Availability)>,
 }
 
-pub(super) fn classify_and_dedupe_candidates<'a>(
+fn classify_and_dedupe_candidates<'a>(
     items: impl IntoIterator<Item = &'a ShelfItem>,
     mut classifier: impl FnMut(&str) -> Availability,
 ) -> PreparedCandidateItems<'a> {
@@ -178,7 +183,7 @@ impl ShelfState {
 }
 
 impl ShelfStore {
-    pub(super) fn commit_drag_preparation(
+    fn commit_drag_preparation(
         &mut self,
         domain: DragDomain,
         batch_id: Option<String>,
@@ -241,7 +246,7 @@ impl ShelfStore {
         Ok((token, available, candidates.unavailable, snapshot))
     }
 
-    pub(super) fn prepare_batches(
+    fn prepare_batches(
         &mut self,
         batch_ids: &[String],
         classifier: impl FnMut(&str) -> Availability,
@@ -277,7 +282,7 @@ impl ShelfStore {
         })
     }
 
-    pub(super) fn prepare_items(
+    fn prepare_items(
         &mut self,
         batch_id: &str,
         item_ids: &[String],

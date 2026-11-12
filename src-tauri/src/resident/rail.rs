@@ -1,17 +1,23 @@
 //! Edge Rail presentation state, expansion and collapse timing, settings application, and pointer classification.
 
-use super::*;
+use tauri::{AppHandle, Emitter, Manager};
+use crate::settings::store::Settings;
+use crate::shelf::ShelfState;
+use windows::Win32::Foundation::{POINT, RECT};
+use windows::Win32::UI::HiDpi::GetDpiForWindow;
+use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetWindowRect};
+use super::{ResidentState, Visibility, now_monotonic_ms};
 use super::drop_shelf::{coordinate_docked_to_shelf, show_shelf_at};
 
-pub(crate) const RAIL_WIDTH: f64 = 280.0;
+const RAIL_WIDTH: f64 = 280.0;
 
-pub(crate) const RAIL_HANDLE_WIDTH: f64 = 16.0;
+const RAIL_HANDLE_WIDTH: f64 = 16.0;
 
-pub(crate) const RAIL_MIN_HEIGHT: f64 = 280.0;
+const RAIL_MIN_HEIGHT: f64 = 280.0;
 
-pub(crate) const RAIL_MAX_HEIGHT: f64 = 642.0;
+const RAIL_MAX_HEIGHT: f64 = 642.0;
 
-pub(crate) const RAIL_EXPAND_DELAY_MS: u64 = 200;
+const RAIL_EXPAND_DELAY_MS: u64 = 200;
 
 pub(crate) const RAIL_COLLAPSE_DELAY_MS: u64 = 300;
 
