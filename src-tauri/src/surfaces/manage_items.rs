@@ -2,7 +2,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use crate::{
     shelf::{ShelfBatch, ShelfState},
-    windows_drag::DragSession,
+    drag_drop::drag::DragSession,
 };
 use serde::Deserialize;
 use tauri::{
@@ -239,7 +239,7 @@ pub(crate) fn open(
     } else {
         let popup = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
             .title("Manage Items - DropCove")
-            .theme(crate::windows_theme::current_theme(app)?)
+            .theme(crate::settings::appearance::current_theme(app)?)
             .inner_size(WIDTH, height)
             .position(x, y)
             .resizable(false)
@@ -273,7 +273,7 @@ pub(crate) fn open(
         receiver.recv().map_err(|error| error.to_string())??;
         popup
     };
-    crate::windows_theme::apply_to_window(&popup)?;
+    crate::settings::appearance::apply_to_window(&popup)?;
     {
         let state = app.state::<ManageItemsState>();
         let mut state = state.lock()?;
@@ -387,8 +387,8 @@ pub(crate) fn open(
         if keyboard {
             popup.set_focus().map_err(|error| error.to_string())?;
         }
-        let new_gen = app.state::<crate::windows_visuals::ShellVisualState>().0.advance_generation(crate::windows_visuals::SurfaceId::ManageItems);
-        let _ = app.emit("visual-generation-changed", crate::windows_visuals::GenerationChangedPayload { surface: crate::windows_visuals::SurfaceId::ManageItems, generation: new_gen });
+        let new_gen = app.state::<crate::surfaces::shell_visuals::ShellVisualState>().0.advance_generation(crate::surfaces::shell_visuals::SurfaceId::ManageItems);
+        let _ = app.emit("visual-generation-changed", crate::surfaces::shell_visuals::GenerationChangedPayload { surface: crate::surfaces::shell_visuals::SurfaceId::ManageItems, generation: new_gen });
         popup
             .emit("manage-items-opened", keyboard)
             .map_err(|error| error.to_string())
@@ -443,7 +443,7 @@ pub(crate) fn close(app: &AppHandle) -> Result<(), String> {
         app.state::<ManageItemsState>().lock()?.pending_close = true;
         return Ok(());
     }
-    crate::selection_confirmation::cancel(app, LABEL)?;
+    crate::surfaces::selection_confirmation::cancel(app, LABEL)?;
     app.state::<ShelfState>()
         .cancel_prepared_item_drag()
         .map_err(|error| error.to_string())?;
@@ -451,8 +451,8 @@ pub(crate) fn close(app: &AppHandle) -> Result<(), String> {
         popup.hide().map_err(|error| error.to_string())?;
         popup.close().map_err(|error| error.to_string())?;
     }
-    let new_gen = app.state::<crate::windows_visuals::ShellVisualState>().0.advance_generation(crate::windows_visuals::SurfaceId::ManageItems);
-    let _ = app.emit("visual-generation-changed", crate::windows_visuals::GenerationChangedPayload { surface: crate::windows_visuals::SurfaceId::ManageItems, generation: new_gen });
+    let new_gen = app.state::<crate::surfaces::shell_visuals::ShellVisualState>().0.advance_generation(crate::surfaces::shell_visuals::SurfaceId::ManageItems);
+    let _ = app.emit("visual-generation-changed", crate::surfaces::shell_visuals::GenerationChangedPayload { surface: crate::surfaces::shell_visuals::SurfaceId::ManageItems, generation: new_gen });
     {
         let state = app.state::<ManageItemsState>();
         let mut state = state.lock()?;
@@ -465,7 +465,7 @@ pub(crate) fn close(app: &AppHandle) -> Result<(), String> {
         .state::<crate::resident::ResidentState>()
         .set_rail_transient_reason(crate::resident::RailTransientReason::ManageItems, false)
     {
-        let _ = crate::edge_rail::arm_rail_timer(app, remaining as u32);
+        let _ = crate::surfaces::edge_rail::arm_rail_timer(app, remaining as u32);
     }
     app.emit("shelf-changed", ())
         .map_err(|error| error.to_string())

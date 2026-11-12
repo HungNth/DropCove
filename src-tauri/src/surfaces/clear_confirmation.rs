@@ -133,7 +133,7 @@ pub(crate) fn request(app: &AppHandle, caller_label: &str) -> Result<(), String>
     // Build hidden first so we can measure the actual outer non-client frame and accurately clamp to work area.
     let confirmation = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
         .title("DropCove")
-        .theme(crate::windows_theme::current_theme(app)?)
+        .theme(crate::settings::appearance::current_theme(app)?)
         .inner_size(WIDTH, HEIGHT)
         .resizable(false)
         .minimizable(false)
@@ -147,7 +147,7 @@ pub(crate) fn request(app: &AppHandle, caller_label: &str) -> Result<(), String>
         .map_err(|e| e.to_string())?;
 
     let setup_res = (|| {
-        crate::windows_theme::apply_to_window(&confirmation)?;
+        crate::settings::appearance::apply_to_window(&confirmation)?;
         let conf_hwnd = confirmation.hwnd().map_err(|e| e.to_string())?;
 
         let mut mi = MONITORINFO {
@@ -241,13 +241,13 @@ pub(crate) fn confirm(app: &AppHandle) -> Result<crate::shelf::ShelfSnapshot, St
 
     if !has_temp {
         close_window_and_release(app)?;
-        return crate::publish_shelf(app, current_snapshot);
+        return crate::shelf::commands::publish_shelf(app, current_snapshot);
     }
 
     close_window_and_release(app)?;
 
     match shelf.clear_temporary() {
-        Ok(cleared_snapshot) => crate::publish_shelf(app, cleared_snapshot),
+        Ok(cleared_snapshot) => crate::shelf::commands::publish_shelf(app, cleared_snapshot),
         Err(err) => {
             let error_msg = err.to_string();
             let _ = app.emit("shelf-error", error_msg.clone());

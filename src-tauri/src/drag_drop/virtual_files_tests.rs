@@ -125,7 +125,7 @@ impl Drop for Profile { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0)
 fn native_png_payload_is_eligible_without_opening_content_until_drop() {
     let reads = std::sync::Arc::new(AtomicUsize::new(0));
     let data: IDataObject = VirtualSource { entries: vec![("photo.png".into(), png())], reads: reads.clone(), stream_paths: Vec::new(), ..Default::default() }.into();
-    assert_eq!(crate::windows_drop::evaluate_data_payload(&data), crate::windows_drop::EvaluatedPayload::VirtualImages);
+    assert_eq!(crate::drag_drop::drop::evaluate_data_payload(&data), crate::drag_drop::drop::EvaluatedPayload::VirtualImages);
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }
 
@@ -253,7 +253,7 @@ fn native_mixed_image_drop_preserves_all_formats_order_duplicates_and_skip_resul
         image::DynamicImage::new_rgb8(2, 3).write_to(&mut encoded, format).unwrap();
         images.push((format!("asset.{extension}"), encoded.into_inner()));
     }
-    images.push(("asset.avif".into(), include_bytes!("fixtures/website-image.avif").to_vec()));
+    images.push(("asset.avif".into(), include_bytes!("../fixtures/website-image.avif").to_vec()));
     images.push(("asset.svg".into(), br#"<svg xmlns="http://www.w3.org/2000/svg"><script>alert('preserved')</script><image href="https://example.test/source.png"/></svg>"#.to_vec()));
     images.push(images[0].clone());
     let mut entries = images.clone();

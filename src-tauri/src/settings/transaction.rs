@@ -1,8 +1,8 @@
 //! One settings application across native integrations and the real atomic JSON store.
 
 use crate::{
-    settings_store::{AppearanceMode, HotKey, Settings, SettingsStore},
-    windows_startup::RegistryValue,
+    settings::store::{AppearanceMode, HotKey, Settings, SettingsStore},
+    resident::startup::RegistryValue,
 };
 
 pub(crate) trait Integrations {
@@ -370,10 +370,10 @@ mod tests {
                 virtual_key: 0x4B,
             },
             start_with_windows: false,
-            rail_edge: crate::settings_store::RailEdge::Left,
+            rail_edge: crate::settings::store::RailEdge::Left,
             rail_monitor_id: "other-display".into(),
             shake_enabled: false,
-            shake_sensitivity: crate::settings_store::ShakeSensitivity::High,
+            shake_sensitivity: crate::settings::store::ShakeSensitivity::High,
             ..Settings::default()
         };
         let native = Native {

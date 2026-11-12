@@ -1,3 +1,11 @@
+pub(crate) mod commands;
+pub(crate) mod foreground;
+pub(crate) mod hotkey;
+pub(crate) mod instance;
+pub(crate) mod shake;
+pub(crate) mod startup;
+pub(crate) mod tray;
+
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex,
@@ -18,7 +26,7 @@ use windows::Win32::{
     },
 };
 
-use crate::{edge_rail, manage_items, settings_store::Settings, shelf::ShelfState};
+use crate::{settings::store::Settings, shelf::ShelfState};
 
 const SHELF_WINDOW_LABEL: &str = "main";
 
@@ -89,7 +97,7 @@ pub(crate) enum RailTransientReason {
 struct ShakeSession {
     id: u64,
     previous_visibility: Visibility,
-    previous_placement: Option<edge_rail::Placement>,
+    previous_placement: Option<crate::surfaces::edge_rail::Placement>,
     previous_rail: RailPresentation,
     drag_inside: bool,
     drop_pending: bool,
@@ -105,7 +113,7 @@ enum ShakeDropResolution {
 #[derive(Default)]
 struct Presentation {
     visibility: Visibility,
-    rail_placement: Option<edge_rail::Placement>,
+    rail_placement: Option<crate::surfaces::edge_rail::Placement>,
     rail: RailPresentation,
     transient_holds: u8,
     pointer_inside: bool,
@@ -129,7 +137,7 @@ impl ResidentState {
             .map_err(|_| "resident coordinator state lock is poisoned".to_owned())
     }
 
-    fn placement(&self) -> Result<Option<edge_rail::Placement>, String> {
+    fn placement(&self) -> Result<Option<crate::surfaces::edge_rail::Placement>, String> {
         self.presentation
             .lock()
             .map(|value| value.rail_placement.clone())
@@ -641,7 +649,7 @@ pub(crate) trait WindowOps {
 /// Production implementation of WindowOps using Win32 API and Tauri window handle.
 pub(crate) struct NativeWindowOps<'a> {
     window: &'a WebviewWindow,
-    target: Option<&'a edge_rail::DisplayMonitor>,
+    target: Option<&'a crate::surfaces::edge_rail::DisplayMonitor>,
 }
 
 impl<'a> NativeWindowOps<'a> {
@@ -652,7 +660,7 @@ impl<'a> NativeWindowOps<'a> {
         }
     }
 
-    fn on_monitor(window: &'a WebviewWindow, target: &'a edge_rail::DisplayMonitor) -> Self {
+    fn on_monitor(window: &'a WebviewWindow, target: &'a crate::surfaces::edge_rail::DisplayMonitor) -> Self {
         Self {
             window,
             target: Some(target),
@@ -1045,14 +1053,14 @@ pub(crate) fn evaluate_fullscreen_coverage(app: &AppHandle) -> Result<(), String
         settings.show_rail_over_fullscreen,
         || {
             if occluded && !settings.show_rail_over_fullscreen {
-                edge_rail::hide(app)
+                crate::surfaces::edge_rail::hide(app)
             } else {
                 let rail = state.rail_presentation()?;
-                edge_rail::show(app, &placement, rail.width, rail.height, rail.expanded)
+                crate::surfaces::edge_rail::show(app, &placement, rail.width, rail.height, rail.expanded)
             }
         },
         || {
-            manage_items::close(app)?;
+            crate::surfaces::manage_items::close(app)?;
             let _ = app.emit("rail-transients-closed", ());
             Ok(())
         },
@@ -1094,7 +1102,7 @@ fn is_monitor_occluded_by_foreground(monitor_rect: &WorkArea) -> bool {
         right: rect.right,
         bottom: rect.bottom,
     };
-    edge_rail::rect_covers_monitor(&window_rect, monitor_rect)
+    crate::surfaces::edge_rail::rect_covers_monitor(&window_rect, monitor_rect)
 }
 
 fn coordinate_exit(
@@ -1127,26 +1135,26 @@ pub(crate) fn repair_topmost(app: &AppHandle) -> Result<(), String> {
 }
 
 pub(crate) fn publish_warning(app: &AppHandle, message: &str) -> Result<(), String> {
-    crate::resident_tray::warning(app, message)
+    crate::resident::tray::warning(app, message)
 }
 
 pub(crate) fn exit(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<ResidentState>();
-    let busy = app.state::<crate::windows_drag::DragSession>().is_active()
-        || crate::shelf_resize::is_resizing(app)?
+    let busy = app.state::<crate::drag_drop::drag::DragSession>().is_active()
+        || crate::surfaces::shelf_resize::is_resizing(app)?
         || app.state::<ShelfState>().has_pending_operations();
     coordinate_exit(state.inner(), busy, || {
-        crate::clear_confirmation::shutdown(app)?;
-        crate::about::shutdown(app)?;
-        manage_items::close(app)?;
-        edge_rail::hide(app)?;
-        crate::windows_foreground::shutdown(app)?;
-        crate::windows_drop::unregister(app);
+        crate::surfaces::clear_confirmation::shutdown(app)?;
+        crate::surfaces::about::shutdown(app)?;
+        crate::surfaces::manage_items::close(app)?;
+        crate::surfaces::edge_rail::hide(app)?;
+        crate::resident::foreground::shutdown(app)?;
+        crate::drag_drop::drop::unregister(app);
         app.state::<ShelfState>()
             .close()
             .map_err(|error| error.to_string())?;
         crate::settings::shutdown(app)?;
-        crate::resident_tray::shutdown(app)?;
+        crate::resident::tray::shutdown(app)?;
         app.exit(0);
         Ok(())
     })
@@ -1160,10 +1168,10 @@ pub(crate) fn show_shelf(app: &AppHandle) -> Result<(), String> {
 
 fn show_shelf_at(
     app: &AppHandle,
-    monitor: Option<&edge_rail::DisplayMonitor>,
+    monitor: Option<&crate::surfaces::edge_rail::DisplayMonitor>,
 ) -> Result<(), String> {
-    if crate::clear_confirmation::is_modal_active(app) {
-        crate::clear_confirmation::request(app, "main")?;
+    if crate::surfaces::clear_confirmation::is_modal_active(app) {
+        crate::surfaces::clear_confirmation::request(app, "main")?;
         return Ok(());
     }
     let window = app
@@ -1180,11 +1188,11 @@ fn show_shelf_at(
         .had_content
         .store(!snapshot.batches.is_empty(), Ordering::Release);
     coordinate_docked_to_shelf(previous, || {
-        manage_items::close(app)?;
+        crate::surfaces::manage_items::close(app)?;
         let _ = app.emit("rail-transients-closed", ());
         Ok(())
     })?;
-    edge_rail::hide(app)?;
+    crate::surfaces::edge_rail::hide(app)?;
     let ops = match monitor {
         Some(monitor) => NativeWindowOps::on_monitor(&window, monitor),
         None => NativeWindowOps::new(&window),
@@ -1198,13 +1206,13 @@ fn show_shelf_at(
         return Err(error);
     }
     if previous != Visibility::Visible {
-        let visual_state = app.state::<crate::windows_visuals::ShellVisualState>();
-        let new_gen = visual_state.0.advance_generation(crate::windows_visuals::SurfaceId::Shelf);
+        let visual_state = app.state::<crate::surfaces::shell_visuals::ShellVisualState>();
+        let new_gen = visual_state.0.advance_generation(crate::surfaces::shell_visuals::SurfaceId::Shelf);
         use tauri::Emitter;
         let _ = app.emit(
             "visual-generation-changed",
-            crate::windows_visuals::GenerationChangedPayload {
-                surface: crate::windows_visuals::SurfaceId::Shelf,
+            crate::surfaces::shell_visuals::GenerationChangedPayload {
+                surface: crate::surfaces::shell_visuals::SurfaceId::Shelf,
                 generation: new_gen,
             },
         );
@@ -1217,7 +1225,7 @@ fn show_saved_shake_rail(app: &AppHandle, session: &ShakeSession) -> Result<(), 
         .previous_placement
         .as_ref()
         .ok_or("saved EdgeDocked Shake session has no rail placement")?;
-    edge_rail::show(
+    crate::surfaces::edge_rail::show(
         app,
         placement,
         session.previous_rail.width,
@@ -1244,7 +1252,7 @@ fn restore_shake_on_window_thread(app: &AppHandle) -> Result<(), String> {
 }
 
 pub(crate) fn begin_shake(app: &AppHandle) -> Result<(), String> {
-    if app.state::<crate::windows_drag::DragSession>().is_active() {
+    if app.state::<crate::drag_drop::drag::DragSession>().is_active() {
         return Ok(());
     }
     let window = app
@@ -1261,9 +1269,9 @@ pub(crate) fn begin_shake(app: &AppHandle) -> Result<(), String> {
         snapshot.preferred_width,
         snapshot.height,
         || {
-            manage_items::close(app)?;
+            crate::surfaces::manage_items::close(app)?;
             let _ = app.emit("rail-transients-closed", ());
-            edge_rail::hide(app)
+            crate::surfaces::edge_rail::hide(app)
         },
         |session| show_saved_shake_rail(app, session),
     )?;
@@ -1358,12 +1366,12 @@ pub(crate) fn cancel_shake(app: &AppHandle) -> Result<(), String> {
     restore_shake_on_window_thread(app)
 }
 
-pub(crate) fn rail_placement(app: &AppHandle) -> Result<Option<edge_rail::Placement>, String> {
+pub(crate) fn rail_placement(app: &AppHandle) -> Result<Option<crate::surfaces::edge_rail::Placement>, String> {
     app.state::<ResidentState>().placement()
 }
 fn set_rail_placement(
     app: &AppHandle,
-    placement: Option<edge_rail::Placement>,
+    placement: Option<crate::surfaces::edge_rail::Placement>,
 ) -> Result<(), String> {
     app.state::<ResidentState>()
         .presentation
@@ -1374,15 +1382,15 @@ fn set_rail_placement(
 }
 pub(crate) fn restore_rail(
     app: &AppHandle,
-    placement: Option<&edge_rail::Placement>,
+    placement: Option<&crate::surfaces::edge_rail::Placement>,
 ) -> Result<(), String> {
     if app.state::<ResidentState>().visibility()? == Visibility::EdgeDocked {
         let rail = app.state::<ResidentState>().rail_presentation()?;
         match placement {
             Some(placement) => {
-                edge_rail::show(app, placement, rail.width, rail.height, rail.expanded)?
+                crate::surfaces::edge_rail::show(app, placement, rail.width, rail.height, rail.expanded)?
             }
-            None => edge_rail::hide(app)?,
+            None => crate::surfaces::edge_rail::hide(app)?,
         }
     }
     set_rail_placement(app, placement.cloned())
@@ -1390,10 +1398,10 @@ pub(crate) fn restore_rail(
 pub(crate) fn coordinate_apply_rail_settings(
     state: &ResidentState,
     shelf: &ShelfState,
-    placement: &edge_rail::Placement,
+    placement: &crate::surfaces::edge_rail::Placement,
     rail_monitor_id_setting: &str,
-    show_native: impl FnOnce(&edge_rail::Placement) -> Result<(), String>,
-    restore_native: impl FnOnce(Option<&edge_rail::Placement>) -> Result<(), String>,
+    show_native: impl FnOnce(&crate::surfaces::edge_rail::Placement) -> Result<(), String>,
+    restore_native: impl FnOnce(Option<&crate::surfaces::edge_rail::Placement>) -> Result<(), String>,
 ) -> Result<(), String> {
     let prior_placement = state.placement()?;
     let prior_remembered = shelf.rail_monitor().map_err(|e| e.to_string())?;
@@ -1464,7 +1472,7 @@ pub(crate) fn apply_rail_settings(app: &AppHandle, settings: &Settings) -> Resul
     if state.visibility()? != Visibility::EdgeDocked {
         return Ok(());
     }
-    let placement = edge_rail::placement(app, settings)?;
+    let placement = crate::surfaces::edge_rail::placement(app, settings)?;
     let shelf = app.state::<ShelfState>();
     let rail = state.rail_presentation()?;
     coordinate_apply_rail_settings(
@@ -1472,10 +1480,10 @@ pub(crate) fn apply_rail_settings(app: &AppHandle, settings: &Settings) -> Resul
         &shelf,
         &placement,
         &settings.rail_monitor_id,
-        |p| edge_rail::show(app, p, rail.width, rail.height, rail.expanded),
+        |p| crate::surfaces::edge_rail::show(app, p, rail.width, rail.height, rail.expanded),
         |prev| match prev {
-            Some(prev_p) => edge_rail::show(app, prev_p, rail.width, rail.height, rail.expanded),
-            None => edge_rail::hide(app),
+            Some(prev_p) => crate::surfaces::edge_rail::show(app, prev_p, rail.width, rail.height, rail.expanded),
+            None => crate::surfaces::edge_rail::hide(app),
         },
     )
 }
@@ -1493,7 +1501,7 @@ pub(crate) fn update_rail_content(app: &AppHandle, batch_count: usize) -> Result
                 return Err(String::from("docked rail has no placement"));
             }
         };
-        if let Err(error) = edge_rail::show(app, &placement, rail.width, rail.height, rail.expanded)
+        if let Err(error) = crate::surfaces::edge_rail::show(app, &placement, rail.width, rail.height, rail.expanded)
         {
             state.set_rail_presentation(prior_rail)?;
             return Err(error);
@@ -1520,15 +1528,15 @@ pub(crate) fn tick_rail(app: &AppHandle) -> Result<(), String> {
                 return Err(String::from("docked rail has no placement"));
             }
         };
-        edge_rail::show(app, &placement, next.width, next.height, next.expanded)?;
+        crate::surfaces::edge_rail::show(app, &placement, next.width, next.height, next.expanded)?;
         state.set_rail_presentation(next)?;
-        edge_rail::cancel_rail_timer(app);
+        crate::surfaces::edge_rail::cancel_rail_timer(app);
     } else {
         state.tick_rail(now, batch_count)?;
         let rail = state.rail_presentation()?;
         if let Some(due) = rail.expand_due_ms.or(rail.collapse_due_ms) {
             let remaining = (due.saturating_sub(now)).max(1) as u32;
-            edge_rail::arm_rail_timer(app, remaining)?;
+            crate::surfaces::edge_rail::arm_rail_timer(app, remaining)?;
         } else {
         }
     }
@@ -1545,7 +1553,7 @@ pub(crate) fn open_shelf_from_rail(app: &AppHandle) -> Result<(), String> {
         Ok(Some(placement)) => placement,
         other => {
             coordinate_docked_to_shelf(Visibility::EdgeDocked, || {
-                manage_items::close(app)?;
+                crate::surfaces::manage_items::close(app)?;
                 let _ = app.emit("rail-transients-closed", ());
                 Ok(())
             })?;
@@ -1587,7 +1595,7 @@ pub(crate) fn classify_rail_pointer(
 }
 
 pub(crate) fn reconcile_rail_pointer_after_drag(app: &AppHandle) -> Result<(), String> {
-    let window = match app.get_webview_window(edge_rail::LABEL) {
+    let window = match app.get_webview_window(crate::surfaces::edge_rail::LABEL) {
         Some(w) => w,
         None => return Ok(()),
     };
@@ -1613,12 +1621,12 @@ pub(crate) fn reconcile_rail_pointer_after_drag(app: &AppHandle) -> Result<(), S
     let rail = state.reconcile_rail_pointer(now, region)?;
     if let Some(due) = rail.expand_due_ms {
         let remaining = (due.saturating_sub(now)).max(1) as u32;
-        let _ = edge_rail::arm_rail_timer(app, remaining);
+        let _ = crate::surfaces::edge_rail::arm_rail_timer(app, remaining);
     } else if let Some(due) = rail.collapse_due_ms {
         let remaining = (due.saturating_sub(now)).max(1) as u32;
-        let _ = edge_rail::arm_rail_timer(app, remaining);
+        let _ = crate::surfaces::edge_rail::arm_rail_timer(app, remaining);
     } else {
-        edge_rail::cancel_rail_timer(app);
+        crate::surfaces::edge_rail::cancel_rail_timer(app);
     }
     Ok(())
 }
@@ -1627,7 +1635,7 @@ fn coordinate_dock(
     ops: &dyn WindowOps,
     state: &ResidentState,
     shelf: &ShelfState,
-    placement: &edge_rail::Placement,
+    placement: &crate::surfaces::edge_rail::Placement,
     show_rail: impl FnOnce() -> Result<(), String>,
     hide_rail: impl FnOnce() -> Result<(), String>,
 ) -> Result<(), String> {
@@ -1676,7 +1684,7 @@ pub(crate) fn dismiss_shelf(app: &AppHandle) -> Result<(), String> {
     if state.visibility()? != Visibility::Visible {
         return Ok(());
     }
-    crate::clear_confirmation::guard_interaction(app)?;
+    crate::surfaces::clear_confirmation::guard_interaction(app)?;
     let window = app
         .get_webview_window(SHELF_WINDOW_LABEL)
         .ok_or("Drop Shelf window is missing")?;
@@ -1685,32 +1693,32 @@ pub(crate) fn dismiss_shelf(app: &AppHandle) -> Result<(), String> {
     state
         .had_content
         .store(!snapshot.batches.is_empty(), Ordering::Release);
-    manage_items::close(app)?;
+    crate::surfaces::manage_items::close(app)?;
     {
-        let visual_state = app.state::<crate::windows_visuals::ShellVisualState>();
-        let new_gen = visual_state.0.advance_generation(crate::windows_visuals::SurfaceId::Shelf);
+        let visual_state = app.state::<crate::surfaces::shell_visuals::ShellVisualState>();
+        let new_gen = visual_state.0.advance_generation(crate::surfaces::shell_visuals::SurfaceId::Shelf);
         use tauri::Emitter;
         let _ = app.emit(
             "visual-generation-changed",
-            crate::windows_visuals::GenerationChangedPayload {
-                surface: crate::windows_visuals::SurfaceId::Shelf,
+            crate::surfaces::shell_visuals::GenerationChangedPayload {
+                surface: crate::surfaces::shell_visuals::SurfaceId::Shelf,
                 generation: new_gen,
             },
         );
     }
     if snapshot.batches.is_empty() {
-        edge_rail::hide(app)?;
+        crate::surfaces::edge_rail::hide(app)?;
         return coordinate_hide(&NativeWindowOps::new(&window), &state, || Ok(()));
     }
-    let placement = edge_rail::placement_for_dismissal(app, &crate::settings::active(app)?)?;
+    let placement = crate::surfaces::edge_rail::placement_for_dismissal(app, &crate::settings::active(app)?)?;
     let rail = state.rail_presentation()?;
     coordinate_dock(
         &NativeWindowOps::new(&window),
         &state,
         &shelf,
         &placement,
-        || edge_rail::show(app, &placement, rail.width, rail.height, rail.expanded),
-        || edge_rail::hide(app),
+        || crate::surfaces::edge_rail::show(app, &placement, rail.width, rail.height, rail.expanded),
+        || crate::surfaces::edge_rail::hide(app),
     )?;
     evaluate_fullscreen_coverage(app)
 }
@@ -1737,9 +1745,9 @@ fn coordinate_content(
 
 fn synchronize_on_window_thread(app: &AppHandle, has_content: bool) -> Result<(), String> {
     coordinate_content(&app.state::<ResidentState>(), has_content, || {
-        manage_items::close(app)?;
+        crate::surfaces::manage_items::close(app)?;
         let _ = app.emit("rail-transients-closed", ());
-        edge_rail::hide(app)?;
+        crate::surfaces::edge_rail::hide(app)?;
         if let Some(window) = app.get_webview_window(SHELF_WINDOW_LABEL) {
             NativeWindowOps::new(&window).hide_window()?;
         }
@@ -1796,8 +1804,8 @@ mod tests {
             right: 1920,
             bottom: 1032,
         };
-        let placement = edge_rail::Placement {
-            monitor: edge_rail::DisplayMonitor {
+        let placement = crate::surfaces::edge_rail::Placement {
+            monitor: crate::surfaces::edge_rail::DisplayMonitor {
                 id: "selected".into(),
                 label: "selected".into(),
                 device: "display".into(),
@@ -1806,7 +1814,7 @@ mod tests {
                 dpi: 96,
                 primary: true,
             },
-            edge: crate::settings_store::RailEdge::Right,
+            edge: crate::settings::store::RailEdge::Right,
         };
         let mut ops = MockWindowOps::new((500, 500), work, 96);
         coordinate_show(&ops, &state, 180.0, 180.0).unwrap();
@@ -1870,8 +1878,8 @@ mod tests {
             right: 1920,
             bottom: 1032,
         };
-        let placement_a = edge_rail::Placement {
-            monitor: edge_rail::DisplayMonitor {
+        let placement_a = crate::surfaces::edge_rail::Placement {
+            monitor: crate::surfaces::edge_rail::DisplayMonitor {
                 id: "monitor_a".into(),
                 label: "monitor_a".into(),
                 device: "display_a".into(),
@@ -1880,10 +1888,10 @@ mod tests {
                 dpi: 96,
                 primary: true,
             },
-            edge: crate::settings_store::RailEdge::Right,
+            edge: crate::settings::store::RailEdge::Right,
         };
-        let placement_b = edge_rail::Placement {
-            monitor: edge_rail::DisplayMonitor {
+        let placement_b = crate::surfaces::edge_rail::Placement {
+            monitor: crate::surfaces::edge_rail::DisplayMonitor {
                 id: "monitor_b".into(),
                 label: "monitor_b".into(),
                 device: "display_b".into(),
@@ -1892,7 +1900,7 @@ mod tests {
                 dpi: 96,
                 primary: false,
             },
-            edge: crate::settings_store::RailEdge::Left,
+            edge: crate::settings::store::RailEdge::Left,
         };
 
         // Setup docked state with placement_a
@@ -2612,8 +2620,8 @@ mod tests {
             right: 1920,
             bottom: 1032,
         };
-        let placement = edge_rail::Placement {
-            monitor: edge_rail::DisplayMonitor {
+        let placement = crate::surfaces::edge_rail::Placement {
+            monitor: crate::surfaces::edge_rail::DisplayMonitor {
                 id: "test".into(),
                 label: "test".into(),
                 device: "display".into(),
@@ -2622,7 +2630,7 @@ mod tests {
                 dpi: 96,
                 primary: true,
             },
-            edge: crate::settings_store::RailEdge::Right,
+            edge: crate::settings::store::RailEdge::Right,
         };
         let ops = MockWindowOps::new((500, 500), work, 96);
         coordinate_show(&ops, &state, 180.0, 180.0).unwrap();
@@ -2757,8 +2765,8 @@ mod tests {
             right: 3840,
             bottom: 1080,
         };
-        let placement = edge_rail::Placement {
-            monitor: edge_rail::DisplayMonitor {
+        let placement = crate::surfaces::edge_rail::Placement {
+            monitor: crate::surfaces::edge_rail::DisplayMonitor {
                 id: "test".into(),
                 label: "test".into(),
                 device: "display".into(),
@@ -2767,7 +2775,7 @@ mod tests {
                 dpi: 96,
                 primary: true,
             },
-            edge: crate::settings_store::RailEdge::Right,
+            edge: crate::settings::store::RailEdge::Right,
         };
         let ops = MockWindowOps::new((500, 500), work, 96);
         let path = std::env::temp_dir().join(format!("dc-fs-{}", std::process::id()));
@@ -2790,15 +2798,15 @@ mod tests {
         state.set_rail_drag_active(true).unwrap();
 
         // Fullscreen on a DIFFERENT monitor does NOT occlude or hide rail
-        let occluded_other = edge_rail::rect_covers_monitor(&other_monitor_rect, &monitor_rect);
+        let occluded_other = crate::surfaces::edge_rail::rect_covers_monitor(&other_monitor_rect, &monitor_rect);
         assert!(!occluded_other);
 
         // Geometric coverage on the rail's monitor
-        let occluded_same = edge_rail::rect_covers_monitor(&monitor_rect, &monitor_rect);
+        let occluded_same = crate::surfaces::edge_rail::rect_covers_monitor(&monitor_rect, &monitor_rect);
         assert!(occluded_same);
 
         // Standard maximized window covering only work area does NOT cover monitor_rect
-        assert!(!edge_rail::rect_covers_monitor(&work, &monitor_rect));
+        assert!(!crate::surfaces::edge_rail::rect_covers_monitor(&work, &monitor_rect));
 
         // Now coordinate fullscreen occlusion with show_over_fullscreen = false
         let rail_hidden = RefCell::new(false);
@@ -2873,7 +2881,7 @@ mod tests {
 
     fn set_rail_presentation_for_test(
         state: &ResidentState,
-        placement: &edge_rail::Placement,
+        placement: &crate::surfaces::edge_rail::Placement,
         rail: RailPresentation,
     ) {
         state.set_visibility(Visibility::EdgeDocked).unwrap();
@@ -2892,8 +2900,8 @@ mod tests {
             right: 1920,
             bottom: 1080,
         };
-        let placement = edge_rail::Placement {
-            monitor: edge_rail::DisplayMonitor {
+        let placement = crate::surfaces::edge_rail::Placement {
+            monitor: crate::surfaces::edge_rail::DisplayMonitor {
                 id: "rail-display".into(),
                 label: "rail".into(),
                 device: "display".into(),
@@ -2902,7 +2910,7 @@ mod tests {
                 dpi: 96,
                 primary: true,
             },
-            edge: crate::settings_store::RailEdge::Left,
+            edge: crate::settings::store::RailEdge::Left,
         };
         let state = ResidentState::default();
         let ops = MockWindowOps::new((600, 500), work, 96);

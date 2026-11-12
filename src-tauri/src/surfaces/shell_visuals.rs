@@ -190,7 +190,7 @@ pub(crate) async fn get_shelf_visual(window:tauri::WebviewWindow,app:tauri::AppH
         let target=state.item_visual_target(&item_id).ok().flatten();
         let Some((path,folder))=target else{return VisualOutcome::Fallback;};
         if surface==SurfaceId::ManageItems {
-            let Ok(Some(batch_id))=crate::manage_items::active_batch(&app) else{return VisualOutcome::Fallback;};
+            let Ok(Some(batch_id))=crate::surfaces::manage_items::active_batch(&app) else{return VisualOutcome::Fallback;};
             let Ok(batch)=state.management_batch(&batch_id) else{return VisualOutcome::Fallback;};
             if !batch.items.iter().any(|item|item.id==item_id){return VisualOutcome::Fallback;}
         }

@@ -6,7 +6,7 @@
 //! with authoritative runtime metadata projection from Tauri app package/config metadata.
 
 use serde::Serialize;
-use crate::windows_auxiliary::{self, InvocationContext};
+use crate::surfaces::placement::{self, InvocationContext};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub(crate) const ABOUT_WINDOW_LABEL: &str = "about";
@@ -64,7 +64,7 @@ pub(crate) fn open(app: &AppHandle, context: InvocationContext) -> Result<(), St
         return Ok(());
     }
 
-    let mon = windows_auxiliary::target_monitor(app, context)?;
+    let mon = placement::target_monitor(app, context)?;
 
     let window = WebviewWindowBuilder::new(
         app,
@@ -72,7 +72,7 @@ pub(crate) fn open(app: &AppHandle, context: InvocationContext) -> Result<(), St
         WebviewUrl::App("index.html".into()),
     )
     .title("About DropCove")
-    .theme(crate::windows_theme::current_theme(app)?)
+    .theme(crate::settings::appearance::current_theme(app)?)
     .inner_size(ABOUT_WIDTH, ABOUT_HEIGHT)
     .min_inner_size(ABOUT_WIDTH, ABOUT_HEIGHT)
     .max_inner_size(ABOUT_WIDTH, ABOUT_HEIGHT)
@@ -85,8 +85,8 @@ pub(crate) fn open(app: &AppHandle, context: InvocationContext) -> Result<(), St
     .map_err(|e| format!("failed to build about window: {e}"))?;
 
     let setup_result = (|| {
-        crate::windows_theme::apply_to_window(&window)?;
-        windows_auxiliary::center_in_work_area(&window, &mon)?;
+        crate::settings::appearance::apply_to_window(&window)?;
+        placement::center_in_work_area(&window, &mon)?;
         window
             .show()
             .map_err(|e| format!("failed to show about window: {e}"))?;

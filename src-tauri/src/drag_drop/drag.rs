@@ -345,7 +345,7 @@ mod tests {
             let _guard = session.enter().unwrap();
             assert!(session.is_active());
             assert_eq!(
-                crate::windows_drop::evaluate_storage_drop(
+                crate::drag_drop::drop::evaluate_storage_drop(
                     session.is_active(),
                     DROPEFFECT_COPY,
                     true
@@ -357,7 +357,7 @@ mod tests {
         // When guard drops (external drag), offered COPY + valid paths -> DROPEFFECT_COPY
         assert!(!session.is_active());
         assert_eq!(
-            crate::windows_drop::evaluate_storage_drop(
+            crate::drag_drop::drop::evaluate_storage_drop(
                 session.is_active(),
                 DROPEFFECT_COPY,
                 true
@@ -367,7 +367,7 @@ mod tests {
 
         // Unsupported payloads (no valid paths) -> DROPEFFECT_NONE
         assert_eq!(
-            crate::windows_drop::evaluate_storage_drop(
+            crate::drag_drop::drop::evaluate_storage_drop(
                 session.is_active(),
                 DROPEFFECT_COPY,
                 false
@@ -377,7 +377,7 @@ mod tests {
 
         // Move only effect without Copy -> DROPEFFECT_NONE
         assert_eq!(
-            crate::windows_drop::evaluate_storage_drop(
+            crate::drag_drop::drop::evaluate_storage_drop(
                 session.is_active(),
                 DROPEFFECT_MOVE,
                 true

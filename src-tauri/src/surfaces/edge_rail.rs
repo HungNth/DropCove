@@ -1,7 +1,7 @@
 //! No-activate Rail Handle and persistent display identity; visibility belongs to ResidentState.
 use crate::{
     resident::{PhysicalPlacement, WorkArea},
-    settings_store::{RailEdge, Settings},
+    settings::store::{RailEdge, Settings},
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -396,7 +396,7 @@ unsafe extern "system" fn no_activate(
 pub(crate) fn initialize(app: &AppHandle) -> Result<(), String> {
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
         .title("DropCove Edge Rail")
-        .theme(crate::windows_theme::current_theme(app)?)
+        .theme(crate::settings::appearance::current_theme(app)?)
         .inner_size(16.0, 280.0)
         .visible(false)
         .focused(false)
@@ -411,7 +411,7 @@ pub(crate) fn initialize(app: &AppHandle) -> Result<(), String> {
         .always_on_top(true)
         .build()
         .map_err(|e| e.to_string())?;
-    crate::windows_theme::apply_to_window(&window)?;
+    crate::settings::appearance::apply_to_window(&window)?;
     let hwnd = window.hwnd().map_err(|e| e.to_string())?;
     // SAFETY: Only our new hidden managed rail HWND is styled; FRAMECHANGED recalculates the border.
     unsafe {
@@ -433,7 +433,7 @@ pub(crate) fn initialize(app: &AppHandle) -> Result<(), String> {
             return Err("could not prevent rail mouse activation".into());
         }
     }
-    crate::windows_drop::register(&window).map_err(|e| e.to_string())?;
+    crate::drag_drop::drop::register(&window).map_err(|e| e.to_string())?;
     Ok(())
 }
 pub(crate) fn show(

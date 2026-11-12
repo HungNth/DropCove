@@ -1,13 +1,17 @@
 //! Resident-owned Settings draft and one native/disk application transaction.
 
+pub(crate) mod appearance;
+pub(crate) mod commands;
+pub(crate) mod store;
+mod transaction;
+
 use crate::{
     resident,
-    settings_store::{AppearanceMode, HotKey, RailEdge, Settings, SettingsStore, ShakeSensitivity},
-    settings_transaction::{self, Integrations},
-    windows_hotkey,
-    windows_auxiliary::{self, InvocationContext},
-    windows_startup::{RegistryValue, StartupRegistration},
+    surfaces::placement::{self, InvocationContext},
+    resident::startup::{RegistryValue, StartupRegistration},
 };
+use store::{AppearanceMode, HotKey, RailEdge, Settings, SettingsStore, ShakeSensitivity};
+use transaction::Integrations;
 use serde::Serialize;
 use std::{
     path::{Path, PathBuf},
@@ -36,7 +40,7 @@ pub(crate) struct SettingsSnapshot {
     pub(crate) shake_enabled: bool,
     pub(crate) shake_sensitivity: ShakeSensitivity,
     pub(crate) appearance_mode: AppearanceMode,
-    pub(crate) monitors: Vec<crate::edge_rail::MonitorChoice>,
+    pub(crate) monitors: Vec<crate::surfaces::edge_rail::MonitorChoice>,
 }
 struct SettingsSession {
     profile: PathBuf,
@@ -68,10 +72,10 @@ pub(crate) fn initialize(
 ) -> Result<(), String> {
     let store = SettingsStore::new(profile);
     let (desired, load_warning) = store.load();
-    crate::windows_theme::initialize(app, desired.appearance_mode)?;
+    crate::settings::appearance::initialize(app, desired.appearance_mode)?;
     let mut warnings: Vec<String> = load_warning.into_iter().collect();
-    let active_token = match windows_hotkey::initialize(window)
-        .and_then(|()| windows_hotkey::register(app, &desired.hot_key))
+    let active_token = match resident::hotkey::initialize(window)
+        .and_then(|()| resident::hotkey::register(app, &desired.hot_key))
     {
         Ok(token) => Some(token),
         Err(error) => {
@@ -92,7 +96,7 @@ pub(crate) fn initialize(
     if let Err(error) = startup_result {
         warnings.push(format!("Start with Windows could not be applied: {error}. Desired setting remains {}; Save can retry", desired.start_with_windows));
     }
-    if let Err(error) = crate::windows_shake::initialize(window, &desired) {
+    if let Err(error) = crate::resident::shake::initialize(window, &desired) {
         warnings.push(format!("Shake-to-open unavailable: {error}; tray, hotkey, Shelf and Rail remain available; Save can retry"));
     }
     app.manage(SettingsState {
@@ -149,7 +153,7 @@ pub(crate) fn get_snapshot(app: &AppHandle) -> Result<SettingsSnapshot, String> 
         shake_enabled: settings.shake_enabled,
         shake_sensitivity: settings.shake_sensitivity,
         appearance_mode: settings.appearance_mode,
-        monitors: crate::edge_rail::choices()?,
+        monitors: crate::surfaces::edge_rail::choices()?,
     })
 }
 fn emit_snapshot(app: &AppHandle) -> Result<SettingsSnapshot, String> {
@@ -166,14 +170,14 @@ pub(crate) fn open(app: &AppHandle, context: InvocationContext) -> Result<(), St
         emit_snapshot(app)?;
         return Ok(());
     }
-    let monitor = windows_auxiliary::target_monitor(app, context)?;
+    let monitor = placement::target_monitor(app, context)?;
     let window = WebviewWindowBuilder::new(
         app,
         SETTINGS_WINDOW_LABEL,
         WebviewUrl::App("index.html".into()),
     )
     .title("Settings - DropCove")
-    .theme(crate::windows_theme::current_theme(app)?)
+    .theme(crate::settings::appearance::current_theme(app)?)
     .inner_size(SETTINGS_WIDTH, SETTINGS_HEIGHT)
     .min_inner_size(SETTINGS_WIDTH, SETTINGS_HEIGHT)
     .resizable(false)
@@ -184,8 +188,8 @@ pub(crate) fn open(app: &AppHandle, context: InvocationContext) -> Result<(), St
     .build()
     .map_err(|error| error.to_string())?;
     let setup = (|| {
-        crate::windows_theme::apply_to_window(&window)?;
-        windows_auxiliary::center_in_work_area(&window, &monitor)?;
+        crate::settings::appearance::apply_to_window(&window)?;
+        placement::center_in_work_area(&window, &monitor)?;
         window.show().map_err(|error| error.to_string())?;
         window.set_focus().map_err(|error| error.to_string())?;
         emit_snapshot(app)?;
@@ -343,7 +347,7 @@ pub(crate) fn set_appearance_mode(
     if app.get_webview_window(SETTINGS_WINDOW_LABEL).is_none() {
         return Err("Settings window is not open".into());
     }
-    crate::windows_theme::apply(app, mode)?;
+    crate::settings::appearance::apply(app, mode)?;
     {
         let state = app.state::<SettingsState>();
         let mut session = state.lock()?;
@@ -382,8 +386,8 @@ struct NativeIntegrations<'a> {
     startup: StartupRegistration,
 }
 impl Integrations for NativeIntegrations<'_> {
-    type RailSnapshot = Option<crate::edge_rail::Placement>;
-    type ShakeSnapshot = crate::windows_shake::RuntimeSnapshot;
+    type RailSnapshot = Option<crate::surfaces::edge_rail::Placement>;
+    type ShakeSnapshot = crate::resident::shake::RuntimeSnapshot;
     fn rail_snapshot(&self) -> Result<Self::RailSnapshot, String> {
         resident::rail_placement(self.app)
     }
@@ -394,41 +398,41 @@ impl Integrations for NativeIntegrations<'_> {
         resident::restore_rail(self.app, previous.as_ref())
     }
     fn rail_description(&self) -> Result<String, String> {
-        crate::edge_rail::description(self.app)
+        crate::surfaces::edge_rail::description(self.app)
     }
     fn shake_snapshot(&self) -> Result<Self::ShakeSnapshot, String> {
-        crate::windows_shake::snapshot(self.app)
+        crate::resident::shake::snapshot(self.app)
     }
     fn shake_apply(&mut self, settings: &Settings) -> Result<(), String> {
         let window = self
             .app
             .get_webview_window("main")
             .ok_or("Drop Shelf window is missing")?;
-        crate::windows_shake::initialize(&window, settings)
+        crate::resident::shake::initialize(&window, settings)
     }
     fn shake_restore(&mut self, previous: &Self::ShakeSnapshot) -> Result<(), String> {
-        crate::windows_shake::restore(self.app, previous)
+        crate::resident::shake::restore(self.app, previous)
     }
     fn shake_description(&self) -> Result<String, String> {
-        crate::windows_shake::description(self.app)
+        crate::resident::shake::description(self.app)
     }
     fn appearance_apply(&mut self, mode: AppearanceMode) -> Result<(), String> {
-        crate::windows_theme::apply(self.app, mode)
+        crate::settings::appearance::apply(self.app, mode)
     }
     fn committed_appearance(&self) -> Result<AppearanceMode, String> {
         Ok(active(self.app)?.appearance_mode)
     }
     fn appearance_description(&self) -> Result<String, String> {
-        Ok(format!("{:?}", crate::windows_theme::snapshot(self.app)?.mode))
+        Ok(format!("{:?}", crate::settings::appearance::snapshot(self.app)?.mode))
     }
     fn register(&mut self, key: &HotKey) -> Result<i32, String> {
-        windows_hotkey::register(self.app, key)
+        resident::hotkey::register(self.app, key)
     }
     fn unregister(&mut self, id: i32) -> Result<(), String> {
-        windows_hotkey::unregister(self.app, id)
+        resident::hotkey::unregister(self.app, id)
     }
     fn registered(&self, id: i32) -> bool {
-        windows_hotkey::is_registered(self.app, id)
+        resident::hotkey::is_registered(self.app, id)
     }
     fn startup_snapshot(&self) -> Result<Option<RegistryValue>, String> {
         self.startup.snapshot()
@@ -495,10 +499,10 @@ fn save_candidate(app: &AppHandle) -> Result<(), String> {
         let window = app
             .get_webview_window("main")
             .ok_or("Drop Shelf window is missing")?;
-        windows_hotkey::initialize(&window)?;
+        resident::hotkey::initialize(&window)?;
     }
     let mut integrations = NativeIntegrations { app, startup };
-    let token = match settings_transaction::apply(
+    let token = match transaction::apply(
         &store,
         &mut integrations,
         &candidate,
@@ -550,7 +554,7 @@ fn restore_appearance(app: &AppHandle) -> Result<(), String> {
         }
         session.desired.appearance_mode
     };
-    crate::windows_theme::apply(app, mode)?;
+    crate::settings::appearance::apply(app, mode)?;
     emit_snapshot(app).map(|_| ())
 }
 
@@ -585,8 +589,8 @@ pub(crate) fn on_settings_window_focus_changed(app: &AppHandle, focused: bool) {
 }
 pub(crate) fn shutdown(app: &AppHandle) -> Result<(), String> {
     discard_session(app)?;
-    crate::windows_shake::shutdown(app)?;
-    windows_hotkey::shutdown(app)?;
+    crate::resident::shake::shutdown(app)?;
+    resident::hotkey::shutdown(app)?;
     if let Some(window) = app.get_webview_window(SETTINGS_WINDOW_LABEL) {
         window.close().map_err(|error| error.to_string())?;
     }

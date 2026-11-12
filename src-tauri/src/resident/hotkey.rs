@@ -1,6 +1,6 @@
 //! Resident global hotkey registration. Focused Settings input is handled by its control.
 
-use crate::settings_store::HotKey;
+use crate::settings::store::HotKey;
 use std::{
     collections::HashMap,
     sync::{LazyLock, Mutex},

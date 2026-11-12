@@ -1,3 +1,8 @@
+pub(crate) mod commands;
+pub(crate) mod managed_files;
+pub(crate) mod paths;
+pub(crate) mod website_images;
+
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -6,7 +11,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::windows_paths::{self, ordinal_equal};
+use paths::ordinal_equal;
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -846,7 +851,7 @@ impl ShelfState {
             });
         }
         let bytes = trimmed_nul.as_bytes();
-        if bytes.len() > crate::managed_files::MAX_TEXT_BYTES {
+        if bytes.len() > crate::shelf::managed_files::MAX_TEXT_BYTES {
             return Ok(DropResult {
                 snapshot: None,
                 skipped: 1,
@@ -854,7 +859,7 @@ impl ShelfState {
             });
         }
         let now = SystemTime::now();
-        let timestamp_str = crate::managed_files::format_local_timestamp_now();
+        let timestamp_str = crate::shelf::managed_files::format_local_timestamp_now();
         let created_at = now
             .duration_since(UNIX_EPOCH)
             .map_err(|_| ShelfError::InvalidSystemClock)?
@@ -871,9 +876,9 @@ impl ShelfState {
         })
     }
 
-    pub(crate) fn image_staging_store(&self) -> Result<crate::managed_files::ManagedStore, ShelfError> {
+    pub(crate) fn image_staging_store(&self) -> Result<crate::shelf::managed_files::ManagedStore, ShelfError> {
         let store = self.store()?;
-        Ok(crate::managed_files::ManagedStore::new(&store.profile_root))
+        Ok(crate::shelf::managed_files::ManagedStore::new(&store.profile_root))
     }
 
     pub(crate) fn accept_image_files(
@@ -938,7 +943,7 @@ impl ShelfState {
     }
 
     pub(crate) fn management_batch(&self, batch_id: &str) -> Result<ShelfBatch, ShelfError> {
-        self.management_batch_with(batch_id, windows_paths::classify)
+        self.management_batch_with(batch_id, paths::classify)
     }
 
     fn management_batch_with(
@@ -1039,7 +1044,7 @@ impl ShelfState {
         &self,
         batch_ids: &[String],
     ) -> Result<BatchPreparation, ShelfError> {
-        self.prepare_batch_drag_with(batch_ids, windows_paths::classify)
+        self.prepare_batch_drag_with(batch_ids, paths::classify)
     }
 
     fn prepare_batch_drag_with(
@@ -1083,7 +1088,7 @@ impl ShelfState {
         batch_id: &str,
         item_ids: &[String],
     ) -> Result<ItemPreparation, ShelfError> {
-        self.prepare_item_drag_with(batch_id, item_ids, windows_paths::classify)
+        self.prepare_item_drag_with(batch_id, item_ids, paths::classify)
     }
 
     pub(crate) fn prepare_item_drag_with(
@@ -1168,7 +1173,7 @@ impl ShelfState {
         let Some(relative_path) = relative_path.filter(|path| path.ends_with(".txt")) else {
             return Ok(None);
         };
-        let managed_store = crate::managed_files::ManagedStore::new(&store.profile_root);
+        let managed_store = crate::shelf::managed_files::ManagedStore::new(&store.profile_root);
         let full_path = managed_store.full_path(&relative_path).map_err(|source| ShelfError::FileSystem {
             path: "managed text".to_string(),
             source,
@@ -1227,7 +1232,7 @@ impl ShelfState {
             if action != ItemActionKind::CopyText {
                 return Err(ShelfError::InvalidItemAction(action, item_id.to_owned()));
             }
-            let managed_store = crate::managed_files::ManagedStore::new(&store.profile_root);
+            let managed_store = crate::shelf::managed_files::ManagedStore::new(&store.profile_root);
             let full_path = managed_store
                 .full_path(&rel)
                 .map_err(|source| ShelfError::FileSystem {
@@ -1480,7 +1485,7 @@ impl ShelfStore {
                 .iter_mut()
                 .flat_map(|batch| batch.items.iter_mut())
             {
-                item.availability = windows_paths::classify(&item.path);
+                item.availability = paths::classify(&item.path);
             }
             self.record_snapshot(&snapshot);
             self.restored_availability = true;
@@ -1633,7 +1638,7 @@ impl ShelfStore {
             params![batch_id, created_at],
         )?;
         for (position, item) in items.iter_mut().enumerate() {
-            let (availability, is_folder) = windows_paths::inspect(&item.path);
+            let (availability, is_folder) = paths::inspect(&item.path);
             item.availability = availability;
             let name = Path::new(&item.path)
                 .file_name()
@@ -1693,7 +1698,7 @@ impl ShelfStore {
         timestamp_str: &str,
         created_at: i64,
     ) -> Result<ShelfSnapshot, ShelfError> {
-        let store = crate::managed_files::ManagedStore::new(&self.profile_root);
+        let store = crate::shelf::managed_files::ManagedStore::new(&self.profile_root);
         store.init_directories().map_err(|source| ShelfError::FileSystem {
             path: self.profile_root.display().to_string(),
             source,
@@ -1732,8 +1737,8 @@ impl ShelfStore {
             tx.rollback()?;
             id
         };
-        let staging_rel = crate::managed_files::ManagedStore::staging_rel_path(&item_id);
-        let final_rel = crate::managed_files::ManagedStore::final_rel_path(&item_id, &filename);
+        let staging_rel = crate::shelf::managed_files::ManagedStore::staging_rel_path(&item_id);
+        let final_rel = crate::shelf::managed_files::ManagedStore::final_rel_path(&item_id, &filename);
         let final_path_str = store.full_path(&final_rel).map_err(|source| ShelfError::FileSystem {
             path: final_rel.clone(), source,
         })?.display().to_string();
@@ -1831,7 +1836,7 @@ impl ShelfStore {
         candidates: Vec<(String, String)>,
         created_at: i64,
     ) -> Result<ShelfSnapshot, ShelfError> {
-        let store = crate::managed_files::ManagedStore::new(&self.profile_root);
+        let store = crate::shelf::managed_files::ManagedStore::new(&self.profile_root);
         store.init_directories().map_err(|source| ShelfError::FileSystem {
             path: self.profile_root.display().to_string(),
             source,
@@ -1857,7 +1862,7 @@ impl ShelfStore {
                     .ok_or_else(|| ShelfError::InvalidPath)?,
                 _ => return Err(ShelfError::InvalidPath),
             };
-            let final_rel = crate::managed_files::ManagedStore::final_rel_path(&item_id, &filename);
+            let final_rel = crate::shelf::managed_files::ManagedStore::final_rel_path(&item_id, &filename);
             let final_path_str = store.full_path(&final_rel).map_err(|source| ShelfError::FileSystem {
                 path: final_rel.clone(),
                 source,
@@ -2184,7 +2189,7 @@ impl ShelfStore {
     }
 
     fn process_pending_managed_deletions(&mut self) -> Result<(), ShelfError> {
-        let store = crate::managed_files::ManagedStore::new(&self.profile_root);
+        let store = crate::shelf::managed_files::ManagedStore::new(&self.profile_root);
         let mut stmt = self.connection.prepare(
             "SELECT id, relative_path FROM pending_managed_file_deletions",
         )?;
@@ -2231,7 +2236,7 @@ impl ShelfStore {
         }
         let is_txt = path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("txt")).unwrap_or(false);
         if is_txt {
-            if meta.len() <= crate::managed_files::MAX_TEXT_BYTES as u64 {
+            if meta.len() <= crate::shelf::managed_files::MAX_TEXT_BYTES as u64 {
                 let bytes = match fs::read(path) {
                     Ok(b) => b,
                     Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
@@ -2244,10 +2249,10 @@ impl ShelfStore {
             }
             return Ok(false);
         } else {
-            match crate::website_images::validate_image(path) {
+            match crate::shelf::website_images::validate_image(path) {
                 Ok(_) => Ok(true),
-                Err(crate::website_images::ValidationError::Invalid(_)) => Ok(false),
-                Err(crate::website_images::ValidationError::Io(e)) => {
+                Err(crate::shelf::website_images::ValidationError::Invalid(_)) => Ok(false),
+                Err(crate::shelf::website_images::ValidationError::Io(e)) => {
                     if e.kind() == std::io::ErrorKind::NotFound {
                         Ok(false)
                     } else {
@@ -2262,7 +2267,7 @@ impl ShelfStore {
     }
 
     fn reconcile_managed_files(&mut self) -> Result<Option<String>, ShelfError> {
-        let store = crate::managed_files::ManagedStore::new(&self.profile_root);
+        let store = crate::shelf::managed_files::ManagedStore::new(&self.profile_root);
         let _ = store.init_directories();
 
         // Query all distinct batch_ids that have staged items
@@ -5402,12 +5407,12 @@ mod tests {
         let state = ShelfState::open(&database).unwrap();
 
         // Seed state: a staged managed file that was promoted to final path before crash
-        let store = crate::managed_files::ManagedStore::new(directory.path());
+        let store = crate::shelf::managed_files::ManagedStore::new(directory.path());
         store.init_directories().unwrap();
         let item_id = "0123456789abcdef0123456789abcdef";
         let filename = "Dropped text 2026-10-23 12-00-00.txt";
-        let staging_rel = crate::managed_files::ManagedStore::staging_rel_path(item_id);
-        let final_rel = crate::managed_files::ManagedStore::final_rel_path(item_id, filename);
+        let staging_rel = crate::shelf::managed_files::ManagedStore::staging_rel_path(item_id);
+        let final_rel = crate::shelf::managed_files::ManagedStore::final_rel_path(item_id, filename);
         let final_full = store.full_path(&final_rel).unwrap();
         if let Some(p) = final_full.parent() {
             fs::create_dir_all(p).unwrap();
@@ -5713,8 +5718,8 @@ mod tests {
 
         let id1 = "11111111111111111111111111111111";
         let id2 = "22222222222222222222222222222222";
-        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
-        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
+        let st1 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id2);
 
         // Minimal 1x1 valid PNG bytes
         let png_bytes = &[
@@ -5778,10 +5783,10 @@ mod tests {
 
         let id1 = "33333333333333333333333333333333";
         let id2 = "44444444444444444444444444444444";
-        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
-        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
-        let fin1 = crate::managed_files::ManagedStore::final_rel_path(id1, "a.png");
-        let fin2 = crate::managed_files::ManagedStore::final_rel_path(id2, "b.png");
+        let st1 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id2);
+        let fin1 = crate::shelf::managed_files::ManagedStore::final_rel_path(id1, "a.png");
+        let fin2 = crate::shelf::managed_files::ManagedStore::final_rel_path(id2, "b.png");
 
         let png_bytes = &[
             0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
@@ -5847,10 +5852,10 @@ mod tests {
 
         let id1 = "55555555555555555555555555555555";
         let id2 = "66666666666666666666666666666666";
-        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
-        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
-        let fin1 = crate::managed_files::ManagedStore::final_rel_path(id1, "ok.png");
-        let fin2 = crate::managed_files::ManagedStore::final_rel_path(id2, "bad.png");
+        let st1 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id2);
+        let fin1 = crate::shelf::managed_files::ManagedStore::final_rel_path(id1, "ok.png");
+        let fin2 = crate::shelf::managed_files::ManagedStore::final_rel_path(id2, "bad.png");
 
         let png_bytes = &[
             0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
@@ -5911,8 +5916,8 @@ mod tests {
 
         let id1 = "11111111111111111111111111111111";
         let id2 = "22222222222222222222222222222222";
-        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
-        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
+        let st1 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id2);
         let png_bytes = &[
             0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
             0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -5955,10 +5960,10 @@ mod tests {
 
         let id1 = "33333333333333333333333333333333";
         let id2 = "44444444444444444444444444444444";
-        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
-        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
-        let fin1 = crate::managed_files::ManagedStore::final_rel_path(id1, "first.png");
-        let fin2 = crate::managed_files::ManagedStore::final_rel_path(id2, "second.png");
+        let st1 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id2);
+        let fin1 = crate::shelf::managed_files::ManagedStore::final_rel_path(id1, "first.png");
+        let fin2 = crate::shelf::managed_files::ManagedStore::final_rel_path(id2, "second.png");
         let png_bytes = &[
             0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
             0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -6000,10 +6005,10 @@ mod tests {
 
         let id1 = "77777777777777777777777777777777";
         let id2 = "88888888888888888888888888888888";
-        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
-        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
-        let fin1 = crate::managed_files::ManagedStore::final_rel_path(id1, "r1.png");
-        let fin2 = crate::managed_files::ManagedStore::final_rel_path(id2, "r2.png");
+        let st1 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id2);
+        let fin1 = crate::shelf::managed_files::ManagedStore::final_rel_path(id1, "r1.png");
+        let fin2 = crate::shelf::managed_files::ManagedStore::final_rel_path(id2, "r2.png");
         let png_bytes = &[
             0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
             0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -6046,10 +6051,10 @@ mod tests {
 
         let id1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         let id2 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-        let st1 = crate::managed_files::ManagedStore::staging_rel_path(id1);
-        let st2 = crate::managed_files::ManagedStore::staging_rel_path(id2);
-        let fin1 = crate::managed_files::ManagedStore::final_rel_path(id1, "mix1.png");
-        let fin2 = crate::managed_files::ManagedStore::final_rel_path(id2, "mix2.png");
+        let st1 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id1);
+        let st2 = crate::shelf::managed_files::ManagedStore::staging_rel_path(id2);
+        let fin1 = crate::shelf::managed_files::ManagedStore::final_rel_path(id1, "mix1.png");
+        let fin2 = crate::shelf::managed_files::ManagedStore::final_rel_path(id2, "mix2.png");
         let png_bytes = &[
             0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
             0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -6118,8 +6123,8 @@ mod tests {
         store.init_directories().unwrap();
 
         let id = "cccccccccccccccccccccccccccccccc";
-        let st = crate::managed_files::ManagedStore::staging_rel_path(id);
-        let fin = crate::managed_files::ManagedStore::final_rel_path(id, "locked.png");
+        let st = crate::shelf::managed_files::ManagedStore::staging_rel_path(id);
+        let fin = crate::shelf::managed_files::ManagedStore::final_rel_path(id, "locked.png");
         let png_bytes = &[
             0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
             0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -6177,8 +6182,8 @@ mod tests {
         store.init_directories().unwrap();
 
         let id = "dddddddddddddddddddddddddddddddd";
-        let st = crate::managed_files::ManagedStore::staging_rel_path(id);
-        let fin = crate::managed_files::ManagedStore::final_rel_path(id, "zone.png");
+        let st = crate::shelf::managed_files::ManagedStore::staging_rel_path(id);
+        let fin = crate::shelf::managed_files::ManagedStore::final_rel_path(id, "zone.png");
         let png_bytes = &[
             0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
             0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -6232,7 +6237,7 @@ mod tests {
 
         // Create a managed file and an external file in the same directory structure or profile
         let id = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-        let fin = crate::managed_files::ManagedStore::final_rel_path(id, "test.png");
+        let fin = crate::shelf::managed_files::ManagedStore::final_rel_path(id, "test.png");
         let full_fin = store.full_path(&fin).unwrap();
         if let Some(p) = full_fin.parent() {
             fs::create_dir_all(p).unwrap();
@@ -6622,7 +6627,7 @@ mod tests {
         assert_eq!(txt_item.managed_content_kind, Some(ManagedContentKind::Text));
 
         let store = state.image_staging_store().unwrap();
-        let img_bytes = include_bytes!("fixtures/website-image.avif");
+        let img_bytes = include_bytes!("../fixtures/website-image.avif");
         let img_rel = format!("staging/{}.tmp", "a".repeat(32));
         store.stage_bytes(&img_rel, img_bytes).unwrap();
         let img_drop = state.accept_image_files(vec![(img_rel, "photo.png".into())], 0).unwrap();

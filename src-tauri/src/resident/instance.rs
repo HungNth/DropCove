@@ -720,7 +720,7 @@ mod tests {
         // 1. Busy for 2 attempts then accepts on 3rd; caller retries and waits for process exit + lease release.
         let mut child = std::process::Command::new(std::env::current_exe().unwrap())
             .arg("--exact")
-            .arg("windows_instance::tests::cooperative_shutdown_retries_until_safe_point_and_waits_for_process_exit")
+            .arg("resident::instance::tests::cooperative_shutdown_retries_until_safe_point_and_waits_for_process_exit")
             .env("DROPCOVE_TEST_RESIDENT_PROFILE", &canonical)
             .env("DROPCOVE_TEST_REQUIRED_ATTEMPTS", "3")
             .stdout(std::process::Stdio::null())
@@ -745,7 +745,7 @@ mod tests {
         // 2. Busy past deadline: caller times out with Err while child process and lease remain active.
         let mut busy_child = std::process::Command::new(std::env::current_exe().unwrap())
             .arg("--exact")
-            .arg("windows_instance::tests::cooperative_shutdown_retries_until_safe_point_and_waits_for_process_exit")
+            .arg("resident::instance::tests::cooperative_shutdown_retries_until_safe_point_and_waits_for_process_exit")
             .env("DROPCOVE_TEST_RESIDENT_PROFILE", &canonical)
             .env("DROPCOVE_TEST_REQUIRED_ATTEMPTS", "999999")
             .stdout(std::process::Stdio::null())

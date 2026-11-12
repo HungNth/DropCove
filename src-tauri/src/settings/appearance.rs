@@ -1,6 +1,6 @@
 //! Resident-owned Windows appearance projection and native frame synchronization.
 
-use crate::settings_store::AppearanceMode;
+use crate::settings::store::AppearanceMode;
 use serde::Serialize;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, Theme, WebviewWindow};

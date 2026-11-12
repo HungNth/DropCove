@@ -6,7 +6,7 @@ pub(crate) struct SelectionConfirmations(Mutex<HashMap<String, String>>);
 
 pub(crate) fn begin(app: &AppHandle, caller: &str) -> Result<(), String> {
     let owner = if caller == "manage-items" {
-        crate::manage_items::origin(app)?.unwrap_or_else(|| caller.to_owned())
+        crate::surfaces::manage_items::origin(app)?.unwrap_or_else(|| caller.to_owned())
     } else {
         caller.to_owned()
     };

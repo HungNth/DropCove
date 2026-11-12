@@ -22,7 +22,7 @@ use windows::Win32::{
     },
 };
 
-use crate::settings_store::{Settings, ShakeSensitivity};
+use crate::settings::store::{Settings, ShakeSensitivity};
 
 const SUBCLASS_ID: usize = 0xDC11;
 const PROCESS_EVENTS: u32 = WM_APP + 0x31;

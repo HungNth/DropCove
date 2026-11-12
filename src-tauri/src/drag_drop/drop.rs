@@ -28,7 +28,7 @@ use windows::{
 };
 
 use crate::shelf::ShelfState;
-use crate::windows_drag::DragSession;
+use crate::drag_drop::drag::DragSession;
 
 pub(crate) const MAX_UNICODE_TEXT_BYTES: usize = 10 * 1024 * 1024;
 
@@ -267,7 +267,7 @@ pub(crate) fn evaluate_data_payload(data: &IDataObject) -> EvaluatedPayload {
             None
         }
     });
-    let has_virtual = crate::windows_virtual_files::has_virtual_family(data);
+    let has_virtual = crate::drag_drop::virtual_files::has_virtual_family(data);
     let text_extraction = if filesystem_paths.is_none() && !has_virtual {
         extract_unicode_text(data)
     } else {
@@ -318,8 +318,8 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         let payload = data.as_ref().map(evaluate_data_payload);
         let supported = payload.as_ref().is_some_and(EvaluatedPayload::is_supported);
         let modal_active = (self.window.label() == "main"
-            && crate::clear_confirmation::is_modal_active(self.window.app_handle()))
-            || crate::selection_confirmation::blocks(self.window.app_handle(), self.window.label());
+            && crate::surfaces::clear_confirmation::is_modal_active(self.window.app_handle()))
+            || crate::surfaces::selection_confirmation::blocks(self.window.app_handle(), self.window.label());
         if !own_drag && !modal_active && matches!(payload, Some(EvaluatedPayload::InvalidUnicodeText)) {
             let _ = self.window.app_handle().emit("shelf-error", INVALID_TEXT_DROP_MESSAGE);
         }
@@ -336,7 +336,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
                 let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
             }
         }
-        if self.window.label() == crate::edge_rail::LABEL && can_copy {
+        if self.window.label() == crate::surfaces::edge_rail::LABEL && can_copy {
             let now = crate::resident::now_monotonic_ms();
             match self
                 .window
@@ -347,13 +347,13 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
                     if let Some(due) = rail.expand_due_ms {
                         let remaining = (due.saturating_sub(now)).max(1) as u32;
                         if let Err(error) =
-                            crate::edge_rail::arm_rail_timer(self.window.app_handle(), remaining)
+                            crate::surfaces::edge_rail::arm_rail_timer(self.window.app_handle(), remaining)
                         {
                             let _ =
                                 crate::resident::publish_warning(self.window.app_handle(), &error);
                         }
                     } else {
-                        crate::edge_rail::cancel_rail_timer(self.window.app_handle());
+                        crate::surfaces::edge_rail::cancel_rail_timer(self.window.app_handle());
                     }
                 }
                 Err(error) => {
@@ -387,7 +387,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
                 let _ = crate::resident::publish_warning(self.window.app_handle(), &error);
             }
         }
-        if self.window.label() == crate::edge_rail::LABEL {
+        if self.window.label() == crate::surfaces::edge_rail::LABEL {
             if let Err(error) =
                 crate::resident::reconcile_rail_pointer_after_drag(self.window.app_handle())
             {
@@ -407,8 +407,8 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         // SAFETY: OLE provides this output pointer for this callback only.
         let effect = unsafe { requested_effect(effect)? };
         if (self.window.label() == "main"
-            && crate::clear_confirmation::is_modal_active(self.window.app_handle()))
-            || crate::selection_confirmation::blocks(self.window.app_handle(), self.window.label())
+            && crate::surfaces::clear_confirmation::is_modal_active(self.window.app_handle()))
+            || crate::surfaces::selection_confirmation::blocks(self.window.app_handle(), self.window.label())
         {
             *effect = DROPEFFECT_NONE;
             self.can_copy.set(false);
@@ -431,7 +431,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         *effect = DROPEFFECT_NONE;
         self.can_copy.set(false);
         let _ = self.window.emit("shelf-drag-over", false);
-        if self.window.label() == crate::edge_rail::LABEL {
+        if self.window.label() == crate::surfaces::edge_rail::LABEL {
             if let Err(error) =
                 crate::resident::reconcile_rail_pointer_after_drag(self.window.app_handle())
             {
@@ -458,7 +458,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
         let images = if matches!(payload, EvaluatedPayload::VirtualImages) {
             let prepared = state.image_staging_store().map_err(|e| format!("Image I/O failed: {e}"))
                 .and_then(|store| data.as_ref().ok_or_else(|| "Image I/O failed: missing data object.".to_string())
-                    .and_then(|data| crate::windows_virtual_files::extract(data, store)));
+                    .and_then(|data| crate::drag_drop::virtual_files::extract(data, store)));
             match prepared {
                 Ok(images) => Some(images),
                 Err(error) => {
@@ -497,7 +497,7 @@ impl IDropTarget_Impl for StorageDropTarget_Impl {
                             window.app_handle(),
                             !snapshot.batches.is_empty(),
                         )
-                        .and_then(|()| crate::manage_items::synchronize(window.app_handle()))
+                        .and_then(|()| crate::surfaces::manage_items::synchronize(window.app_handle()))
                         .and_then(|()| {
                             crate::resident::update_rail_content(
                                 window.app_handle(),

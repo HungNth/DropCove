@@ -9,7 +9,7 @@ use windows::{
     },
 };
 
-use crate::{managed_files::ManagedStore, shelf::{DropResult, ShelfState}, windows_drop::StorageMedium, website_images::{self, MAX_DESCRIPTORS, MAX_DROP_BYTES, MAX_IMAGE_BYTES}};
+use crate::{shelf::managed_files::ManagedStore, shelf::{DropResult, ShelfState}, drag_drop::drop::StorageMedium, shelf::website_images::{self, MAX_DESCRIPTORS, MAX_DROP_BYTES, MAX_IMAGE_BYTES}};
 
 fn format(name: PCWSTR, index: i32, medium: u32) -> FORMATETC {
     // SAFETY: All callers provide static NUL-terminated clipboard-format names.
@@ -118,7 +118,7 @@ impl Drop for ImageDrop {
 pub(crate) fn extract(data: &IDataObject, store: ManagedStore) -> Result<ImageDrop, String> {
     let (names, count) = descriptors(data)?;
     store.init_directories().map_err(|e| format!("Image I/O failed: {e}"))?;
-    let mut result = ImageDrop { store, entries: Vec::with_capacity(names.len()), skipped: count.saturating_sub(names.len()), source: source_url(data), timestamp: crate::managed_files::format_local_timestamp_now() };
+    let mut result = ImageDrop { store, entries: Vec::with_capacity(names.len()), skipped: count.saturating_sub(names.len()), source: source_url(data), timestamp: crate::shelf::managed_files::format_local_timestamp_now() };
     for (index, name) in names.into_iter().enumerate() {
         let Some(name) = name else { result.skipped += 1; continue; };
         let request = format(CFSTR_FILECONTENTS, index as i32, (TYMED_ISTREAM.0 | TYMED_HGLOBAL.0) as u32);
@@ -218,5 +218,5 @@ impl ImageDrop {
 }
 
 #[cfg(test)]
-#[path = "windows_virtual_files_tests.rs"]
+#[path = "virtual_files_tests.rs"]
 mod tests;

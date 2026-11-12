@@ -22,7 +22,7 @@ use windows::Win32::{
     },
 };
 
-use crate::{shelf::ShelfState, windows_drag::DragSession};
+use crate::{shelf::ShelfState, drag_drop::drag::DragSession};
 
 const SUBCLASS_ID: usize = 0xDC05;
 
@@ -130,10 +130,10 @@ pub(crate) fn register_owner(window: &WebviewWindow) -> Result<(), String> {
 }
 
 pub(crate) fn start(app: &AppHandle, edge: ResizeEdge) -> Result<(), String> {
-    if app.state::<DragSession>().is_active() || is_resizing(app)? || crate::clear_confirmation::is_modal_active(app) {
+    if app.state::<DragSession>().is_active() || is_resizing(app)? || crate::surfaces::clear_confirmation::is_modal_active(app) {
         return Err("another native interaction is already active".to_owned());
     }
-    crate::manage_items::close(app)?;
+    crate::surfaces::manage_items::close(app)?;
     let window = app
         .get_webview_window("main")
         .ok_or("Drop Shelf window is missing")?;
@@ -166,10 +166,10 @@ pub(crate) fn start(app: &AppHandle, edge: ResizeEdge) -> Result<(), String> {
 }
 
 pub(crate) fn prepare_move(app: &AppHandle) -> Result<(), String> {
-    if app.state::<DragSession>().is_active() || is_resizing(app)? || crate::clear_confirmation::is_modal_active(app) {
+    if app.state::<DragSession>().is_active() || is_resizing(app)? || crate::surfaces::clear_confirmation::is_modal_active(app) {
         return Err("another native interaction is already active".to_owned());
     }
-    crate::manage_items::close_explicit(app)
+    crate::surfaces::manage_items::close_explicit(app)
 }
 
 fn clamp_rect(hwnd: HWND, edge: ResizeEdge, rect: &mut RECT) -> Result<(), String> {
@@ -318,7 +318,7 @@ fn complete(app: &AppHandle, hwnd: HWND) -> Result<(), String> {
                         manual_height(initial_height, height, edge),
                     )
                     .map_err(|error| error.to_string())?;
-                crate::publish_shelf(&app, snapshot)?;
+                crate::shelf::commands::publish_shelf(&app, snapshot)?;
             }
             Ok::<_, String>(())
         })();
@@ -344,7 +344,7 @@ fn handle(
     match message {
         WM_ENTERSIZEMOVE => {
             let (_, height) = client_size(hwnd)?;
-            crate::manage_items::close(app)?;
+            crate::surfaces::manage_items::close(app)?;
             let state = app.state::<ResizeState>();
             state.lock()?.session = Some(Session {
                 initial_height: height,
