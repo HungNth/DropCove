@@ -148,8 +148,7 @@ export async function buildPagesSite({
 
   for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
     if (entry.name === "index.html") continue;
-    if (!entry.isFile()) continue;
-    fs.copyFileSync(path.join(sourceDir, entry.name), path.join(outDir, entry.name));
+    fs.cpSync(path.join(sourceDir, entry.name), path.join(outDir, entry.name), { recursive: true });
   }
 
   return resolved;

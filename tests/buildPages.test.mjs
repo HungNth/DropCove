@@ -63,8 +63,23 @@ test("builds landing page with resolved release version, direct ZIP link, copy, 
     assert.ok(html.includes("./app-icon.svg"));
     assert.ok(!html.includes("{{"));
     assert.ok(!/<script\b/i.test(html));
+    assert.ok(html.includes("hero-showcase"));
+    assert.ok(html.includes('aria-labelledby="showcase-caption"'));
+    assert.ok(html.includes('aria-label="DropCove Drop Shelf demonstration"'));
+    assert.ok(html.includes('poster="./assets/shelf-preview.png"'));
+    assert.ok(html.includes("./assets/dropcove-demo.webm"));
+    assert.ok(html.includes("showcase-fallback-img"));
+    assert.ok(/<video\b[^>]*\bautoplay\b[^>]*\bloop\b[^>]*\bmuted\b[^>]*\bplaysinline\b/i.test(html));
+
+    const css = fs.readFileSync(path.join(outDir, "styles.css"), "utf8");
+    assert.ok(css.includes("prefers-reduced-motion"));
+    assert.ok(css.includes(".showcase-video"));
+    assert.ok(css.includes(".showcase-fallback-img"));
+
     assert.ok(fs.existsSync(path.join(outDir, "styles.css")));
     assert.ok(fs.existsSync(path.join(outDir, "app-icon.svg")));
+    assert.ok(fs.existsSync(path.join(outDir, "assets", "shelf-preview.png")));
+    assert.ok(fs.existsSync(path.join(outDir, "assets", "dropcove-demo.webm")));
     assert.ok(fs.existsSync(path.join(outDir, ".nojekyll")));
   });
 });

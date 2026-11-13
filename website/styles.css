@@ -185,6 +185,47 @@ a:hover {
   font-size: 0.875rem;
 }
 
+.hero-showcase {
+  margin-top: 2.25rem;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.showcase-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 440px;
+  width: 100%;
+}
+
+.showcase-video,
+.showcase-fallback-img {
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--dc-border);
+  background-color: var(--dc-surface);
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--dc-border);
+}
+
+.showcase-video {
+  display: block;
+}
+
+.showcase-fallback-img {
+  display: none;
+}
+
+.showcase-caption {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--dc-text-muted);
+  line-height: 1.4;
+}
+
 .section {
   padding: 2.75rem 0;
   border-bottom: 1px solid var(--dc-border);
@@ -324,6 +365,14 @@ a:hover {
     transition: none !important;
     animation: none !important;
   }
+
+  .showcase-video {
+    display: none !important;
+  }
+
+  .showcase-fallback-img {
+    display: block !important;
+  }
 }
 
 @media (forced-colors: active) {
@@ -332,10 +381,11 @@ a:hover {
   .section,
   .requirements-list,
   .req-row,
-  .download-button {
+  .download-button,
+  .showcase-video,
+  .showcase-fallback-img {
     border-color: CanvasText;
   }
-
   .download-button {
     forced-color-adjust: none;
     background-color: ButtonFace;
