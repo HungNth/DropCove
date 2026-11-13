@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="dark" />
+        <meta name="theme-color" content="#0c0c0c" />
+        <title>DropCove: Temporary drag-and-drop shelf for Windows 11</title>
+        <meta
+            name="description"
+            content="DropCove is a resident Windows 11 utility providing a temporary drag-and-drop workspace for files, folders, Website Image Virtual Files, and text snippets."
+        />
+        <link rel="icon" type="image/svg+xml" href="./app-icon.svg" />
+        <link rel="stylesheet" href="./styles.css" />
+    </head>
+    <body>
+        <a class="skip-link" href="#main">Skip to content</a>
+
+        <div class="page-column">
+            <header class="site-header">
+                <div class="brand">
+                    <img
+                        class="brand-mark"
+                        src="./app-icon.svg"
+                        width="40"
+                        height="40"
+                        fetchpriority="high"
+                        decoding="async"
+                        alt="DropCove Brand Visual showing an indigo tray with a downward drop arrow"
+                    />
+                    <span class="brand-name">DropCove</span>
+                </div>
+                <nav class="header-links" aria-label="Primary">
+                    <a href="#features">Features</a>
+                    <a href="#how-it-works">How it works</a>
+                    <a href="#requirements">Requirements</a>
+                </nav>
+            </header>
+
+            <main id="main">
+                <section class="hero" aria-labelledby="hero-title">
+                    <h1 id="hero-title">
+                        A resident Windows 11 shelf for items in transit.
+                    </h1>
+                    <p class="hero-lead">
+                        DropCove is a temporary drag-and-drop workspace for
+                        file and folder references, Website Image Virtual
+                        Files, and text snippets. Drop items onto the
+                        floating Drop Shelf while switching apps, then drag
+                        them out where they belong.
+                    </p>
+                    <p class="hero-boundary">
+                        Built strictly for Windows 11 (x64). DropCove is not
+                        a file manager, clipboard history, or cloud-sync
+                        tool, and it never alters, moves, or deletes your
+                        original external files.
+                    </p>
+
+                    <div class="download-block" id="download">
+                        <a
+                            class="download-button"
+                            href="{{DOWNLOAD_URL}}"
+                            download="{{ASSET_NAME}}"
+                            aria-label="Download DropCove {{VERSION}} ZIP for Windows 11 x64"
+                        >
+                            Download DropCove {{VERSION}}
+                        </a>
+                        <p class="download-meta">
+                            <span>Windows 11 (x64)</span>
+                            <span aria-hidden="true">/</span>
+                            <span>{{ASSET_NAME}}</span>
+                            <span aria-hidden="true">/</span>
+                            <span
+                                >Per-user installer, no elevation
+                                required</span
+                            >
+                        </p>
+                    </div>
+                </section>
+
+                <section
+                    class="section"
+                    id="features"
+                    aria-labelledby="features-title"
+                >
+                    <h2 id="features-title">Features</h2>
+                    <dl class="feature-list">
+                        <div class="feature-item">
+                            <dt>
+                                Intake without leaving your source window
+                            </dt>
+                            <dd>
+                                Drop local or network paths as External
+                                References, drag Website Image Virtual Files
+                                straight from Edge or Chrome, or drop
+                                non-empty text snippets as Managed Files.
+                                Each drop creates one ordered Shelf Batch.
+                            </dd>
+                        </div>
+                        <div class="feature-item">
+                            <dt>
+                                Drop Shelf, Shake-to-open, and Edge Rail
+                            </dt>
+                            <dd>
+                                Shake your pointer while dragging to summon
+                                the floating Drop Shelf, or use global
+                                hotkeys and the notification-area icon. When
+                                dismissed with items still waiting, the
+                                Shelf docks to your screen edge as the Edge
+                                Rail without stealing foreground focus.
+                            </dd>
+                        </div>
+                        <div class="feature-item">
+                            <dt>Batch and item drag-out</dt>
+                            <dd>
+                                Drag out a whole Shelf Batch, select
+                                multiple batches, or open Manage Items to
+                                pick and drag out individual Shelf Items in
+                                order.
+                            </dd>
+                        </div>
+                        <div class="feature-item">
+                            <dt>Temporary and Pinned lifecycles</dt>
+                            <dd>
+                                Temporary Items clear automatically after a
+                                successful drag-out while leaving External
+                                References on disk untouched. Pin items you
+                                need to reuse, or let DropCove retain your
+                                Shelf across restarts.
+                            </dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section
+                    class="section"
+                    id="how-it-works"
+                    aria-labelledby="how-title"
+                >
+                    <h2 id="how-title">How it works</h2>
+                    <ol class="steps">
+                        <li>
+                            <h3>Install DropCove</h3>
+                            <p>
+                                Download ZIP → Extract → Run the installer.
+                                Setup installs per user without
+                                administrator elevation.
+                            </p>
+                        </li>
+                        <li>
+                            <h3>Collect items onto the Drop Shelf</h3>
+                            <p>
+                                Open the Drop Shelf with Shake-to-open, a
+                                hotkey, or the Edge Rail, then drop files,
+                                folders, Website Image Virtual Files, or
+                                text snippets into Shelf Batches.
+                            </p>
+                        </li>
+                        <li>
+                            <h3>Switch context and drag out</h3>
+                            <p>
+                                Open your destination folder, email, or
+                                editor, then drag out batches or selected
+                                items. Temporary Items clear on completion
+                                while Pinned Items remain ready.
+                            </p>
+                        </li>
+                    </ol>
+                </section>
+
+                <section
+                    class="section"
+                    id="requirements"
+                    aria-labelledby="requirements-title"
+                >
+                    <h2 id="requirements-title">
+                        Requirements and updates
+                    </h2>
+                    <dl class="requirements-list">
+                        <div class="req-row">
+                            <dt>Operating system</dt>
+                            <dd>Windows 11, build 22000 or later (x64).</dd>
+                        </div>
+                        <div class="req-row">
+                            <dt>Runtime prerequisite</dt>
+                            <dd>
+                                <a
+                                    href="https://aka.ms/vs/17/release/vc_redist.x64.exe"
+                                    rel="noopener noreferrer"
+                                    >Microsoft Visual C++ Redistributable
+                                    (x64)</a
+                                >.
+                            </dd>
+                        </div>
+                        <div class="req-row">
+                            <dt>Install steps</dt>
+                            <dd>
+                                Download ZIP → Extract → Run the installer.
+                            </dd>
+                        </div>
+                        <div class="req-row">
+                            <dt>Updates</dt>
+                            <dd>
+                                DropCove checks for the Latest Release only
+                                when you click Check for updates in About,
+                                and updates through the installer with
+                                Cooperative Shutdown.
+                            </dd>
+                        </div>
+                    </dl>
+                </section>
+            </main>
+
+            <footer class="site-footer">
+                <p>DropCove {{VERSION}}. Open source under Apache-2.0.</p>
+                <p class="footer-links">
+                    <a href="{{REPO_URL}}">Source on GitHub</a>
+                    <a href="{{LICENSE_URL}}">Apache-2.0 License</a>
+                </p>
+            </footer>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,376 @@
+:root {
+  color-scheme: dark;
+  --dc-canvas: #0c0c0c;
+  --dc-surface: #161616;
+  --dc-text-primary: #f5f5f5;
+  --dc-text-muted: #929292;
+  --dc-accent: #7aa2ff;
+  --dc-accent-hover: #2354cc;
+  --dc-action: #2b63eb;
+  --dc-action-text: #ffffff;
+  --dc-border: #3a3a3a;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background-color: var(--dc-canvas);
+  color: var(--dc-text-primary);
+  font-family: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  line-height: 1.55;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--dc-canvas);
+  color: var(--dc-text-primary);
+}
+
+a {
+  color: var(--dc-accent);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--dc-text-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--dc-accent);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  padding: 0.6rem 1rem;
+  background-color: var(--dc-surface);
+  color: var(--dc-text-primary);
+  border: 1px solid var(--dc-accent);
+  text-decoration: none;
+  z-index: 10;
+}
+
+.skip-link:focus-visible {
+  left: 1rem;
+  top: 1rem;
+}
+
+.page-column {
+  max-width: 52rem;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 2.25rem 4rem;
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--dc-border);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-mark {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 9px;
+}
+
+.brand-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.header-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.header-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--dc-text-muted);
+  text-decoration: none;
+}
+
+.header-links a:hover,
+.header-links a:focus-visible {
+  color: var(--dc-text-primary);
+  text-decoration: underline;
+}
+
+.hero {
+  padding: 3.5rem 0 3rem;
+  border-bottom: 1px solid var(--dc-border);
+  scroll-margin-top: 1.5rem;
+}
+
+.hero h1 {
+  margin: 0 0 1.25rem;
+  max-width: 18ch;
+  font-family: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-size: clamp(2.125rem, 4.4vw, 3.125rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+.hero-lead {
+  margin: 0 0 1rem;
+  max-width: 62ch;
+  font-size: 1.0625rem;
+}
+
+.hero-boundary {
+  margin: 0 0 2rem;
+  max-width: 62ch;
+  color: var(--dc-text-muted);
+  font-size: 0.96875rem;
+}
+
+.download-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.download-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.75rem 1.35rem;
+  background-color: var(--dc-action);
+  color: var(--dc-action-text);
+  border: 1px solid var(--dc-accent);
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.download-button:hover {
+  background-color: var(--dc-accent-hover);
+  color: var(--dc-action-text);
+}
+
+.download-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  margin: 0;
+  color: var(--dc-text-muted);
+  font-size: 0.875rem;
+}
+
+.section {
+  padding: 2.75rem 0;
+  border-bottom: 1px solid var(--dc-border);
+  scroll-margin-top: 1.5rem;
+}
+
+.section h2 {
+  margin: 0 0 1.5rem;
+  font-family: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.feature-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.75rem 2.25rem;
+  margin: 0;
+}
+
+.feature-item {
+  display: flex;
+  flex-direction: column;
+}
+.feature-item dt {
+  margin-bottom: 0.35rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.feature-item dd {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--dc-text-muted);
+}
+
+.steps {
+  display: grid;
+  gap: 1.5rem;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.steps li::marker {
+  color: var(--dc-text-muted);
+  font-weight: 600;
+}
+
+.steps h3 {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.steps p {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--dc-text-muted);
+}
+
+.requirements-list {
+  display: grid;
+  margin: 0;
+  background-color: var(--dc-surface);
+  border: 1px solid var(--dc-border);
+  border-radius: 6px;
+}
+
+.req-row {
+  display: grid;
+  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+  gap: 0.5rem 1.5rem;
+  padding: 0.95rem 1.15rem;
+  border-top: 1px solid var(--dc-border);
+}
+
+.req-row:first-child {
+  border-top: 0;
+}
+.req-row dt {
+  font-weight: 600;
+}
+
+.req-row dd {
+  margin: 0;
+  color: var(--dc-text-muted);
+}
+
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  padding-top: 2rem;
+  color: var(--dc-text-muted);
+  font-size: 0.875rem;
+}
+
+.site-footer p {
+  margin: 0;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.footer-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+}
+
+@media (max-width: 640px) {
+  .page-column {
+    padding: 1.25rem 1.125rem 3rem;
+  }
+
+  .hero {
+    padding: 2.25rem 0 2rem;
+  }
+
+  .req-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .site-header,
+  .hero,
+  .section,
+  .requirements-list,
+  .req-row,
+  .download-button {
+    border-color: CanvasText;
+  }
+
+  .download-button {
+    forced-color-adjust: none;
+    background-color: ButtonFace;
+    color: ButtonText;
+  }
+
+  a:focus-visible,
+  :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 3px;
+  }
+}
+
+@media print {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    background-color: #ffffff;
+    color: #000000;
+  }
+
+  .download-block {
+    display: none;
+  }
+
+  .page-column {
+    max-width: 100%;
+    padding: 0;
+  }
+
+  a {
+    color: #000000;
+    text-decoration: underline;
+  }
+}
