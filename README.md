@@ -8,6 +8,8 @@
 
 Temporary holding area for files, images, and text snippets while you work across windows and desktops.
 
+[Product Website & Download](https://hungnth.github.io/DropCove/)
+
 [![Platform](https://img.shields.io/badge/platform-Windows%2011%20(x64)-blue.svg)](#requirements)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%20v2-24C8DB.svg)](https://tauri.app/)
