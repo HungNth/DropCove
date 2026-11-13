@@ -197,21 +197,19 @@ a:hover {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  max-width: 440px;
   width: 100%;
 }
 
 .showcase-video,
 .showcase-fallback-img {
   width: 100%;
-  max-width: 440px;
+  aspect-ratio: 16 / 9;
   height: auto;
   border-radius: 12px;
   border: 1px solid var(--dc-border);
   background-color: var(--dc-surface);
   box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--dc-border);
 }
-
 .showcase-video {
   display: block;
 }
@@ -261,6 +259,50 @@ a:hover {
 .feature-item dd {
   margin: 0;
   max-width: 64ch;
+  color: var(--dc-text-muted);
+}
+
+.tour-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.tour-card {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--dc-border);
+  border-radius: 10px;
+  background-color: var(--dc-surface);
+  overflow: hidden;
+}
+
+.tour-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  object-fit: cover;
+  border-bottom: 1px solid var(--dc-border);
+}
+
+.tour-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.85rem 1rem;
+}
+
+.tour-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--dc-text-primary);
+}
+
+.tour-desc {
+  font-size: 0.875rem;
+  line-height: 1.45;
   color: var(--dc-text-muted);
 }
 
@@ -353,6 +395,10 @@ a:hover {
     padding: 2.25rem 0 2rem;
   }
 
+  .tour-grid {
+    grid-template-columns: 1fr;
+  }
+
   .req-row {
     grid-template-columns: 1fr;
   }
@@ -384,7 +430,9 @@ a:hover {
   .req-row,
   .download-button,
   .showcase-video,
-  .showcase-fallback-img {
+  .showcase-fallback-img,
+  .tour-card,
+  .tour-image {
     border-color: CanvasText;
   }
   .download-button {
