@@ -32,6 +32,7 @@
                 </div>
                 <nav class="header-links" aria-label="Primary">
                     <a href="#features">Features</a>
+                    <a href="#tour">Tour</a>
                     <a href="#how-it-works">How it works</a>
                     <a href="#requirements">Requirements</a>
                 </nav>
@@ -58,7 +59,7 @@
                             class="download-button"
                             href="{{DOWNLOAD_URL}}"
                             download="{{ASSET_NAME}}"
-                            aria-label="Download DropCove {{VERSION}} ZIP for Windows 11 x64"
+                            aria-label="Download DropCove {{VERSION}} installer for Windows 11 x64"
                         >
                             Download DropCove {{VERSION}}
                         </a>
@@ -82,9 +83,10 @@
                                 loop
                                 muted
                                 playsinline
+                                controls
                                 poster="./assets/shelf-preview.png"
-                                width="440"
-                                height="220"
+                                width="1280"
+                                height="720"
                                 aria-label="DropCove Drop Shelf demonstration"
                             >
                                 <source src="./assets/dropcove-demo.webm" type="video/webm" />
@@ -92,12 +94,12 @@
                             <img
                                 class="showcase-fallback-img"
                                 src="./assets/shelf-preview.png"
-                                alt="Drop Shelf holding files and a text snippet"
-                                width="440"
-                                height="220"
+                                alt="Drop Shelf holding files, a web image, and a text snippet"
+                                width="1920"
+                                height="1080"
                             />
                             <figcaption id="showcase-caption" class="showcase-caption">
-                                Drop Shelf holding files and snippets ready to drag out.
+                                Full workflow: Shake-to-open, Drop Shelf intake, Edge Rail docking, Manage Items, pinning, and Appearance Mode.
                             </figcaption>
                         </figure>
                     </div>
@@ -148,6 +150,111 @@
 
                 <section
                     class="section"
+                    id="tour"
+                    aria-labelledby="tour-title"
+                >
+                    <h2 id="tour-title">Visual tour</h2>
+                    <div class="tour-grid">
+                        <figure class="tour-card">
+                            <img
+                                class="tour-image"
+                                src="./assets/tour-shake.webp"
+                                alt="Dragging hero-mockup.png from File Explorer and using Shake-to-open to open the Drop Shelf"
+                                width="1920"
+                                height="1080"
+                                loading="lazy"
+                                decoding="async"
+                            />
+                            <figcaption class="tour-caption">
+                                <strong class="tour-title">1. Shake-to-open</strong>
+                                <span class="tour-desc">Hold left-click while dragging a file and shake to summon the Drop Shelf near the cursor.</span>
+                            </figcaption>
+                        </figure>
+
+                        <figure class="tour-card">
+                            <img
+                                class="tour-image"
+                                src="./assets/shelf-preview.png"
+                                alt="Drop Shelf holding a web image, a text snippet, a multi-item batch, and a single image file"
+                                width="1920"
+                                height="1080"
+                                loading="lazy"
+                                decoding="async"
+                            />
+                            <figcaption class="tour-caption">
+                                <strong class="tour-title">2. Drop files, web images &amp; text</strong>
+                                <span class="tour-desc">Accepts Explorer files, web images, and text snippets as grouped Shelf Batches.</span>
+                            </figcaption>
+                        </figure>
+
+                        <figure class="tour-card">
+                            <img
+                                class="tour-image"
+                                src="./assets/tour-edge-rail.webp"
+                                alt="Expanded Edge Rail along the right screen edge holding five Shelf Batches"
+                                width="1920"
+                                height="1080"
+                                loading="lazy"
+                                decoding="async"
+                            />
+                            <figcaption class="tour-caption">
+                                <strong class="tour-title">3. Dock &amp; drop onto Edge Rail</strong>
+                                <span class="tour-desc">Dismiss the Drop Shelf to dock at the screen edge and accept drops without stealing focus.</span>
+                            </figcaption>
+                        </figure>
+
+                        <figure class="tour-card">
+                            <img
+                                class="tour-image"
+                                src="./assets/tour-manage-items.webp"
+                                alt="Manage Items popup with two selected items and the Selection Actions Menu open"
+                                width="1920"
+                                height="1080"
+                                loading="lazy"
+                                decoding="async"
+                            />
+                            <figcaption class="tour-caption">
+                                <strong class="tour-title">4. Manage Items &amp; selection</strong>
+                                <span class="tour-desc">Inspect multi-item batches, select multiple Shelf Items or batches, and run bulk actions.</span>
+                            </figcaption>
+                        </figure>
+
+                        <figure class="tour-card">
+                            <img
+                                class="tour-image"
+                                src="./assets/tour-pin-dragout.webp"
+                                alt="Pinned item remaining on the Drop Shelf after dragging out to Explorer while the temporary item clears"
+                                width="1920"
+                                height="1080"
+                                loading="lazy"
+                                decoding="async"
+                            />
+                            <figcaption class="tour-caption">
+                                <strong class="tour-title">5. Pin or auto-clear on drag-out</strong>
+                                <span class="tour-desc">Temporary Items clear automatically after a successful drop; Pinned Items stay ready.</span>
+                            </figcaption>
+                        </figure>
+
+                        <figure class="tour-card">
+                            <img
+                                class="tour-image"
+                                src="./assets/tour-settings.webp"
+                                alt="DropCove Settings Appearance tab previewing Light mode across Settings and the Drop Shelf"
+                                width="1920"
+                                height="1080"
+                                loading="lazy"
+                                decoding="async"
+                            />
+                            <figcaption class="tour-caption">
+                                <strong class="tour-title">6. Settings &amp; Appearance Mode</strong>
+                                <span class="tour-desc">Configure global shortcut, Edge Rail, Shake-to-open, and live Dark or Light presentation.</span>
+                            </figcaption>
+                        </figure>
+                    </div>
+                </section>
+
+                <section
+                    class="section"
                     id="how-it-works"
                     aria-labelledby="how-title"
                 >
@@ -156,7 +263,7 @@
                         <li>
                             <h3>Install DropCove</h3>
                             <p>
-                                Download ZIP → Extract → Run the installer.
+                                Download and run the installer.
                                 Installs per user without administrator
                                 elevation.
                             </p>
@@ -208,7 +315,7 @@
                         <div class="req-row">
                             <dt>Install steps</dt>
                             <dd>
-                                Download ZIP → Extract → Run the installer.
+                                Download and run the installer.
                             </dd>
                         </div>
                         <div class="req-row">

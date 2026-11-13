@@ -35,7 +35,7 @@ function validateRelease(release, owner, repo) {
   const parsed = parseReleaseTag(release.tag_name);
   if (!parsed) return null;
 
-  const expectedAssetName = `DropCove-Setup-${parsed.version}.zip`;
+  const expectedAssetName = `DropCove-Setup-${parsed.version}.exe`;
   const assets = Array.isArray(release.assets) ? release.assets : [];
   const asset = assets.find((entry) => entry && entry.name === expectedAssetName);
   if (!asset) return null;
@@ -87,7 +87,7 @@ export async function resolvePublishedRelease({
     );
     const validated = validateRelease(release, owner, repo);
     if (!validated) {
-      throw new Error(`Release ${requestedTag} is missing a valid DropCove-Setup-<version>.zip asset or is not stable`);
+      throw new Error(`Release ${requestedTag} is missing a valid DropCove-Setup-<version>.exe asset or is not stable`);
     }
     return validated;
   }
@@ -110,7 +110,7 @@ export async function resolvePublishedRelease({
     }
   }
   if (!best) {
-    throw new Error("No stable GitHub Release with a matching DropCove-Setup-<version>.zip asset was found");
+    throw new Error("No stable GitHub Release with a matching DropCove-Setup-<version>.exe asset was found");
   }
   return best;
 }

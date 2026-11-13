@@ -11,7 +11,7 @@ function makeRelease({
   tag = "v0.1.0",
   draft = false,
   prerelease = false,
-  assetName = "DropCove-Setup-0.1.0.zip",
+  assetName = "DropCove-Setup-0.1.0.exe",
   downloadUrl = `https://github.com/HungNth/DropCove/releases/download/${tag}/${assetName}`,
 } = {}) {
   return {
@@ -31,7 +31,7 @@ function withTempOutDir(fn) {
   }
 }
 
-test("builds landing page with resolved release version, direct ZIP link, copy, and local assets", async () => {
+test("builds landing page with resolved release version, direct EXE link, copy, and local assets", async () => {
   await withTempOutDir(async (outDir) => {
     const result = await buildPagesSite({
       sourceDir: path.resolve("website"),
@@ -48,7 +48,7 @@ test("builds landing page with resolved release version, direct ZIP link, copy, 
     });
 
     assert.equal(result.version, "0.1.0");
-    assert.equal(result.downloadUrl, "https://github.com/HungNth/DropCove/releases/download/v0.1.0/DropCove-Setup-0.1.0.zip");
+    assert.equal(result.downloadUrl, "https://github.com/HungNth/DropCove/releases/download/v0.1.0/DropCove-Setup-0.1.0.exe");
 
     const html = fs.readFileSync(path.join(outDir, "index.html"), "utf8");
     assert.ok(html.includes(result.downloadUrl));
@@ -56,9 +56,8 @@ test("builds landing page with resolved release version, direct ZIP link, copy, 
     assert.ok(html.includes("Windows 11"));
     assert.ok(html.includes("build 22000"));
     assert.ok(html.includes("Microsoft Visual C++ Redistributable"));
-    assert.ok(html.includes("Download ZIP"));
-    assert.ok(html.includes("Extract"));
-    assert.ok(html.includes("Run the installer"));
+    assert.ok(html.includes("Download and run the installer"));
+    assert.ok(!html.includes("Download ZIP"));
     assert.ok(html.includes("./styles.css"));
     assert.ok(html.includes("./app-icon.svg"));
     assert.ok(!html.includes("{{"));
@@ -69,12 +68,18 @@ test("builds landing page with resolved release version, direct ZIP link, copy, 
     assert.ok(html.includes('poster="./assets/shelf-preview.png"'));
     assert.ok(html.includes("./assets/dropcove-demo.webm"));
     assert.ok(html.includes("showcase-fallback-img"));
-    assert.ok(/<video\b[^>]*\bautoplay\b[^>]*\bloop\b[^>]*\bmuted\b[^>]*\bplaysinline\b/i.test(html));
+    assert.ok(/<video\b[^>]*\bautoplay\b[^>]*\bloop\b[^>]*\bmuted\b[^>]*\bplaysinline\b[^>]*\bcontrols\b/i.test(html));
+    assert.ok(html.includes('id="tour"'));
+    for (const tourImg of ["tour-shake.webp", "tour-edge-rail.webp", "tour-manage-items.webp", "tour-pin-dragout.webp", "tour-settings.webp"]) {
+      assert.ok(html.includes(`./assets/${tourImg}`), `Expected built HTML to reference ${tourImg}`);
+      assert.ok(fs.existsSync(path.join(outDir, "assets", tourImg)), `Expected built assets to include ${tourImg}`);
+    }
 
     const css = fs.readFileSync(path.join(outDir, "styles.css"), "utf8");
     assert.ok(css.includes("prefers-reduced-motion"));
     assert.ok(css.includes(".showcase-video"));
     assert.ok(css.includes(".showcase-fallback-img"));
+    assert.ok(css.includes(".tour-grid"));
 
     assert.ok(fs.existsSync(path.join(outDir, "styles.css")));
     assert.ok(fs.existsSync(path.join(outDir, "app-icon.svg")));
@@ -87,12 +92,12 @@ test("builds landing page with resolved release version, direct ZIP link, copy, 
 test("selects highest stable release even when drafts, prereleases, or malformed tags are present", async () => {
   await withTempOutDir(async (outDir) => {
     const releases = [
-      makeRelease({ tag: "v9.9.9", draft: true, assetName: "DropCove-Setup-9.9.9.zip" }),
-      makeRelease({ tag: "v8.8.8", prerelease: true, assetName: "DropCove-Setup-8.8.8.zip" }),
-      makeRelease({ tag: "nightly", assetName: "DropCove-Setup-nightly.zip" }),
-      makeRelease({ tag: "0.1.0", assetName: "DropCove-Setup-0.1.0.zip" }),
-      makeRelease({ tag: "v0.1.0", assetName: "DropCove-Setup-0.1.0.zip" }),
-      makeRelease({ tag: "v0.2.0", assetName: "DropCove-Setup-0.2.0.zip" }),
+      makeRelease({ tag: "v9.9.9", draft: true, assetName: "DropCove-Setup-9.9.9.exe" }),
+      makeRelease({ tag: "v8.8.8", prerelease: true, assetName: "DropCove-Setup-8.8.8.exe" }),
+      makeRelease({ tag: "nightly", assetName: "DropCove-Setup-nightly.exe" }),
+      makeRelease({ tag: "0.1.0", assetName: "DropCove-Setup-0.1.0.exe" }),
+      makeRelease({ tag: "v0.1.0", assetName: "DropCove-Setup-0.1.0.exe" }),
+      makeRelease({ tag: "v0.2.0", assetName: "DropCove-Setup-0.2.0.exe" }),
     ];
 
     const result = await buildPagesSite({
@@ -103,7 +108,7 @@ test("selects highest stable release even when drafts, prereleases, or malformed
     });
 
     assert.equal(result.version, "0.2.0");
-    assert.equal(result.downloadUrl, "https://github.com/HungNth/DropCove/releases/download/v0.2.0/DropCove-Setup-0.2.0.zip");
+    assert.equal(result.downloadUrl, "https://github.com/HungNth/DropCove/releases/download/v0.2.0/DropCove-Setup-0.2.0.exe");
   });
 });
 
@@ -124,12 +129,12 @@ test("can target an explicit release tag without guessing another release", asyn
   });
 });
 
-test("rejects missing ZIP asset, mismatched asset name, draft/prerelease explicit tag, malformed tag, and outside download host", async () => {
+test("rejects missing EXE asset, mismatched asset name, draft/prerelease explicit tag, malformed tag, and outside download host", async () => {
   const cases = [
     [makeRelease({ assetName: "" })],
-    [makeRelease({ assetName: "DropCove-Setup-0.1.0.exe" })],
-    [makeRelease({ tag: "0.1.0", assetName: "DropCove-Setup-0.1.0.zip" })],
-    [makeRelease({ tag: "v0.1.0", assetName: "DropCove-Setup-0.1.0.zip", downloadUrl: "https://evil.example/DropCove-Setup-0.1.0.zip" })],
+    [makeRelease({ assetName: "DropCove-Setup-0.1.0.zip" })],
+    [makeRelease({ tag: "0.1.0", assetName: "DropCove-Setup-0.1.0.exe" })],
+    [makeRelease({ tag: "v0.1.0", assetName: "DropCove-Setup-0.1.0.exe", downloadUrl: "https://evil.example/DropCove-Setup-0.1.0.exe" })],
     [makeRelease({ draft: true })],
     [makeRelease({ prerelease: true })],
     [],
