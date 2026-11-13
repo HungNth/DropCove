@@ -1,8 +1,6 @@
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-
 const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const TAG_PATTERN = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
@@ -60,80 +58,25 @@ export function verifyReleaseTag(tag, expectedVersion) {
   return { tag: cleanTag, version: tagVersion };
 }
 
-function listZipEntries(zipPath) {
-  const buf = fs.readFileSync(zipPath);
-  let eocdOffset = -1;
-  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65_557); i -= 1) {
-    if (buf.readUInt32LE(i) === 0x06054b50) {
-      eocdOffset = i;
-      break;
-    }
-  }
-  if (eocdOffset < 0) {
-    throw new Error(`Invalid ZIP archive (missing central directory): ${zipPath}`);
-  }
-
-  const totalEntries = buf.readUInt16LE(eocdOffset + 10);
-  const centralSize = buf.readUInt32LE(eocdOffset + 12);
-  const centralOffset = buf.readUInt32LE(eocdOffset + 16);
-  const entries = [];
-  let cursor = centralOffset;
-  const end = centralOffset + centralSize;
-
-  while (cursor < end) {
-    if (buf.readUInt32LE(cursor) !== 0x02014b50) {
-      throw new Error(`Invalid ZIP central directory entry in ${zipPath}`);
-    }
-    const nameLen = buf.readUInt16LE(cursor + 28);
-    const extraLen = buf.readUInt16LE(cursor + 30);
-    const commentLen = buf.readUInt16LE(cursor + 32);
-    const name = buf.toString("utf8", cursor + 46, cursor + 46 + nameLen);
-    entries.push(name);
-    cursor += 46 + nameLen + extraLen + commentLen;
-  }
-
-  if (entries.length !== totalEntries) {
-    throw new Error(`ZIP entry count mismatch in ${zipPath}`);
-  }
-  return entries;
-}
-
-export function verifyZipContents({ zipPath, version }) {
-  if (!fs.existsSync(zipPath)) {
-    throw new Error(`Release ZIP not found: ${zipPath}`);
-  }
-  const expectedExe = `DropCove-Setup-${version}.exe`;
-  const entries = listZipEntries(zipPath);
-  if (entries.length !== 1 || entries[0] !== expectedExe) {
-    throw new Error(
-      `Release ZIP must contain only [${expectedExe}] at root; found [${entries.join(", ")}]`,
-    );
-  }
-  return entries;
-}
-
-export function packageInstallerZip({ rootDir = process.cwd(), version }) {
+export function verifyInstallerExe({ rootDir = process.cwd(), version }) {
   const expectedExe = `DropCove-Setup-${version}.exe`;
   const exePath = path.join(rootDir, "build", expectedExe);
-  const zipPath = path.join(rootDir, "build", `DropCove-Setup-${version}.zip`);
   if (!fs.existsSync(exePath)) {
     throw new Error(`Installer EXE not found: ${exePath}`);
   }
-  fs.rmSync(zipPath, { force: true });
-
-  execFileSync("powershell.exe", [
-    "-NoProfile",
-    "-Command",
-    "Compress-Archive -Path $env:DC_EXE -DestinationPath $env:DC_ZIP -Force",
-  ], {
-    env: { ...process.env, DC_EXE: exePath, DC_ZIP: zipPath },
-    stdio: "inherit",
-  });
-
-  verifyZipContents({ zipPath, version });
-  return { exePath, zipPath };
+  const header = Buffer.alloc(2);
+  const fd = fs.openSync(exePath, "r");
+  let bytesRead = 0;
+  try {
+    bytesRead = fs.readSync(fd, header, 0, 2, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+  if (bytesRead < 2 || header[0] !== 0x4d || header[1] !== 0x5a) {
+    throw new Error(`Installer EXE is empty or missing PE MZ header: ${exePath}`);
+  }
+  return exePath;
 }
-
 function parseCli(argv) {
   const [command, ...rest] = argv;
   const opts = { rootDir: process.cwd(), tag: "" };
@@ -153,10 +96,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (command === "verify") {
     const checked = verifyReleaseTag(opts.tag || `v${version}`, version);
     console.log(`Verified DropCove version ${checked.version} and tag ${checked.tag}`);
-  } else if (command === "package-zip") {
-    const { zipPath } = packageInstallerZip({ rootDir: opts.rootDir, version });
-    console.log(`Verified archive ${zipPath} containing only DropCove-Setup-${version}.exe`);
+  } else if (command === "verify-exe") {
+    const exePath = verifyInstallerExe({ rootDir: opts.rootDir, version });
+    console.log(`Verified installer ${exePath}`);
   } else {
-    throw new Error(`Usage: node scripts/release-check.mjs <verify|package-zip> [--tag vX.Y.Z]`);
+    throw new Error(`Usage: node scripts/release-check.mjs <verify|verify-exe> [--tag vX.Y.Z]`);
   }
 }

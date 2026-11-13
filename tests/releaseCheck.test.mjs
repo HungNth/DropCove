@@ -1,14 +1,12 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
-  packageInstallerZip,
+  verifyInstallerExe,
   verifyManifestVersions,
   verifyReleaseTag,
-  verifyZipContents,
 } from "../scripts/release-check.mjs";
 
 function makeTempRoot(version = "0.1.0") {
@@ -64,28 +62,20 @@ test("rejects malformed tags and version mismatches", () => {
   }
 });
 
-test("packages ZIP containing only DropCove-Setup-<version>.exe at archive root and rejects extra entries", () => {
+test("verifies DropCove-Setup-<version>.exe exists with PE MZ header and rejects missing or non-PE files", () => {
   const root = makeTempRoot("0.1.0");
   try {
+    assert.throws(() => verifyInstallerExe({ rootDir: root, version: "0.1.0" }), /not found/);
+
     const exePath = path.join(root, "build", "DropCove-Setup-0.1.0.exe");
-    const zipPath = path.join(root, "build", "DropCove-Setup-0.1.0.zip");
+    fs.writeFileSync(exePath, "");
+    assert.throws(() => verifyInstallerExe({ rootDir: root, version: "0.1.0" }), /empty|PE|MZ/i);
+
+    fs.writeFileSync(exePath, "PK\x03\x04not-an-exe");
+    assert.throws(() => verifyInstallerExe({ rootDir: root, version: "0.1.0" }), /PE|MZ/i);
+
     fs.writeFileSync(exePath, "MZ-dummy-installer-bytes");
-
-    packageInstallerZip({ rootDir: root, version: "0.1.0" });
-    assert.ok(fs.existsSync(zipPath));
-    assert.deepEqual(verifyZipContents({ zipPath, version: "0.1.0" }), [
-      "DropCove-Setup-0.1.0.exe",
-    ]);
-
-    const extraFile = path.join(root, "build", "extra.txt");
-    fs.writeFileSync(extraFile, "unwanted");
-    const badZipPath = path.join(root, "build", "bad.zip");
-    execFileSync("powershell.exe", [
-      "-NoProfile",
-      "-Command",
-      `Compress-Archive -Path '${exePath}', '${extraFile}' -DestinationPath '${badZipPath}' -Force`,
-    ]);
-    assert.throws(() => verifyZipContents({ zipPath: badZipPath, version: "0.1.0" }));
+    assert.equal(verifyInstallerExe({ rootDir: root, version: "0.1.0" }), exePath);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
