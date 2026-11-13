@@ -2,6 +2,7 @@
   "name": "dropcove",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@12.18.0",
   "author": {
     "name": "HungNth",
     "email": "thienhungdev@gmail.com",
